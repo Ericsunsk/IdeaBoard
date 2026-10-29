@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/pagination"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -149,10 +150,7 @@ FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DE
 	if err := rows.Err(); err != nil {
 		return ports.ReconciliationRunPage{}, fmt.Errorf("credits reconciliation: read runs: %w", err)
 	}
-	if len(page.Runs) > limit {
-		page.NextBeforeID = page.Runs[limit-1].ID
-		page.Runs = page.Runs[:limit]
-	}
+	page.Runs, page.NextBeforeID = pagination.TruncateBeforeID(page.Runs, limit, func(r ports.ReconciliationRun) int64 { return r.ID })
 	return page, nil
 }
 
@@ -223,10 +221,7 @@ func ScanReconciliationFindingPage(rows reconciliationFindingRows, limit int) (p
 	if err := rows.Err(); err != nil {
 		return ports.ReconciliationFindingPage{}, fmt.Errorf("credits reconciliation: read findings: %w", err)
 	}
-	if len(page.Findings) > limit {
-		page.NextBeforeID = page.Findings[limit-1].ID
-		page.Findings = page.Findings[:limit]
-	}
+	page.Findings, page.NextBeforeID = pagination.TruncateBeforeID(page.Findings, limit, func(f ports.ReconciliationFinding) int64 { return f.ID })
 	return page, nil
 }
 

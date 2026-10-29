@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { workspaceMemberIdempotencyKey } from '../../../../api/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
+import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import { useWorkspaceSettingsRoster } from './reads'
 import {
   cancelWorkspaceMemberInvite,
@@ -74,6 +75,7 @@ function memberFailureCopyKey(
 export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions) {
   const { t } = useI18n()
   const toast = useAppToast()
+  const { copyText } = useAppClipboard()
   const queryClient = useQueryClient()
 
   const workspaceIdOf = (): string => toValue(options.workspaceId).trim()
@@ -157,13 +159,8 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   async function copyInviteLink(invite: WorkspaceMemberInvite): Promise<void> {
     const link = getInviteLink(invite)
     if (!link) return
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(link)
-        toast.info(t('workspace.switcher.members.inviteLinkCopied'))
-      }
-    } catch {
-      // ignore clipboard error
+    if (await copyText(link)) {
+      toast.info(t('workspace.switcher.members.inviteLinkCopied'))
     }
   }
 
@@ -226,10 +223,9 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
           action: {
             label: t('workspace.switcher.members.copyInviteLink'),
             onClick: () => {
-              if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                void navigator.clipboard.writeText(claimUrl)
-                toast.info(t('workspace.switcher.members.inviteLinkCopied'))
-              }
+              void copyText(claimUrl).then((isCopied) => {
+                if (isCopied) toast.info(t('workspace.switcher.members.inviteLinkCopied'))
+              })
             },
           },
         })

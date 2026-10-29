@@ -36,8 +36,11 @@
   --text-admin-title-sm: var(--primitive-type-size-15);
   --text-admin-title: var(--primitive-type-size-16);
   --text-admin-heading: var(--primitive-type-size-18);
+  --text-admin-title-lg: var(--primitive-type-size-19);
   --text-admin-icon: var(--primitive-type-size-20);
   --text-admin-summary-value: var(--primitive-type-size-28);
+  --text-admin-display-sm: var(--primitive-type-size-30);
+  --text-admin-display: var(--primitive-type-size-34);
   --text-admin-modal-title: var(--primitive-type-size-26);
   --text-admin-modal-title-mobile: var(--primitive-type-size-22);
 

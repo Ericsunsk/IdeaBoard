@@ -15,7 +15,7 @@ const authModalShellBaseClass =
 
 export const authModalShellClass = `${authModalShellBaseClass} bg-popover py-6 sm:py-7`
 
-export const authCompactModalShellClass = `${authModalShellBaseClass} bg-[var(--color-auth-shell)] backdrop-blur-xl py-5 sm:py-6`
+export const authCompactModalShellClass = `${authModalShellBaseClass} bg-[var(--color-auth-shell)] backdrop-blur-[var(--blur-glass)] py-5 sm:py-6`
 
 export const authModalBackdropClass =
   'pointer-events-none absolute inset-0 bg-gradient-to-tr from-[var(--color-auth-backdrop-from)] via-[var(--color-auth-backdrop-via)] to-[var(--color-auth-backdrop-to)]'

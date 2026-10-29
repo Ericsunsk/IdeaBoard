@@ -3,10 +3,10 @@
     :is-open="props.isVisible"
     :title="props.title"
     :description="props.message"
-    :size="confirmPreset.size"
+    size="slim-inset"
     :is-busy="props.isLoading"
     :has-close="confirmPreset.hasClose"
-    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    content-class="bg-popover"
     @update:open="handleOpenUpdate"
   >
     <div class="min-h-0 overflow-y-auto">

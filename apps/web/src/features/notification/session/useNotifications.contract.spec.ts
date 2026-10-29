@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive, ref } from 'vue'
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { QueryClient, VueQueryPlugin, focusManager } from '@tanstack/vue-query'
 import { render, waitFor, fireEvent, screen, within } from '@/test/render'
 import { mockAppToast } from '@/test/toast'
 import { http, HttpResponse, server } from '@/test/msw'
@@ -33,9 +33,9 @@ let session: ReturnType<typeof useNotifications>
 let client: QueryClient
 const isVisible = ref(true)
 const tab = ref<NotificationCenterTab>('all')
-function mountSession() {
+function mountSession(staleTime = 0) {
   client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime }, mutations: { retry: false } },
   })
   const Harness = defineComponent({
     setup() {
@@ -85,6 +85,76 @@ afterEach(() => {
   vi.useRealTimers()
 })
 describe('notification session facts and mutations', () => {
+  it.each([true, false])(
+    'resumes fresh polling after a hidden response (panel visible: %s)',
+    async (isPanelVisible) => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+      const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+      function setVisibility(state: 'visible' | 'hidden') {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: state })
+        document.dispatchEvent(new Event('visibilitychange'))
+        focusManager.setFocused(state === 'visible')
+      }
+      let finishFirst!: () => void
+      const firstResponse = new Promise<void>((resolve) => {
+        finishFirst = resolve
+      })
+      let listRequests = 0
+      let countRequests = 0
+      server.use(
+        http.get('*/api/v1/user/notifications', async () => {
+          listRequests++
+          if (listRequests === 1) await firstResponse
+          return HttpResponse.json({
+            data: { items: [item(`notif_poll_${listRequests}`)], total: 1, offset: 0, limit: 20 },
+          })
+        }),
+        http.get('*/api/v1/user/notifications/unread-count', async () => {
+          countRequests++
+          if (countRequests === 1) await firstResponse
+          return HttpResponse.json({ data: { count: countRequests } })
+        }),
+      )
+      setVisibility('visible')
+      isVisible.value = isPanelVisible
+      const view = mountSession(5_000)
+      try {
+        await vi.waitFor(() => expect(countRequests).toBe(1))
+        if (isPanelVisible) await vi.waitFor(() => expect(listRequests).toBe(1))
+        setVisibility('hidden')
+        finishFirst()
+        await vi.waitFor(() => expect(session.unreadCount.value).toBe(1))
+        if (isPanelVisible)
+          await vi.waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_poll_1'))
+        await vi.advanceTimersByTimeAsync(60_000)
+        expect(countRequests).toBe(1)
+        expect(listRequests).toBe(isPanelVisible ? 1 : 0)
+
+        // Only interval timers advance; the responses remain inside the real 5s fresh window.
+        setVisibility('visible')
+        await vi.advanceTimersByTimeAsync(30_000)
+        await vi.waitFor(() => expect(session.unreadCount.value).toBe(2))
+        expect(listRequests).toBe(isPanelVisible ? 2 : 0)
+
+        isVisible.value = false
+        await vi.waitFor(() => expect(session.isFetching.value).toBe(false))
+        await vi.advanceTimersByTimeAsync(30_000)
+        await vi.waitFor(() => expect(session.unreadCount.value).toBe(3))
+        expect(listRequests).toBe(isPanelVisible ? 2 : 0)
+        auth.user = null
+        await vi.waitFor(() => expect(session.notifications.value).toEqual([]))
+        await vi.advanceTimersByTimeAsync(60_000)
+        expect(countRequests).toBe(3)
+      } finally {
+        finishFirst()
+        view.unmount()
+        focusManager.setFocused(undefined)
+        if (visibilityDescriptor)
+          Object.defineProperty(document, 'visibilityState', visibilityDescriptor)
+        else Reflect.deleteProperty(document, 'visibilityState')
+      }
+    },
+  )
   it('refreshes on reopen with unchanged unread count', async () => {
     mountSession()
     await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_first'))

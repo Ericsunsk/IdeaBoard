@@ -1,4 +1,7 @@
 import { formatMinorCurrencyValue } from '@/core/utils/currency'
+import { formatLocaleDate } from '@/core/i18n/formatters'
+import { parseDateGuard } from '@/core/datetime/parse'
+import { SHANGHAI_TIME_ZONE } from '@/core/datetime/shanghai'
 import type { AdminPaymentOrderStatus } from './paymentOrderTypes'
 
 // Pill 直连：与 StatusBadge `tone` 同构，模块内自有定义以免依赖组件层。
@@ -64,14 +67,17 @@ export function getCreditStatusLabel(status: string): string {
 }
 
 export function formatPaymentDateTime(value?: string): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('zh-CN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Shanghai',
-  }).format(date)
+  const date = parseDateGuard(value ?? null)
+  if (!date) return '—'
+  return formatLocaleDate(
+    date,
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: SHANGHAI_TIME_ZONE,
+    },
+    'zh-CN',
+  )
 }
 
 export function formatPaymentMoney(amountMinor?: number, currency?: string): string {

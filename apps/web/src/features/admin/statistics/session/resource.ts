@@ -123,7 +123,7 @@ export type ApiResponseAdminStatistics = { data: AdminStatistics }
 
 export type AdminStatisticsResourceOptions = {
   enabled?: MaybeRefOrGetter<boolean>
-  refetchInterval?: number | false | (() => number | false)
+  refetchInterval?: MaybeRefOrGetter<number | false>
   refetchIntervalInBackground?: boolean
   refetchOnWindowFocus?: boolean
   staleTime?: number

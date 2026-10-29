@@ -2,6 +2,7 @@ package http
 
 import (
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"strconv"
 	"strings"
 	"time"
@@ -47,8 +48,7 @@ type setRewardCodeEnabledRequest struct {
 
 func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	actorID, ok := requireAdmin(c)
@@ -88,8 +88,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 
 func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
@@ -119,8 +118,7 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 
 func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
@@ -146,8 +144,7 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 
 func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	rewardCodeID, actorID, ok := requireAdminRewardCode(c)

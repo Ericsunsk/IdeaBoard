@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
+	"ideaboard/api/internal/platform/pagination"
 	"strings"
 
 	billingrecordsdomain "ideaboard/api/internal/billingrecords/domain"
@@ -38,10 +39,7 @@ func (s *Service) List(ctx context.Context, input billingrecordsports.ListInput)
 		return billingrecordsports.Page{}, err
 	}
 	page := billingrecordsports.Page{Records: make([]billingrecordsports.Record, 0, min(len(ledgerRecords), limit))}
-	if len(ledgerRecords) > limit {
-		page.NextBeforeSequence = ledgerRecords[limit-1].sequence
-		ledgerRecords = ledgerRecords[:limit]
-	}
+	ledgerRecords, page.NextBeforeSequence = pagination.TruncateBeforeID(ledgerRecords, limit, func(r ledgerRecord) int64 { return r.sequence })
 	for _, ledgerRecord := range ledgerRecords {
 		record, err := recordFromLedger(ledgerRecord)
 		if err != nil {

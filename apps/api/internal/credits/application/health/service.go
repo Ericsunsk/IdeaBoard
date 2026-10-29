@@ -7,6 +7,7 @@ import (
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -45,8 +46,8 @@ type Backend struct {
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits health: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits health: %w", err)
 	}
 	if backend.GetSnapshot == nil {
 		return nil, fmt.Errorf("credits health: persistence backend not configured")

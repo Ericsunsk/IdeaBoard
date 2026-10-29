@@ -180,12 +180,3 @@ func writeRewardError(c *gin.Context, err error) {
 func writeRewardInputError(c *gin.Context, code, message string) {
 	errorrender.Render(c, http.StatusBadRequest, code, message)
 }
-
-// writeRewardUnavailableError renders a missing service dependency.
-func writeRewardUnavailableError(c *gin.Context, userFacing bool) {
-	if userFacing {
-		errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, errorrender.MsgRewardRedeemFailed)
-		return
-	}
-	errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable)
-}

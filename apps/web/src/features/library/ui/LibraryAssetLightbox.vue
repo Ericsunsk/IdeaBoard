@@ -1,5 +1,4 @@
 <template>
-  <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-media-scrim/65 backdrop-blur-2xl) -->
   <Teleport to="body">
     <Transition
       enter-active-class="transition-opacity duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
@@ -9,7 +8,7 @@
     >
       <div
         v-if="!!asset"
-        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-[var(--blur-overlay)] select-none"
         @click="emit('close')"
       >
         <!-- 顶部极简悬浮信息与操作栏 -->

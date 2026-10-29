@@ -388,16 +388,11 @@ func boardPageRequest(c *gin.Context) (boards.V1BoardCatalogPageRequest, bool) {
 	if !ok {
 		return boards.V1BoardCatalogPageRequest{}, false
 	}
-	page := boards.V1BoardCatalogPageRequest{Limit: pageSize}
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			renderBoardCursorInvalid(c)
-			return boards.V1BoardCatalogPageRequest{}, false
-		}
-		page.Offset = cursor.Offset
+	offset, ok := v1OffsetCursor(c)
+	if !ok {
+		return boards.V1BoardCatalogPageRequest{}, false
 	}
-	return page, true
+	return boards.V1BoardCatalogPageRequest{Limit: pageSize, Offset: offset}, true
 }
 
 func renderBoardCursorInvalid(c *gin.Context) {
@@ -406,30 +401,11 @@ func renderBoardCursorInvalid(c *gin.Context) {
 }
 
 func boardPageMeta(c *gin.Context, nextOffset int, hasMore bool) (contract.PageMeta, bool) {
-	if !hasMore {
-		return contract.NewPageMeta("", false), true
-	}
-	next, err := contract.EncodeCursor(v1ListCursor{Offset: nextOffset})
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable46)
-		c.Abort()
-		return contract.PageMeta{}, false
-	}
-	return contract.NewPageMeta(next, true), true
+	return v1OffsetMeta(c, nextOffset, hasMore, runtimehttp.MsgServiceUnavailable46)
 }
 
 func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
-	page, ok := boardPageRequest(c)
-	if !ok {
-		return nil, contract.PageMeta{}, false
-	}
-	if page.Offset > len(items) {
-		renderBoardCursorInvalid(c)
-		return nil, contract.PageMeta{}, false
-	}
-	end := min(page.Offset+page.Limit, len(items))
-	meta, ok := boardPageMeta(c, end, end < len(items))
-	return items[page.Offset:end], meta, ok
+	return v1OffsetPage(c, items, runtimehttp.MsgServiceUnavailable46)
 }
 
 func (h *contractV1Handler) listBoards(c *gin.Context) {

@@ -1,4 +1,5 @@
 import { formatLocaleDate } from '../../../core/i18n/formatters'
+import { SHANGHAI_TIME_ZONE } from '../../../core/datetime/shanghai'
 
 const localDateTimeOptions = {
   year: 'numeric',
@@ -21,7 +22,7 @@ const rechargeDateTimeOptions = {
 
 const shanghaiDateTimeOptions = {
   ...localDateTimeOptions,
-  timeZone: 'Asia/Shanghai',
+  timeZone: SHANGHAI_TIME_ZONE,
 } as const satisfies Intl.DateTimeFormatOptions
 
 const expiryDateTimeOptions = {

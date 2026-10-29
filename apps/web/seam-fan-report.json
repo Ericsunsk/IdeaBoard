@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "cd595fc7ad4ab515f8837ea4b5922ee0f4da5688",
+  "checkpointSha": "25d1924f659c13cef363d2bdc100c5d77afc9c74",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 271, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 275, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -9746,6 +9746,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.vue",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
@@ -9766,7 +9771,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9774,7 +9779,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10500,17 +10505,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/payments/useRecharge.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
+          "from": "src/core/query/useCursorInfiniteList.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -10570,7 +10565,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 16,
+      "fanIn": 14,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -10578,7 +10573,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 16,
+      "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11224,6 +11219,112 @@
       "ownershipScope": ["src/core/contracts/imageServices.ts"],
       "impureRuntimePaths": []
     },
+    "src/core/datetime/parse.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/core/utils/dateTime.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/billing/BillingPane.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/rewards/rewardCodeTime.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/shared/format.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 8,
+      "fanOut": 0,
+      "fanOutTargets": [],
+      "outboundEdges": [],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 8,
+      "targetFanOut": 0,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/datetime/parse.ts"],
+      "impureRuntimePaths": []
+    },
+    "src/core/datetime/shanghai.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/account/session/formatters.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/rewards/rewardCodeTime.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 4,
+      "fanOut": 0,
+      "fanOutTargets": [],
+      "outboundEdges": [],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 4,
+      "targetFanOut": 0,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/datetime/shanghai.ts"],
+      "impureRuntimePaths": []
+    },
     "src/core/errors/errorCatalog.ts": {
       "consumerEdges": [
         {
@@ -11516,7 +11617,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/core/pricing/billingPricingColumns.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/shared/format.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -11566,7 +11677,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 21,
+      "fanIn": 23,
       "fanOut": 2,
       "fanOutTargets": ["src/core/i18n/localeManifest.ts", "src/core/i18n/userLocale.ts"],
       "outboundEdges": [
@@ -11585,7 +11696,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 21,
+      "targetFanIn": 23,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13148,6 +13259,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/lib/chartTheme.ts",
+          "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/motion/chartMotion.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "type-only"
@@ -13188,7 +13304,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 12,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
@@ -13216,7 +13332,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14005,17 +14121,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing-account/useBillingAccountContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -14031,11 +14147,6 @@
         },
         {
           "from": "src/features/account/session/quota/useMemberQuotaSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -14120,7 +14231,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 25,
+      "fanIn": 24,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -14128,7 +14239,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 25,
+      "targetFanIn": 24,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14181,6 +14292,114 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/core/query/taskResult.ts"],
+      "impureRuntimePaths": []
+    },
+    "src/core/query/useCursorInfiniteList.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/payments/useRecharge.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 3,
+      "fanOut": 4,
+      "fanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vue/index.js",
+        "src/core/config/pagination.ts",
+        "src/core/query/queryDefaults.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 3,
+      "targetFanOut": 4,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/query/useCursorInfiniteList.ts"],
+      "impureRuntimePaths": []
+    },
+    "src/core/query/useQueryPolling.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+          "to": "src/core/query/useQueryPolling.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/core/query/useQueryPolling.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 2,
+      "fanOut": 2,
+      "fanOutTargets": ["node_modules/@vueuse/core/dist/index.js", "node_modules/vue/index.js"],
+      "outboundEdges": [
+        {
+          "from": "src/core/query/useQueryPolling.ts",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/useQueryPolling.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/query/useQueryPolling.ts"],
       "impureRuntimePaths": []
     },
     "src/core/query/userCreditsInvalidation.ts": {
@@ -14692,9 +14911,18 @@
         }
       ],
       "fanIn": 6,
-      "fanOut": 2,
-      "fanOutTargets": ["src/core/i18n/formatters.ts", "src/core/i18n/userLocale.ts"],
+      "fanOut": 3,
+      "fanOutTargets": [
+        "src/core/datetime/parse.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/userLocale.ts"
+      ],
       "outboundEdges": [
+        {
+          "from": "src/core/utils/dateTime.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/core/utils/dateTime.ts",
           "to": "src/core/i18n/formatters.ts",
@@ -14711,7 +14939,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 6,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -15383,7 +15611,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 100,
+      "fanOut": 104,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -15430,6 +15658,7 @@
         "src/core/components/StatusBadge.vue",
         "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useFailureToast.ts",
@@ -15438,7 +15667,8 @@
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/composables/useSiteBranding.ts",
         "src/core/composables/useSupportChannels.ts",
-        "src/core/config/pagination.ts",
+        "src/core/datetime/parse.ts",
+        "src/core/datetime/shanghai.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
@@ -15449,12 +15679,14 @@
         "src/core/interaction/interactiveControlState.ts",
         "src/core/lib/brandMark.ts",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/lib/chartTimeRange.ts",
         "src/core/lib/pageChrome.ts",
         "src/core/media/avatarUrl.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/motion/motionPolicy.ts",
         "src/core/query/queryDefaults.ts",
+        "src/core/query/useCursorInfiniteList.ts",
         "src/core/query/userCreditsInvalidation.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/currency.ts",
@@ -15704,22 +15936,12 @@
         },
         {
           "from": "src/features/account/session/billing/useBillingRecords.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/billing/useBillingRecords.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
-          "to": "src/core/query/queryDefaults.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
           "kind": "runtime"
         },
         {
@@ -15785,6 +16007,11 @@
         {
           "from": "src/features/account/session/chart.ts",
           "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.ts",
+          "to": "src/core/lib/chartTheme.ts",
           "kind": "runtime"
         },
         {
@@ -15900,6 +16127,11 @@
         {
           "from": "src/features/account/session/credits/useCreditsSync.unit.spec.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/formatters.ts",
+          "to": "src/core/datetime/shanghai.ts",
           "kind": "runtime"
         },
         {
@@ -16079,17 +16311,17 @@
         },
         {
           "from": "src/features/account/session/payments/useRecharge.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/payments/useRecharge.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
           "kind": "runtime"
         },
         {
@@ -16374,22 +16606,12 @@
         },
         {
           "from": "src/features/account/session/rewards/useRewardHistory.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/rewards/useRewardHistory.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
-          "to": "src/core/query/queryDefaults.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
           "kind": "runtime"
         },
         {
@@ -16649,6 +16871,11 @@
         },
         {
           "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -16730,6 +16957,11 @@
         {
           "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/composables/useFailureToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/billing/BillingPane.vue",
+          "to": "src/core/datetime/parse.ts",
           "kind": "runtime"
         },
         {
@@ -17534,6 +17766,11 @@
         },
         {
           "from": "src/features/account/ui/recharge/HistoryTable.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -17555,6 +17792,11 @@
         {
           "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/components/ui/skeleton/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
+          "to": "src/core/datetime/parse.ts",
           "kind": "runtime"
         },
         {
@@ -17765,6 +18007,11 @@
         {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/composables/useFailureToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
+          "to": "src/core/datetime/parse.ts",
           "kind": "runtime"
         },
         {
@@ -17993,7 +18240,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 100,
+      "targetFanOut": 104,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -18033,7 +18280,7 @@
         }
       ],
       "fanIn": 5,
-      "fanOut": 11,
+      "fanOut": 12,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -18042,6 +18289,7 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "src/api/idempotencyKey.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useAppToast.ts",
         "src/features/account/session/accountWorkspace.ts",
         "src/features/account/session/billing-account/resource.ts",
@@ -18130,6 +18378,11 @@
         },
         {
           "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -18144,7 +18397,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 5,
-      "targetFanOut": 11,
+      "targetFanOut": 12,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -19901,14 +20154,13 @@
         }
       ],
       "fanIn": 123,
-      "fanOut": 58,
+      "fanOut": 59,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
-        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/chart.js/dist/chart.cjs",
         "node_modules/reka-ui/dist/index.cjs",
         "node_modules/valibot/dist/index.mjs",
@@ -19950,9 +20202,11 @@
         "src/core/config/runtimeUrls.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/lib/chartTimeRange.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/query/queryDefaults.ts",
+        "src/core/query/useQueryPolling.ts",
         "src/core/utils/errorMessages.ts",
         "src/features/admin/monitor/resource.ts",
         "src/features/admin/routePaths.ts",
@@ -20230,12 +20484,7 @@
         },
         {
           "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
-          "to": "node_modules/@vueuse/core/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
-          "to": "node_modules/vue/index.js",
+          "to": "src/core/query/useQueryPolling.ts",
           "kind": "runtime"
         },
         {
@@ -20421,6 +20670,11 @@
         {
           "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/chart/chart.ts",
+          "to": "src/core/lib/chartTheme.ts",
           "kind": "runtime"
         },
         {
@@ -21234,7 +21488,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 123,
-      "targetFanOut": 58,
+      "targetFanOut": 59,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -21718,17 +21972,12 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 2,
-      "fanOutTargets": ["node_modules/@vueuse/core/dist/index.js", "node_modules/vue/index.js"],
+      "fanOut": 1,
+      "fanOutTargets": ["src/core/query/useQueryPolling.ts"],
       "outboundEdges": [
         {
           "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
-          "to": "node_modules/@vueuse/core/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
-          "to": "node_modules/vue/index.js",
+          "to": "src/core/query/useQueryPolling.ts",
           "kind": "runtime"
         }
       ],
@@ -21737,7 +21986,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 2,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -22539,11 +22788,12 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 6,
+      "fanOut": 7,
       "fanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
         "node_modules/vue/index.js",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/motion/chartMotion.ts",
         "src/features/admin/shared/core/adminThemeTokens.ts",
         "src/theme/composables/useTheme.ts"
@@ -22562,6 +22812,11 @@
         {
           "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/chart/chart.ts",
+          "to": "src/core/lib/chartTheme.ts",
           "kind": "runtime"
         },
         {
@@ -22585,7 +22840,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 6,
+      "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -31609,7 +31864,7 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 20,
+      "fanOut": 21,
       "fanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
@@ -31622,6 +31877,7 @@
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
         "src/core/utils/auth.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/board/ports/canvasSession.ts",
@@ -31652,6 +31908,11 @@
           "from": "src/features/canvas/session/board-session/boardSyncCoordinator.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/board-session/boardSyncCoordinator.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/board-session/boardSyncCoordinator.ts",
@@ -31884,7 +32145,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 10,
-      "targetFanOut": 20,
+      "targetFanOut": 21,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -34066,7 +34327,7 @@
         }
       ],
       "fanIn": 63,
-      "fanOut": 32,
+      "fanOut": 33,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -34080,6 +34341,7 @@
         "src/core/media/displayTier.ts",
         "src/core/media/mediaAssetPath.ts",
         "src/core/media/mediaRef.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -34110,6 +34372,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/adapterContracts.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/adapterContracts.ts",
+          "to": "src/core/vue/refs.ts",
           "kind": "type-only"
         },
         {
@@ -35068,7 +35335,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 63,
-      "targetFanOut": 32,
+      "targetFanOut": 33,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -35187,7 +35454,7 @@
         }
       ],
       "fanIn": 12,
-      "fanOut": 38,
+      "fanOut": 39,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
@@ -35203,6 +35470,7 @@
         "src/core/utils/ids.ts",
         "src/core/utils/imageUploadSupport.ts",
         "src/core/utils/polling.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/board/ports/canvasSession.ts",
@@ -35891,6 +36159,11 @@
         },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
         },
@@ -36260,7 +36533,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 12,
-      "targetFanOut": 38,
+      "targetFanOut": 39,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -37396,7 +37669,7 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 20,
+      "fanOut": 21,
       "fanOutTargets": [
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -37405,6 +37678,7 @@
         "src/api/mediaAssetDelivery.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userLocale.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/session/execution/index.ts",
@@ -37522,6 +37796,11 @@
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -37554,6 +37833,11 @@
           "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
@@ -37726,7 +38010,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 10,
-      "targetFanOut": 20,
+      "targetFanOut": 21,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -37854,7 +38138,7 @@
         }
       ],
       "fanIn": 8,
-      "fanOut": 15,
+      "fanOut": 16,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -37865,6 +38149,7 @@
         "src/core/contracts/imageServices.ts",
         "src/core/i18n/index.ts",
         "src/core/utils/number.ts",
+        "src/core/vue/refs.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/tools/image-tools/ui/chrome.ts",
@@ -37954,6 +38239,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/tools/inpaint/session/useInpaintChromeActions.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/tools/inpaint/session/useInpaintChromeActions.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -37967,6 +38257,11 @@
           "from": "src/features/canvas/tools/inpaint/session/useInpaintChromeState.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/inpaint/session/useInpaintChromeState.ts",
+          "to": "src/core/vue/refs.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/tools/inpaint/session/useInpaintChromeState.unit.spec.ts",
@@ -38059,7 +38354,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 8,
-      "targetFanOut": 15,
+      "targetFanOut": 16,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

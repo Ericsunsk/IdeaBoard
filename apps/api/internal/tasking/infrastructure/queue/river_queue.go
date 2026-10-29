@@ -32,12 +32,7 @@ func NewRiverQueue(client *river.Client[pgx.Tx], db *pgxpool.Pool, maxRetry int)
 }
 
 func NewRiverQueueWithClient(client riverClient, db *pgxpool.Pool, queueName string, maxRetry int) *RiverQueue {
-	if strings.TrimSpace(queueName) == "" {
-		queueName = riverpolicy.RiverQueueDefault
-	}
-	if maxRetry <= 0 {
-		maxRetry = riverpolicy.RiverMaxAttemptsDefault
-	}
+	queueName, maxRetry = riverpolicy.WithDefaults(queueName, maxRetry)
 	return &RiverQueue{
 		client:    client,
 		db:        db,

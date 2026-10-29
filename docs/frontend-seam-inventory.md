@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth。
 
-当前包含 271 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 275 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -8559,6 +8559,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.vue",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
@@ -8579,9 +8584,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/composables/useAppClipboard.ts"
@@ -9223,17 +9228,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/payments/useRecharge.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
+          "from": "src/core/query/useCursorInfiniteList.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -9293,9 +9288,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 14,
       "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "targetFanIn": 14,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/config/pagination.ts"
@@ -9971,6 +9966,110 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": "Pure public contract. Consumers: Canvas, Admin; keep aligned with backend/OpenAPI."
     },
     {
+      "path": "src/core/datetime/parse.ts",
+      "kind": "canonical",
+      "owner": "core",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/utils/dateTime.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/billing/BillingPane.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/rewards/rewardCodeTime.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/shared/format.ts",
+          "to": "src/core/datetime/parse.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 8,
+      "measuredFanOut": 0,
+      "targetFanIn": 8,
+      "targetFanOut": 0,
+      "ownershipScope": [
+        "src/core/datetime/parse.ts"
+      ],
+      "publicExports": [
+        "parseDateGuard"
+      ],
+      "targetFanOutTargets": [],
+      "notes": "Date-guard single source for display rendering; callers keep presentation-local fallbacks."
+    },
+    {
+      "path": "src/core/datetime/shanghai.ts",
+      "kind": "canonical",
+      "owner": "core",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/session/formatters.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/rewards/rewardCodeTime.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
+          "to": "src/core/datetime/shanghai.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 0,
+      "targetFanIn": 4,
+      "targetFanOut": 0,
+      "ownershipScope": [
+        "src/core/datetime/shanghai.ts"
+      ],
+      "publicExports": [
+        "SHANGHAI_TIME_ZONE",
+        "getShanghaiInputPartsFormat",
+        "getShanghaiMonthShortFormat",
+        "getShanghaiWallPartsFormat",
+        "toShanghaiParts"
+      ],
+      "targetFanOutTargets": [],
+      "notes": "Asia/Shanghai wall-clock single source; formatter options stay per-surface, parts reduction is shared."
+    },
+    {
       "path": "src/core/errors/errorCatalog.ts",
       "kind": "canonical",
       "owner": "core",
@@ -10263,7 +10362,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/core/pricing/billingPricingColumns.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/core/shared/format.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -10313,9 +10422,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 21,
+      "measuredFanIn": 23,
       "measuredFanOut": 2,
-      "targetFanIn": 21,
+      "targetFanIn": 23,
       "targetFanOut": 2,
       "ownershipScope": [
         "src/core/i18n/formatters.ts"
@@ -11812,6 +11921,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/core/lib/chartTheme.ts",
+          "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/motion/chartMotion.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "type-only"
@@ -11852,9 +11966,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 12,
       "measuredFanOut": 3,
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 3,
       "ownershipScope": [
         "src/core/lib/chartPrimitives.ts"
@@ -12601,17 +12715,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/core/query/useCursorInfiniteList.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing-account/useBillingAccountContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -12627,11 +12741,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/account/session/quota/useMemberQuotaSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -12716,9 +12825,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 25,
+      "measuredFanIn": 24,
       "measuredFanOut": 0,
-      "targetFanIn": 25,
+      "targetFanIn": 24,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/query/queryDefaults.ts"
@@ -12774,6 +12883,79 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ],
       "targetFanOutTargets": [],
       "notes": ""
+    },
+    {
+      "path": "src/core/query/useCursorInfiniteList.ts",
+      "kind": "canonical",
+      "owner": "core",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/payments/useRecharge.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
+          "to": "src/core/query/useCursorInfiniteList.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
+      "targetFanIn": 3,
+      "targetFanOut": 4,
+      "ownershipScope": [
+        "src/core/query/useCursorInfiniteList.ts"
+      ],
+      "publicExports": [
+        "useCursorInfiniteList"
+      ],
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vue/index.js",
+        "src/core/config/pagination.ts",
+        "src/core/query/queryDefaults.ts"
+      ],
+      "notes": "Cursor-infinite-list owner for account feeds; callers keep keys, transports and domain projections."
+    },
+    {
+      "path": "src/core/query/useQueryPolling.ts",
+      "kind": "canonical",
+      "owner": "core",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+          "to": "src/core/query/useQueryPolling.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/core/query/useQueryPolling.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "ownershipScope": [
+        "src/core/query/useQueryPolling.ts"
+      ],
+      "publicExports": [
+        "useQueryPolling"
+      ],
+      "targetFanOutTargets": [
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/vue/index.js"
+      ],
+      "notes": "Visibility-aware polling cadence; moved up from admin shared so notification reads reuse it."
     },
     {
       "path": "src/core/query/userCreditsInvalidation.ts",
@@ -13273,9 +13455,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 6,
-      "measuredFanOut": 2,
+      "measuredFanOut": 3,
       "targetFanIn": 6,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "ownershipScope": [
         "src/core/utils/dateTime.ts"
       ],
@@ -13287,6 +13469,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "formatDurationSeconds"
       ],
       "targetFanOutTargets": [
+        "src/core/datetime/parse.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/userLocale.ts"
       ],
@@ -13957,9 +14140,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 100,
+      "measuredFanOut": 104,
       "targetFanIn": 4,
-      "targetFanOut": 100,
+      "targetFanOut": 104,
       "ownershipScope": [
         "src/features/account/"
       ],
@@ -14145,6 +14328,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/components/StatusBadge.vue",
         "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useFailureToast.ts",
@@ -14153,7 +14337,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/composables/useSiteBranding.ts",
         "src/core/composables/useSupportChannels.ts",
-        "src/core/config/pagination.ts",
+        "src/core/datetime/parse.ts",
+        "src/core/datetime/shanghai.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
@@ -14164,12 +14349,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/interaction/interactiveControlState.ts",
         "src/core/lib/brandMark.ts",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/lib/chartTimeRange.ts",
         "src/core/lib/pageChrome.ts",
         "src/core/media/avatarUrl.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/motion/motionPolicy.ts",
         "src/core/query/queryDefaults.ts",
+        "src/core/query/useCursorInfiniteList.ts",
         "src/core/query/userCreditsInvalidation.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/currency.ts",
@@ -14236,9 +14423,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 5,
-      "measuredFanOut": 11,
+      "measuredFanOut": 12,
       "targetFanIn": 5,
-      "targetFanOut": 11,
+      "targetFanOut": 12,
       "notes": "Settings roster/account read lifecycle and member actions; shared and independent mounts use one session module.",
       "ownershipScope": [
         "src/features/account/session/workspace-settings/"
@@ -14258,6 +14445,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "src/api/idempotencyKey.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useAppToast.ts",
         "src/features/account/session/accountWorkspace.ts",
         "src/features/account/session/billing-account/resource.ts",
@@ -15853,9 +16041,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 123,
-      "measuredFanOut": 58,
+      "measuredFanOut": 59,
       "targetFanIn": 123,
-      "targetFanOut": 58,
+      "targetFanOut": 59,
       "ownershipScope": [
         "src/features/admin/shared/core/",
         "src/features/admin/shared/index.ts",
@@ -16107,7 +16295,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
-        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/chart.js/dist/chart.cjs",
         "node_modules/reka-ui/dist/index.cjs",
         "node_modules/valibot/dist/index.mjs",
@@ -16149,9 +16336,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/config/runtimeUrls.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/lib/chartTimeRange.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/query/queryDefaults.ts",
+        "src/core/query/useQueryPolling.ts",
         "src/core/utils/errorMessages.ts",
         "src/features/admin/monitor/resource.ts",
         "src/features/admin/routePaths.ts",
@@ -16463,9 +16652,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 2,
+      "measuredFanOut": 1,
       "targetFanIn": 2,
-      "targetFanOut": 2,
+      "targetFanOut": 1,
       "ownershipScope": [
         "src/features/admin/shared/session/collection/useQueryPolling.ts"
       ],
@@ -16473,8 +16662,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useQueryPolling"
       ],
       "targetFanOutTargets": [
-        "node_modules/@vueuse/core/dist/index.js",
-        "node_modules/vue/index.js"
+        "src/core/query/useQueryPolling.ts"
       ],
       "notes": ""
     },
@@ -17125,9 +17313,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 6,
+      "measuredFanOut": 7,
       "targetFanIn": 4,
-      "targetFanOut": 6,
+      "targetFanOut": 7,
       "ownershipScope": [
         "src/features/admin/shared/ui/chart/chart.ts"
       ],
@@ -17151,6 +17339,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/chart.js/dist/chart.cjs",
         "node_modules/vue/index.js",
         "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTheme.ts",
         "src/core/motion/chartMotion.ts",
         "src/features/admin/shared/core/adminThemeTokens.ts",
         "src/theme/composables/useTheme.ts"
@@ -20921,9 +21110,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 10,
-      "measuredFanOut": 20,
+      "measuredFanOut": 21,
       "targetFanIn": 10,
-      "targetFanOut": 20,
+      "targetFanOut": 21,
       "ownershipScope": [
         "src/features/canvas/session/board-session/"
       ],
@@ -20955,6 +21144,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
         "src/core/utils/auth.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/board/ports/canvasSession.ts",
@@ -21929,9 +22119,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 63,
-      "measuredFanOut": 32,
+      "measuredFanOut": 33,
       "targetFanIn": 63,
-      "targetFanOut": 32,
+      "targetFanOut": 33,
       "ownershipScope": [
         "src/features/canvas/session/flow-adapter/"
       ],
@@ -22020,6 +22210,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/media/displayTier.ts",
         "src/core/media/mediaAssetPath.ts",
         "src/core/media/mediaRef.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -22160,9 +22351,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 12,
-      "measuredFanOut": 38,
+      "measuredFanOut": 39,
       "targetFanIn": 12,
-      "targetFanOut": 38,
+      "targetFanOut": 39,
       "ownershipScope": [
         "src/features/canvas/session/graph-editing/"
       ],
@@ -22201,6 +22392,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/ids.ts",
         "src/core/utils/imageUploadSupport.ts",
         "src/core/utils/polling.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/board/ports/canvasSession.ts",
@@ -22590,9 +22782,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 10,
-      "measuredFanOut": 20,
+      "measuredFanOut": 21,
       "targetFanIn": 10,
-      "targetFanOut": 20,
+      "targetFanOut": 21,
       "ownershipScope": [
         "src/features/canvas/tools/image-tools/"
       ],
@@ -22619,6 +22811,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/mediaAssetDelivery.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userLocale.ts",
+        "src/core/vue/refs.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/session/execution/index.ts",
@@ -22749,9 +22942,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 8,
-      "measuredFanOut": 15,
+      "measuredFanOut": 16,
       "targetFanIn": 8,
-      "targetFanOut": 15,
+      "targetFanOut": 16,
       "ownershipScope": [
         "src/features/canvas/tools/inpaint/"
       ],
@@ -22773,6 +22966,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/contracts/imageServices.ts",
         "src/core/i18n/index.ts",
         "src/core/utils/number.ts",
+        "src/core/vue/refs.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/tools/image-tools/ui/chrome.ts",
@@ -25566,7 +25760,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/components/UserConfirmDialog.vue` | canonical | core | 1 | 8 → 8 | 8 → 8 |
 | `src/core/components/formFieldContract.ts` | canonical | core | 4 | 4 → 4 | 0 → 0 |
 | `src/core/components/serviceIcons.ts` | canonical | core | 1 | 6 → 6 | 3 → 3 |
-| `src/core/composables/useAppClipboard.ts` | canonical | core | 1 | 6 → 6 | 0 → 0 |
+| `src/core/composables/useAppClipboard.ts` | canonical | core | 1 | 7 → 7 | 0 → 0 |
 | `src/core/composables/useAppToast.ts` | canonical | core | 2 | 31 → 31 | 1 → 1 |
 | `src/core/composables/useAsyncAction.ts` | canonical | core | 3 | 17 → 17 | 1 → 1 |
 | `src/core/composables/useLogoutRedirect.ts` | canonical | core | 1 | 5 → 5 | 1 → 1 |
@@ -25575,15 +25769,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/composables/useSiteBranding.ts` | canonical | core | 17 | 7 → 7 | 6 → 6 |
 | `src/core/composables/useSupportChannels.ts` | canonical | core | 4 | 9 → 9 | 6 → 6 |
 | `src/core/composables/useUserConfirmDialog.ts` | canonical | core | 2 | 3 → 3 | 1 → 1 |
-| `src/core/config/pagination.ts` | canonical | core | 2 | 16 → 16 | 0 → 0 |
+| `src/core/config/pagination.ts` | canonical | core | 2 | 14 → 14 | 0 → 0 |
 | `src/core/config/runtimeUrls.ts` | canonical | core | 8 | 21 → 21 | 0 → 0 |
 | `src/core/config/timing.ts` | canonical | core | 8 | 8 → 8 | 0 → 0 |
 | `src/core/constants/media.ts` | canonical | core | 5 | 5 → 5 | 0 → 0 |
 | `src/core/contracts/externalImageProviders.ts` | canonical | core | 4 | 11 → 11 | 0 → 0 |
 | `src/core/contracts/generationContract.ts` | canonical | core | 18 | 23 → 23 | 0 → 0 |
 | `src/core/contracts/imageServices.ts` | canonical | core | 3 | 30 → 30 | 0 → 0 |
+| `src/core/datetime/parse.ts` | canonical | core | 1 | 8 → 8 | 0 → 0 |
+| `src/core/datetime/shanghai.ts` | canonical | core | 5 | 4 → 4 | 0 → 0 |
 | `src/core/errors/errorCatalog.ts` | canonical | core | 5 | 41 → 41 | 1 → 1 |
-| `src/core/i18n/formatters.ts` | canonical | core | 5 | 21 → 21 | 2 → 2 |
+| `src/core/i18n/formatters.ts` | canonical | core | 5 | 23 → 23 | 2 → 2 |
 | `src/core/i18n/index.ts` | canonical | core | 7 | 146 → 146 | 7 → 7 |
 | `src/core/i18n/localeCore.ts` | canonical | core | 5 | 5 → 5 | 0 → 0 |
 | `src/core/i18n/localeManifest.ts` | canonical | core | 2 | 5 → 5 | 5 → 5 |
@@ -25596,7 +25792,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/interaction/interactiveControlState.ts` | canonical | core | 5 | 8 → 8 | 0 → 0 |
 | `src/core/interaction/menuKeyboardNavigation.ts` | canonical | core | 1 | 3 → 3 | 0 → 0 |
 | `src/core/lib/brandMark.ts` | canonical | core | 2 | 3 → 3 | 0 → 0 |
-| `src/core/lib/chartPrimitives.ts` | canonical | core | 15 | 11 → 11 | 3 → 3 |
+| `src/core/lib/chartPrimitives.ts` | canonical | core | 15 | 12 → 12 | 3 → 3 |
 | `src/core/lib/chartTimeRange.ts` | canonical | core | 7 | 3 → 3 | 0 → 0 |
 | `src/core/lib/pageChrome.ts` | canonical | core | 4 | 6 → 6 | 0 → 0 |
 | `src/core/media/imageAssetPipeline.ts` | canonical | core | 6 | 8 → 8 | 6 → 6 |
@@ -25608,15 +25804,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/motion/motionPolicy.ts` | canonical | core | 6 | 8 → 8 | 0 → 0 |
 | `src/core/motion/popoverMotion.ts` | canonical | core | 3 | 7 → 7 | 2 → 2 |
 | `src/core/query/queryClient.ts` | canonical | core | 2 | 21 → 21 | 1 → 1 |
-| `src/core/query/queryDefaults.ts` | canonical | core | 5 | 25 → 25 | 0 → 0 |
+| `src/core/query/queryDefaults.ts` | canonical | core | 5 | 24 → 24 | 0 → 0 |
 | `src/core/query/taskResult.ts` | canonical | core | 3 | 4 → 4 | 0 → 0 |
+| `src/core/query/useCursorInfiniteList.ts` | canonical | core | 1 | 3 → 3 | 4 → 4 |
+| `src/core/query/useQueryPolling.ts` | canonical | core | 1 | 2 → 2 | 2 → 2 |
 | `src/core/query/userCreditsInvalidation.ts` | canonical | core | 4 | 7 → 7 | 0 → 0 |
 | `src/core/router/queryParams.ts` | canonical | core | 3 | 12 → 12 | 1 → 1 |
 | `src/core/seo/routeSeo.ts` | canonical | core | 12 | 4 → 4 | 0 → 0 |
 | `src/core/seo/seoStaticHtml.ts` | canonical | core | 1 | 1 → 1 | 1 → 1 |
 | `src/core/utils/auth.ts` | canonical | core | 16 | 33 → 33 | 4 → 4 |
 | `src/core/utils/currency.ts` | canonical | core | 3 | 2 → 2 | 2 → 2 |
-| `src/core/utils/dateTime.ts` | canonical | core | 5 | 6 → 6 | 2 → 2 |
+| `src/core/utils/dateTime.ts` | canonical | core | 5 | 6 → 6 | 3 → 3 |
 | `src/core/utils/errorMessages.ts` | canonical | core | 4 | 9 → 9 | 0 → 0 |
 | `src/core/utils/formValidation.ts` | canonical | core | 3 | 4 → 4 | 0 → 0 |
 | `src/core/utils/ids.ts` | canonical | core | 3 | 13 → 13 | 0 → 0 |
@@ -25626,8 +25824,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/utils/polling.ts` | canonical | core | 5 | 6 → 6 | 0 → 0 |
 | `src/core/utils/storage.ts` | canonical | core | 8 | 15 → 15 | 0 → 0 |
 | `src/core/utils/workspaceId.ts` | canonical | core | 2 | 8 → 8 | 1 → 1 |
-| `src/features/account/index.ts` | canonical | account | 134 | 4 → 4 | 100 → 100 |
-| `src/features/account/session/workspace-settings/index.ts` | canonical | account-workspace-settings | 5 | 5 → 5 | 11 → 11 |
+| `src/features/account/index.ts` | canonical | account | 134 | 4 → 4 | 104 → 104 |
+| `src/features/account/session/workspace-settings/index.ts` | canonical | account-workspace-settings | 5 | 5 → 5 | 12 → 12 |
 | `src/features/account/ui/chrome/SupportChannelQr.vue` | canonical | account | 1 | 1 → 1 | 9 → 9 |
 | `src/features/account/ui/chrome/UserAccountMenu.vue` | canonical | account | 1 | 6 → 6 | 18 → 18 |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue` | canonical | account | 1 | 1 → 1 | 2 → 2 |
@@ -25646,7 +25844,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts` | canonical | admin | 2 | 2 → 2 | 0 → 0 |
 | `src/features/admin/shared/core/taskMetricTokens.ts` | canonical | admin | 7 | 3 → 3 | 1 → 1 |
 | `src/features/admin/shared/core/uiClasses.ts` | canonical | admin | 40 | 17 → 17 | 0 → 0 |
-| `src/features/admin/shared/index.ts` | canonical | admin | 237 | 123 → 123 | 58 → 58 |
+| `src/features/admin/shared/index.ts` | canonical | admin | 237 | 123 → 123 | 59 → 59 |
 | `src/features/admin/shared/session/anomalyRules.ts` | canonical | admin | 4 | 3 → 3 | 3 → 3 |
 | `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 14 | 6 → 6 | 14 → 14 |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts` | canonical | admin | 1 | 1 → 1 | 5 → 5 |
@@ -25654,7 +25852,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/session/collection/useAdminCursorCollection.ts` | canonical | admin | 1 | 1 → 1 | 4 → 4 |
 | `src/features/admin/shared/session/collection/useOptimisticToggle.ts` | canonical | admin | 3 | 2 → 2 | 1 → 1 |
 | `src/features/admin/shared/session/collection/usePagePagination.ts` | canonical | admin | 1 | 2 → 2 | 2 → 2 |
-| `src/features/admin/shared/session/collection/useQueryPolling.ts` | canonical | admin | 1 | 2 → 2 | 2 → 2 |
+| `src/features/admin/shared/session/collection/useQueryPolling.ts` | canonical | admin | 1 | 2 → 2 | 1 → 1 |
 | `src/features/admin/shared/session/collection/useRefetchOnClose.ts` | canonical | admin | 1 | 1 → 1 | 1 → 1 |
 | `src/features/admin/shared/session/feedback/confirmSettingsSave.ts` | canonical | admin | 1 | 2 → 2 | 1 → 1 |
 | `src/features/admin/shared/session/feedback/toast.ts` | canonical | admin | 4 | 29 → 29 | 2 → 2 |
@@ -25668,7 +25866,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/AdminSpinner.vue` | canonical | admin | 1 | 3 → 3 | 2 → 2 |
 | `src/features/admin/shared/ui/chart/AdminChartCard.vue` | canonical | admin | 1 | 1 → 1 | 2 → 2 |
 | `src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue` | canonical | admin | 1 | 1 → 1 | 1 → 1 |
-| `src/features/admin/shared/ui/chart/chart.ts` | canonical | admin | 14 | 4 → 4 | 6 → 6 |
+| `src/features/admin/shared/ui/chart/chart.ts` | canonical | admin | 14 | 4 → 4 | 7 → 7 |
 | `src/features/admin/shared/ui/feedback/AdminAlert.vue` | canonical | admin | 2 | 2 → 2 | 2 → 2 |
 | `src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue` | canonical | admin | 1 | 3 → 3 | 4 → 4 |
 | `src/features/admin/shared/ui/feedback/AdminEmptyState.vue` | canonical | admin | 1 | 1 → 1 | 2 → 2 |
@@ -25713,24 +25911,24 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/core/graph/index.ts` | canonical | canvas | 58 | 63 → 63 | 4 → 4 |
 | `src/features/canvas/core/nodes/imageActions.ts` | canonical | canvas | 1 | 7 → 7 | 1 → 1 |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts` | canonical | canvas | 1 | 5 → 5 | 1 → 1 |
-| `src/features/canvas/session/board-session/index.ts` | canonical | canvas | 14 | 10 → 10 | 20 → 20 |
+| `src/features/canvas/session/board-session/index.ts` | canonical | canvas | 14 | 10 → 10 | 21 → 21 |
 | `src/features/canvas/session/collaboration/index.ts` | canonical | canvas | 5 | 12 → 12 | 7 → 7 |
 | `src/features/canvas/session/execution/board-attachment/index.ts` | canonical | canvas | 2 | 13 → 13 | 0 → 0 |
 | `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 49 → 49 |
 | `src/features/canvas/session/execution/pending-execution/core.ts` | canonical | canvas | 17 | 14 → 14 | 8 → 8 |
-| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 63 → 63 | 32 → 32 |
+| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 63 → 63 | 33 → 33 |
 | `src/features/canvas/session/graph-editing/groupContracts.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |
-| `src/features/canvas/session/graph-editing/index.ts` | canonical | canvas | 18 | 12 → 12 | 38 → 38 |
+| `src/features/canvas/session/graph-editing/index.ts` | canonical | canvas | 18 | 12 → 12 | 39 → 39 |
 | `src/features/canvas/session/image-workflow/index.ts` | canonical | canvas | 3 | 4 → 4 | 21 → 21 |
 | `src/features/canvas/session/media/preloadImage.ts` | canonical | canvas | 1 | 2 → 2 | 0 → 0 |
 | `src/features/canvas/session/media/serviceImageActionText.ts` | canonical | canvas | 2 | 2 → 2 | 3 → 3 |
 | `src/features/canvas/session/workspace/index.ts` | canonical | canvas | 2 | 5 → 5 | 26 → 26 |
 | `src/features/canvas/session/workspace/useCanvasFeedback.ts` | canonical | canvas | 3 | 10 → 10 | 2 → 2 |
 | `src/features/canvas/tools/image-tools/core/index.ts` | canonical | canvas | 1 | 1 → 1 | 1 → 1 |
-| `src/features/canvas/tools/image-tools/index.ts` | canonical | canvas | 13 | 10 → 10 | 20 → 20 |
+| `src/features/canvas/tools/image-tools/index.ts` | canonical | canvas | 13 | 10 → 10 | 21 → 21 |
 | `src/features/canvas/tools/image-tools/ui/chrome.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |
 | `src/features/canvas/tools/image-tools/ui/stage.ts` | canonical | canvas | 1 | 1 → 1 | 1 → 1 |
-| `src/features/canvas/tools/inpaint/index.ts` | canonical | canvas | 6 | 8 → 8 | 15 → 15 |
+| `src/features/canvas/tools/inpaint/index.ts` | canonical | canvas | 6 | 8 → 8 | 16 → 16 |
 | `src/features/canvas/tools/retouch/index.ts` | canonical | canvas | 36 | 16 → 16 | 34 → 34 |
 | `src/features/canvas/tools/retouch/testing/browser.ts` | canonical | canvas | 2 | 1 → 1 | 4 → 4 |
 | `src/features/canvas/ui/chrome/components/index.ts` | canonical | canvas | 6 | 1 → 1 | 16 → 16 |

@@ -340,8 +340,8 @@ const (
 	// Search provider admin codes (searchcatalog/interfaces/http edge).
 	// Wire-stable. CodeSearchProviderUnavailable is the #806 kernel
 	// code (503); the provider edge keeps explicit statuses at each
-	// render site (nil-dependency paths render 500 with the same code
-	// and must not route via StatusOf).
+	// render site (nil-dependency paths fail closed with 503 through
+	// the shared platform/http guard and must not route via StatusOf).
 	CodeSearchProviderNotFound       Code = "search_provider_not_found"
 	CodeSearchRequestInvalid         Code = "search_request_invalid"
 	CodeSearchProviderTestRequired   Code = "search_provider_test_required"

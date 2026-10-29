@@ -1,9 +1,6 @@
+import type { ValueRef } from '@/core/vue/refs'
 import { computed } from 'vue'
 import type { RetouchModeState } from '../../retouch'
-
-type ValueRef<T> = {
-  readonly value: T
-}
 
 type ImageToolInpaintState = RetouchModeState & { mode: 'inpaint' }
 

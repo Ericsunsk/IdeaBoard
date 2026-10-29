@@ -6,6 +6,7 @@ import (
 	aigatewaydomain "ideaboard/api/internal/aigateway/domain"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/workflow"
 	"net/http"
@@ -48,8 +49,7 @@ type updateGatewayRequest struct {
 
 // Get returns the masked gateway configuration.
 func (h *Handler) Get(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	summary, err := h.store.GetSummary(c.Request.Context())
@@ -66,8 +66,7 @@ func (h *Handler) Get(c *gin.Context) {
 // enforces the operator capability); the handler resolves the actor from
 // the request principal without re-checking the admin role.
 func (h *Handler) Update(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	var req updateGatewayRequest
@@ -128,8 +127,7 @@ type testGatewayConnectionRequest struct {
 // persisted. Pure diagnosis: no configuration is read or written.
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) TestConnection(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	var req testGatewayConnectionRequest
@@ -148,8 +146,7 @@ func (h *Handler) TestConnection(c *gin.Context) {
 
 // ListCatalog returns every model item in the AI gateway catalog.
 func (h *Handler) ListCatalog(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	catalog, err := h.store.ListCatalog(c.Request.Context())
@@ -171,8 +168,7 @@ type saveCatalogRequest struct {
 // Authorization rides the outer Control Plane guard; the actor is resolved
 // from the request principal.
 func (h *Handler) SaveCatalog(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	var req saveCatalogRequest
@@ -223,8 +219,7 @@ func (h *Handler) ListProviders(c *gin.Context) {
 // DetectModels probes the gateway for available models.
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) DetectModels(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	provider := strings.TrimSpace(c.Query("provider"))
@@ -243,8 +238,7 @@ func (h *Handler) DetectModels(c *gin.Context) {
 // flows. Only invalid input (missing model identity) is a 400.
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) GetModelReference(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAigatewayApplicationGet, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
 	reference, err := h.store.GetModelReference(
@@ -290,8 +284,7 @@ func (h *Handler) SetObservedService(svc *aigatewaydomain.ObservedService) {
 // neither attempts nor mappings in the window; callers render 暂无数据.
 // Authorization rides the outer Control Plane guard (controlProxy + guard).
 func (h *Handler) ListModelsObserved(c *gin.Context) {
-	if h == nil || h.observed == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgListModelsObserved, nil)
+	if !platformhttp.RequireDependency(c, h != nil && h.observed != nil, errorrender.MsgListModelsObserved) {
 		return
 	}
 	rows, err := h.observed.ListModelsObserved(c.Request.Context())

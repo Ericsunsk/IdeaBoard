@@ -299,40 +299,7 @@ func toLibraryAssetDTO(workspacePublicID string, asset *librarydomain.V1Asset) v
 }
 
 func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
-	pageSize, ok := v1PageSize(c)
-	if !ok {
-		return nil, contract.PageMeta{}, false
-	}
-	offset := 0
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-			c.Abort()
-			return nil, contract.PageMeta{}, false
-		}
-		offset = cursor.Offset
-	}
-	if offset > len(items) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-		c.Abort()
-		return nil, contract.PageMeta{}, false
-	}
-	end := offset + pageSize
-	if end > len(items) {
-		end = len(items)
-	}
-	meta := contract.NewPageMeta("", false)
-	if end < len(items) {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
-		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable49)
-			c.Abort()
-			return nil, contract.PageMeta{}, false
-		}
-		meta = contract.NewPageMeta(next, true)
-	}
-	return items[offset:end], meta, true
+	return v1OffsetPage(c, items, runtimehttp.MsgServiceUnavailable49)
 }
 
 func (h *contractV1Handler) listLibraryFolders(c *gin.Context) {

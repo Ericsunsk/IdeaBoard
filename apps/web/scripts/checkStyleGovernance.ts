@@ -35,6 +35,9 @@ export const primitiveReferencePattern = /var\(\s*--(?:primitive|palette)-[a-z0-
 export const darkVariantUtilityPattern = /\bdark:(?=[\w![(-])/g
 export const rawMotionUtilityPattern =
   /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-easing\)\])|animate-\[)[^\]]+\]/g
+export const rawDialogWidthPattern = /w-\[min\(420px,[^\]]+\]/g
+export const rawWhiteOverlayPattern = /white(?:\/\d+|_)/g
+export const rawClipboardPattern = /navigator\?\.clipboard/g
 
 const styleCountRules = [
   {
@@ -202,9 +205,27 @@ const tokenCountRules = [
   {
     id: 'legacy-token',
     pattern:
-      /var\(--color-(?:admin|board)-[a-z0-9-]+\)|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration|from|via|to)-admin-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration)-board-(?:page|primary|surface|control|card|loading|danger|dialog|create|focus)[a-z-]*(?:\/[\d.]+)?/g,
+      /var\(--color-(?:admin|board)-[a-z0-9-]+\)|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration|from|via|to)-admin-(?!micro|caption|meta|body|content|title-sm|title-lg|title|heading|icon|display-sm|display|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration)-board-(?:page|primary|surface|control|card|loading|danger|dialog|create|focus)[a-z-]*(?:\/[\d.]+)?/g,
     message:
       'Legacy domain color tokens are decommissioned at the component layer: use standard semantic tokens (bg-card, text-foreground, border-border, bg-primary, ...) instead of admin-*/board-* color utilities or direct var(--color-admin/board-*) references.',
+  },
+  {
+    id: 'raw-dialog-width',
+    pattern: rawDialogWidthPattern,
+    message:
+      'Dialog widths must use the dialogShell size contract (data-size narrow/compact/…) instead of raw w-[min(420px,…)] overrides.',
+  },
+  {
+    id: 'raw-white-overlay',
+    pattern: rawWhiteOverlayPattern,
+    message:
+      'Raw white overlay values must use semantic overlay tokens (e.g. --color-overlay-scrim-line) instead of white/white_ utilities.',
+  },
+  {
+    id: 'raw-clipboard',
+    pattern: rawClipboardPattern,
+    message:
+      'Clipboard writes must route through useAppClipboard (shared boolean seam); direct navigator.clipboard access is banned outside the hook.',
   },
 ] as const satisfies readonly CountRule<string>[]
 
@@ -213,9 +234,10 @@ type TokenCountRuleId = (typeof tokenCountRules)[number]['id']
 const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   'src/features/account/session/chart.ts': {
     counts: {
-      'hex-color': 3,
+      'hex-color': 9,
     },
-    reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
+    reason:
+      'Account usage chart palette is a domain visual contract (dark + light fallbacks for accent/axis/surface/text).',
   },
   'src/features/board/ui/gallery/skin.ts': {
     counts: {
@@ -293,24 +315,6 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'shadcn-vue standard microcopy size; matches the upstream primitive contract.',
   },
-  'src/features/account/ui/dialog/AccountDialogContent.vue': {
-    counts: {
-      'text-px': 1,
-    },
-    reason: 'Account brand wordmark optical size; no type-scale tier.',
-  },
-  'src/features/account/ui/profile/ProfilePane.vue': {
-    counts: {
-      'text-px': 1,
-    },
-    reason: 'Profile hero numerals sit outside the type scale (30/34/24 display sizes).',
-  },
-  'src/features/account/ui/usage/UsagePane.vue': {
-    counts: {
-      'text-px': 2,
-    },
-    reason: 'Usage hero numeral responsive tiers sit outside the type scale.',
-  },
   'src/features/auth/components/modalUi.ts': {
     counts: {
       'text-px': 1,
@@ -319,21 +323,16 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/board/ui/gallery/skin.ts': {
     counts: {
-      'text-px': 3,
+      'text-px': 2,
     },
-    reason: 'Board catalog hero/display sizes sit outside the type scale.',
+    reason:
+      'Board catalog hero sizes (40/62) stay outside the scale; subtitle uses text-admin-title-lg.',
   },
   'src/features/canvas/ui/pages/CanvasLandingPage.vue': {
     counts: {
       'text-px': 1,
     },
     reason: 'Landing hero display size; marketing one-off.',
-  },
-  'src/features/legal/components/PublicLegalPage.vue': {
-    counts: {
-      'text-px': 1,
-    },
-    reason: 'Legal page title display size; no type-scale tier.',
   },
   'src/features/search/ui/pages/SearchPage.vue': {
     counts: {
@@ -350,6 +349,25 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
     },
     reason:
       'Account shell viewport height uses a computed 1081px geometry breakpoint, not a standard tier.',
+  },
+}
+
+const rawDialogWidthAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/core/components/dialogShell.ts': {
+    counts: {
+      'raw-dialog-width': 1,
+    },
+    reason:
+      'dialogShell owns the single 420px width source for the slim-inset and narrow size profiles.',
+  },
+}
+
+const rawClipboardAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/core/composables/useAppClipboard.ts': {
+    counts: {
+      'raw-clipboard': 1,
+    },
+    reason: 'useAppClipboard owns the single navigator.clipboard seam.',
   },
 }
 
@@ -443,6 +461,9 @@ function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
   pushOver('text-px', textPxAllowances)
   pushOver('arbitrary-breakpoint', arbitraryBreakpointAllowances)
   pushOver('dark-variant', {})
+  pushOver('raw-dialog-width', rawDialogWidthAllowances)
+  pushOver('raw-white-overlay', {})
+  pushOver('raw-clipboard', rawClipboardAllowances)
 
   return violations
 }
@@ -665,6 +686,8 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
     ...checkAllowanceReasons(textPxAllowances, 'textPxAllowances'),
     ...checkAllowanceReasons(arbitraryBreakpointAllowances, 'arbitraryBreakpointAllowances'),
     ...checkAllowanceReasons(legacyTokenAllowances, 'legacyTokenAllowances'),
+    ...checkAllowanceReasons(rawDialogWidthAllowances, 'rawDialogWidthAllowances'),
+    ...checkAllowanceReasons(rawClipboardAllowances, 'rawClipboardAllowances'),
   ]
 
   for (const file of files) {
@@ -730,6 +753,18 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       tokenCountRules,
       legacyTokenAllowances,
       'stale-legacy-token-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      rawDialogWidthAllowances,
+      'stale-raw-dialog-width-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      rawClipboardAllowances,
+      'stale-raw-clipboard-allowance',
     ),
   )
 

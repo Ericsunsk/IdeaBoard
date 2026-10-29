@@ -1,3 +1,4 @@
+import type { MutableValueRef as ValueRef } from '@/core/vue/refs'
 import { toRaw } from 'vue'
 import {
   createEmptyBoardSnapshot,
@@ -23,7 +24,6 @@ export type SaveStatus =
   'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover' | 'archived'
 
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
-type ValueRef<T> = { value: T }
 type SaveCurrentBoardSnapshotOptions = {
   isSilent?: boolean | undefined
 }

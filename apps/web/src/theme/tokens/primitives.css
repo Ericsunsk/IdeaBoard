@@ -190,6 +190,7 @@
   --primitive-size-24: 24px;
   --primitive-size-44: 44px;
   --primitive-blur-12: 12px;
+  --primitive-blur-40: 40px;
   --primitive-size-3: 3px;
   /* Inter's Latin face is declared in type.css; CJK uses the platform fallback chain. */
   --primitive-font-inter-variable:
@@ -203,8 +204,11 @@
   --primitive-type-size-15: 15px;
   --primitive-type-size-16: 16px;
   --primitive-type-size-18: 18px;
+  --primitive-type-size-19: 19px;
   --primitive-type-size-20: 20px;
   --primitive-type-size-28: 28px;
+  --primitive-type-size-30: 30px;
+  --primitive-type-size-34: 34px;
   --primitive-type-size-26: 26px;
   --primitive-type-size-22: 22px;
   --primitive-font-weight-650: 650;
@@ -288,6 +292,8 @@
   --primitive-amber-400-alpha-15: rgb(251 191 36 / 15%);
   --primitive-blue-400-alpha-15: rgb(96 165 250 / 15%);
   --primitive-neutral-0-alpha-15: rgb(255 255 255 / 15%);
+  --primitive-neutral-0-alpha-86: rgb(255 255 255 / 86%);
+  --primitive-neutral-0-alpha-95: rgb(255 255 255 / 95%);
   --primitive-neutral-0-alpha-25: rgb(255 255 255 / 25%);
   --primitive-neutral-890-alpha-78: rgb(24 24 24 / 78%);
   --primitive-neutral-0-alpha-20: rgb(255 255 255 / 20%);

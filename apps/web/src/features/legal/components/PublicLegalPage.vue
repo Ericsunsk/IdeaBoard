@@ -26,7 +26,7 @@
             {{ projectName }}
           </p>
           <h1
-            class="mt-2 mb-0 text-admin-summary-value leading-tight font-bold text-foreground sm:text-[34px]"
+            class="mt-2 mb-0 text-admin-summary-value leading-tight font-bold text-foreground sm:text-admin-display"
           >
             {{ title }}
           </h1>

@@ -1,5 +1,5 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { PaymentReturnContext } from '../../core/return'
 import { i18n } from '../../../../core/i18n'
 import { createUniqueId } from '../../../../core/utils/ids'
@@ -14,10 +14,9 @@ import {
 } from './resource'
 import { invalidateUserMoney } from '../invalidateUserMoney'
 import { useAccountWorkspace } from '../accountWorkspace'
-import { PAGE_SIZES } from '../../../../core/config/pagination'
+import { useCursorInfiniteList } from '../../../../core/query/useCursorInfiniteList'
 import { noRetry } from '../../../../core/query/queryDefaults'
 
-const historyPageSize = PAGE_SIZES.standard
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }
 
 export function useRecharge(
@@ -31,7 +30,7 @@ export function useRecharge(
   const transportReady = computed(() => toValue(active) && isSelectionSettled.value)
 
   const returnToken = computed(() => toValue(paymentReturn)?.publicToken ?? '')
-  const { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery } = useRechargeQueries(
+  const { optionsQuery, pendingOrdersQuery, history, returnQuery } = useRechargeQueries(
     resource,
     activeWorkspaceId,
     transportReady,
@@ -59,10 +58,7 @@ export function useRecharge(
     removeCachedPendingOrder: pendingOrders.removeCachedPendingOrder,
   })
 
-  const historyItems = computed(
-    () => historyQuery.data.value?.pages.flatMap((page) => page.items) ?? [],
-  )
-  const hasLoadedHistory = computed(() => historyQuery.data.value !== undefined)
+  const historyQuery = history.query
 
   return {
     purchaseOptions: optionsQuery.data,
@@ -87,16 +83,18 @@ export function useRecharge(
     returnPending: returnQuery.isPending,
     returnError: returnQuery.error,
     retryReturn: returnQuery.refetch,
-    historyItems,
-    historyInitialPending: computed(() => historyQuery.isPending.value && !hasLoadedHistory.value),
-    historyInitialError: computed(() => (hasLoadedHistory.value ? null : historyQuery.error.value)),
-    historyLoadMoreError: computed(() =>
-      historyQuery.isFetchNextPageError.value ? historyQuery.error.value : null,
+    historyItems: history.items,
+    historyInitialPending: computed(
+      () => historyQuery.isPending.value && !history.hasLoadedPage.value,
     ),
-    historyHasNextPage: historyQuery.hasNextPage,
-    historyFetchingNextPage: historyQuery.isFetchingNextPage,
-    retryHistory: historyQuery.refetch,
-    loadMoreHistory: historyQuery.fetchNextPage,
+    historyInitialError: computed(() =>
+      history.hasLoadedPage.value ? null : historyQuery.error.value,
+    ),
+    historyLoadMoreError: history.loadMoreError,
+    historyHasNextPage: history.hasNextPage,
+    historyFetchingNextPage: history.isFetchingNextPage,
+    retryHistory: history.retryInitial,
+    loadMoreHistory: history.loadMore,
   }
 }
 
@@ -212,21 +210,19 @@ function useRechargeQueries(
     ...noRetry(),
   })
 
-  const historyQuery = useInfiniteQuery({
+  const history = useCursorInfiniteList({
     queryKey: computed(() => paymentsQueryKeys.history(toValue(workspaceId) ?? '')),
-    queryFn: ({ pageParam, signal }: { pageParam: string; signal: AbortSignal }) =>
+    fetchPage: ({ pageParam, signal, pageSize }) =>
       resource.listRecharges(
         toValue(workspaceId) ?? '',
         {
-          limit: historyPageSize,
+          limit: pageSize,
           ...(pageParam ? { cursor: pageParam } : {}),
         },
         signal,
       ),
-    initialPageParam: '',
-    getNextPageParam: (lastPage) => lastPage.next_cursor,
-    enabled: transportReady,
-    ...noRetry(),
+    isEnabled: transportReady,
+    getItems: (page) => page.items,
   })
 
   const returnQuery = useQuery({
@@ -239,7 +235,7 @@ function useRechargeQueries(
     ...noRetry(),
   })
 
-  return { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery }
+  return { optionsQuery, pendingOrdersQuery, history, returnQuery }
 }
 
 function useCheckoutAction(

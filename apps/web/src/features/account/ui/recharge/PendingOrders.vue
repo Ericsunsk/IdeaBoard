@@ -74,6 +74,7 @@ import { useNow } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { parseDateGuard } from '../../../../core/datetime/parse'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { formatAccountExpiryDateTime } from '../../session/formatters'
 import { accountPrimaryActionButtonClass } from '../shared/ui'
@@ -137,13 +138,14 @@ function statusTone(status: PendingPaymentOrder['status']) {
 }
 
 function isCreditProcessingDelayed(updatedAt: string) {
-  const updatedAtMs = new Date(updatedAt).getTime()
-  return Number.isFinite(updatedAtMs) && now.value.getTime() - updatedAtMs > 60_000
+  const updatedAtDate = parseDateGuard(updatedAt)
+  if (!updatedAtDate) return false
+  return now.value.getTime() - updatedAtDate.getTime() > 60_000
 }
 
 function expiryText(item: PendingPaymentOrder) {
-  const date = new Date(item.expires_at)
-  if (Number.isNaN(date.getTime())) return t('account.topUp.expiryUnknown')
+  const date = parseDateGuard(item.expires_at)
+  if (!date) return t('account.topUp.expiryUnknown')
   const formatted = formatAccountExpiryDateTime(date)
   return item.status === 'expired'
     ? t('account.topUp.expiredAt', { time: formatted })

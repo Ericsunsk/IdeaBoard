@@ -27,6 +27,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 	statisticscontracts "ideaboard/api/internal/tasking/ports/statistics"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,7 +57,7 @@ func (s *StatisticsStore) dbWithContext(ctx context.Context) repositoryQueryer {
 
 func (s *StatisticsStore) ready() error {
 	if s == nil || s.db == nil || s.q == nil {
-		return fmt.Errorf("tasking statistics: database pool not configured")
+		return fmt.Errorf("tasking statistics: %w", database.ErrPoolNotConfigured)
 	}
 	return nil
 }

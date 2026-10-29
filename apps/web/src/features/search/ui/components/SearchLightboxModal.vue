@@ -9,7 +9,7 @@
       <div
         v-if="visible && activeResult"
         ref="dialogRef"
-        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-[var(--blur-overlay)] select-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-lightbox-title"

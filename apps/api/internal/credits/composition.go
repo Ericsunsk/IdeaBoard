@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/credits/infrastructure/postgres"
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -73,7 +74,7 @@ func postgresBackends() postgresBackendsSet {
 
 var defaultPostgresBackends = postgresBackends()
 
-var errServiceUnavailable = fmt.Errorf("credits service: database pool not configured")
+var errServiceUnavailable = fmt.Errorf("credits service: %w", database.ErrPoolNotConfigured)
 
 func (s *Service) serviceError() error {
 	if s == nil {

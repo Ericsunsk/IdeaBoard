@@ -171,6 +171,7 @@ import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { ibFormInputClass } from '../../../../theme/formControls'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { useProfileFeedback } from '../../session/profile/useProfileFeedback'
+import { parseDateGuard } from '../../../../core/datetime/parse'
 import { formatAccountShanghaiDateTime } from '../../session/formatters'
 import { useRewardRedemption } from '../../session/rewards/useRewardRedemption'
 import { useRewardHistory } from '../../session/rewards/useRewardHistory'
@@ -228,8 +229,8 @@ function formatCreditedAmount(value: number): string {
 }
 
 function formatShanghaiDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('account.rewards.unknownTime')
+  const date = parseDateGuard(value)
+  if (!date) return t('account.rewards.unknownTime')
 
   return formatAccountShanghaiDateTime(date)
 }

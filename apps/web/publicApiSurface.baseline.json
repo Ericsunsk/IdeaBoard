@@ -2337,6 +2337,14 @@
     "parseRequestedOutputCount"
   ],
   "src/core/contracts/imageServices.ts": ["SERVICE", "SERVICE_SLUGS", "Service"],
+  "src/core/datetime/parse.ts": ["parseDateGuard"],
+  "src/core/datetime/shanghai.ts": [
+    "SHANGHAI_TIME_ZONE",
+    "getShanghaiInputPartsFormat",
+    "getShanghaiMonthShortFormat",
+    "getShanghaiWallPartsFormat",
+    "toShanghaiParts"
+  ],
   "src/core/errors/errorCatalog.ts": [
     "ErrorCodeCopyKeyMap",
     "readinessErrorCodeCopyKey",
@@ -2541,6 +2549,8 @@
     "normalizeTaskImageResult",
     "normalizeTaskImageResults"
   ],
+  "src/core/query/useCursorInfiniteList.ts": ["useCursorInfiniteList"],
+  "src/core/query/useQueryPolling.ts": ["useQueryPolling"],
   "src/core/query/userCreditsInvalidation.ts": [
     "UserCreditsInvalidationEvent",
     "UserCreditsInvalidationListener",

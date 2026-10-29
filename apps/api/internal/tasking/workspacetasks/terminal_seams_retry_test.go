@@ -57,7 +57,7 @@ func TestCreateSeamsMissingIsRetryableUnavailable(t *testing.T) {
 			if !errors.Is(err, ErrSettlementUnavailable) || !strings.Contains(err.Error(), "caller must retry") {
 				t.Fatalf("Create err = %v, want retryable unavailable", err)
 			}
-			if len(store.claims) != 0 {
+			if store.claimCount() != 0 {
 				t.Fatal("missing dependency must not claim a submission")
 			}
 		})

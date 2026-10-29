@@ -74,6 +74,20 @@ func (s *InMemoryStore) SetClockForTests(now func() time.Time) {
 	s.now = now
 }
 
+// RestoreTaskForTest restores the pre-image of one task row. The shared
+// settlement fake (db/dbutil/testscope) uses it to register rollback undos
+// for terminal flips, so a rolled-back settlement restores atomicity
+// instead of leaking a flipped task.
+func (s *InMemoryStore) RestoreTaskForTest(workspaceID, taskID string, before *WorkspaceTask) {
+	if s == nil || before == nil {
+		return
+	}
+	snapshot := *before
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tasks[taskKey(workspaceID, taskID)] = &snapshot
+}
+
 func (s *InMemoryStore) clock() time.Time {
 	if s.now != nil {
 		return s.now().UTC()

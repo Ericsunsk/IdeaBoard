@@ -266,7 +266,7 @@ const ADMIN_TASK_DETAIL_QUERY_ROOT = [...ADMIN_MONITOR_QUERY_KEY, 'detail'] as c
 
 type NestedQueryOptions = {
   query?: {
-    refetchInterval?: number | false | (() => number | false)
+    refetchInterval?: MaybeRefOrGetter<number | false>
     refetchIntervalInBackground?: boolean
     refetchOnWindowFocus?: boolean
     enabled?: MaybeRefOrGetter<boolean>

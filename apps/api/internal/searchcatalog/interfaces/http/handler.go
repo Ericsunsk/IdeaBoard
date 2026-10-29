@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
@@ -59,8 +60,7 @@ func NewHandler(repository providerConfigStore, adapters ...ports.ProviderTestAd
 }
 
 func (h *Handler) List(c *gin.Context) {
-	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.repository != nil, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable) {
 		return
 	}
 	configs, err := h.repository.List(c.Request.Context())
@@ -78,8 +78,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.repository != nil, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable) {
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
@@ -115,8 +114,7 @@ func (h *Handler) Test(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.repository != nil, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable) {
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
@@ -125,8 +123,7 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	adapter := h.adapters[provider]
-	if adapter == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable2)
+	if !platformhttp.RequireDependencyCode(c, adapter != nil, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable2) {
 		return
 	}
 	key, err := h.repository.RawAPIKey(c.Request.Context(), provider)

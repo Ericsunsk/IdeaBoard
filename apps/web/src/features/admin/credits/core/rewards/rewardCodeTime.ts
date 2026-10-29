@@ -1,4 +1,6 @@
-const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
+import { parseDateGuard } from '@/core/datetime/parse'
+import { getShanghaiInputPartsFormat, toShanghaiParts } from '@/core/datetime/shanghai'
+
 const DATE_TIME_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 
 export function shanghaiDateTimeInputToPickerDate(value: string): Date | null {
@@ -18,7 +20,7 @@ export function pickerDateToShanghaiDateTimeInput(value: Date | null | undefined
 // 过期 preset 的 wall 日历计算：取此刻的上海 wall 日期加天，落 23:59。
 // 不经本地时区中转，否则浏览器非 Asia/Shanghai 且两地日期不一致时会差一天。
 export function shanghaiEndOfDayPlusDays(days: number, now: Date = new Date()): string {
-  if (Number.isNaN(now.getTime())) return ''
+  if (!parseDateGuard(now)) return ''
   const wallDate = /^(\d{4})-(\d{2})-(\d{2})T/.exec(isoToShanghaiDateTimeInput(now.toISOString()))
   if (!wallDate) return ''
   const target = new Date(
@@ -32,23 +34,10 @@ export function shanghaiEndOfDayPlusDays(days: number, now: Date = new Date()): 
 }
 
 export function isoToShanghaiDateTimeInput(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
+  const date = parseDateGuard(value)
+  if (!date) return ''
 
-  const entries = new Intl.DateTimeFormat('en-CA', {
-    timeZone: SHANGHAI_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-    .formatToParts(date)
-    .reduce<Record<string, string>>((result, part) => {
-      if (part.type !== 'literal') result[part.type] = part.value
-      return result
-    }, {})
+  const entries = toShanghaiParts(date, getShanghaiInputPartsFormat())
 
   if (!entries.year || !entries.month || !entries.day || !entries.hour || !entries.minute) {
     return ''

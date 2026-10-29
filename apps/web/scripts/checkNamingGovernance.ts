@@ -696,6 +696,16 @@ const EXPORTED_SYMBOL =
 function collectExportedSymbols(source: string): Set<string> {
   const exported = new Set<string>()
   for (const match of source.matchAll(EXPORTED_SYMBOL)) exported.add(match[1] ?? '')
+  const parsed = ts.createSourceFile('module.ts', source, ts.ScriptTarget.Latest, true)
+  for (const statement of parsed.statements) {
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      for (const element of statement.exportClause.elements) exported.add(element.name.text)
+    }
+  }
   return exported
 }
 
@@ -1109,6 +1119,42 @@ function runSelfTest(): void {
         'export function useThing() {\n  return 1\n}\n',
       ),
       null,
+    ],
+    [
+      'symbol-alignment-named-reexport',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export {\n useThing\n} from "./implementation"',
+      ),
+      null,
+    ],
+    [
+      'symbol-alignment-aliased-export',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'const useInternal = () => 1; export { useInternal as useThing }',
+      ),
+      null,
+    ],
+    [
+      'symbol-alignment-reexport-alias-mismatch',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export { useThing as useOther } from "./implementation"',
+      )?.kind,
+      'symbol-alignment',
+    ],
+    [
+      'symbol-alignment-commented-reexport',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        '// export { useThing } from "./implementation"',
+      )?.kind,
+      'symbol-alignment',
     ],
     [
       'symbol-alignment-async-mismatch',

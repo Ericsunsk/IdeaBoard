@@ -1,48 +1,39 @@
 import { computed, type MaybeRefOrGetter } from 'vue'
-import { useInfiniteQuery } from '@tanstack/vue-query'
 import { useCreditsSync } from '../credits/useCreditsSync'
 import { billingRecordsQueryKeys, fetchBillingRecords } from './resource'
-import { PAGE_SIZES } from '../../../../core/config/pagination'
-import { noRetry } from '../../../../core/query/queryDefaults'
+import { useCursorInfiniteList } from '../../../../core/query/useCursorInfiniteList'
 import { useBillingAccount } from '../billing-account/useBillingAccount'
-
-const pageSize = PAGE_SIZES.standard
 
 export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
   const billing = useBillingAccount(enabled)
 
-  const query = useInfiniteQuery({
-    queryKey: computed(() =>
-      billingRecordsQueryKeys.list(
-        billing.readScope.value.workspaceId,
-        billing.readScope.value.billingAccountId,
-        billing.readScope.value.identity,
-        billing.readScope.value.consumptionScope ?? '',
+  const { query, items, hasLoadedPage, loadMoreError, hasNextPage, isFetchingNextPage, loadMore } =
+    useCursorInfiniteList({
+      queryKey: computed(() =>
+        billingRecordsQueryKeys.list(
+          billing.readScope.value.workspaceId,
+          billing.readScope.value.billingAccountId,
+          billing.readScope.value.identity,
+          billing.readScope.value.consumptionScope ?? '',
+        ),
       ),
-    ),
-    queryFn: ({ queryKey, pageParam, signal }) =>
-      fetchBillingRecords(
-        queryKey[3],
-        {
-          page_size: pageSize,
-          ...(pageParam ? { cursor: pageParam } : {}),
-        },
-        signal,
-      ),
-    initialPageParam: '',
-    getNextPageParam: (lastPage) => lastPage.next_cursor,
-    enabled: billing.isReady,
-    ...noRetry(),
-  })
+      fetchPage: ({ queryKey, pageParam, signal, pageSize }) =>
+        fetchBillingRecords(
+          queryKey[3] as string,
+          {
+            page_size: pageSize,
+            ...(pageParam ? { cursor: pageParam } : {}),
+          },
+          signal,
+        ),
+      isEnabled: billing.isReady,
+      getItems: (page) => page.records,
+    })
 
-  const records = computed(() =>
-    billing.isReady.value ? (query.data.value?.pages.flatMap((page) => page.records) ?? []) : [],
-  )
-  const hasLoadedPage = computed(() => query.data.value !== undefined)
+  const records = computed(() => (billing.isReady.value ? [...items.value] : []))
   const initialError = billing.readError(() => (!hasLoadedPage.value ? query.error.value : null))
 
-  // jscpd:ignore-start -- billing and reward pagination expose distinct domain-shaped results.
   return {
     billingAccountId: billing.billingAccountId,
     consumptionScope: billing.consumptionScope,
@@ -52,11 +43,10 @@ export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
       () => !initialError.value && query.isPending.value && !hasLoadedPage.value,
     ),
     initialError,
-    loadMoreError: computed(() => (query.isFetchNextPageError.value ? query.error.value : null)),
-    hasNextPage: query.hasNextPage,
-    isFetchingNextPage: query.isFetchingNextPage,
+    loadMoreError,
+    hasNextPage,
+    isFetchingNextPage,
     retryInitial: () => billing.retryRead(query.refetch),
-    loadMore: query.fetchNextPage,
+    loadMore,
   }
-  // jscpd:ignore-end
 }

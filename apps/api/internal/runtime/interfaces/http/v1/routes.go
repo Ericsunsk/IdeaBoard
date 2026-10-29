@@ -445,25 +445,6 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 	if !ok || !h.requireStore(c) {
 		return
 	}
-	pageSize, ok := v1PageSize(c)
-	if !ok {
-		return
-	}
-	offset := 0
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-			c.Abort()
-			return
-		}
-		if cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-			c.Abort()
-			return
-		}
-		offset = cursor.Offset
-	}
 	ctx := c.Request.Context()
 	workspaces, err := h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
 	if err != nil {
@@ -491,28 +472,13 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 			}
 		}
 	}
-	if offset > len(workspaces) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-		c.Abort()
+	slice, meta, ok := v1OffsetPage(c, workspaces, runtimehttp.MsgServiceUnavailable38)
+	if !ok {
 		return
 	}
-	end := offset + pageSize
-	if end > len(workspaces) {
-		end = len(workspaces)
-	}
-	page := make([]v1WorkspaceDTO, 0, end-offset)
-	for _, w := range workspaces[offset:end] {
+	page := make([]v1WorkspaceDTO, 0, len(slice))
+	for _, w := range slice {
 		page = append(page, toWorkspaceDTO(w))
-	}
-	meta := contract.NewPageMeta("", false)
-	if end < len(workspaces) {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
-		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-			c.Abort()
-			return
-		}
-		meta = contract.NewPageMeta(next, true)
 	}
 	contract.RenderPaginated(c, page, meta)
 }

@@ -1,5 +1,6 @@
 import { computed, watch, type Ref } from 'vue'
 import { useInfiniteQuery, type QueryClient } from '@tanstack/vue-query'
+import { useQueryPolling } from '@/core/query/useQueryPolling'
 import {
   getGetUserNotificationsUnreadCountQueryKey,
   getListUserNotificationsQueryKey,
@@ -36,6 +37,11 @@ export function useNotificationReads(options: {
   params: Ref<ListUserNotificationsParams>
 }) {
   const { queryClient, identity, isEnabled, isVisible, params } = options
+  // Both queries pause in hidden tabs; panel visibility additionally gates the list.
+  const polling = useQueryPolling({
+    visibleInterval: NOTIFICATION_POLL_INTERVAL_MS,
+    isEnabled: () => isEnabled.value,
+  })
   const notificationsQuery = useInfiniteQuery(
     {
       queryKey: computed(() => [
@@ -59,7 +65,7 @@ export function useNotificationReads(options: {
         const nextOffset = page.offset + page.items.length
         return page.items.length > 0 && nextOffset < page.total ? nextOffset : undefined
       },
-      refetchInterval: computed(() => (isVisible.value ? NOTIFICATION_POLL_INTERVAL_MS : false)),
+      refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: true,
     },
@@ -69,7 +75,7 @@ export function useNotificationReads(options: {
     {
       query: {
         queryKey: computed(() => [...getGetUserNotificationsUnreadCountQueryKey(), identity.value]),
-        refetchInterval: NOTIFICATION_POLL_INTERVAL_MS,
+        refetchInterval: polling.refetchInterval,
         refetchIntervalInBackground: false,
         refetchOnWindowFocus: true,
         enabled: isEnabled,

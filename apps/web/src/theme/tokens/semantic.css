@@ -251,6 +251,8 @@
     --color-media-foreground: var(--primitive-neutral-0);
     --color-overlay-btn-bg: var(--primitive-neutral-1000-alpha-42);
     --color-overlay-btn-bg-hover: var(--primitive-neutral-1000-alpha-68);
+    --color-overlay-scrim-line: var(--primitive-neutral-0-alpha-15);
+    --color-home-hero-ring: var(--primitive-neutral-0-alpha-95);
 
     /* ── Scrollbars, masks ── */
     --color-scrollbar-thumb: color-mix(in srgb, var(--foreground) 58%, transparent);

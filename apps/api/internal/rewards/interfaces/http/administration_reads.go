@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"strconv"
 	"strings"
 
@@ -31,8 +32,7 @@ type searchRewardCodesRequest struct {
 
 func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	if _, ok := requireAdmin(c); !ok {
@@ -76,8 +76,7 @@ func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 
 func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	rewardCodeID, _, ok := requireAdminRewardCode(c)
@@ -120,8 +119,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 
 func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		writeRewardUnavailableError(c, false)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable) {
 		return
 	}
 	rewardCodeID, _, ok := requireAdminRewardCode(c)

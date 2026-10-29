@@ -31,9 +31,9 @@ package worker
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -41,82 +41,40 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// workerFakeTx is a no-op settlement transaction: Commit/Rollback only
-// record their outcome (plus deferred cleanups on rollback). All other
-// pgx.Tx legs are never called by the in-memory fakes below.
-type workerFakeTx struct {
-	pgx.Tx
-	committed  bool
-	rolledBack bool
-	onRollback []func()
-}
+// workerFakeTx aliases the shared settlement fake so the three hand-copied
+// harnesses cannot drift again. Neighboring suite files keep referring to
+// workerFakeTx; this alias keeps that wiring compiling.
+type workerFakeTx = testscope.Tx
 
-func (t *workerFakeTx) Commit(context.Context) error {
-	t.committed = true
-	return nil
-}
-
-func (t *workerFakeTx) Rollback(context.Context) error {
-	t.rolledBack = true
-	for _, fn := range t.onRollback {
-		fn()
-	}
-	t.onRollback = nil
-	return nil
-}
-
-// workerShimTx wraps a real postgres settlement transaction so the
-// database-outside fake legs (in-memory claim fence, fake holder maps,
-// fake queue slice) can register rollback undos on it. Task rows need no
-// undo: the real rollback discards them.
-type workerShimTx struct {
-	pgx.Tx
-	onRollback []func()
-}
-
-func (t *workerShimTx) Rollback(ctx context.Context) error {
-	for _, fn := range t.onRollback {
-		fn()
-	}
-	t.onRollback = nil
-	return t.Tx.Rollback(ctx)
-}
+// workerShimTx aliases the shared shim: it wraps a real postgres
+// settlement transaction so the database-outside fake legs (in-memory
+// claim fence, fake holder maps, fake queue slice) can register rollback
+// undos on it. Task rows need no undo: the real rollback discards them.
+type workerShimTx = testscope.ShimTx
 
 // workerOnRollback registers an in-memory cleanup on either transaction
 // flavor. It is a no-op for foreign transactions (e.g. ambient carriers),
 // which own their own commit/rollback.
 func workerOnRollback(tx pgx.Tx, fn func()) {
-	switch t := tx.(type) {
-	case *workerFakeTx:
-		t.onRollback = append(t.onRollback, fn)
-	case *workerShimTx:
-		t.onRollback = append(t.onRollback, fn)
-	}
-}
-
-func workerClaimScopeKey(workspaceID, operation, key string) string {
-	return strings.TrimSpace(workspaceID) + "\x00" + strings.TrimSpace(operation) + "\x00" + strings.TrimSpace(key)
+	testscope.OnRollback(tx, fn)
 }
 
 // txWorkerStore wraps the merged claim+attempt adapter with the
 // settlement-transaction seams for database-free worker loop tests.
 type txWorkerStore struct {
 	*attemptClaimStore
-	mu     sync.Mutex
-	claims map[string]*workspacetasks.SubmissionClaim
+	fence  testscope.Claims[workspacetasks.SubmissionClaim]
 	lastTx *workerFakeTx
 }
 
 func newTxWorkerStore(store *attemptClaimStore) *txWorkerStore {
-	return &txWorkerStore{attemptClaimStore: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
+	return &txWorkerStore{attemptClaimStore: store}
 }
 
 func (s *txWorkerStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
-	tx := &workerFakeTx{}
-	s.mu.Lock()
+	scope, tx := testscope.BeginScope(ctx)
 	s.lastTx = tx
-	s.mu.Unlock()
-	return dbutil.ScopeForTest(ctx, tx, true), nil
+	return scope, nil
 }
 
 func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
@@ -124,12 +82,10 @@ func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *wor
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := tx.(*workerFakeTx); ok {
-		workspaceID, taskID := task.WorkspaceID, task.ID
-		workerOnRollback(tx, func() {
-			_ = s.DeleteTask(context.Background(), workspaceID, taskID)
-		})
-	}
+	workspaceID, taskID := task.WorkspaceID, task.ID
+	workerOnRollback(tx, func() {
+		_ = s.DeleteTask(context.Background(), workspaceID, taskID)
+	})
 	return created, nil
 }
 
@@ -137,16 +93,49 @@ func (s *txWorkerStore) GetTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, 
 	return s.GetTask(ctx, workspaceID, taskID)
 }
 
-func (s *txWorkerStore) CompleteTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
-	return s.CompleteTask(ctx, workspaceID, taskID, outputs)
+func (s *txWorkerStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	completed, err := s.CompleteTask(ctx, workspaceID, taskID, outputs)
+	if err != nil {
+		return nil, err
+	}
+	restoreWorkerTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return completed, nil
 }
 
-func (s *txWorkerStore) FailTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
-	return s.FailTask(ctx, workspaceID, taskID, errorMsg)
+func (s *txWorkerStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	failed, err := s.FailTask(ctx, workspaceID, taskID, errorMsg)
+	if err != nil {
+		return nil, err
+	}
+	restoreWorkerTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return failed, nil
 }
 
-func (s *txWorkerStore) CancelTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
-	return s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+func (s *txWorkerStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	cancelled, already, err := s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+	if err != nil || already {
+		return cancelled, already, err
+	}
+	restoreWorkerTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return cancelled, already, nil
+}
+
+// restoreWorkerTaskOnRollback registers the pre-image of one task row on
+// the fake transaction so a settlement rollback restores it instead of
+// leaking a flipped task. The mechanics live in testscope; this only
+// binds the store's restore helper. It is a no-op for foreign
+// transactions, which own their own rollback.
+func restoreWorkerTaskOnRollback(tx pgx.Tx, store *workspacetasks.InMemoryStore, workspaceID, taskID string, before *workspacetasks.WorkspaceTask) {
+	if store == nil || before == nil {
+		return
+	}
+	snapshot := *before
+	testscope.OnRollback(tx, func() {
+		store.RestoreTaskForTest(workspaceID, taskID, &snapshot)
+	})
 }
 
 func (s *txWorkerStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
@@ -154,21 +143,7 @@ func (s *txWorkerStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, wo
 }
 
 func (s *txWorkerStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
-	key := workerClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if existing, ok := s.claims[key]; ok {
-		dup := *existing
-		return &dup, false, nil
-	}
-	stored := claim
-	s.claims[key] = &stored
-	workerOnRollback(tx, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		delete(s.claims, key)
-	})
-	return nil, true, nil
+	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
 // txPGServiceStore wraps the real postgres task store for the fixture-DB
@@ -177,12 +152,11 @@ func (s *txWorkerStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim 
 // claim table).
 type txPGServiceStore struct {
 	*taskpostgres.Store
-	mu     sync.Mutex
-	claims map[string]*workspacetasks.SubmissionClaim
+	fence testscope.Claims[workspacetasks.SubmissionClaim]
 }
 
 func newTxPGServiceStore(store *taskpostgres.Store) *txPGServiceStore {
-	return &txPGServiceStore{Store: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
+	return &txPGServiceStore{Store: store}
 }
 
 func (s *txPGServiceStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
@@ -190,25 +164,11 @@ func (s *txPGServiceStore) BeginSettlementScope(ctx context.Context) (*dbutil.Sc
 	if err != nil {
 		return nil, err
 	}
-	return dbutil.ScopeForTest(ctx, &workerShimTx{Tx: scope.Tx()}, true), nil
+	return dbutil.ScopeForTest(ctx, testscope.WrapShim(scope.Tx()), true), nil
 }
 
 func (s *txPGServiceStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
-	key := workerClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if existing, ok := s.claims[key]; ok {
-		dup := *existing
-		return &dup, false, nil
-	}
-	stored := claim
-	s.claims[key] = &stored
-	workerOnRollback(tx, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		delete(s.claims, key)
-	})
-	return nil, true, nil
+	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
 // workerTestAcceptance mirrors the production submit gate without a

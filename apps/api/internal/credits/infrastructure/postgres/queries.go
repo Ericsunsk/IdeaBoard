@@ -10,6 +10,8 @@ import (
 	"ideaboard/api/internal/consumptionread"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/pagination"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,8 +22,8 @@ func GetAvailableBalances(
 	pool *pgxpool.Pool,
 	billingAccountIDs []int64,
 ) (map[int64]int64, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits service: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits service: %w", err)
 	}
 	if len(billingAccountIDs) == 0 {
 		return map[int64]int64{}, nil
@@ -91,8 +93,8 @@ ORDER BY requested.billing_account_id`, billingAccountIDs)
 }
 
 func GetWallet(ctx context.Context, pool *pgxpool.Pool, billingAccountID int64) (domain.WalletDetails, error) {
-	if pool == nil {
-		return domain.WalletDetails{}, fmt.Errorf("credits service: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return domain.WalletDetails{}, fmt.Errorf("credits service: %w", err)
 	}
 	if connection, ok := dbutil.ConnectionFromContext(ctx); ok {
 		return getWallet(ctx, connection, billingAccountID)
@@ -184,8 +186,8 @@ func getWallet(ctx context.Context, q walletQuerier, billingAccountID int64) (do
 }
 
 func ListLedger(ctx context.Context, pool *pgxpool.Pool, input domain.ListLedgerInput) (domain.LedgerPage, error) {
-	if pool == nil {
-		return domain.LedgerPage{}, fmt.Errorf("credits service: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return domain.LedgerPage{}, fmt.Errorf("credits service: %w", err)
 	}
 	if input.BillingAccountID <= 0 {
 		return domain.LedgerPage{}, domain.ErrInvalidCommand
@@ -248,10 +250,7 @@ LIMIT $3`, input.BillingAccountID, input.BeforeSequence, limit+1)
 		return domain.LedgerPage{}, fmt.Errorf("credits service: read ledger transactions: %w", err)
 	}
 	page := domain.LedgerPage{}
-	if len(transactions) > limit {
-		page.NextBeforeSequence = transactions[limit-1].SequenceID
-		transactions = transactions[:limit]
-	}
+	transactions, page.NextBeforeSequence = pagination.TruncateBeforeID(transactions, limit, func(tx domain.LedgerTransaction) int64 { return tx.SequenceID })
 	if err := loadPostings(ctx, pool, transactions); err != nil {
 		return domain.LedgerPage{}, err
 	}
@@ -463,8 +462,8 @@ func GetCaptureUsage(
 	filter domain.UsageFilter,
 	location *time.Location,
 ) (totalCredits int64, peakDailyCredits int64, firstCaptureDay time.Time, err error) {
-	if pool == nil {
-		return 0, 0, time.Time{}, fmt.Errorf("credits service: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("credits service: %w", err)
 	}
 	if billingAccountID <= 0 || !filter.Valid() {
 		return 0, 0, time.Time{}, domain.ErrInvalidCommand
@@ -514,8 +513,8 @@ func GetDailyCaptureUsage(
 	start time.Time,
 	endExclusive time.Time,
 ) (map[string]int64, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits service: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits service: %w", err)
 	}
 	if billingAccountID <= 0 || !filter.Valid() {
 		return nil, domain.ErrInvalidCommand

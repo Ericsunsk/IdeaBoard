@@ -1,17 +1,13 @@
 import { getLocaleDateFormatter } from '../i18n/formatters'
 import { getActiveUserLocale } from '../i18n/userLocale'
-
-function toDate(input: string | Date): Date | null {
-  const d = typeof input === 'string' ? new Date(input) : input
-  return Number.isNaN(d.getTime()) ? null : d
-}
+import { parseDateGuard } from '../datetime/parse'
 
 /**
  * Canonical `YYYY-MM-DD` key (locale-invariant, e.g. chart buckets, stable labels).
  * Local calendar fields keep it stable without `Intl` overhead.
  */
 export function formatDateOnly(input: string | Date): string {
-  const d = toDate(input)
+  const d = parseDateGuard(input)
   if (!d) return ''
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -21,7 +17,7 @@ export function formatDateOnly(input: string | Date): string {
 
 /** Locale-aware admin timestamp. Falls back when the input is invalid. */
 export function formatAdminDateTime(input: string | Date, fallback = '-'): string {
-  const d = toDate(input)
+  const d = parseDateGuard(input)
   if (!d) return fallback
   return getLocaleDateFormatter(getActiveUserLocale(), {
     year: 'numeric',

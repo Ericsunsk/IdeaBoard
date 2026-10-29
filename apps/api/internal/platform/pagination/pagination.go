@@ -106,3 +106,18 @@ func DecodeCursor[T any](value string) (*T, error) {
 	}
 	return &cursor, nil
 }
+
+// TruncateBeforeID applies the shared limit+1 truncation for id-ordered
+// pages: callers query limit+1 rows, then converge to (page, next). When
+// more rows exist, next is the idOf the last returned row (limit-1) and the
+// page is truncated to limit; otherwise next is zero ("no more") and the
+// page is returned whole. The off-by-one (limit-1, not limit) and the
+// zero-means-exhausted semantics live here alone.
+func TruncateBeforeID[T any, ID ~int64](items []T, limit int, idOf func(T) ID) ([]T, ID) {
+	var zero ID
+	if len(items) <= limit {
+		return items, zero
+	}
+	next := idOf(items[limit-1])
+	return items[:limit], next
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/platform/errorrender"
+	"ideaboard/api/internal/platform/pagination"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"strconv"
@@ -345,10 +346,7 @@ func (s *Service) ListRedemptions(ctx context.Context, input ListRedemptionsInpu
 		return RedemptionHistoryPage{}, fmt.Errorf("read reward Redemption history: %w", err)
 	}
 	page := RedemptionHistoryPage{Redemptions: items}
-	if len(items) > limit {
-		page.Redemptions = items[:limit]
-		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
-	}
+	page.Redemptions, page.NextBeforeID = pagination.TruncateBeforeID(page.Redemptions, limit, func(item RedemptionHistoryItem) int64 { return item.ID })
 	return page, nil
 }
 

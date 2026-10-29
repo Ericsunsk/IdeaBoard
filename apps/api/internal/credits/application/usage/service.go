@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,8 +22,8 @@ type Backend struct {
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits usage: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits usage: %w", err)
 	}
 	if backend.GetCaptureUsage == nil || backend.GetDailyCaptureUsage == nil {
 		return nil, fmt.Errorf("credits usage: persistence backend not configured")
@@ -37,7 +38,7 @@ func (s *Service) GetCaptureUsage(
 	location *time.Location,
 ) (totalCredits int64, peakDailyCredits int64, firstCaptureDay time.Time, err error) {
 	if s == nil || s.pool == nil {
-		return 0, 0, time.Time{}, fmt.Errorf("credits service: database pool not configured")
+		return 0, 0, time.Time{}, fmt.Errorf("credits service: %w", database.ErrPoolNotConfigured)
 	}
 	if billingAccountID <= 0 || !filter.Valid() {
 		return 0, 0, time.Time{}, domain.ErrInvalidCommand
@@ -54,7 +55,7 @@ func (s *Service) GetDailyCaptureUsage(
 	endExclusive time.Time,
 ) (map[string]int64, error) {
 	if s == nil || s.pool == nil {
-		return nil, fmt.Errorf("credits service: database pool not configured")
+		return nil, fmt.Errorf("credits service: %w", database.ErrPoolNotConfigured)
 	}
 	return s.backend.GetDailyCaptureUsage(ctx, s.pool, billingAccountID, filter, location, start, endExclusive)
 }

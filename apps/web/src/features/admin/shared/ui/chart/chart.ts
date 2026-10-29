@@ -3,12 +3,16 @@ import { markRaw, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import {
   chartFontFamilyStack,
   createChartEmptyStatePlugin,
-  defineChartNumericScale,
   defineChartOptions,
   formatCompactNumber,
   type ChartOptions,
   withAlpha,
 } from '@/core/lib/chartPrimitives'
+import {
+  defineSharedChartNumericScale,
+  defineSharedChartTooltip,
+  readChartToken,
+} from '@/core/lib/chartTheme'
 import { resolveChartAnimation } from '@/core/motion/chartMotion'
 import { isDarkModeActive } from '@/theme/composables/useTheme'
 import { adminThemeTokenFallbacks, adminThemeTokenVars } from '../../core/adminThemeTokens'
@@ -29,11 +33,8 @@ const adminChartFontFamily = chartFontFamilyStack
 function themedChartToken(key: keyof typeof adminThemeTokenFallbacks): string {
   // Keep computed chart options dependent on the shared theme selection.
   isDarkModeActive()
-  const color =
-    typeof document === 'undefined'
-      ? ''
-      : getComputedStyle(document.documentElement).getPropertyValue(adminThemeTokenVars[key]).trim()
-  return color && !color.includes('var(') ? color : adminThemeTokenFallbacks[key]
+  const styles = typeof document === 'undefined' ? null : getComputedStyle(document.documentElement)
+  return readChartToken(styles, adminThemeTokenVars[key], adminThemeTokenFallbacks[key])
 }
 
 export const adminChartTheme = {
@@ -159,46 +160,52 @@ export function adminChartLegend(position: 'top' | 'bottom' = 'top') {
 }
 
 export function defineAdminChartCountScale(input: AdminChartNumericScaleInput = {}) {
-  return defineChartNumericScale({
-    stacked: input.stacked,
-    values: input.values,
-    max: input.max,
-    min: input.min,
-    headroom: input.headroom,
-    precision: 0,
-    stepSize: input.stepSize,
-    tickColor: adminChartTheme.axisText,
-    gridColor: input.gridColor ?? adminChartTheme.splitLine,
-    borderColor: input.borderColor,
-    formatTick: formatCompactNumber,
-  })
+  return defineSharedChartNumericScale(
+    { axisText: adminChartTheme.axisText, grid: adminChartTheme.splitLine, axisLine: '' },
+    {
+      stacked: input.stacked,
+      values: input.values,
+      max: input.max,
+      min: input.min,
+      headroom: input.headroom,
+      precision: 0,
+      stepSize: input.stepSize,
+      gridColor: input.gridColor,
+      borderColor: input.borderColor,
+      formatTick: formatCompactNumber,
+    },
+  )
 }
 
 export function defineAdminChartDurationScale(input: AdminChartNumericScaleInput = {}) {
-  return defineChartNumericScale({
-    values: input.values,
-    max: input.max,
-    min: input.min,
-    headroom: input.headroom,
-    stepSize: input.stepSize,
-    tickColor: adminChartTheme.axisText,
-    gridColor: input.gridColor ?? adminChartTheme.splitLine,
-    borderColor: input.borderColor,
-    formatTick: formatAdminChartDurationSeconds,
-  })
+  return defineSharedChartNumericScale(
+    { axisText: adminChartTheme.axisText, grid: adminChartTheme.splitLine, axisLine: '' },
+    {
+      values: input.values,
+      max: input.max,
+      min: input.min,
+      headroom: input.headroom,
+      stepSize: input.stepSize,
+      gridColor: input.gridColor,
+      borderColor: input.borderColor,
+      formatTick: formatAdminChartDurationSeconds,
+    },
+  )
 }
 
 export function defineAdminChartPercentScale(input: AdminChartNumericScaleInput = {}) {
-  return defineChartNumericScale({
-    axisMin: input.min ?? 0,
-    max: input.max ?? 100,
-    precision: 0,
-    stepSize: input.stepSize,
-    tickColor: adminChartTheme.axisText,
-    gridColor: input.gridColor ?? adminChartTheme.splitLine,
-    borderColor: input.borderColor,
-    formatTick: (value) => formatAdminChartPercent(value, input.suffix),
-  })
+  return defineSharedChartNumericScale(
+    { axisText: adminChartTheme.axisText, grid: adminChartTheme.splitLine, axisLine: '' },
+    {
+      axisMin: input.min ?? 0,
+      max: input.max ?? 100,
+      precision: 0,
+      stepSize: input.stepSize,
+      gridColor: input.gridColor,
+      borderColor: input.borderColor,
+      formatTick: (value) => formatAdminChartPercent(value, input.suffix),
+    },
+  )
 }
 
 export function defineAdminChartPointClipStyle() {
@@ -280,28 +287,17 @@ function toFiniteChartNumber(value: number) {
 
 export function defineAdminChartTooltip(options: Record<string, unknown> = {}) {
   return {
-    enabled: true,
-    backgroundColor: adminChartTheme.tooltipBg,
-    borderColor: adminChartTheme.tooltipBorder,
-    borderWidth: 1,
-    titleColor: adminChartTheme.mainText,
-    bodyColor: adminChartTheme.tooltipText,
-    titleFont: {
-      size: 11,
-      weight: 'bold' as const,
-      family: adminChartFontFamily,
-    },
-    bodyFont: {
-      size: 11,
-      family: adminChartFontFamily,
-    },
-    padding: 10,
+    ...defineSharedChartTooltip(
+      {
+        surface: adminChartTheme.tooltipBg,
+        border: adminChartTheme.tooltipBorder,
+        text: adminChartTheme.tooltipText,
+      },
+      {
+        titleColor: adminChartTheme.mainText,
+      },
+    ),
     cornerRadius: 8,
-    boxWidth: 8,
-    boxHeight: 8,
-    boxPadding: 6,
-    usePointStyle: true,
-    displayColors: true,
     ...options,
   }
 }

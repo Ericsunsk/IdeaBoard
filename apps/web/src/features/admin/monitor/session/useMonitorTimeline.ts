@@ -3,10 +3,11 @@ import type { ChartDataset } from 'chart.js'
 import { adminChartPlugins, adminChartTheme, defineAdminChartTooltip } from '../../shared'
 import { formatLocaleNumber } from '@/core/i18n/formatters'
 import {
-  formatCompactNumber,
-  resolveChartScaleMax,
-  withAlpha,
-} from '@/core/lib/chartPrimitives'
+  getShanghaiMonthShortFormat,
+  getShanghaiWallPartsFormat,
+  toShanghaiParts,
+} from '@/core/datetime/shanghai'
+import { formatCompactNumber, resolveChartScaleMax, withAlpha } from '@/core/lib/chartPrimitives'
 import { adminTaskStatuses } from '../core/status'
 import { taskMetricDefinitions, monitorChartSpecs } from '../../shared'
 import { timeRangePresets, type TimeRangePresetKey } from '../core/timeRange'
@@ -18,36 +19,11 @@ type MonitorTimelineOptions = {
   filterStatus: Ref<TaskStatus | null>
 }
 
-// GMT+8 wall-clock single source: every part comes from Intl with a fixed
-// Asia/Shanghai time zone, so axis labels never drift with the browser's local
-// time zone. Month names stay fixed en-US short ('Jan'..'Dec') to keep the
-// historical `Mon D` axis rendering byte-identical.
-const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
-
-const shanghaiWallPartsFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: SHANGHAI_TIME_ZONE,
-  year: 'numeric',
-  month: 'numeric',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-})
-
-const shanghaiMonthShortFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: SHANGHAI_TIME_ZONE,
-  month: 'short',
-})
+// Use Shanghai wall time and fixed en-US month names regardless of the browser zone.
 
 export function toGmt8Date(value: Date | number) {
   const date = value instanceof Date ? value : new Date(value)
-  const entries = shanghaiWallPartsFormat
-    .formatToParts(date)
-    .reduce<Record<string, string>>((result, part) => {
-      if (part.type !== 'literal') result[part.type] = part.value
-      return result
-    }, {})
+  const entries = toShanghaiParts(date, getShanghaiWallPartsFormat())
   return new Date(
     Number(entries.year),
     Number(entries.month) - 1,
@@ -59,18 +35,13 @@ export function toGmt8Date(value: Date | number) {
 }
 
 export function formatXAxisTime(date: Date, durationMs: number) {
-  const entries = shanghaiWallPartsFormat
-    .formatToParts(date)
-    .reduce<Record<string, string>>((result, part) => {
-      if (part.type !== 'literal') result[part.type] = part.value
-      return result
-    }, {})
+  const entries = toShanghaiParts(date, getShanghaiWallPartsFormat())
   const hh = entries.hour ?? '00'
   const mm = entries.minute ?? '00'
   if (durationMs <= 12 * 3600 * 1000) {
     return `${hh}:${mm}`
   }
-  const mon = shanghaiMonthShortFormat.format(date)
+  const mon = getShanghaiMonthShortFormat().format(date)
   const day = Number(entries.day)
   if (durationMs <= 24 * 3600 * 1000) {
     return `${mon} ${day}, ${hh}:${mm}`

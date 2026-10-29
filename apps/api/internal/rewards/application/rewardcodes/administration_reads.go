@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"ideaboard/api/internal/platform/pagination"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -57,10 +59,7 @@ LIMIT $3`, input.RewardCodeID, input.BeforeID, limit+1)
 		return AdminRedemptionPage{}, fmt.Errorf("read admin RewardCode Redemptions: %w", err)
 	}
 	page := AdminRedemptionPage{Redemptions: items}
-	if len(items) > limit {
-		page.Redemptions = items[:limit]
-		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
-	}
+	page.Redemptions, page.NextBeforeID = pagination.TruncateBeforeID(page.Redemptions, limit, func(item AdminRedemptionSummary) int64 { return item.ID })
 	return page, nil
 }
 

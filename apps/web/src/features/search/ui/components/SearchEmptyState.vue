@@ -1,7 +1,7 @@
 <template>
   <section
     v-if="resultsCount === 0"
-    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
+    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-[var(--blur-glass)]"
   >
     <div class="flex max-w-sm flex-col items-center">
       <div

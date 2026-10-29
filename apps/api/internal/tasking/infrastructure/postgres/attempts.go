@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -33,7 +34,7 @@ const maxAttemptErrorBytes = 500
 // the caller to degrade on.
 func (s *Store) StartAttempt(ctx context.Context, start workspacetasks.AttemptStart) (int32, error) {
 	if s == nil || s.db == nil {
-		return 0, fmt.Errorf("tasking postgres: database pool not configured")
+		return 0, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
 	taskID := strings.TrimSpace(start.TaskID)
 	token := strings.TrimSpace(start.ExecutionToken)
@@ -79,7 +80,7 @@ RETURNING attempt_no`,
 // race: not an error, the caller logs and continues.
 func (s *Store) FinishAttempt(ctx context.Context, finish workspacetasks.AttemptFinish) (int64, error) {
 	if s == nil || s.db == nil {
-		return 0, fmt.Errorf("tasking postgres: database pool not configured")
+		return 0, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
 	taskID := strings.TrimSpace(finish.TaskID)
 	token := strings.TrimSpace(finish.ExecutionToken)
@@ -121,7 +122,7 @@ WHERE task_id = $1 AND execution_token = $2 AND status = 'running'`,
 // fallback for all later executions.
 func (s *Store) HasModelFallbackAttempt(ctx context.Context, taskID string) (bool, error) {
 	if s == nil || s.db == nil {
-		return false, fmt.Errorf("tasking postgres: database pool not configured")
+		return false, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {

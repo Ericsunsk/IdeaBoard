@@ -6,8 +6,7 @@ import (
 	"fmt"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/testsupport/testenv"
-	"os"
+	"ideaboard/api/internal/testdb"
 	"reflect"
 	"sync"
 	"testing"
@@ -236,38 +235,8 @@ func libraryTestAssetInput(sourceID string) domain.AssetInput {
 
 func openLibraryTestEnv(t *testing.T) *libraryTestEnv {
 	t.Helper()
-	raw := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
+	pool := testdb.OpenIsolatedSchema(t, "lib_test", libraryTestDDL)
 	ctx := context.Background()
-	cfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	admin, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatalf("open test database: %v", err)
-	}
-	schema := fmt.Sprintf("lib_test_%d_%d", os.Getpid(), time.Now().UnixNano())
-	if _, err := admin.Exec(ctx, `CREATE SCHEMA `+schema); err != nil {
-		admin.Close()
-		t.Fatalf("create test schema: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = admin.Exec(context.Background(), `DROP SCHEMA `+schema+` CASCADE`)
-		admin.Close()
-	})
-	schemaCfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	schemaCfg.ConnConfig.RuntimeParams["search_path"] = schema + ",public"
-	pool, err := pgxpool.NewWithConfig(ctx, schemaCfg)
-	if err != nil {
-		t.Fatalf("open isolated test pool: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, libraryTestDDL); err != nil {
-		t.Fatalf("apply library fixture ddl: %v", err)
-	}
 	var userID int64
 	if err := pool.QueryRow(ctx,
 		`INSERT INTO users (display_name, storage_uid) VALUES ('lib test user', 'T00001') RETURNING id`,
@@ -1256,6 +1225,9 @@ func TestLibraryManagedSaveAutoManualConverge(t *testing.T) {
 // partial unique backstop (exactly one created=true).
 func TestLibraryManagedSaveConcurrentDedup(t *testing.T) {
 	env := openLibraryTestEnv(t)
+	if env.pool.Config().MaxConns < 2 {
+		t.Fatal("concurrent dedup requires at least two database connections")
+	}
 	ctx := context.Background()
 	mediaID := mustSeedSizedMediaAsset(t, ctx, env, env.wsA, "conc-dedup", "image", ptr(100), ptr(80))
 	const callers = 16

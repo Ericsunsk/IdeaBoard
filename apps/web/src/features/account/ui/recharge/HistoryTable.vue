@@ -88,9 +88,7 @@
           class="flex min-h-40 items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span :class="accountEmptyTitleClass">{{
-            t('account.topUp.historyEmptyTitle')
-          }}</span>
+          <span :class="accountEmptyTitleClass">{{ t('account.topUp.historyEmptyTitle') }}</span>
         </div>
       </template>
 
@@ -136,6 +134,7 @@ import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
 import { accountEmptyTitleClass } from '../shared/ui'
+import { parseDateGuard } from '../../../../core/datetime/parse'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { formatAccountRechargeDateTime } from '../../session/formatters'
 import { formatCurrencyMinor } from '../../session/money'
@@ -173,10 +172,10 @@ function rechargeStatusLabel(item: RechargeHistoryItem): string {
   return t('account.topUp.statusHistoryCredited')
 }
 function formatDateTime(value: string): string {
-  const date = new Date(value)
+  const date = parseDateGuard(value)
   // Invalid-guard stays presentation-local (needs the `t()` fallback); the
   // format itself converges on the account family (`formatters.ts`).
-  if (Number.isNaN(date.getTime())) return t('account.topUp.unknownTime')
+  if (!date) return t('account.topUp.unknownTime')
   return formatAccountRechargeDateTime(date)
 }
 </script>

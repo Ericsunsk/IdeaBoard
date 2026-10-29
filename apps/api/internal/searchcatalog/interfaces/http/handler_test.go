@@ -25,6 +25,16 @@ func TestSearchHandlersFailClosedWithoutDependencies(t *testing.T) {
 		}
 	})
 
+	t.Run("provider list", func(t *testing.T) {
+		router := gin.New()
+		router.GET("/providers", NewHandler(nil).List)
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/providers", nil))
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+		}
+	})
+
 	for _, method := range []string{"update", "test"} {
 		t.Run("provider "+method, func(t *testing.T) {
 			router := gin.New()

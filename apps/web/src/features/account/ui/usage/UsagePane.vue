@@ -52,7 +52,7 @@
             :class="[summaryCellClass, metric.cellClass]"
           >
             <p
-              class="m-0 break-all whitespace-normal font-mono text-admin-summary-value leading-tight font-bold text-foreground sm:text-[30px] lg:text-[34px]"
+              class="m-0 break-all whitespace-normal font-mono text-admin-summary-value leading-tight font-bold text-foreground sm:text-admin-display-sm lg:text-admin-display"
             >
               {{ metric.value }}
             </p>

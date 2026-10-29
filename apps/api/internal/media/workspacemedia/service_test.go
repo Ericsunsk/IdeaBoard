@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/testsupport/testenv"
+	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -211,38 +210,8 @@ type mediaTestEnv struct {
 
 func openMediaTestEnv(t *testing.T) *mediaTestEnv {
 	t.Helper()
-	raw := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
+	pool := testdb.OpenIsolatedSchema(t, "media_test", mediaTestDDL, testdb.WithMaxConns(1))
 	ctx := context.Background()
-	cfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	admin, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatalf("open test database: %v", err)
-	}
-	schema := fmt.Sprintf("media_test_%d_%d", os.Getpid(), time.Now().UnixNano())
-	if _, err := admin.Exec(ctx, `CREATE SCHEMA `+schema); err != nil {
-		admin.Close()
-		t.Fatalf("create test schema: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = admin.Exec(context.Background(), `DROP SCHEMA `+schema+` CASCADE`)
-		admin.Close()
-	})
-	schemaCfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	schemaCfg.ConnConfig.RuntimeParams["search_path"] = schema + ",public"
-	pool, err := pgxpool.NewWithConfig(ctx, schemaCfg)
-	if err != nil {
-		t.Fatalf("open isolated test pool: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, mediaTestDDL); err != nil {
-		t.Fatalf("apply media fixture ddl: %v", err)
-	}
 	var userID int64
 	if err := pool.QueryRow(ctx,
 		`INSERT INTO users (display_name, storage_uid) VALUES ('media test user', 'M00001') RETURNING id`,

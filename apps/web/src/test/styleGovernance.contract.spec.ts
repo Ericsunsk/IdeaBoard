@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   darkVariantUtilityPattern,
   primitiveReferencePattern,
+  rawClipboardPattern,
+  rawDialogWidthPattern,
   rawMotionUtilityPattern,
+  rawWhiteOverlayPattern,
 } from '../../scripts/checkStyleGovernance'
 
 describe('theme variant governance', () => {
@@ -67,5 +70,42 @@ describe('motion utility governance', () => {
     'duration-[calc(var(--motion-control-duration)+100ms)]',
   ])('rejects the arbitrary motion utility %s', (utility) => {
     expect([...utility.matchAll(rawMotionUtilityPattern)]).toHaveLength(1)
+  })
+})
+
+describe('dialog width governance', () => {
+  it('rejects raw 420px dialog widths outside dialogShell', () => {
+    expect([...'w-[min(420px,calc(100vw-32px))]'.matchAll(rawDialogWidthPattern)]).toHaveLength(1)
+  })
+
+  it('accepts the dialogShell size contract', () => {
+    expect([...'w-[min(30rem,calc(100vw-1.5rem))]'.matchAll(rawDialogWidthPattern)].length).toBe(0)
+  })
+})
+
+describe('white overlay governance', () => {
+  it.each(['border-white/15', 'border-white/95', 'white_86%'])(
+    'rejects the raw white overlay value %s',
+    (value) => {
+      expect([...value.matchAll(rawWhiteOverlayPattern)]).toHaveLength(1)
+    },
+  )
+
+  it('accepts overlay token references and whitespace utilities', () => {
+    expect(
+      [
+        ...'border-overlay-scrim-line whitespace-nowrap border-[var(--color-overlay-scrim-line)]'.matchAll(
+          rawWhiteOverlayPattern,
+        ),
+      ].length,
+    ).toBe(0)
+  })
+})
+
+describe('clipboard seam governance', () => {
+  it('rejects direct clipboard access outside useAppClipboard', () => {
+    expect([...'navigator?.clipboard.writeText(link)'.matchAll(rawClipboardPattern)]).toHaveLength(
+      1,
+    )
   })
 })

@@ -23,83 +23,41 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// fakeTx is a no-op settlement transaction: Commit/Rollback only record
-// their outcome (plus deferred cleanups on rollback). All other pgx.Tx
-// legs are never called by the in-memory fakes below.
-type fakeTx struct {
-	pgx.Tx
-	committed  bool
-	rolledBack bool
-	onRollback []func()
-}
-
-func (t *fakeTx) Commit(context.Context) error {
-	t.committed = true
-	return nil
-}
-
-func (t *fakeTx) Rollback(context.Context) error {
-	t.rolledBack = true
-	for _, fn := range t.onRollback {
-		fn()
-	}
-	t.onRollback = nil
-	return nil
-}
-
-func fakeTxFrom(tx pgx.Tx) *fakeTx {
-	fake, _ := tx.(*fakeTx)
-	return fake
-}
-
-// restoreOnRollback registers the pre-image of one task row on the fake
-// transaction so a settlement rollback restores it. Production rolls the
-// state flip back when the settlement unit fails (Capture error,
-// settlement write error); the immediate in-memory write above restores
-// its pre-image on rollback so the fake keeps that atomicity instead of
-// leaking a flipped task.
-func restoreOnRollback(fake *fakeTx, store *InMemoryStore, workspaceID, taskID string, before *WorkspaceTask) {
-	if fake == nil || store == nil || before == nil {
-		return
-	}
-	snapshot := *before
-	fake.onRollback = append(fake.onRollback, func() {
-		store.mu.Lock()
-		defer store.mu.Unlock()
-		store.tasks[taskKey(workspaceID, taskID)] = &snapshot
-	})
-}
+// fakeTx aliases the shared settlement fake: the Commit/Rollback,
+// claim-fence, and restore mechanics live in db/dbutil/testscope so the
+// three hand-copied harnesses cannot drift again. Neighboring suite files
+// keep referring to fakeTx; this alias keeps that wiring compiling.
+type fakeTx = testscope.Tx
 
 // txTestStore wraps the InMemoryStore with the settlement-transaction
 // seams. Task rows are written immediately (same-tx read-your-write), and
 // every durable write registers its undo on the fake transaction so a
-// rollback removes it again.
+// rollback removes it again. The claim fence and rollback mechanics live
+// in testscope; this type only keeps the suite wiring (lastTx assertion,
+// quota/ledger fakes below).
 type txTestStore struct {
 	*InMemoryStore
 	mu     sync.Mutex
-	claims map[string]*SubmissionClaim
-	lastTx *fakeTx
+	fence  testscope.Claims[SubmissionClaim]
+	lastTx *testscope.Tx
 }
 
 func newTxTestStore() *txTestStore {
-	return &txTestStore{InMemoryStore: NewInMemoryStoreForTests(), claims: make(map[string]*SubmissionClaim)}
-}
-
-func claimScopeKey(workspaceID, operation, key string) string {
-	return strings.TrimSpace(workspaceID) + "\x00" + strings.TrimSpace(operation) + "\x00" + strings.TrimSpace(key)
+	return &txTestStore{InMemoryStore: NewInMemoryStoreForTests()}
 }
 
 func (s *txTestStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
-	tx := &fakeTx{}
+	scope, tx := testscope.BeginScope(ctx)
 	s.mu.Lock()
 	s.lastTx = tx
 	s.mu.Unlock()
-	return dbutil.ScopeForTest(ctx, tx, true), nil
+	return scope, nil
 }
 
 func (s *txTestStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *WorkspaceTask) (*WorkspaceTask, error) {
@@ -107,12 +65,10 @@ func (s *txTestStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *Works
 	if err != nil {
 		return nil, err
 	}
-	if fake := fakeTxFrom(tx); fake != nil {
-		workspaceID, taskID := task.WorkspaceID, task.ID
-		fake.onRollback = append(fake.onRollback, func() {
-			_ = s.DeleteTask(context.Background(), workspaceID, taskID)
-		})
-	}
+	workspaceID, taskID := task.WorkspaceID, task.ID
+	testscope.OnRollback(tx, func() {
+		_ = s.DeleteTask(context.Background(), workspaceID, taskID)
+	})
 	return created, nil
 }
 
@@ -126,7 +82,7 @@ func (s *txTestStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspace
 	if err != nil {
 		return nil, err
 	}
-	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	restoreTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
 	return completed, nil
 }
 
@@ -136,7 +92,7 @@ func (s *txTestStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, 
 	if err != nil {
 		return nil, err
 	}
-	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	restoreTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
 	return failed, nil
 }
 
@@ -146,8 +102,23 @@ func (s *txTestStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID
 	if err != nil || already {
 		return cancelled, already, err
 	}
-	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	restoreTaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
 	return cancelled, already, nil
+}
+
+// restoreTaskOnRollback registers the pre-image of one task row on the
+// fake transaction so a settlement rollback restores it. Production rolls
+// the state flip back when the settlement unit fails; the fake keeps that
+// atomicity instead of leaking a flipped task. The mechanics live in
+// testscope; this only binds the store's restore helper.
+func restoreTaskOnRollback(tx pgx.Tx, store *InMemoryStore, workspaceID, taskID string, before *WorkspaceTask) {
+	if store == nil || before == nil {
+		return
+	}
+	snapshot := *before
+	testscope.OnRollback(tx, func() {
+		store.RestoreTaskForTest(workspaceID, taskID, &snapshot)
+	})
 }
 
 func (s *txTestStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*WorkspaceTask, error) {
@@ -162,29 +133,11 @@ func (s *txTestStore) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ s
 }
 
 func (s *txTestStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim SubmissionClaim) (*SubmissionClaim, bool, error) {
-	key := claimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if existing, ok := s.claims[key]; ok {
-		dup := *existing
-		return &dup, false, nil
-	}
-	stored := claim
-	s.claims[key] = &stored
-	if fake := fakeTxFrom(tx); fake != nil {
-		fake.onRollback = append(fake.onRollback, func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			delete(s.claims, key)
-		})
-	}
-	return nil, true, nil
+	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
 func (s *txTestStore) claimCount() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.claims)
+	return s.fence.Count()
 }
 
 // txTestQuoter serves both quote seams from one snapshot.
@@ -210,8 +163,8 @@ func (h *txTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID
 	if err != nil {
 		return "", err
 	}
-	if fake := fakeTxFrom(tx); fake != nil && holdID != "" {
-		fake.onRollback = append(fake.onRollback, func() {
+	if holdID != "" {
+		testscope.OnRollback(tx, func() {
 			delete(h.holds, holdID)
 		})
 	}
@@ -239,16 +192,14 @@ func (q *txTestEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *Works
 	if err := q.Enqueue(ctx, task); err != nil {
 		return err
 	}
-	if fake := fakeTxFrom(tx); fake != nil {
-		fake.onRollback = append(fake.onRollback, func() {
-			for i, enqueued := range q.enqueued {
-				if enqueued == task {
-					q.enqueued = append(q.enqueued[:i], q.enqueued[i+1:]...)
-					return
-				}
+	testscope.OnRollback(tx, func() {
+		for i, enqueued := range q.enqueued {
+			if enqueued == task {
+				q.enqueued = append(q.enqueued[:i], q.enqueued[i+1:]...)
+				return
 			}
-		})
-	}
+		}
+	})
 	return nil
 }
 
@@ -372,7 +323,7 @@ func TestBoardSubmitWalksSingleTransactionSeams(t *testing.T) {
 	if got := env.txStore.claimCount(); got != 1 {
 		t.Fatalf("durable claims = %d, want 1 (claim commits with the settlement)", got)
 	}
-	if env.txStore.lastTx == nil || !env.txStore.lastTx.committed || env.txStore.lastTx.rolledBack {
+	if env.txStore.lastTx == nil || !env.txStore.lastTx.Committed || env.txStore.lastTx.RolledBack {
 		t.Fatalf("settlement tx = %+v, want committed without rollback", env.txStore.lastTx)
 	}
 	if _, ok := env.saved[created.ID]; !ok {
@@ -414,7 +365,7 @@ func TestCreateInTxInvalidInputIsValidationNotAvailability(t *testing.T) {
 	if got := env.txStore.claimCount(); got != 0 {
 		t.Fatalf("durable claims = %d, want 0 (rejected input must not fence its key)", got)
 	}
-	if env.txStore.lastTx == nil || !env.txStore.lastTx.rolledBack {
+	if env.txStore.lastTx == nil || !env.txStore.lastTx.RolledBack {
 		t.Fatalf("settlement tx = %+v, want rolled back", env.txStore.lastTx)
 	}
 }

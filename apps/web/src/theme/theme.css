@@ -130,6 +130,12 @@
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
   --blur-glass: var(--primitive-blur-12);
+  --blur-overlay: var(--primitive-blur-40);
+
+  /* Fixed white overlay line + hero ring (media scrim chrome keeps light ink). */
+  --color-overlay-scrim-line: var(--primitive-neutral-0-alpha-15);
+  --color-home-hero-ring: var(--primitive-neutral-0-alpha-95);
+  --shadow-home-hero-ring: 0 0 18px var(--primitive-neutral-0-alpha-86);
 
   /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: var(--palette-dark-0);

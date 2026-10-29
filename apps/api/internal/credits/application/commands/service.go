@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,8 +31,8 @@ type Backend struct {
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits commands: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits commands: %w", err)
 	}
 	if !backendComplete(backend) {
 		return nil, fmt.Errorf("credits commands: persistence backend not configured")
@@ -74,7 +75,7 @@ func withManagedTransactionResult[T any](
 ) (T, error) {
 	var empty T
 	if service == nil || service.pool == nil {
-		return empty, fmt.Errorf("credits service: database pool not configured")
+		return empty, fmt.Errorf("credits service: %w", database.ErrPoolNotConfigured)
 	}
 	// Ambient guard transaction (control audit atomicity, step 3): when
 	// the guard staged its mutation transaction in the context, the

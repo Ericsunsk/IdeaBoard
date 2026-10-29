@@ -1,9 +1,6 @@
+import type { ValueRef } from '@/core/vue/refs'
 import { i18n } from '../../../../../core/i18n'
 import type { ImageInpaintCommittedData } from '../core/model.ts'
-
-type ValueRef<T> = {
-  readonly value: T
-}
 
 type InpaintExecutionMaskData = {
   executionMaskDataUrl?: ImageInpaintCommittedData['executionMaskDataUrl'] | null

@@ -1,12 +1,12 @@
 package adminbranding
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -107,8 +107,7 @@ func (h *Handler) checkAdmin(c *gin.Context) bool {
 }
 
 func (h *Handler) requireStore(c *gin.Context) (Store, bool) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgRequireStore, errors.New("admin brand logo override store is unavailable"))
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgRequireStore) {
 		return nil, false
 	}
 	return h.store, true

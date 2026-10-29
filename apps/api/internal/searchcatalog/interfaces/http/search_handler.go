@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/searchcatalog/application"
 	searchdomain "ideaboard/api/internal/searchcatalog/domain"
 
@@ -25,8 +26,7 @@ func NewSearchHandler(service *application.SearchService, previews *preview.Serv
 }
 
 func (h *SearchHandler) Search(c *gin.Context) {
-	if h == nil || h.service == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchUnavailable), errorrender.MsgSearchUnavailable)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, string(contract.CodeSearchUnavailable), errorrender.MsgSearchUnavailable) {
 		return
 	}
 	limit := application.DefaultSearchLimit

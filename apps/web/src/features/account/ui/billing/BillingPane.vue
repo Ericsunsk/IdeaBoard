@@ -147,6 +147,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { useFailureToast } from '../../../../core/composables/useFailureToast'
+import { parseDateGuard } from '../../../../core/datetime/parse'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
@@ -225,8 +226,8 @@ function recordDescription(record: BillingRecord): string {
 }
 
 function formatLocalDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('account.billingRecords.unknownTime')
+  const date = parseDateGuard(value)
+  if (!date) return t('account.billingRecords.unknownTime')
   return formatAccountLocalDateTime(date)
 }
 

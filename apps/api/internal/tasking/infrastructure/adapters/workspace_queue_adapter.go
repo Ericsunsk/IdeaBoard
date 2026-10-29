@@ -52,12 +52,7 @@ type WorkspaceTaskEnqueuer struct {
 var _ workspacetasks.TxEnqueuer = (*WorkspaceTaskEnqueuer)(nil)
 
 func NewWorkspaceTaskEnqueuer(client workspaceRiverClient, queue string, maxAttempts int) *WorkspaceTaskEnqueuer {
-	if strings.TrimSpace(queue) == "" {
-		queue = riverpolicy.RiverQueueDefault
-	}
-	if maxAttempts <= 0 {
-		maxAttempts = riverpolicy.RiverMaxAttemptsDefault
-	}
+	queue, maxAttempts = riverpolicy.WithDefaults(queue, maxAttempts)
 	return &WorkspaceTaskEnqueuer{client: client, queue: queue, maxAttempts: maxAttempts}
 }
 

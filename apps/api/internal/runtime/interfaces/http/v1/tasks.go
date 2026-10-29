@@ -553,15 +553,9 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 		if !ok {
 			return
 		}
-		offset := 0
-		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-				c.Abort()
-				return
-			}
-			offset = cursor.Offset
+		offset, ok := v1OffsetCursor(c)
+		if !ok {
+			return
 		}
 		tasks, err := h.deps.Tasks.ListTasks(c.Request.Context(), workspace.PublicID, pageSize+1, offset)
 		if err != nil {
@@ -594,14 +588,9 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 		// Cursor pagination stays store-ordered: hasMore derives from the
 		// store page (a filtered page may be shorter without more data).
 		storeHasMore := len(tasks) > pageSize
-		meta := contract.NewPageMeta("", false)
-		if storeHasMore {
-			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
-			if encodeErr != nil {
-				renderTaskError(c, encodeErr)
-				return
-			}
-			meta = contract.NewPageMeta(next, true)
+		meta, ok := v1OffsetMeta(c, offset+pageSize, storeHasMore, runtimehttp.MsgServiceUnavailable25)
+		if !ok {
+			return
 		}
 		contract.RenderPaginated(c, page, meta)
 	})

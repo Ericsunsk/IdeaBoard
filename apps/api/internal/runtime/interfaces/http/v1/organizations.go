@@ -55,34 +55,15 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	if !ok {
 		return
 	}
-	pageSize, ok := v1PageSize(c)
-	if !ok {
-		return
-	}
-	offset := 0
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-			c.Abort()
-			return
-		}
-		offset = cursor.Offset
-	}
 	organizations, err := h.deps.Store.ListOrganizationsForUser(c.Request.Context(), identityPrincipal.UserID())
 	if err != nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
 		c.Abort()
 		return
 	}
-	if offset > len(organizations) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-		c.Abort()
+	slice, meta, ok := v1OffsetPage(c, organizations, runtimehttp.MsgServiceUnavailable53)
+	if !ok {
 		return
-	}
-	end := offset + pageSize
-	if end > len(organizations) {
-		end = len(organizations)
 	}
 	// Batch expansions: one role lookup and one count lookup for the whole
 	// page, replacing per-organization GetOrganizationRole and
@@ -90,8 +71,8 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	roles := map[string]string{}
 	counts := map[string]int64{}
 	if expand["role"] || expand["workspace_counts"] {
-		orgIDs := make([]string, 0, end-offset)
-		for _, o := range organizations[offset:end] {
+		orgIDs := make([]string, 0, len(slice))
+		for _, o := range slice {
 			orgIDs = append(orgIDs, o.PublicID)
 		}
 		if expand["role"] {
@@ -113,8 +94,8 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 			counts = fetched
 		}
 	}
-	page := make([]v1OrganizationDTO, 0, end-offset)
-	for _, o := range organizations[offset:end] {
+	page := make([]v1OrganizationDTO, 0, len(slice))
+	for _, o := range slice {
 		dto := toOrganizationDTO(o)
 		if expand["role"] {
 			// Membership-backed rows always carry a role; a raced
@@ -126,16 +107,6 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 			dto.WorkspaceCount = &count
 		}
 		page = append(page, dto)
-	}
-	meta := contract.NewPageMeta("", false)
-	if end < len(organizations) {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
-		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
-			c.Abort()
-			return
-		}
-		meta = contract.NewPageMeta(next, true)
 	}
 	contract.RenderPaginated(c, page, meta)
 }

@@ -16,6 +16,7 @@
 package riverpolicy
 
 import (
+	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/accountlimits"
@@ -162,6 +163,20 @@ const (
 // | Frontend background continuation | canvas canvasBudgets BACKGROUND_* | 8 rounds, 5s init exp backoff capped at 60s, total 315s after the 6min waiter (~675s end-to-end < 17min River) | terminal state materializes inline; exhaustion ends with progressTimeout (mirror, owned by web) |
 // | Frontend board materialization | canvas canvasBudgets PENDING_IMAGE_MATERIALIZATION_ATTEMPTS | 3 attempts | in-place retry of transient graph writes; contract violations fail fast (mirror, owned by web) |
 const WorkspaceSlowTaskBudget = 6 * time.Minute
+
+// WithDefaults converges the River default template: empty queue names fall
+// back to RiverQueueDefault and non-positive budgets to
+// RiverMaxAttemptsDefault. Enqueuer constructors share this single seam so
+// the default template cannot drift per call site.
+func WithDefaults(queue string, maxAttempts int) (string, int) {
+	if strings.TrimSpace(queue) == "" {
+		queue = RiverQueueDefault
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = RiverMaxAttemptsDefault
+	}
+	return queue, maxAttempts
+}
 
 // WorkspaceExecutionBudget returns the effective per-execution provider cap:
 // the 360s slow-task budget, clamped never above the River drawing budget so

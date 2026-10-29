@@ -72,7 +72,7 @@
             aria-hidden="true"
           />
           <div
-            class="home-hero-ring absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-pill border-[4px] border-white/95 shadow-[0_0_18px_color-mix(in_srgb,white_86%,transparent)]"
+            class="home-hero-ring absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-pill border-[4px] border-[var(--color-home-hero-ring)] shadow-[var(--shadow-home-hero-ring)]"
             aria-hidden="true"
           ></div>
           <img

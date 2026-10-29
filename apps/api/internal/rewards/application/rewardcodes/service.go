@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/pagination"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	rewardsports "ideaboard/api/internal/rewards/ports"
 	"strings"
@@ -432,10 +433,7 @@ LIMIT $10`, append(arguments, beforeID, limit+1)...)
 
 func buildRewardCodePage(items []RewardCode, total int64, limit int) RewardCodePage {
 	page := RewardCodePage{RewardCodes: items, Total: total}
-	if len(items) > limit {
-		page.RewardCodes = items[:limit]
-		page.NextBeforeID = page.RewardCodes[len(page.RewardCodes)-1].ID
-	}
+	page.RewardCodes, page.NextBeforeID = pagination.TruncateBeforeID(page.RewardCodes, limit, func(rc RewardCode) int64 { return rc.ID })
 	return page
 }
 

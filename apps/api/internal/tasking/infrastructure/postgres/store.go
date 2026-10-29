@@ -69,7 +69,7 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 // owned leg, so this leg must not join a carrier on its own.
 func (s *Store) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
 	if s == nil || s.db == nil {
-		return nil, fmt.Errorf("tasking postgres: database pool not configured")
+		return nil, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
 	scope, err := dbutil.BeginOwned(ctx, s.db, pgx.TxOptions{})
 	if err != nil {
@@ -721,7 +721,7 @@ var _ workspacetasks.StalledSettlementScanner = (*Store)(nil)
 // rather than scanning the whole table.
 func (s *Store) ListStalledHeldSettlements(ctx context.Context, stalledBefore time.Time, limit int) ([]workspacetasks.StalledSettlement, error) {
 	if s == nil || s.db == nil {
-		return nil, fmt.Errorf("tasking postgres: database pool not configured")
+		return nil, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
 	if stalledBefore.IsZero() {
 		return nil, fmt.Errorf("tasking postgres: stalled settlement cutoff required: %w", workspacetasks.ErrValidation)

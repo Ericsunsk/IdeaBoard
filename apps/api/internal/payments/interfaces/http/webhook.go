@@ -3,6 +3,7 @@ package http
 import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/platform/response"
 	"io"
 	"net/http"
@@ -12,8 +13,7 @@ import (
 
 func (h *WebhookHandler) ReceiveStripeWebhook(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, errorrender.MsgReceiveStripeWebhook)
+	if !platformhttp.RequireDependency(c, h != nil && h.service != nil, errorrender.MsgReceiveStripeWebhook) {
 		return
 	}
 	if c.Request == nil || c.Request.Body == nil || c.Request.ContentLength > maxStripeWebhookRequestBytes {

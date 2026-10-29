@@ -23,63 +23,46 @@ package v1
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// v1FakeTx is a no-op settlement transaction: Commit/Rollback only record
-// their outcome (plus deferred cleanups on rollback). All other pgx.Tx
-// legs are never called by the in-memory fakes below.
-type v1FakeTx struct {
-	pgx.Tx
-	committed  bool
-	rolledBack bool
-	onRollback []func()
-}
+// v1FakeTx aliases the shared settlement fake so the three hand-copied
+// harnesses cannot drift again. Neighboring fixture files keep referring
+// to v1FakeTx/v1OnRollback; these aliases keep that wiring compiling.
+type v1FakeTx = testscope.Tx
 
-func (t *v1FakeTx) Commit(context.Context) error {
-	t.committed = true
-	return nil
-}
-
-func (t *v1FakeTx) Rollback(context.Context) error {
-	t.rolledBack = true
-	for _, fn := range t.onRollback {
-		fn()
-	}
-	t.onRollback = nil
-	return nil
-}
-
+// v1OnRollback registers an in-memory cleanup on the fake settlement
+// transaction. It is a no-op for foreign transactions, which own their
+// own commit/rollback.
 func v1OnRollback(tx pgx.Tx, fn func()) {
-	if fake, ok := tx.(*v1FakeTx); ok {
-		fake.onRollback = append(fake.onRollback, fn)
-	}
-}
-
-func v1ClaimScopeKey(workspaceID, operation, key string) string {
-	return strings.TrimSpace(workspaceID) + "\x00" + strings.TrimSpace(operation) + "\x00" + strings.TrimSpace(key)
+	testscope.OnRollback(tx, fn)
 }
 
 // v1TxTaskStore wraps the task InMemoryStore with the
-// settlement-transaction seams for database-free HTTP fixtures.
+// settlement-transaction seams for database-free HTTP fixtures. Task rows
+// are written immediately (same-tx read-your-write); every durable
+// in-memory write registers its undo on the fake transaction, and terminal
+// flips register their pre-image restore, so a rejected submit leaves no
+// claim behind and a rolled-back settlement leaks no flipped task. The
+// mechanics live in testscope; this type only keeps the fixture wiring.
 type v1TxTaskStore struct {
 	*workspacetasks.InMemoryStore
-	mu     sync.Mutex
-	claims map[string]*workspacetasks.SubmissionClaim
+	fence testscope.Claims[workspacetasks.SubmissionClaim]
 }
 
 func newV1TxTaskStore(store *workspacetasks.InMemoryStore) *v1TxTaskStore {
-	return &v1TxTaskStore{InMemoryStore: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
+	return &v1TxTaskStore{InMemoryStore: store}
 }
 
 func (s *v1TxTaskStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
-	return dbutil.ScopeForTest(ctx, &v1FakeTx{}, true), nil
+	scope, _ := testscope.BeginScope(ctx)
+	return scope, nil
 }
 
 func (s *v1TxTaskStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
@@ -87,12 +70,10 @@ func (s *v1TxTaskStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *wor
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := tx.(*v1FakeTx); ok {
-		workspaceID, taskID := task.WorkspaceID, task.ID
-		v1OnRollback(tx, func() {
-			_ = s.DeleteTask(context.Background(), workspaceID, taskID)
-		})
-	}
+	workspaceID, taskID := task.WorkspaceID, task.ID
+	v1OnRollback(tx, func() {
+		_ = s.DeleteTask(context.Background(), workspaceID, taskID)
+	})
 	return created, nil
 }
 
@@ -100,16 +81,49 @@ func (s *v1TxTaskStore) GetTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, 
 	return s.GetTask(ctx, workspaceID, taskID)
 }
 
-func (s *v1TxTaskStore) CompleteTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
-	return s.CompleteTask(ctx, workspaceID, taskID, outputs)
+func (s *v1TxTaskStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	completed, err := s.CompleteTask(ctx, workspaceID, taskID, outputs)
+	if err != nil {
+		return nil, err
+	}
+	restoreV1TaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return completed, nil
 }
 
-func (s *v1TxTaskStore) FailTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
-	return s.FailTask(ctx, workspaceID, taskID, errorMsg)
+func (s *v1TxTaskStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	failed, err := s.FailTask(ctx, workspaceID, taskID, errorMsg)
+	if err != nil {
+		return nil, err
+	}
+	restoreV1TaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return failed, nil
 }
 
-func (s *v1TxTaskStore) CancelTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
-	return s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+func (s *v1TxTaskStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	cancelled, already, err := s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+	if err != nil || already {
+		return cancelled, already, err
+	}
+	restoreV1TaskOnRollback(tx, s.InMemoryStore, workspaceID, taskID, before)
+	return cancelled, already, nil
+}
+
+// restoreV1TaskOnRollback registers the pre-image of one task row on the
+// fake transaction so a settlement rollback restores it instead of leaking
+// a flipped task. The mechanics live in testscope; this only binds the
+// store's restore helper. It is a no-op for foreign transactions, which
+// own their own rollback.
+func restoreV1TaskOnRollback(tx pgx.Tx, store *workspacetasks.InMemoryStore, workspaceID, taskID string, before *workspacetasks.WorkspaceTask) {
+	if store == nil || before == nil {
+		return
+	}
+	snapshot := *before
+	testscope.OnRollback(tx, func() {
+		store.RestoreTaskForTest(workspaceID, taskID, &snapshot)
+	})
 }
 
 func (s *v1TxTaskStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
@@ -117,21 +131,7 @@ func (s *v1TxTaskStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, wo
 }
 
 func (s *v1TxTaskStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
-	key := v1ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if existing, ok := s.claims[key]; ok {
-		dup := *existing
-		return &dup, false, nil
-	}
-	stored := claim
-	s.claims[key] = &stored
-	v1OnRollback(tx, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		delete(s.claims, key)
-	})
-	return nil, true, nil
+	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
 // v1TxSubmissionAcceptance mirrors the production submit gate without a

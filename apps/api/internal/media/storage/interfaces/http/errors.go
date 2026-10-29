@@ -6,6 +6,7 @@ import (
 
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,10 +44,10 @@ func writeStorageInputError(c *gin.Context) {
 }
 
 // writeStorageUnavailable renders a missing service dependency. A nil
-// service is a server misconfiguration, so it is logged like a 5xx.
+// service is a server misconfiguration, so it shares the fail-closed 503
+// service_unavailable guard with every other HTTP edge.
 func writeStorageUnavailable(c *gin.Context) {
-	errorrender.RenderDefault(c, "storage service unavailable",
-		http.StatusServiceUnavailable, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable, nil)
+	platformhttp.RequireDependencyCode(c, false, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable)
 }
 
 // writeStorageListError renders profile-listing failures. Listing only fails

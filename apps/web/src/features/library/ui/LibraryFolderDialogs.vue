@@ -4,11 +4,11 @@
     :is-open="createOpen"
     :title="t('library.dialogs.newFolderTitle')"
     :description="t('library.dialogs.folderNameLabel')"
-    :size="sharePreset.size"
+    size="narrow"
     :is-busy="createSaving"
     :has-close="sharePreset.hasClose"
     :close-label="t('library.dialogs.cancel')"
-    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    content-class="bg-popover"
     @update:open="emit('update:createOpen', $event)"
   >
     <div class="min-h-0 overflow-y-auto">
@@ -65,11 +65,11 @@
     :is-open="renameOpen"
     :title="t('library.dialogs.renameFolderTitle')"
     :description="t('library.dialogs.folderNameLabel')"
-    :size="sharePreset.size"
+    size="narrow"
     :is-busy="renameSaving"
     :has-close="sharePreset.hasClose"
     :close-label="t('library.dialogs.cancel')"
-    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    content-class="bg-popover"
     @update:open="emit('update:renameOpen', $event)"
   >
     <div class="min-h-0 overflow-y-auto">

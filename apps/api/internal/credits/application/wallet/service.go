@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,8 +38,8 @@ type Backend struct {
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
-	if pool == nil {
-		return nil, fmt.Errorf("credits wallet: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return nil, fmt.Errorf("credits wallet: %w", err)
 	}
 	if !backendComplete(backend) {
 		return nil, fmt.Errorf("credits wallet: persistence backend not configured")
@@ -277,7 +278,7 @@ func withManagedRestrictionTransaction(
 	run func(*transactionLifecycle) (ports.WalletRestrictionChange, error),
 ) (ports.WalletRestrictionChange, error) {
 	if service == nil || service.pool == nil {
-		return ports.WalletRestrictionChange{}, fmt.Errorf("credits restrictions: database pool not configured")
+		return ports.WalletRestrictionChange{}, fmt.Errorf("credits restrictions: %w", database.ErrPoolNotConfigured)
 	}
 	// Ambient guard transaction (control audit atomicity, step 3): same
 	// borrower contract as the commands path above. The restriction

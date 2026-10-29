@@ -807,15 +807,9 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		if !ok {
 			return
 		}
-		offset := 0
-		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-				c.Abort()
-				return
-			}
-			offset = cursor.Offset
+		offset, ok := v1OffsetCursor(c)
+		if !ok {
+			return
 		}
 		// #936: authorization precedes pagination. The offset counts
 		// AUTHORIZED items, so pages and has_more never leak unauthorized
@@ -835,15 +829,9 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		for _, asset := range assets {
 			page = append(page, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
 		}
-		meta := contract.NewPageMeta("", false)
-		if hasMore {
-			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
-			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable51)
-				c.Abort()
-				return
-			}
-			meta = contract.NewPageMeta(next, true)
+		meta, ok := v1OffsetMeta(c, offset+pageSize, hasMore, runtimehttp.MsgServiceUnavailable51)
+		if !ok {
+			return
 		}
 		contract.RenderPaginated(c, page, meta)
 	})

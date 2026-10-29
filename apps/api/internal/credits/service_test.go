@@ -2,12 +2,14 @@ package credits_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/database"
 )
 
 func requireServiceUnavailable(t *testing.T, err error, op string) {
@@ -15,8 +17,11 @@ func requireServiceUnavailable(t *testing.T, err error, op string) {
 	if err == nil {
 		t.Fatalf("%s error = nil, want service-unavailable failure", op)
 	}
-	// The nil-pool sentinel is unexported; pin the fail-closed behavior
-	// through the existing error surface (non-nil + stable message).
+	// The nil-pool guard converges on the shared database sentinel; pin
+	// both the sentinel and the stable message surface.
+	if !errors.Is(err, database.ErrPoolNotConfigured) {
+		t.Fatalf("%s error = %v, want %v", op, err, database.ErrPoolNotConfigured)
+	}
 	if !strings.Contains(err.Error(), "database pool not configured") {
 		t.Fatalf("%s error = %v, want service-unavailable failure", op, err)
 	}

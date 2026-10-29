@@ -1,5 +1,7 @@
 import type { CreditReconciliationRun } from '../../session/shared/api'
 import { sanitizeApiErrorMessage } from '@/core/utils/errorMessages'
+import { formatLocaleDate } from '@/core/i18n/formatters'
+import { parseDateGuard } from '@/core/datetime/parse'
 
 // Ledger command vocabulary (issue #809). The legacy generated
 // `CreditLedgerTransaction` model is gone; the control ledger types the
@@ -7,25 +9,27 @@ import { sanitizeApiErrorMessage } from '@/core/utils/errorMessages'
 type CreditLedgerCommand =
   'grant' | 'deduction' | 'hold' | 'capture' | 'release' | 'refund' | 'correction'
 
-const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hour12: false,
-})
-
 /**
  * Admin-local fixed `zh-CN` timestamp with seconds.
  * Named distinctly from `core/utils/dateTime.formatAdminDateTime`
  * (locale-aware, no seconds) to avoid cross-module misuse.
  */
 export function formatAdminDateTimeWithSeconds(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '-' : dateTimeFormat.format(date)
+  const date = parseDateGuard(value)
+  if (!date) return '-'
+  return formatLocaleDate(
+    date,
+    {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    },
+    'zh-CN',
+  )
 }
 
 const commandLabels: Record<CreditLedgerCommand, string> = {

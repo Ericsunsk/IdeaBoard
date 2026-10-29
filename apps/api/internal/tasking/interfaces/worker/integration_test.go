@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -23,7 +22,7 @@ import (
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
-	"ideaboard/api/internal/testsupport/testenv"
+	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -482,38 +481,8 @@ const workspaceIntegrationChecksum = "abcdef0123456789abcdef0123456789abcdef0123
 
 func openWorkspaceIntegrationEnv(t *testing.T) *workspaceIntegrationEnv {
 	t.Helper()
-	raw := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
+	pool := testdb.OpenIsolatedSchema(t, "wsint_test", workspaceIntegrationDDL, testdb.WithMaxConns(1))
 	ctx := context.Background()
-	cfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	admin, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatalf("open test database: %v", err)
-	}
-	schema := fmt.Sprintf("wsint_test_%d_%d", os.Getpid(), time.Now().UnixNano())
-	if _, err := admin.Exec(ctx, `CREATE SCHEMA `+schema); err != nil {
-		admin.Close()
-		t.Fatalf("create test schema: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = admin.Exec(context.Background(), `DROP SCHEMA `+schema+` CASCADE`)
-		admin.Close()
-	})
-	schemaCfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse test database dsn: %v", err)
-	}
-	schemaCfg.ConnConfig.RuntimeParams["search_path"] = schema + ",public"
-	pool, err := pgxpool.NewWithConfig(ctx, schemaCfg)
-	if err != nil {
-		t.Fatalf("open isolated test pool: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, workspaceIntegrationDDL); err != nil {
-		t.Fatalf("apply workspace integration fixture ddl: %v", err)
-	}
 	seedUser := func(display, storageUID string) int64 {
 		t.Helper()
 		var id int64

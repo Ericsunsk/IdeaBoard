@@ -3,11 +3,11 @@
     :is-open="isCreateDialogOpen"
     :title="t('workspace.switcher.createDialogTitle')"
     :description="t('workspace.switcher.createDialogNameLabel')"
-    :size="accountPreset.size"
+    size="slim-inset"
     :is-busy="isCreating"
     :has-close="accountPreset.hasClose"
     :close-label="t('common.actions.close')"
-    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    content-class="bg-popover"
     @update:open="handleCreateOpenUpdate"
   >
     <div class="min-h-0 overflow-y-auto">

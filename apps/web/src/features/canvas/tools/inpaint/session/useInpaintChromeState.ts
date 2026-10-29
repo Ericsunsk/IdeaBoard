@@ -1,9 +1,6 @@
+import type { ValueRef } from '@/core/vue/refs'
 import { ref, watch } from 'vue'
 import { clampMaskLayerOpacity, INPAINT_DEFAULT_LAYER_OPACITY } from '../core/constants'
-
-type ValueRef<T> = {
-  readonly value: T
-}
 
 type UseInpaintChromeStateOptions = {
   retouchNodeId: ValueRef<string | null>

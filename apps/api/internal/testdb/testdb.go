@@ -104,6 +104,102 @@ func isRequiredDatabase() bool {
 	return err == nil && required
 }
 
+// IsolatedSchemaOptions bounds the isolated test pool. Zero means the
+// driver default; WithMaxConns pins the ceiling for bounded fixtures.
+type IsolatedSchemaOptions struct {
+	MaxConns int32
+}
+
+// IsolatedSchemaOption tunes OpenIsolatedSchema.
+type IsolatedSchemaOption func(*IsolatedSchemaOptions)
+
+// WithMaxConns pins the isolated pool ceiling (e.g. 1 for serial fixtures).
+func WithMaxConns(n int32) IsolatedSchemaOption {
+	return func(o *IsolatedSchemaOptions) {
+		o.MaxConns = n
+	}
+}
+
+// OpenIsolatedSchema creates an isolated schema, applies ddl inside it, and
+// returns a bounded pgxpool pinned to that schema's search_path. prefix
+// names the schema family (sanitized); ddl is executed verbatim when
+// non-empty. It skips when API_TEST_DATABASE_DSN is unset, mirroring Open.
+func OpenIsolatedSchema(t testing.TB, prefix, ddl string, opts ...IsolatedSchemaOption) *pgxpool.Pool {
+	t.Helper()
+
+	var options IsolatedSchemaOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
+	raw := testenv.Get("API_TEST_DATABASE_DSN")
+	if raw == "" {
+		if isRequiredDatabase() {
+			t.Fatal("API_TEST_DATABASE_DSN is required for PostgreSQL integration tests")
+		}
+		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
+	}
+
+	adminPool, err := pgxpool.New(t.Context(), raw)
+	if err != nil {
+		t.Fatalf("open PostgreSQL test db failed: %v", err)
+	}
+
+	sanitized := strings.Trim(strings.TrimSpace(prefix), "_")
+	if sanitized == "" {
+		sanitized = "isolated"
+	}
+	if len(sanitized) > 24 {
+		sanitized = sanitized[:24]
+	}
+	schemaName := nextUniqueName(sanitized)
+	quotedSchema := pgx.Identifier{schemaName}.Sanitize()
+	schemaCreated := false
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if schemaCreated {
+			// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
+			_, _ = adminPool.Exec(ctx, `DROP SCHEMA IF EXISTS `+quotedSchema+` CASCADE`)
+		}
+		adminPool.Close()
+	})
+
+	if err := adminPool.Ping(t.Context()); err != nil {
+		t.Fatalf("ping PostgreSQL test db failed: %v", err)
+	}
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
+	if _, err := adminPool.Exec(t.Context(), `CREATE SCHEMA `+quotedSchema); err != nil {
+		t.Fatalf("create PostgreSQL test schema failed: %v", err)
+	}
+	schemaCreated = true
+
+	cfg, err := pgxpool.ParseConfig(raw)
+	if err != nil {
+		t.Fatalf("parse PostgreSQL test pool dsn failed: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = searchPathForSchema(schemaName)
+	if options.MaxConns > 0 {
+		cfg.MaxConns = options.MaxConns
+	}
+	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL test pool failed: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := pool.Ping(t.Context()); err != nil {
+		t.Fatalf("ping isolated PostgreSQL test pool failed: %v", err)
+	}
+	if trimmed := strings.TrimSpace(ddl); trimmed != "" {
+		if _, err := pool.Exec(t.Context(), trimmed); err != nil {
+			t.Fatalf("apply isolated schema fixture ddl: %v", err)
+		}
+	}
+	return pool
+}
+
 func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 	t.Helper()
 

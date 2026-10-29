@@ -6,6 +6,7 @@ import (
 
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/platform/errorrender"
+	platformhttp "ideaboard/api/internal/platform/http"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -31,16 +32,14 @@ func NewHandler(service StorageProfilesService) *Handler {
 }
 
 func (h *Handler) ListProviders(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	response.SuccessDTO(c, storageProvidersResponse{Providers: h.service.ListProviderMeta()})
 }
 
 func (h *Handler) ListProfiles(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	profiles, err := h.service.ListProfiles(c.Request.Context())
@@ -52,8 +51,7 @@ func (h *Handler) ListProfiles(c *gin.Context) {
 }
 
 func (h *Handler) CreateProfile(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	var req domain.StorageProfile
@@ -74,8 +72,7 @@ func (h *Handler) CreateProfile(c *gin.Context) {
 }
 
 func (h *Handler) UpdateProfile(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	var req domain.StorageProfile
@@ -97,8 +94,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 }
 
 func (h *Handler) DeleteProfile(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	if err := h.service.DeleteProfile(c.Request.Context(), c.Param("id")); err != nil {
@@ -109,8 +105,7 @@ func (h *Handler) DeleteProfile(c *gin.Context) {
 }
 
 func (h *Handler) ApplyProfile(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	profile, err := h.service.ApplyProfile(c.Request.Context(), c.Param("id"))
@@ -125,8 +120,7 @@ func (h *Handler) ApplyProfile(c *gin.Context) {
 }
 
 func (h *Handler) TestProfile(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	if err := h.service.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
@@ -137,8 +131,7 @@ func (h *Handler) TestProfile(c *gin.Context) {
 }
 
 func (h *Handler) GetBucketInfo(c *gin.Context) {
-	if h.service == nil {
-		writeStorageUnavailable(c)
+	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, codeStorageServiceUnavailable, errorrender.MsgStorageServiceUnavailable) {
 		return
 	}
 	info, err := h.service.GetBucketInfo(c.Request.Context(), c.Param("id"))

@@ -1,3 +1,4 @@
+import type { ValueRef } from '@/core/vue/refs'
 import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, watch, type Ref } from 'vue'
 import {
@@ -27,7 +28,6 @@ import type { FlowLocalUploadState, FlowNodeData } from '../../../core/nodes/flo
 import { createFlowGraphCommandOptions } from '../../../session/flow-adapter'
 import { createCanvasGraphEditingNodeRuntime } from './createCanvasGraphEditingNodeRuntime'
 
-type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
 
 export type CanvasGraphEditingUploadAdapter = {

@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func GetCreditHealthSnapshot(ctx context.Context, pool *pgxpool.Pool) (ports.CreditHealthSnapshot, error) {
-	if pool == nil {
-		return ports.CreditHealthSnapshot{}, fmt.Errorf("credits health: database pool not configured")
+	if err := database.RequirePool(pool); err != nil {
+		return ports.CreditHealthSnapshot{}, fmt.Errorf("credits health: %w", err)
 	}
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {

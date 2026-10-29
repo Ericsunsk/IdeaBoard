@@ -1,3 +1,4 @@
+import type { ValueRef } from '@/core/vue/refs'
 import { computed } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
@@ -21,10 +22,6 @@ import type { CanvasFeedback } from '../../../session/workspace/useCanvasFeedbac
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
 import { createImageToolApplyScopeHost } from './applyScope'
 import type { ImageActionStrengthControlSource } from '../core/model.ts'
-
-type ValueRef<T> = {
-  readonly value: T
-}
 
 type CanvasImageToolsFeedback = CanvasFeedback['imageTools']
 

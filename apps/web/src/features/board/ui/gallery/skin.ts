@@ -10,7 +10,7 @@ export const catalogClasses = {
   pageTitle:
     'm-0 break-words text-center text-[40px] leading-[1.05] font-bold tracking-normal md:text-[62px]',
   pageSubtitle:
-    'mt-4 mb-[34px] text-center text-admin-title-sm tracking-normal text-muted-foreground md:text-[19px]',
+    'mt-4 mb-[34px] text-center text-admin-title-sm tracking-normal text-muted-foreground md:text-admin-title-lg',
   toolbar: 'mb-6 grid grid-cols-1 items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]',
   createButton:
     'cursor-pointer !h-[42px] !rounded-pill !border-0 !bg-primary !px-5 !text-sm !font-bold !tracking-normal !text-primary-foreground !shadow-none hover:!bg-primary-hover focus-visible:!ring-2 focus-visible:!ring-ring !w-full md:!w-auto',

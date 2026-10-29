@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import DialogShell from './DialogShell.vue'
-import { dialogShellPresets, dialogShellSizeClasses } from './dialogShell'
+import { dialogShellPresets, dialogShellSizeClasses, type DialogShellSize } from './dialogShell'
 import { renderWithUser, screen } from '@/test/render'
 
 function renderShell(
@@ -8,7 +8,7 @@ function renderShell(
     isOpen: boolean
     title: string
     description: string
-    size: 'slim' | 'compact' | 'form' | 'medium' | 'wide'
+    size: DialogShellSize
     isBusy: boolean
     hasClose: boolean
   }> = {},
@@ -42,10 +42,23 @@ describe('DialogShell', () => {
 
   it('keeps every size on the same motion and stacking contract', () => {
     for (const size of Object.keys(dialogShellSizeClasses)) {
-      expect(dialogShellSizeClasses[size as keyof typeof dialogShellSizeClasses]).toContain(
-        'calc(100vw-1.5rem)',
-      )
+      const classes = dialogShellSizeClasses[size as keyof typeof dialogShellSizeClasses]
+      const viewportGuard = ['slim-inset', 'narrow'].includes(size)
+        ? 'calc(100vw-32px)'
+        : 'calc(100vw-1.5rem)'
+      expect(classes).toContain(viewportGuard)
     }
+  })
+
+  it.each([
+    ['slim-inset', 'max-w-[23rem]'],
+    ['narrow', 'max-w-[30rem]'],
+  ] as const)('preserves the %s viewport width and original rem maximum', async (size, maximum) => {
+    renderShell({ size })
+
+    const dialog = await screen.findByRole('dialog', { name: '共享看板' })
+    expect(dialog).toHaveAttribute('data-size', size)
+    expect(dialog).toHaveClass('w-[min(420px,calc(100vw-32px))]', maximum)
   })
 
   it('closes through mask click and Escape while idle', async () => {

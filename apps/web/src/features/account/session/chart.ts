@@ -2,13 +2,19 @@ import {
   chartFontFamilyStack,
   createChartEmptyStatePlugin,
   defineChartData,
-  defineChartNumericScale,
   defineChartOptions,
   formatCompactNumber,
   getParsedY,
   type ChartData,
   type ChartOptions,
+  type ChartTooltipItem,
 } from '../../../core/lib/chartPrimitives'
+import {
+  defineSharedChartNumericScale,
+  defineSharedChartTooltip,
+  readChartToken,
+} from '../../../core/lib/chartTheme'
+import { isDarkModeActive } from '../../../theme/composables/useTheme'
 import {
   resolveChartTimeTickDensity,
   shouldShowChartTimeTick,
@@ -16,7 +22,6 @@ import {
 import { resolveChartAnimation } from '../../../core/motion/chartMotion'
 import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
 import { i18n } from '../../../core/i18n'
-import { isDarkModeActive } from '../../../theme/composables/useTheme'
 
 import type { UsageChartTheme, UsageTrendPoint } from '../core/chart'
 
@@ -34,12 +39,8 @@ export function createUsageChartPlugins(readTheme: () => UsageChartTheme) {
   ]
 }
 
-/*
- * Static fallbacks mirror the default dark tokens behind each readColor() call
- * (accent/ring, muted-foreground, border ×2, card, foreground) so charts
- * render the token palette even when CSS vars cannot resolve (SSR/tests).
- */
-const defaultTheme: UsageChartTheme = {
+// Concrete canvas colors when CSS tokens cannot resolve (SSR or before boot).
+const darkThemeFallback: UsageChartTheme = {
   accent: '#fcfcfc',
   accentFill: 'rgba(255, 255, 255, 0.2)',
   axisText: '#a3a3a3',
@@ -47,6 +48,17 @@ const defaultTheme: UsageChartTheme = {
   grid: 'rgba(255, 255, 255, 0.08)',
   surface: 'rgba(20, 20, 20, 0.85)',
   text: '#f5f5f5',
+  fontFamily: chartFontFamilyStack,
+}
+
+const lightThemeFallback: UsageChartTheme = {
+  accent: '#9278e6',
+  accentFill: 'rgb(146 120 230 / 10%)',
+  axisText: '#737373',
+  axisLine: '#e4e4e7',
+  grid: '#e4e4e7',
+  surface: '#ffffff',
+  text: '#171717',
   fontFamily: chartFontFamilyStack,
 }
 
@@ -87,23 +99,20 @@ export function buildUsageTrendChart(
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: theme.surface,
-          borderColor: theme.axisLine,
-          borderWidth: 1,
-          titleColor: theme.text,
-          bodyColor: theme.text,
-          bodyFont: { size: 12 },
-          titleFont: { size: 12, weight: 700 },
-          padding: 10,
-          displayColors: false,
-          callbacks: {
-            label: (context) =>
-              i18n.global.t('account.usage.tooltipLabel', {
-                amount: formatIdeaAmount(getParsedY(context)),
-              }),
+        tooltip: defineSharedChartTooltip(
+          { surface: theme.surface, border: theme.axisLine, text: theme.text },
+          {
+            bodyFont: { size: 12 },
+            titleFont: { size: 12, weight: 700 },
+            displayColors: false,
+            callbacks: {
+              label: (context: ChartTooltipItem) =>
+                i18n.global.t('account.usage.tooltipLabel', {
+                  amount: formatIdeaAmount(getParsedY(context)),
+                }),
+            },
           },
-        },
+        ),
       },
       scales: {
         x: {
@@ -125,14 +134,11 @@ export function buildUsageTrendChart(
           grid: { color: theme.grid },
           border: { color: theme.axisLine },
         },
-        y: defineChartNumericScale({
+        y: defineSharedChartNumericScale(theme, {
           values,
           min: 10,
           headroom: 1.15,
           precision: 0,
-          tickColor: theme.axisText,
-          gridColor: theme.grid,
-          borderColor: theme.axisLine,
           formatTick: formatCompactNumber,
         }),
       },
@@ -146,31 +152,29 @@ export function buildUsageTrendChart(
 export function resolveUsageChartTheme(
   styles: Pick<CSSStyleDeclaration, 'getPropertyValue'> | null = readDocumentStyles(),
 ): UsageChartTheme {
+  // Track theme changes before reading the applied root palette.
   isDarkModeActive()
+  const fallback = readDocumentStylesThemeIsDark() ? darkThemeFallback : lightThemeFallback
   return {
-    accent: readColor(styles, '--color-brand-creative-accent', defaultTheme.accent),
-    accentFill: readColor(styles, '--color-brand-creative-accent-ring', defaultTheme.accentFill),
-    axisText: readColor(styles, '--muted-foreground', defaultTheme.axisText),
-    axisLine: readColor(styles, '--border', defaultTheme.axisLine),
-    grid: readColor(styles, '--border', defaultTheme.grid),
-    surface: readColor(styles, '--card', defaultTheme.surface),
-    text: readColor(styles, '--foreground', defaultTheme.text),
-    fontFamily: defaultTheme.fontFamily,
+    accent: readChartToken(styles, '--color-brand-creative-accent', fallback.accent),
+    accentFill: readChartToken(styles, '--color-brand-creative-accent-ring', fallback.accentFill),
+    axisText: readChartToken(styles, '--muted-foreground', fallback.axisText),
+    axisLine: readChartToken(styles, '--border', fallback.axisLine),
+    grid: readChartToken(styles, '--border', fallback.grid),
+    surface: readChartToken(styles, '--card', fallback.surface),
+    text: readChartToken(styles, '--foreground', fallback.text),
+    fontFamily: fallback.fontFamily,
   }
+}
+
+function readDocumentStylesThemeIsDark(): boolean {
+  if (typeof document === 'undefined') return true
+  return !document.documentElement.classList.contains('light')
 }
 
 function readDocumentStyles() {
   if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') return null
   return getComputedStyle(document.documentElement)
-}
-
-function readColor(
-  styles: Pick<CSSStyleDeclaration, 'getPropertyValue'> | null,
-  token: string,
-  fallback: string,
-) {
-  const value = styles?.getPropertyValue(token).trim() || ''
-  return value && !value.includes('var(') ? value : fallback
 }
 
 function formatTrendDateLabel(date: string) {

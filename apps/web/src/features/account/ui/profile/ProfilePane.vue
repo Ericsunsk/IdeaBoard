@@ -22,7 +22,7 @@
                 class="rounded-pill object-cover"
               />
               <AvatarFallback
-                class="bg-primary text-admin-summary-value font-bold text-primary-foreground sm:text-[34px]"
+                class="bg-primary text-admin-summary-value font-bold text-primary-foreground sm:text-admin-display"
               >
                 {{ userInitial }}
               </AvatarFallback>
