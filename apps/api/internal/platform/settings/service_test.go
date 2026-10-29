@@ -61,12 +61,29 @@ func TestRuntimeSettingsOutboundPolicyUpdateRejectsInvalidActor(t *testing.T) {
 	}
 }
 
+func TestNormalizeOutboundPolicyAcceptsURLForms(t *testing.T) {
+	normalized, err := NormalizeOutboundPolicySetting(OutboundPolicySetting{AllowHosts: []string{
+		"https://internal.example.com:8443/v1",
+		"HTTP://Internal.Example.COM./health",
+		"  internal.example.com:8443  ",
+		"internal.example.com.",
+		"10.0.0.8",
+	}})
+	if err != nil {
+		t.Fatalf("NormalizeOutboundPolicySetting() error = %v", err)
+	}
+	want := []string{"internal.example.com:8443", "internal.example.com", "10.0.0.8"}
+	if !equalStringSlices(normalized.AllowHosts, want) {
+		t.Fatalf("outbound policy = %+v, want %+v", normalized.AllowHosts, want)
+	}
+}
+
 func TestNormalizeOutboundPolicyRejectsInvalidInputs(t *testing.T) {
 	tests := []struct {
 		name    string
 		setting OutboundPolicySetting
 	}{
-		{name: "host scheme", setting: OutboundPolicySetting{AllowHosts: []string{"https://internal.example.com"}}},
+		{name: "host userinfo", setting: OutboundPolicySetting{AllowHosts: []string{"https://user@internal.example.com"}}},
 		{name: "host wildcard", setting: OutboundPolicySetting{AllowHosts: []string{"*.example.com"}}},
 		{name: "too many hosts", setting: OutboundPolicySetting{AllowHosts: make([]string, maxOutboundAllowHosts+1)}},
 	}

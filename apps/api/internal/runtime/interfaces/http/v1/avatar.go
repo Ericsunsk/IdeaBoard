@@ -85,7 +85,7 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 	ext := imageformat.DetectImageExtensionFromBytes(data)
 	mime := imageformat.ImageMIMEFromExtension(ext)
 	if ext == "" || mime == "" {
-		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"avatar": "unsupported"}})
+		renderMediaUnsupportedType(c, "avatar")
 		return
 	}
 	if raw := strings.TrimSpace(c.GetHeader("Content-Type")); raw != "" {

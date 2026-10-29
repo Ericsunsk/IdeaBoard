@@ -30,12 +30,14 @@ type DialogShellTrack = 'share' | 'auth' | 'account' | 'confirm'
 
 /**
  * Per-surface dialog presets. The shell stays neutral; each track picks a
- * size and close affordance. Alert semantics stay split by design:
- * - User confirm (`UserConfirmDialog`) is a plain `dialog` (blocking confirm,
- *   typed-confirm support, focus restores through the shared lifecycle).
- * - Admin confirm (`AdminConfirmDialog`) is an `alertdialog` (destructive
- *   operator confirm, error toast keeps the dialog open).
- * Neither preset may cross that role boundary.
+ * size and close affordance. One confirm (`ConfirmDialog` in core) serves
+ * both surfaces through its `surface` prop:
+ * - `surface="user"` renders a plain `dialog` (blocking confirm, typed-confirm
+ *   support, focus restores through the shared lifecycle).
+ * - `surface="admin"` renders an `alertdialog` (destructive operator confirm,
+ *   error toast keeps the dialog open).
+ * Both branches share danger intent styling, the busy lock, and cancel
+ * settlement.
  */
 export const dialogShellPresets: Record<DialogShellTrack, DialogShellPreset> = {
   share: { size: 'compact', hasClose: true },

@@ -504,19 +504,26 @@ func LoadAndValidate() (*Config, error) {
 	return cfg, nil
 }
 
-// Validate runs every startup fail-fast check in one place: required
-// secrets and origins (listed together so one run reports everything
-// missing), database settings, malformed env fallbacks (production only),
-// public origins, and the at-rest secrets encryption key. Callers booting
-// the serving process must fail on the returned error before opening any
-// connection or listener. Migration-only entrypoints (migrate,
-// finalize-migrate) use ValidateForMigration instead: they legitimately run
-// without the serving secrets (internal keys, ticket secret, rewards).
+// Validate runs the startup fail-fast checks for the serving process
+// (all modes: all, http-only, worker-only). Production keeps the full
+// fail-fast gate: every serving secret and origin is required before
+// opening any connection or listener. Outside production only the
+// boot-critical inputs are required, including the origin and credits/rewards
+// keys used unconditionally during runtime construction. Missing internal
+// auth and ticket secrets warn and fail closed at their dependent endpoints.
+// Migration-only entrypoints (migrate,
+// finalize-migrate) use ValidateForMigration instead; init-admin,
+// init-credit-wallets, and backfill-board-previews use their own trimmed
+// validators below.
 func (c *Config) Validate() error {
 	if c == nil {
 		return fmt.Errorf("config is required")
 	}
-	if err := c.ValidateRequired(); err != nil {
+	if isProductionAppEnv(c.App.Env) {
+		if err := c.ValidateRequired(); err != nil {
+			return err
+		}
+	} else if err := c.ValidateBootCritical(); err != nil {
 		return err
 	}
 	if err := c.ValidateDatabase(); err != nil {
@@ -526,6 +533,53 @@ func (c *Config) Validate() error {
 		return err
 	}
 	return nil
+}
+
+// ValidateBootCritical requires only the inputs the serving process
+// cannot boot without in any environment and warn-logs optional auth/ticket
+// inputs, which
+// stays fail-closed at its point of use. Production never reaches this
+// path: Validate keeps the full ValidateRequired gate there.
+func (c *Config) ValidateBootCritical() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if strings.TrimSpace(c.Database.Password) == "" {
+		return fmt.Errorf("API_PG_PASSWORD is required")
+	}
+	if err := c.ValidateSecrets(); err != nil {
+		return err
+	}
+	var missing []string
+	if strings.TrimSpace(c.Credits.WelcomeIdentityKey) == "" {
+		missing = append(missing, "CREDITS_WELCOME_IDENTITY_KEY")
+	}
+	if strings.TrimSpace(c.Rewards.CodeHMACKeys) == "" {
+		missing = append(missing, "REWARDS_CODE_HMAC_KEYS")
+	}
+	if c.PublicOrigins.Validate() != nil {
+		missing = append(missing, "PUBLIC_ORIGIN")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing or invalid boot-critical env: %s", strings.Join(missing, ", "))
+	}
+	for _, missing := range c.degradedServingKeys() {
+		slog.Warn("serving input is not set; dependent endpoints stay fail-closed", "key", missing)
+	}
+	return nil
+}
+
+// degradedServingKeys lists the serving inputs that are missing but only
+// warn in non-production (fail at point of use instead of at boot).
+func (c *Config) degradedServingKeys() []string {
+	var missing []string
+	if strings.TrimSpace(c.Auth.InternalAPIKey) == "" {
+		missing = append(missing, "AUTH_INTERNAL_KEY")
+	}
+	if strings.TrimSpace(c.Realtime.TicketSecret) == "" {
+		missing = append(missing, "RT_TICKET_SECRET")
+	}
+	return missing
 }
 
 // ValidateRequired rejects a serving process that is missing any required
@@ -559,6 +613,76 @@ func (c *Config) ValidateRequired() error {
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing or invalid required env: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// ValidateForInitAdmin runs the fail-fast checks for the init-admin
+// command. It provisions the admin identity through the auth service and
+// the credit wallet lifecycle, so it requires the database, the at-rest
+// secrets key, the internal auth key, the welcome identity key, and the
+// admin seed inputs. Ticket, rewards, and origin inputs are never used on
+// this path.
+func (c *Config) ValidateForInitAdmin() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateDatabase(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Database.Password) == "" {
+		return fmt.Errorf("API_PG_PASSWORD is required for init-admin")
+	}
+	if err := c.ValidateSecrets(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Auth.InternalAPIKey) == "" {
+		return fmt.Errorf("AUTH_INTERNAL_KEY is required for init-admin")
+	}
+	if strings.TrimSpace(c.Credits.WelcomeIdentityKey) == "" {
+		return fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY is required for init-admin")
+	}
+	if strings.TrimSpace(c.AdminSeed.Email) == "" {
+		return fmt.Errorf("INIT_ADMIN_EMAIL is required for init-admin")
+	}
+	if strings.TrimSpace(c.AdminSeed.Password) == "" {
+		return fmt.Errorf("INIT_ADMIN_PASSWORD is required for init-admin")
+	}
+	return nil
+}
+
+// ValidateForInitCreditWallets runs the fail-fast checks for the
+// init-credit-wallets command. It only touches the database and the
+// credit wallet lifecycle; auth, ticket, rewards, and origin inputs are
+// never used on this path.
+func (c *Config) ValidateForInitCreditWallets() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateDatabase(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Database.Password) == "" {
+		return fmt.Errorf("API_PG_PASSWORD is required for init-credit-wallets")
+	}
+	if strings.TrimSpace(c.Credits.WelcomeIdentityKey) == "" {
+		return fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY is required for init-credit-wallets")
+	}
+	return nil
+}
+
+// ValidateForBackfill runs the fail-fast checks for the
+// backfill-board-previews command. It only reads and writes board rows;
+// no secret, ticket, reward, or origin input is used on this path.
+func (c *Config) ValidateForBackfill() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateDatabase(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Database.Password) == "" {
+		return fmt.Errorf("API_PG_PASSWORD is required for backfill-board-previews")
 	}
 	return nil
 }

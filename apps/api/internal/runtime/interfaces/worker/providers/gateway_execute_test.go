@@ -25,7 +25,7 @@ import (
 
 func gatewayTestFactory(serverURL string) runtimeports.GatewayClientFactory {
 	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
+		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
 	}
 }
 

@@ -176,7 +176,7 @@ import { AdminSwitch } from '../../../../shared/index'
 import { useOptimisticToggle } from '../../../../shared/index'
 import { secretField } from '../../../../shared/index'
 import { confirmSettingsSave } from '../../../../shared/index'
-import { useAdminConfirm } from '../../../../shared/index'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { formatAdminDisplayError } from '../../../../shared/index'
 import { useAdminMailSettingsFeedback } from '../../../session/useSettingsFeedback'
 import SettingEditorCard from '../SettingEditorCard.vue'
@@ -196,7 +196,7 @@ const props = withDefaults(
 )
 const defaultResource = createAdminMailConfigResource()
 const feedback = useAdminMailSettingsFeedback()
-const confirm = useAdminConfirm()
+const confirm = useConfirm()
 const summary = ref<MailConfigSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)

@@ -96,7 +96,7 @@ import { vendorPresetCatalog } from '../../../core/storage/meta'
 import { STORAGE_MESSAGES } from './messages'
 import { SETTINGS_SECTIONS } from '../../pages/sections'
 import { useStorageContext } from '../../../session/storage/useStorageContext'
-import { useAdminConfirm } from '../../../../shared/index'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { reconcileStableRows } from '../../../../shared/index'
 import type { StorageCard } from '../../../core/storage/profiles'
 import AdminStorageTable, {
@@ -105,7 +105,7 @@ import AdminStorageTable, {
 } from './AdminStorageTable.vue'
 import AdminStorageEditorDialog from './AdminStorageEditorDialog.vue'
 
-const adminConfirm = useAdminConfirm()
+const adminConfirm = useConfirm()
 const {
   saving,
   fetching,

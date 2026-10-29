@@ -1,7 +1,7 @@
-import type { UserConfirmRequest } from '../../../core/composables/useUserConfirmDialog'
+import type { ConfirmRequest } from '../../../core/composables/useConfirmDialog'
 import { i18n } from '../../../core/i18n'
 
-export function deleteFolderConfirmation(folderName: string): UserConfirmRequest {
+export function deleteFolderConfirmation(folderName: string): ConfirmRequest {
   return {
     title: i18n.global.t('library.dialogs.deleteFolderTitle'),
     message: i18n.global.t('library.dialogs.deleteFolderMessage', { name: folderName }),
@@ -10,7 +10,7 @@ export function deleteFolderConfirmation(folderName: string): UserConfirmRequest
   }
 }
 
-export function removeAssetConfirmation(): UserConfirmRequest {
+export function removeAssetConfirmation(): ConfirmRequest {
   return {
     title: i18n.global.t('library.dialogs.removeAssetTitle'),
     message: i18n.global.t('library.dialogs.removeAssetMessage'),

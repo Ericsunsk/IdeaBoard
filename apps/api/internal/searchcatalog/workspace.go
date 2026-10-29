@@ -21,7 +21,7 @@ package searchcatalog
 //     workspace library store at the handler), staged workspace uploads
 //     by upload_ id (stage-then-reference through the upload-session
 //     byte PUT; existence, liveness, and staged bytes are checked at
-//     the handler), and external images by allowlisted https URL
+//     the handler), and external images by public https URL
 //     (IsV1VisionExternalImageURL). Client bytes never cross the v1
 //     vision boundary, so no multipart surface is introduced.
 //   - Vision billing reuses the ai-search:vision SKU semantics from the
@@ -30,6 +30,7 @@ package searchcatalog
 
 import (
 	"errors"
+	"net"
 	"net/url"
 	"strings"
 	"unicode/utf8"
@@ -130,36 +131,43 @@ type V1VisionQueryInput struct {
 	ImageURLs       []string
 }
 
-// V1VisionExternalImageHosts is the fail-closed CDN allowlist for v1
-// vision external refs: exact-host https only. It mirrors the tree's
-// existing gates (the searchcatalog provider-result filter and the
-// legacy vision input reader); hosts outside this set fail validation
-// with ErrV1VisionInput and are never fetched.
-var V1VisionExternalImageHosts = []string{"images.unsplash.com", "plus.unsplash.com", "images.pexels.com"}
-
-// IsV1VisionExternalImageURL reports whether raw is an allowlisted
-// https image URL (exact host match, no exotic ports).
+// IsV1VisionExternalImageURL reports whether raw is a fetchable external
+// image URL: any public https URL (no exotic ports, no userinfo, no
+// literal private/loopback IP). The curated CDN host allowlist is gone:
+// the single gate is the safehttp transport at fetch time
+// (private/loopback DNS + dial re-check, redirect re-validation, 3-hop
+// cap). Literal private IPs fail fast here; DNS-resolved private targets
+// still fail at fetch time as unavailable.
 func IsV1VisionExternalImageURL(raw string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
 		return false
 	}
 	if port := parsed.Port(); port != "" && port != "443" {
 		return false
 	}
-	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	for _, allowed := range V1VisionExternalImageHosts {
-		if host == allowed {
-			return true
-		}
+	if ip := net.ParseIP(strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")); ip != nil && isPrivateVisionImageIP(ip) {
+		return false
 	}
-	return false
+	return true
+}
+
+// isPrivateVisionImageIP mirrors the safehttp transport block list for
+// literal-IP fast rejection (DNS-resolved names are still enforced at
+// fetch time, where TOCTOU-safe re-checks run).
+func isPrivateVisionImageIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified()
 }
 
 // ValidateV1VisionQueryInput enforces text/refs presence, the 200-rune
 // text bound, at most 4 refs in total across all three ref kinds, and
 // per-ref shapes (lasset_ for library refs, upload_ for staged-upload
-// refs, allowlisted https for external URLs). Existence and workspace
+// refs, public https for external URLs). Existence and workspace
 // binding are checked against the owning stores at the handler; hidden
 // refs converge to 404 there.
 func ValidateV1VisionQueryInput(input V1VisionQueryInput) (V1VisionQueryInput, error) {
@@ -220,15 +228,15 @@ const (
 	// V1VisionReferenceUpload is a staged workspace upload referenced
 	// by upload_ id (ObjectKey locates the staged bytes server-side).
 	V1VisionReferenceUpload = "upload"
-	// V1VisionReferenceExternal is an allowlisted external image URL.
+	// V1VisionReferenceExternal is a public external image URL.
 	V1VisionReferenceExternal = "external"
 )
 
 // V1VisionReference is one server-resolved vision input handed to the
 // extractor seam. Library refs carry provider URL + source metadata;
 // upload refs carry the staged byte locator (resolved server-side,
-// never client bytes); external refs carry the validated allowlisted
-// URL. Bytes never cross this boundary (provider fetch stays
+// never client bytes); external refs carry the validated public
+// image URL. Bytes never cross this boundary (provider fetch stays
 // #808-owned).
 type V1VisionReference struct {
 	Provider   string

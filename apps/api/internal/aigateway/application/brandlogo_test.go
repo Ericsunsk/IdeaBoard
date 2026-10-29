@@ -70,23 +70,24 @@ func TestNormalizeBrandLogoProvider(t *testing.T) {
 	}
 }
 
-func TestLoadBrandLogoAllowlistReject(t *testing.T) {
-	// models.dev 不在 egress allowlist：直接回默认图，不发起任何上游请求。
-	stubBrandLogoUpstream(t, []string{"example.com"}, func(w http.ResponseWriter, r *http.Request) {
-		t.Error("logo fetch must not run without allowlist")
+func TestLoadBrandLogoNeedsNoAllowlistEntry(t *testing.T) {
+	// models.dev 不在 egress allowlist：公网只读仍直接抓取上游 SVG。
+	stubBrandLogoUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		_, _ = w.Write([]byte(testBrandLogoSVG))
 	})
 	body, fallback, err := loadBrandLogo(context.Background(), "openai")
 	if err != nil {
 		t.Fatalf("loadBrandLogo() error = %v", err)
 	}
-	if !fallback || string(body) != defaultBrandLogoSVG {
-		t.Fatalf("body = %q, fallback = %v; want embedded default mark", body, fallback)
+	if fallback || string(body) != testBrandLogoSVG {
+		t.Fatalf("body = %q, fallback = %v; want upstream bytes without allowlist entry", body, fallback)
 	}
 }
 
 func TestLoadBrandLogoPassthroughAndCache(t *testing.T) {
 	var hits atomic.Int64
-	stubBrandLogoUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	stubBrandLogoUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		if r.URL.Path != "/openai.svg" {
 			t.Errorf("upstream path = %s, want /openai.svg", r.URL.Path)
@@ -141,7 +142,7 @@ func TestLoadBrandLogoFallbacks(t *testing.T) {
 		{"upstream 200 empty serves default", http.StatusOK, "", "empty"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			stubBrandLogoUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+			stubBrandLogoUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.status)
 				_, _ = w.Write([]byte(tc.body))
 			})
@@ -156,7 +157,7 @@ func TestLoadBrandLogoFallbacks(t *testing.T) {
 	}
 
 	// 无效 provider 直接 400 语义（error），不回默认图。
-	stubBrandLogoUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	stubBrandLogoUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		t.Error("logo fetch must not run for invalid provider")
 	})
 	if _, _, err := loadBrandLogo(context.Background(), "../../etc"); err == nil {
@@ -166,7 +167,7 @@ func TestLoadBrandLogoFallbacks(t *testing.T) {
 
 func TestGatewayHandlerBrandLogo(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	stubBrandLogoUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	stubBrandLogoUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/fal.svg" {
 			w.WriteHeader(http.StatusNotFound)
 			return

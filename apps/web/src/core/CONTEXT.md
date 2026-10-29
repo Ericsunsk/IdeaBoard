@@ -50,9 +50,9 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 
 ## Feedback Factory Map (per-surface split, intentional)
 
-- User surfaces own one `*Feedback` factory each over `useAppToast` + locale keys: account `useProfileFeedback`, auth `useAuthFeedback`, board `createBoardFeedback`/`useBoardFeedback`, canvas `createCanvasFeedback`/`useCanvasFeedback`, library delete/remove confirmations in `components/confirmations.ts` over `useUserConfirmDialog`.
+- User surfaces own one `*Feedback` factory each over `useAppToast` + locale keys: account `useProfileFeedback`, auth `useAuthFeedback`, board `createBoardFeedback`/`useBoardFeedback`, canvas `createCanvasFeedback`/`useCanvasFeedback`, library delete/remove confirmations in `components/confirmations.ts` over `useConfirmDialog`.
 - Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file/storage/payment), users.
-- Factories never cross surfaces (no shared generic factory, no user-copy in admin factories, no zh literals in user factories); confirm dialogs split the same way (`UserConfirmDialog` + `useUserConfirmDialog` for user surfaces, `AdminConfirmDialog` for admin).
+- Factories never cross surfaces (no shared generic factory, no user-copy in admin factories, no zh literals in user factories); user and admin surfaces share one confirm (`ConfirmDialog` + `useConfirmDialog`/`useConfirm` in `core`, distinguished by `intent`/`surface`).
 
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
 

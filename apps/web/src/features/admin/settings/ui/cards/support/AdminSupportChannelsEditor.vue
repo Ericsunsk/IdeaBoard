@@ -224,10 +224,11 @@ const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
     }
     return ''
   },
-  save: (draft) => mutation.mutateAsync(draft),
-  synchronizeCache: async (saved) => {
+  save: async (draft) => {
+    const saved = await mutation.mutateAsync(draft)
     queryClient.setQueryData(supportChannelsQueryKey, saved)
     await queryClient.invalidateQueries({ queryKey: SUPPORT_CHANNELS_QUERY_KEY })
+    return saved
   },
   feedback: useAdminSupportChannelsFeedback(),
 })

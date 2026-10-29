@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '@/core/composables/useAsyncAction'
-import type { AdminConfirmPort } from '../../../shared/index'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import { useOptimisticToggle } from '../../../shared/index'
 import {
   createAdminStorageResource,
@@ -29,7 +29,7 @@ type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 
 export type AdminStorageWorkspaceOptions = {
   feedback: AdminStorageFeedback
-  confirm: AdminConfirmPort
+  confirm: ConfirmPort
   runAsyncAction: RunAsyncAction
   resource?: AdminStorageResource | undefined
 }

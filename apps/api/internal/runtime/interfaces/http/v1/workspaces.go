@@ -68,8 +68,10 @@ func v1AllowOwnerOrAdmin(role string, visible bool) bool {
 
 // writeV1InputError renders the single frozen bind-failure shape for
 // every v1 JSON body (400 bad_request, 请求体非法, details.data =
-// invalid). All BindStrictJSON sites call this instead of rendering
-// inline, so the shape cannot drift between surfaces.
+// invalid). All JSON bind sites (strict and lenient) call this instead
+// of rendering inline, so the shape cannot drift between surfaces.
+// Lenient binds only reach it for malformed JSON or trailing payloads;
+// ignored unknown fields never render.
 func writeV1InputError(c *gin.Context) {
 	contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
 		runtimehttp.MsgRequireEmptyV1BillingActionBody, contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
@@ -124,14 +126,31 @@ func (h *contractV1Handler) withWorkspace(c *gin.Context, opts v1WorkspaceOpts, 
 	v1WorkspacePrelude(c, require, resolve, opts.Allow, fn)
 }
 
-// withV1WorkspaceBody runs the shared prelude plus JSON binding for
-// the common shape where binding directly follows the capability
-// gate. It is a free function (not a method) because Go methods
-// cannot carry type parameters. Handlers with key/domain checks
-// between the gate and the bind step must use withWorkspace plus a
-// manual writeV1InputError call in the original position instead,
-// so error precedence never changes.
+// withV1WorkspaceBody runs the shared prelude plus lenient JSON binding
+// for the common shape where binding directly follows the capability
+// gate (content writes: unknown fields are ignored with a warn). It is
+// a free function (not a method) because Go methods cannot carry type
+// parameters. Handlers with key/domain checks between the gate and the
+// bind step must use withWorkspace plus a manual writeV1InputError call
+// in the original position instead, so error precedence never changes.
 func withV1WorkspaceBody[T any](h *contractV1Handler, c *gin.Context, opts v1WorkspaceOpts, fn func(v1WorkspaceCtx, T)) {
+	h.withWorkspace(c, opts, func(wctx v1WorkspaceCtx) {
+		var body T
+		if err := contract.BindLenientJSON(c, &body); err != nil {
+			writeV1InputError(c)
+			return
+		}
+		fn(wctx, body)
+	})
+}
+
+// withV1WorkspaceBodyStrict runs the shared prelude plus strict JSON
+// binding for permission and funds-adjacent writes on the shared-prelude
+// shape (member role updates, task quotes): unknown fields fail closed
+// with writeV1InputError. New content writes must use
+// withV1WorkspaceBody; new sensitive writes must use this helper, never
+// a hand-rolled bind.
+func withV1WorkspaceBodyStrict[T any](h *contractV1Handler, c *gin.Context, opts v1WorkspaceOpts, fn func(v1WorkspaceCtx, T)) {
 	h.withWorkspace(c, opts, func(wctx v1WorkspaceCtx) {
 		var body T
 		if err := contract.BindStrictJSON(c, &body); err != nil {

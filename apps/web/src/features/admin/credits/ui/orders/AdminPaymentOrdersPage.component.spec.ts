@@ -19,8 +19,8 @@ vi.mock('../../session/orders/paymentOrderResource', () => ({
   createAdminPaymentOrderResource: () => resource,
 }))
 
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => confirm,
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => confirm,
 }))
 
 vi.mock('../../../../../core/composables/useAppToast')

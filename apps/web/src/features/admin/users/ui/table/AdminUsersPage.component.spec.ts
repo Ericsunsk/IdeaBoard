@@ -15,8 +15,8 @@ let toastMocks: AppToastMocks
 const userPublicID = 'usr_000000000000000000000012'
 const secondUserPublicID = 'usr_000000000000000000000013'
 
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: confirmMock }),
 }))
 
 vi.mock('../../../../../core/composables/useAppToast')

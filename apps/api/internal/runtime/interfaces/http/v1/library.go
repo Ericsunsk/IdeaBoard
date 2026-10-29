@@ -337,7 +337,7 @@ func (h *contractV1Handler) createLibraryFolder(c *gin.Context) {
 			return
 		}
 		var body v1CreateLibraryFolderBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -403,7 +403,7 @@ func (h *contractV1Handler) renameLibraryFolder(c *gin.Context) {
 			return
 		}
 		var body v1RenameLibraryFolderBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -515,7 +515,7 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 			return
 		}
 		var body v1SaveLibraryAssetBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -669,7 +669,7 @@ func (h *contractV1Handler) moveLibraryAsset(c *gin.Context) {
 			return
 		}
 		var body v1MoveLibraryAssetBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}

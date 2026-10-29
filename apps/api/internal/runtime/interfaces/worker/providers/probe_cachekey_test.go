@@ -47,9 +47,9 @@ func TestProbeModelSuccess(t *testing.T) {
 		map[string]string{"cf-aig-model": "openai/gpt-4o-mini"}, `{"data":[]}`)
 	defer server.Close()
 
-	client, err := providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
 	if err != nil {
-		t.Fatalf("providerinfra.NewGatewayClientForTest() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	verdict, err := ProbeModel(context.Background(), client, "openrouter", "google/gemini-3.1-flash-lite-image", "api/v1/models", 5*time.Second)
 	if err != nil {
@@ -77,9 +77,9 @@ func TestProbeModelErrorResponseIsReachable(t *testing.T) {
 	server := newGatewayCaptureServer(t, &capture, http.StatusUnauthorized, nil, `{"error":"bad key"}`)
 	defer server.Close()
 
-	client, err := providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
 	if err != nil {
-		t.Fatalf("providerinfra.NewGatewayClientForTest() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	verdict, err := ProbeModel(context.Background(), client, "openrouter", "google/gemini-3.1-flash-lite-image", "api/v1/models", 5*time.Second)
 	if err == nil {
@@ -96,9 +96,9 @@ func TestProbeModelErrorResponseIsReachable(t *testing.T) {
 }
 
 func TestProbeModelRejectsBadInput(t *testing.T) {
-	client, err := providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{BaseURL: "http://127.0.0.1:1", Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: "http://127.0.0.1:1", Token: "test-token"})
 	if err != nil {
-		t.Fatalf("providerinfra.NewGatewayClientForTest() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	if _, err := ProbeModel(context.Background(), nil, "openrouter", "m", "api/v1/models", time.Second); err == nil {
 		t.Fatal("nil client accepted")

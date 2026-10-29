@@ -45,10 +45,11 @@ export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSett
     normalize: normalizeMediaUploadSetting,
     isSame: isSameMediaUploadSetting,
     validate: validateMediaUploadSetting,
-    save: (draft) => saveMutation.mutateAsync(draft),
-    synchronizeCache: async (savedSetting) => {
-      writeMediaUploadQueryCache(queryClient, savedSetting)
+    save: async (draft) => {
+      const saved = await saveMutation.mutateAsync(draft)
+      writeMediaUploadQueryCache(queryClient, saved)
       await queryClient.invalidateQueries({ queryKey: ADMIN_MEDIA_UPLOAD_QUERY_KEY })
+      return saved
     },
     feedback: options.feedback,
   })

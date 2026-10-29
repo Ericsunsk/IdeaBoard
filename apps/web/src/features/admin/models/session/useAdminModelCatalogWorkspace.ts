@@ -1,7 +1,7 @@
 import { computed, onUnmounted, ref, type ComputedRef } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared'
-import { useAdminConfirm } from '../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import {
   useAdminModelCatalogFeedback,
   type AdminModelCatalogFeedback,
@@ -38,7 +38,7 @@ function mirrorCatalogLoadFailure(
 export function useAdminModelCatalogWorkspace(
   resource: AdminGatewayCatalog = createAdminGatewayResource().catalog,
 ) {
-  const adminConfirm = useAdminConfirm()
+  const adminConfirm = useConfirm()
   const feedback = useAdminModelCatalogFeedback()
   const { copyText } = useAppClipboard()
   const queryClient = useQueryClient()

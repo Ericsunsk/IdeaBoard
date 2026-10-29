@@ -1,9 +1,11 @@
 package application
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -29,17 +31,22 @@ func TestValidateUpdateInput(t *testing.T) {
 		t.Fatal("token rotation not detected")
 	}
 
-	// Non-Cloudflare hosts fail closed: there is no custom-egress path.
+	// Open egress: any http(s) host passes (audited, not allowlisted).
 	for _, customURL := range []string{
 		"https://my-gateway.example.com/",
-		"https://gateway.myorg.internal",
-		"http://127.0.0.1:8080/v1/a/g",
+		"https://gateway.example.com/v1/abcdef0123456789abcdef0123456789/my-gateway",
 	} {
-		if _, _, _, _, _, err := validateUpdateInput(UpdateInput{
-			BaseURL: customURL,
-			Token:   &token,
-		}, 7); err == nil {
-			t.Fatalf("validateUpdateInput(%q) accepted, want sole-egress rejection", customURL)
+		gotBase, gotAccount, gotGateway, _, _, err := validateUpdateInput(UpdateInput{
+			BaseURL:   customURL,
+			AccountID: "abcdef0123456789abcdef0123456789",
+			GatewayID: "my-gateway",
+			Token:     &token,
+		}, 7)
+		if err != nil {
+			t.Fatalf("validateUpdateInput(%q) rejected, want open-host pass: %v", customURL, err)
+		}
+		if gotBase == "" || gotAccount == "" || gotGateway == "" {
+			t.Fatalf("validateUpdateInput(%q) = %q / %q / %q, want normalized", customURL, gotBase, gotAccount, gotGateway)
 		}
 	}
 
@@ -77,12 +84,28 @@ func TestValidateUpdateInput(t *testing.T) {
 		{"empty token", UpdateInput{Token: strPtr("  "), AccountID: "abcdef0123456789abcdef0123456789", GatewayID: "g"}, 7},
 		{"bad base url scheme", UpdateInput{BaseURL: "ftp://example.com", Token: strPtr("tok")}, 7},
 		{"bad base url empty host", UpdateInput{BaseURL: "http://", Token: strPtr("tok")}, 7},
-		{"base url userinfo", UpdateInput{BaseURL: "https://user:pass@example.com", Token: strPtr("tok")}, 7},
-		{"base url query", UpdateInput{BaseURL: "https://example.com/path?token=secret", Token: strPtr("tok")}, 7},
 		{"explicit invalid account with custom url", UpdateInput{BaseURL: "https://example.com", AccountID: "not-valid", Token: strPtr("tok")}, 7},
+		{"bare custom url without identity", UpdateInput{BaseURL: "https://gateway.example.com", Token: strPtr("tok")}, 7},
 	} {
 		if _, _, _, _, _, err := validateUpdateInput(tc.input, tc.actor); err == nil {
 			t.Fatalf("%s accepted, want error", tc.name)
+		}
+	}
+
+	// Userinfo, query, and fragment are rejected so secrets never
+	// ride inside the stored URL.
+	for _, tc := range []struct {
+		name  string
+		input UpdateInput
+	}{
+		{"arbitrary url userinfo", UpdateInput{BaseURL: "https://user:pass@gateway.example.com", Token: strPtr("tok")}},
+		{"arbitrary url query", UpdateInput{BaseURL: "https://gateway.example.com/?token=secret", Token: strPtr("tok")}},
+		{"arbitrary url fragment", UpdateInput{BaseURL: "https://gateway.example.com/#frag", Token: strPtr("tok")}},
+	} {
+		if _, _, _, _, _, err := validateUpdateInput(tc.input, 7); err == nil {
+			t.Fatalf("%s accepted, want error", tc.name)
+		} else if err.Error() != errorrender.MsgValidateUpdateInput4 {
+			t.Fatalf("%s error = %q, want %q", tc.name, err.Error(), errorrender.MsgValidateUpdateInput4)
 		}
 	}
 }
@@ -104,7 +127,8 @@ func newGatewayTestRepository(t *testing.T) *ConfigRepository {
 
 func TestConfigRepositoryRoundTrip(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	repo := newGatewayTestRepository(t)
+	db := testdb.Open(t)
+	repo := NewConfigRepository(settings.NewSystemConfigRepository(db))
 	ctx := t.Context()
 
 	if _, err := repo.Resolve(ctx); err != ErrAIGatewayNotConfigured {
@@ -133,18 +157,54 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 		t.Fatalf("resolved leaks or misbuilds: %+v", resolved.BaseURL)
 	}
 
-	// Custom BaseURLs fail closed on update: sole egress pins Cloudflare.
+	// Open egress: an arbitrary custom host persists, and the admin
+	// audit records host-level old→new without the token value.
+	customToken := "rotated-gateway-token-value"
 	if err := repo.Update(ctx, UpdateInput{
-		BaseURL: "https://gateway.myorg.internal",
-	}, 42); err == nil {
-		t.Fatal("Update() with custom BaseURL succeeded, want sole-egress rejection")
+		BaseURL:   "https://gateway.example.com",
+		AccountID: "abcdef0123456789abcdef0123456789",
+		GatewayID: "custom-one",
+		Token:     &customToken,
+	}, 42); err != nil {
+		t.Fatalf("Update() with arbitrary BaseURL error = %v, want open-host pass", err)
 	}
 	keptCustom, err := repo.Resolve(ctx)
 	if err != nil {
-		t.Fatalf("Resolve() after rejected custom BaseURL error = %v", err)
+		t.Fatalf("Resolve() after custom BaseURL error = %v", err)
 	}
-	if keptCustom.BaseURL == "https://gateway.myorg.internal" {
-		t.Fatalf("custom BaseURL persisted despite rejection: %+v", keptCustom)
+	if keptCustom.BaseURL != "https://gateway.example.com" {
+		t.Fatalf("custom BaseURL not persisted: %+v", keptCustom)
+	}
+	// Audit records actor plus host-level old→new, never the token plaintext.
+	var auditAction string
+	var auditActor int64
+	var auditMetadataRaw []byte
+	if err := db.QueryRow(ctx, `
+SELECT action_type, actor_id, metadata
+FROM system_settings_admin_actions
+WHERE action_type = 'update_ai_gateway'
+ORDER BY id DESC
+LIMIT 1`).Scan(&auditAction, &auditActor, &auditMetadataRaw); err != nil {
+		t.Fatalf("read ai gateway audit: %v", err)
+	}
+	if auditAction != "update_ai_gateway" || auditActor != 42 {
+		t.Fatalf("audit = type=%q actor=%d, want update_ai_gateway/42", auditAction, auditActor)
+	}
+	var auditMetadata map[string]any
+	if err := json.Unmarshal(auditMetadataRaw, &auditMetadata); err != nil {
+		t.Fatalf("decode ai gateway audit metadata: %v", err)
+	}
+	if auditMetadata["base_url_host"] != "gateway.example.com" {
+		t.Fatalf("audit base_url_host = %v, want gateway.example.com", auditMetadata["base_url_host"])
+	}
+	if auditMetadata["prev_base_url_host"] != "gateway.ai.cloudflare.com" {
+		t.Fatalf("audit prev_base_url_host = %v, want gateway.ai.cloudflare.com", auditMetadata["prev_base_url_host"])
+	}
+	if rotated, _ := auditMetadata["token_rotated"].(bool); !rotated {
+		t.Fatalf("audit token_rotated = %v, want true", auditMetadata["token_rotated"])
+	}
+	if strings.Contains(string(auditMetadataRaw), customToken) {
+		t.Fatal("audit metadata leaks token plaintext")
 	}
 
 	if err := repo.Update(ctx, UpdateInput{
@@ -157,7 +217,7 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve() after token-less update error = %v", err)
 	}
-	if kept.Token != token || kept.GatewayID != "prod-v2" {
+	if kept.Token != customToken || kept.GatewayID != "prod-v2" {
 		t.Fatalf("token not preserved across update: %+v", kept)
 	}
 	if kept.BaseURL != "https://gateway.ai.cloudflare.com/v1/abcdef0123456789abcdef0123456789/prod-v2" {

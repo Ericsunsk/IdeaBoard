@@ -65,7 +65,7 @@
         />
       </div>
 
-      <!-- CF 身份：官方域名可空（后端从 URL 派生）；自定义域名如需模型探测请填写 -->
+      <!-- CF 身份：官方域名可空（后端从 URL 派生）；自定义域名不带身份路径，必填 -->
       <div class="flex flex-col gap-1.5">
         <label
           class="text-admin-caption font-semibold text-foreground"
@@ -198,6 +198,17 @@ const defaultResource = createAdminGatewayResource().connection
 const resource = computed(() => props.resource ?? defaultResource)
 const feedback = useAdminGatewayConfigFeedback()
 
+// 非默认主机视为自定义域名：必须显式填写 Account ID 与 Gateway ID。
+const DEFAULT_GATEWAY_HOST = 'gateway.ai.cloudflare.com'
+
+function gatewayHostnameOf(raw: string): string {
+  try {
+    return new URL(raw.trim()).hostname.toLowerCase().replace(/\.$/, '')
+  } catch {
+    return ''
+  }
+}
+
 const summary = ref<GatewayConnectionSummary | null>(null)
 const probeProvider = ref('')
 const probePath = ref('')
@@ -283,6 +294,14 @@ const handleSave = form.handleSubmit(async (values) => {
   try {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
+    const host = gatewayHostnameOf(finalBaseUrl)
+    const accountId = values.account_id.trim().toLowerCase()
+    const gatewayId = values.gateway_id.trim().toLowerCase()
+    if (host !== '' && host !== DEFAULT_GATEWAY_HOST && (!accountId || !gatewayId)) {
+      feedback.saveFailed(new Error(MODELS_MESSAGES.gatewayCustomIdentityRequired))
+      return
+    }
+
     const payload: {
       base_url?: string
       token?: string
@@ -294,9 +313,9 @@ const handleSave = form.handleSubmit(async (values) => {
     if (values.token.trim()) {
       payload.token = values.token.trim()
     }
-    // 身份字段显式透传（含清空）：自定义域名场景靠它们建 control-plane 身份。
-    payload.account_id = values.account_id.trim().toLowerCase()
-    payload.gateway_id = values.gateway_id.trim().toLowerCase()
+    // 身份字段显式透传（含清空）。
+    payload.account_id = accountId
+    payload.gateway_id = gatewayId
 
     await resource.value.update(payload)
 

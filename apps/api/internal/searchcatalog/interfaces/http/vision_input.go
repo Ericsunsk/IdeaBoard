@@ -144,8 +144,8 @@ func readLibraryVisionImage(ctx context.Context, asset librarydomain.Asset) (dom
 	if strings.TrimSpace(rawURL) == "" {
 		rawURL = asset.PreviewURL
 	}
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Scheme != "https" || !isLibraryImageHost(parsed.Hostname()) {
+	parsed, ok := parseHTTPSVisionImageURL(rawURL)
+	if !ok {
 		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)
@@ -187,8 +187,8 @@ const visionInputTarget = "vision-input"
 
 // visionImageRequest is kept as a narrow seam for deterministic tests. The
 // production implementation still runs every request through the standard
-// outbound client and combines the runtime outbound policy with the exact,
-// curated image CDN hosts used by Search references.
+// outbound client under the runtime outbound policy (public reference
+// images need no listing; the transport blocks private targets).
 // visionInputFetchTimeout bounds one external reference image fetch,
 // separate from the gateway extraction timeout.
 const visionInputFetchTimeout = 30 * time.Second
@@ -196,38 +196,9 @@ const visionInputFetchTimeout = 30 * time.Second
 var visionImageRequest = func(ctx context.Context, request *http.Request) (*http.Response, error) {
 	return visionImageOutbound.Do(ctx, request, safehttp.RequestOptions{
 		Timeout:    visionInputFetchTimeout,
-		AllowHosts: visionImageAllowHosts(ctx),
+		AllowHosts: safehttp.AllowHosts(ctx),
 		Target:     visionInputTarget,
 	})
-}
-
-func visionImageAllowHosts(ctx context.Context) []string {
-	configured := safehttp.AllowHosts(ctx)
-	allowed := make([]string, 0, len(configured)+3)
-	seen := make(map[string]struct{}, len(configured)+3)
-	for _, host := range configured {
-		normalized := strings.ToLower(strings.TrimSpace(host))
-		if normalized == "" {
-			continue
-		}
-		if _, exists := seen[normalized]; exists {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		allowed = append(allowed, host)
-	}
-	for _, host := range []string{"images.unsplash.com", "plus.unsplash.com", "images.pexels.com"} {
-		normalized := strings.ToLower(strings.TrimSpace(host))
-		if normalized == "" {
-			continue
-		}
-		if _, exists := seen[normalized]; exists {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		allowed = append(allowed, host)
-	}
-	return allowed
 }
 
 func parseLibraryAssetIDs(rawIDs []string) ([]int64, error) {
@@ -250,13 +221,21 @@ func parseLibraryAssetIDs(rawIDs []string) ([]int64, error) {
 	return ids, nil
 }
 
-func isLibraryImageHost(host string) bool {
-	switch strings.ToLower(strings.TrimSpace(host)) {
-	case "images.unsplash.com", "plus.unsplash.com", "images.pexels.com":
-		return true
-	default:
-		return false
+// parseHTTPSVisionImageURL validates one server-fetchable reference image
+// URL: exact https (no exotic ports, no userinfo) with a host. The curated
+// CDN host checks are gone: the single gate is the safehttp transport
+// (private/loopback DNS + dial re-check, redirect re-validation, 3-hop
+// cap), so any public https URL is fetchable and anything else fails at
+// fetch time as unavailable.
+func parseHTTPSVisionImageURL(raw string) (*url.URL, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
+		return nil, false
 	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return nil, false
+	}
+	return parsed, true
 }
 
 // VisionExternalReference is the metadata the browser sends for a Search
@@ -324,17 +303,11 @@ func isAllowedExternalProvider(provider string) bool {
 
 // readExternalVisionImage fetches, validates, and decodes the bytes the
 // browser would otherwise have to download directly. The HTTP transport is
-// the same one the library-asset path uses so the allowlist, timeout, and
-// size cap stay consistent.
+// the same one the library-asset path uses so the timeout and size cap stay
+// consistent (no per-host allowlist on either path).
 func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (domain.VisionImage, error) {
-	parsed, err := url.Parse(strings.TrimSpace(ref.PreviewURL))
-	if err != nil || parsed.Scheme != "https" || !isLibraryImageHost(parsed.Hostname()) {
-		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
-	}
-	// Reject anything that is not on the exact CDN host allowlist. The allowlist
-	// is shared with the library-asset path so the server-side materialization
-	// never depends on third-party CORS headers.
-	if !isExternalReferenceHost(parsed.Hostname(), ref.Provider) {
+	parsed, ok := parseHTTPSVisionImageURL(ref.PreviewURL)
+	if !ok {
 		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)
@@ -354,17 +327,6 @@ func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
 	return domain.VisionImage{Filename: ref.Provider + "-" + ref.ID, ContentType: contentType, Data: data}, nil
-}
-
-func isExternalReferenceHost(host, provider string) bool {
-	host = strings.ToLower(strings.TrimSpace(host))
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "unsplash":
-		return host == "images.unsplash.com" || host == "plus.unsplash.com"
-	case "pexels":
-		return host == "images.pexels.com"
-	}
-	return false
 }
 
 // visionErrorTable is the single source of truth for vision failures:

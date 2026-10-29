@@ -4,40 +4,35 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
-	"image"
 	"io"
 	"mime/multipart"
 )
 
+// ErrUnsupportedImageFormat reports bytes whose sniffed format is unknown
+// to the upload allowlist (heic, svg, truncated headers, …) or a claimed
+// extension the registry does not know. Edges map it to 415
+// (CodeMediaUnsupportedType); mismatched-but-known formats stay 422 via
+// MsgValidateImageMagic.
+var ErrUnsupportedImageFormat = errors.New("imageformat: unsupported image format")
+
 // InspectFileHeader determines the image format from the uploaded bytes and
 // validates its dimensions. The filename extension is deliberately ignored:
 // multipart metadata is user-controlled and may be stale after content
-// negotiation or a client-side rename.
+// negotiation or a client-side rename. The single Decode truth is
+// image.DecodeConfig inside Inspect (which runs the registered format
+// decoder, including the AVIF config decoder): no second full pixel decode
+// runs here, so every accepted format validates at identical depth.
+// Unknown formats fail with ErrUnsupportedImageFormat (edges map to 415).
 func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	if fh == nil {
-		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
+		return Facts{}, fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
 	f, err := fh.Open()
 	if err != nil {
 		return Facts{}, fmt.Errorf(errorrender.MsgInspectFileHeader, err)
 	}
 	defer f.Close()
-	facts, err := InspectDetected(f)
-	if err != nil {
-		return Facts{}, err
-	}
-	// Go does not currently ship an AVIF pixel decoder in this service. Its
-	// container and dimension validation remains authoritative until a native
-	// decoder is introduced; all other accepted upload formats are fully decoded.
-	if facts.Extension != ".avif" {
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
-		}
-		if _, _, err := image.Decode(f); err != nil {
-			return Facts{}, fmt.Errorf(errorrender.MsgInspectFileHeader2, err)
-		}
-	}
-	return facts, nil
+	return InspectDetected(f)
 }
 
 // InspectDetected detects the canonical format from the source bytes before
@@ -56,7 +51,7 @@ func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	}
 	ext := DetectImageExtensionFromBytes(header[:n])
 	if ext == "" {
-		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
+		return Facts{}, fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
 		return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
@@ -64,80 +59,53 @@ func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	return Inspect(source, ext)
 }
 
+// sniffWindowBytes bounds the single shared-database sniff on streams:
+// 512 bytes cover every allowlisted magic (PNG needs 8, GIF 6, WebP 16)
+// without materializing the whole file.
+const sniffWindowBytes = 512
+
 // ValidateImageBytes verifies in-memory bytes match the allowed image extension.
 func ValidateImageBytes(data []byte, ext string) error {
-	normalizedExt, ok := NormalizeImageExtension(ext)
-	if !ok {
-		return fmt.Errorf(errorrender.MsgInspect, ext)
-	}
-
-	signatures := imageSignaturesByExtension(normalizedExt)
-	required := requiredImageHeaderLength(signatures)
-	if len(data) < required {
-		return errors.New(errorrender.MsgInspectDetectedBytes)
-	}
-
-	return validateImageMagic(data[:required], normalizedExt)
+	return validateImageMagic(data, ext)
 }
 
 // ValidateImageReader verifies the image signature from a stream without
-// requiring callers to materialize the whole file in memory.
+// requiring callers to materialize the whole file in memory: only the
+// sniff window is buffered.
 func ValidateImageReader(r io.Reader, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf(errorrender.MsgInspect, ext)
+		return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, fmt.Sprintf(errorrender.MsgInspect, ext))
 	}
 	if r == nil {
-		return errors.New(errorrender.MsgInspectDetectedBytes)
+		return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
-
-	signatures := imageSignaturesByExtension(normalizedExt)
-	required := requiredImageHeaderLength(signatures)
-	buf := make([]byte, required)
+	buf := make([]byte, sniffWindowBytes)
 	n, err := io.ReadFull(r, buf)
-	if err != nil || n < required {
-		return errors.New(errorrender.MsgInspectDetectedBytes)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
-
-	return validateImageMagic(buf, normalizedExt)
-}
-
-func requiredImageHeaderLength(signatures []imageSignature) int {
-	maxLen := 0
-	for _, sig := range signatures {
-		if sig.offset+len(sig.bytes) > maxLen {
-			maxLen = sig.offset + len(sig.bytes)
-		}
+	if n == 0 {
+		return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
-	return maxLen
+	return validateImageMagic(buf[:n], normalizedExt)
 }
 
 func validateImageMagic(buf []byte, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf(errorrender.MsgInspect, ext)
+		return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, fmt.Sprintf(errorrender.MsgInspect, ext))
 	}
-	// A confident shared-database detection decides directly: a different
-	// allowlisted format is a mismatch, an unknown one (heic, svg, …) can
-	// never satisfy the claimed extension.
-	if detected := detectExtensionViaMimetype(buf); detected != "" {
+	// Single sniff: the shared magic database decides. A different
+	// allowlisted format is a mismatch (422); an unknown one (heic,
+	// svg, truncated headers, …) can never satisfy the claimed extension
+	// and reports unsupported (415 at the edges). There is no
+	// allowlist-scoped per-format fallback.
+	if detected := DetectImageExtensionFromBytes(buf); detected != "" {
 		if detected != normalizedExt {
 			return errors.New(errorrender.MsgValidateImageMagic)
 		}
 		return nil
 	}
-	// No confident detection (e.g. truncated header): fall back to the
-	// allowlist-scoped per-format magic check.
-	signatures := imageSignaturesByExtension(normalizedExt)
-	for _, sig := range signatures {
-		if len(buf) < sig.offset+len(sig.bytes) {
-			return errors.New(errorrender.MsgInspectDetectedBytes)
-		}
-		for i, b := range sig.bytes {
-			if buf[sig.offset+i] != b {
-				return errors.New(errorrender.MsgValidateImageMagic)
-			}
-		}
-	}
-	return nil
+	return fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 }

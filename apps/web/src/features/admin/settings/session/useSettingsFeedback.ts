@@ -61,10 +61,10 @@ const ADMIN_ACCESS_SETTINGS_COPY = {
   loadFailed: { error: '加载访问控制设置失败' },
   rateLimitValidationFailed: { errorText: (message: string) => message },
   rateLimitSaved: { success: '访问限流已保存' },
-  rateLimitSaveFailed: { error: '保存失败' },
+  rateLimitSaveFailed: { error: '保存访问限流失败' },
   loginLockoutValidationFailed: { errorText: (message: string) => message },
   loginLockoutSaved: { success: '登录锁定已保存' },
-  loginLockoutSaveFailed: { error: '保存失败' },
+  loginLockoutSaveFailed: { error: '保存登录锁定失败' },
   registrationUpdated: {
     success: (isEnabled: boolean) => (isEnabled ? '已开放注册' : '已关闭注册'),
   },

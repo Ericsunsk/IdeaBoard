@@ -13,12 +13,9 @@ import { withControlCopy } from '../../../shared/index'
 
 const MAIL_CONTROL_MESSAGES = {
   forbidden: '权限不足，无法操作邮件配置',
-  403: '权限不足，无法操作邮件配置',
   control_not_found: '邮件配置不存在',
   not_found: '邮件配置不存在',
-  404: '邮件配置不存在',
   service_unavailable: '邮件服务暂不可用，请稍后重试',
-  503: '邮件服务暂不可用，请稍后重试',
 } as const
 
 type MailConfigMutationOptions = ControlMutationOptions

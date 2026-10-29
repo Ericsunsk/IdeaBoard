@@ -37,8 +37,8 @@ vi.mock('../../session/useAdminMonitorFeedback', () => ({
     detailLoadFailed: vi.fn(),
   }),
 }))
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: vi.fn() }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: vi.fn() }),
 }))
 
 function buildResponse(status: 'running' | 'completed'): PaginatedControlTasks {

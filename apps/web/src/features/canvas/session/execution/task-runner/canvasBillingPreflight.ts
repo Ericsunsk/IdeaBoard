@@ -70,13 +70,13 @@ export function isCanvasBillingPreflightError(
  *   billing_quote_unavailable 瞬态）可重试；
  * - `resolution-unavailable`（空 Service Model Pool，422 确定性无 hold）
  *   与 `insufficient-credits` 不可重试；
- * - 未映射的原始传输错误按 status 判定：503/429/422 瞬态可重试，其余
- *   直接冒泡（调用方保留手动重提入口）。
+ * - 未映射的原始传输错误仅 503/429 可重试；422 属于确定性校验失败，
+ *   其余错误直接冒泡（调用方保留手动重提入口）。
  */
 export function isRetryableCanvasTaskRequestError(error: unknown): boolean {
   if (error instanceof CanvasBillingPreflightError) {
     return error.kind === 'network' || error.kind === 'pricing-unavailable'
   }
   const status = (error as { status?: unknown } | null)?.status
-  return status === 503 || status === 429 || status === 422
+  return status === 503 || status === 429
 }

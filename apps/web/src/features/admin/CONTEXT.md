@@ -42,11 +42,11 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - Pages stay thin: data via resource, actions via workspace/context; pages only lay out and bind.
 - Call chain is `generated-query -> *Api.ts/*ApiAdapter.ts -> *Resource.ts -> Workspace/Context -> Page.vue`; route pages never call the generated client directly.
 - No Pinia: state is TanStack Query (key generators owned by resource) plus local refs; cross-mutation invalidation is explicit `invalidateQueries`.
-- Dangerous actions (ban/delete/refund/cancel) require `useAdminConfirm` plus feedback dual-channel; never bare `mutate`.
+- Dangerous actions (ban/delete/refund/cancel) require `useConfirm` plus feedback dual-channel; never bare `mutate`.
 - Confirmation returns a boolean; mutation transport carries the request ID and idempotency key. Audit records retain the actor, operation, target, outcome and timestamp.
 - Only five known cross-vertical refs are allowed (wallets barrel, Stripe dialog, logo picker, storage full-page embedded in settings, shell anomaly-radar aggregating statistics); no new cross-vertical deep imports.
 - Collection load (TanStack Query): key change fetches (fetching without data is first-screen loading, failure is `initialError`); same-key `refetch` is background refresh (stale kept, failure is `backgroundError`); key isolation means late responses never overwrite the current page.
-- Settings lifecycle (`useSettingsLifecycle`): `hydrate(source)` to dirty (`isDirty`) to `validate` (`validationError`) to `save` to `hydrate + synchronizeCache`; skip source overwrite while `saving || isDirty`.
+- Settings lifecycle (`useSettingsLifecycle`): `hydrate(source)` to dirty (`isDirty`) to `validate` (`validationError`) to `save` (cache write + invalidate inside `save`, then `hydrate(saved)` as truth); skip source overwrite while `saving || isDirty`; save failures preserve the dirty draft for retry and report once through the Admin feedback boundary.
 - Wallet idempotent command: `validate` (refund requires chargeTransactionId) to idempotency-key assembly to mutate (`commandPending`) to `invalidateWallet`; successful replay is reported explicitly, while HTTP 409 is a conflict requiring refresh and review.
 - Monitor stream: `idle` / `unsupported` / `connecting` / `connected` / `degraded`; `snapshot` writes `setQueryData` and returns to `connected`, `snapshot_error` / `onerror` enters `degraded`, `close` returns to `idle` (reconnect when visible).
 - Task cancel: only `pending` / `running` cancellable; single-flight via `pendingTaskID`; success refreshes list/detail/monitor keys.

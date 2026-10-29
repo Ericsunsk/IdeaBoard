@@ -81,12 +81,12 @@ import { timeRangePresets } from '../../core/timeRange'
 import { useAdminTaskCancel } from '../../session/useAdminTaskCancel'
 import { useAdminTaskDetailResource } from '../../resource'
 import { useAdminTaskRuntimeSnapshot } from '../../session/useAdminTaskRuntimeSnapshot'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { useMonitorTimeline } from '../../session/useMonitorTimeline'
 import { monitorChartSpecs, type TaskMetricStatsSnapshot } from '../../../shared'
 import { MONITOR_MESSAGES } from './messages'
 
-const adminConfirm = useAdminConfirm()
+const adminConfirm = useConfirm()
 const taskCancellationFeedback = useAdminTaskCancellationFeedback()
 const taskLoadFeedback = useAdminTaskLoadFeedback()
 const {

@@ -181,6 +181,35 @@ describe('Admin gateway resource', () => {
     })
   })
 
+  it('passes custom domain update payload with explicit identity through', async () => {
+    // 自定义域名透传显式身份。
+    let requestBody: unknown
+    useMswHandlers(
+      http.put('/api/control/v1/platform/ai-gateway', async ({ request }) => {
+        requestBody = await request.json()
+        return HttpResponse.json({ data: {} })
+      }),
+    )
+
+    await expect(
+      createAdminGatewayResource().connection.update(
+        {
+          base_url: 'https://gateway.example.com',
+          token: 'tok',
+          account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
+          gateway_id: 'my-gateway',
+        },
+        options,
+      ),
+    ).resolves.toBeUndefined()
+    expect(requestBody).toMatchObject({
+      base_url: 'https://gateway.example.com',
+      token: 'tok',
+      account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
+      gateway_id: 'my-gateway',
+    })
+  })
+
   it('rejects gateway config updates when the envelope reports an error', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway', () =>

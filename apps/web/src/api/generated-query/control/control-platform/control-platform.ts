@@ -853,7 +853,7 @@ export const getUploadControlBrandingLogoUrl = () => {
 }
 
 /**
- * Multipart logo upload behind control:platform. The file rides the Storage service into the canonical content-hashed key uploads/site/assets/logo_{hash}.ext through the active storage profile. The returned logo_url and branding settings carry that canonical key. Preview uses GET /api/v1/public/branding/logo?key={key}, which returns rendered image bytes. Validation applies a 50MB image cap and detected-format allowlist, without trusting the filename. The control guard cannot buffer multipart bodies, so this route registers as a POST read-guard and enforces the mutation guarantees in-handler: a header-only Idempotency-Key is required (400 otherwise); the key replays the first stored response on content-identical reuse and conflicts (409) on divergent reuse; every call is audited.
+ * Multipart logo upload behind control:platform. The file rides the Storage service into the canonical content-hashed key uploads/site/assets/logo_{hash}.ext through the active storage profile. The returned logo_url and branding settings carry that canonical key. Preview uses GET /api/v1/public/branding/logo?key={key}, which returns rendered image bytes. Validation applies a 50MB image cap and detected-format allowlist, without trusting the filename. Unknown image formats render 415 media_unsupported_type. The control guard cannot buffer multipart bodies, so this route registers as a POST read-guard and enforces the mutation guarantees in-handler: a header-only Idempotency-Key is required (400 otherwise); the key replays the first stored response on content-identical reuse and conflicts (409) on divergent reuse; every call is audited.
  * @summary Upload a branding logo file (multipart)
  */
 export const uploadControlBrandingLogo = async (
@@ -878,6 +878,7 @@ export const getUploadControlBrandingLogoMutationOptions = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | IdempotencyConflictResponse
+    | ControlErrorEnvelope
     | RateLimitedResponse,
   TContext = unknown,
 >(options?: {
@@ -922,6 +923,7 @@ export type UploadControlBrandingLogoMutationError =
   | UnauthorizedResponse
   | ForbiddenResponse
   | IdempotencyConflictResponse
+  | ControlErrorEnvelope
   | RateLimitedResponse
 export type UploadControlBrandingLogoMutationVariables = { data: UploadControlBrandingLogoBody }
 
@@ -934,6 +936,7 @@ export const useUploadControlBrandingLogo = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | IdempotencyConflictResponse
+    | ControlErrorEnvelope
     | RateLimitedResponse,
   TContext = unknown,
 >(

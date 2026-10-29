@@ -1,7 +1,14 @@
 import { defineComponent } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
-import UserConfirmDialog from './UserConfirmDialog.vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import ConfirmDialog from './ConfirmDialog.vue'
+import { activeConfirm, useConfirm } from '../composables/useConfirmDialog'
 import { renderWithUser, screen } from '../../test/render'
+
+const toast = vi.hoisted(() => ({ error: vi.fn() }))
+
+vi.mock('../composables/useAppToast', () => ({
+  useAppToast: () => toast,
+}))
 
 const DialogRootStub = defineComponent({
   props: {
@@ -23,7 +30,7 @@ const DialogOverlayStub = defineComponent({
   inheritAttrs: false,
   emits: ['click'],
   template:
-    '<div data-testid="user-confirm-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
+    '<div data-testid="confirm-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
 })
 
 const DialogContentStub = defineComponent({
@@ -35,11 +42,12 @@ const DialogContentStub = defineComponent({
   `,
 })
 
-function renderConfirmDialog(isLoading = false, extraProps: Record<string, unknown> = {}) {
+function renderUserDialog(isLoading = false, extraProps: Record<string, unknown> = {}) {
   const onVisibleUpdate = vi.fn()
   const onConfirm = vi.fn()
-  const view = renderWithUser(UserConfirmDialog, {
+  const view = renderWithUser(ConfirmDialog, {
     props: {
+      surface: 'user',
       isVisible: true,
       title: '删除确认',
       message: '确定删除吗？',
@@ -64,16 +72,21 @@ function renderConfirmDialog(isLoading = false, extraProps: Record<string, unkno
   return { ...view, onVisibleUpdate, onConfirm }
 }
 
-describe('UserConfirmDialog', () => {
-  it('dismisses from the mask through the shared lifecycle while idle', async () => {
-    const { user, onVisibleUpdate } = renderConfirmDialog()
+describe('ConfirmDialog', () => {
+  beforeEach(() => {
+    activeConfirm.value = null
+    vi.clearAllMocks()
+  })
 
-    await user.click(screen.getByTestId('user-confirm-mask'))
+  it('dismisses from the mask through the shared lifecycle while idle', async () => {
+    const { user, onVisibleUpdate } = renderUserDialog()
+
+    await user.click(screen.getByTestId('confirm-mask'))
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })
 
   it('dismisses from Escape through the shared lifecycle while idle', async () => {
-    const { user, onVisibleUpdate } = renderConfirmDialog()
+    const { user, onVisibleUpdate } = renderUserDialog()
 
     screen.getByRole('dialog', { name: '删除确认' }).focus()
     await user.keyboard('{Escape}')
@@ -81,7 +94,7 @@ describe('UserConfirmDialog', () => {
   })
 
   it('emits confirm and cancel through its own controls while idle', async () => {
-    const { user, onVisibleUpdate, onConfirm } = renderConfirmDialog()
+    const { user, onVisibleUpdate, onConfirm } = renderUserDialog()
 
     await user.click(screen.getByRole('button', { name: '删除' }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
@@ -91,12 +104,12 @@ describe('UserConfirmDialog', () => {
   })
 
   it('locks mask, Escape, and external close while the irreversible commit is busy', async () => {
-    const { user, onVisibleUpdate } = renderConfirmDialog(true)
+    const { user, onVisibleUpdate } = renderUserDialog(true)
     const dialog = screen.getByRole('dialog', { name: '删除确认' })
 
     expect(dialog).toHaveAttribute('aria-busy', 'true')
 
-    await user.click(screen.getByTestId('user-confirm-mask'))
+    await user.click(screen.getByTestId('confirm-mask'))
     expect(onVisibleUpdate).not.toHaveBeenCalled()
 
     dialog.focus()
@@ -105,7 +118,7 @@ describe('UserConfirmDialog', () => {
   })
 
   it('disables confirm until the typed text matches the expected name', async () => {
-    const { user, onConfirm } = renderConfirmDialog(false, {
+    const { user, onConfirm } = renderUserDialog(false, {
       expectedConfirmText: 'Team',
       confirmInputLabel: 'Type "Team" to confirm',
       confirmInputPlaceholder: 'Workspace name',
@@ -128,7 +141,7 @@ describe('UserConfirmDialog', () => {
   })
 
   it('keeps the typed confirm locked while busy and confirms on Enter when matched', async () => {
-    const { user, onConfirm } = renderConfirmDialog(false, {
+    const { user, onConfirm } = renderUserDialog(false, {
       expectedConfirmText: 'Team',
       confirmInputLabel: 'Type "Team" to confirm',
     })
@@ -140,7 +153,7 @@ describe('UserConfirmDialog', () => {
   })
 
   it('disables the typed input and confirm while the commit is busy', async () => {
-    const { user, onConfirm } = renderConfirmDialog(true, {
+    const { user, onConfirm } = renderUserDialog(true, {
       expectedConfirmText: 'Team',
       confirmInputLabel: 'Type "Team" to confirm',
     })
@@ -153,21 +166,37 @@ describe('UserConfirmDialog', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('copies the expected name when its chip is clicked', async () => {
-    const { user } = renderConfirmDialog(false, {
+  it('renders the typed hint as plain text with no copy affordance', async () => {
+    renderUserDialog(false, {
       expectedConfirmText: 'Team',
       confirmInputLabel: 'Type "Team" to confirm',
     })
-    // renderWithUser resets the navigator stub, so stub after render.
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { clipboard: { writeText } })
-    try {
-      expect(screen.getByText('Team')).toBeVisible()
-      await user.click(screen.getByRole('button', { name: 'Copy' }))
-      expect(writeText).toHaveBeenCalledWith('Team')
-      expect(await screen.findByText('Copied')).toBeVisible()
-    } finally {
-      vi.unstubAllGlobals()
-    }
+
+    expect(screen.getByText('Type "Team" to confirm')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+    expect(screen.getByLabelText('Type "Team" to confirm')).toBeVisible()
+  })
+
+  it('shows a safe error and keeps the admin dialog open when confirmation fails', async () => {
+    const error = new Error('operation failed')
+    const confirmPromise = useConfirm().confirm({
+      title: '确认删除',
+      message: '删除后不可恢复。',
+      confirmLabel: '删除',
+      intent: 'danger',
+      onConfirm: async () => {
+        throw error
+      },
+    })
+    const rejectedConfirm = confirmPromise.catch((reason: unknown) => reason)
+    const { user } = renderWithUser(ConfirmDialog, { props: { surface: 'admin' } })
+
+    expect(await screen.findByRole('alertdialog')).toHaveClass('bg-popover')
+    await user.click(await screen.findByRole('button', { name: '删除' }))
+
+    await expect(rejectedConfirm).resolves.toBe(error)
+    expect(toast.error).toHaveBeenCalledWith('operation failed')
+    expect(activeConfirm.value?.open).toBe(true)
+    expect(activeConfirm.value?.loading).toBe(false)
   })
 })

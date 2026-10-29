@@ -281,8 +281,9 @@ type v1UpdateMemberBody struct {
 
 func (h *contractV1Handler) updateWorkspaceMember(c *gin.Context) {
 	// Visibility first (hidden -> 404); the store enforces the
-	// actor-role transition rules below (403 on violation).
-	withV1WorkspaceBody(h, c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx, body v1UpdateMemberBody) {
+	// actor-role transition rules below (403 on violation). Role changes
+	// are permission writes: strict binding stays (unknown fields 400).
+	withV1WorkspaceBodyStrict(h, c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx, body v1UpdateMemberBody) {
 		newRole := strings.TrimSpace(body.Data.Role)
 		if !tenancy.IsValidRole(newRole) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,

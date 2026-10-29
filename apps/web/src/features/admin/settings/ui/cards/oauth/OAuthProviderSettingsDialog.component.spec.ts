@@ -59,7 +59,9 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('未启用')).not.toBeInTheDocument()
     expect(within(dialog).getByRole('switch', { name: 'Google 登录' })).toBeChecked()
-    expect(within(dialog).getByRole('switch', { name: 'Discord 登录' })).toBeChecked()
+    // 简化第二波：按需单 provider GET，未访问过的 provider 开关按默认未选中
+    // 渲染，选中后才懒加载其真实状态（行为终态一致，见下个用例）。
+    expect(within(dialog).getByRole('switch', { name: 'Discord 登录' })).not.toBeChecked()
     expect(within(dialog).getByLabelText('OAuth Provider')).toHaveTextContent('Google')
     const callback = within(dialog).getByLabelText('Callback URL') as HTMLInputElement
     expect(callback).toHaveValue('https://example.com/api/auth/callback/google')
@@ -68,6 +70,27 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(secret).toHaveValue('')
     expect(secret).toHaveAttribute('type', 'password')
     expect(secret).toHaveAttribute('placeholder', '已配置，留空则保持不变')
+  })
+
+  it('loads the other provider on demand when it is selected', async () => {
+    const discordSummary: OAuthProviderSettingsSummary = {
+      ...configuredSummary,
+      callbackUrl: 'https://example.com/api/auth/callback/discord',
+    }
+    vi.mocked(resource.get).mockImplementation(async (provider) =>
+      provider === 'discord' ? discordSummary : configuredSummary,
+    )
+    const { user } = renderDialog()
+    const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
+    await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
+    expect(vi.mocked(resource.get)).toHaveBeenCalledTimes(1)
+
+    await user.click(within(dialog).getByText('Discord'))
+
+    await within(dialog).findByDisplayValue('https://example.com/api/auth/callback/discord')
+    expect(vi.mocked(resource.get)).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(resource.get)).toHaveBeenNthCalledWith(2, 'discord')
+    expect(within(dialog).getByRole('switch', { name: 'Discord 登录' })).toBeChecked()
   })
 
   it('validates incomplete enabled settings only when Save is clicked', async () => {
@@ -88,7 +111,40 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(resource.save).not.toHaveBeenCalled()
   })
 
-  it('allows a blank Secret when one is already configured and refetches both providers', async () => {
+  it('prevents saving another provider credentials after a provider load fails', async () => {
+    const { user, rerender } = renderDialog()
+    const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
+    await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
+    vi.mocked(resource.get).mockRejectedValueOnce(new Error('Discord unavailable'))
+
+    await user.click(within(dialog).getByText('Discord'))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Discord unavailable'))
+    const saveButton = within(dialog).getByRole('button', { name: '保存' })
+    expect(saveButton).toBeDisabled()
+    expect(within(dialog).queryByDisplayValue(configuredSummary.clientId)).not.toBeInTheDocument()
+    await user.click(saveButton)
+    expect(resource.save).not.toHaveBeenCalled()
+
+    vi.mocked(resource.get).mockResolvedValueOnce({
+      ...configuredSummary,
+      clientId: 'discord-client',
+      callbackUrl: 'https://example.com/api/auth/callback/discord',
+    })
+    await rerender({ visible: false })
+    await rerender({ visible: true })
+    await within(dialog).findByDisplayValue('discord-client')
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(resource.save).toHaveBeenCalledWith('discord', {
+        enabled: true,
+        clientId: 'discord-client',
+        clientSecret: '',
+      }),
+    )
+  })
+
+  it('allows a blank Secret when one is already configured and closes without a refresh roundtrip', async () => {
     const { user, emitted } = renderDialog()
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
@@ -102,7 +158,7 @@ describe('OAuthProviderSettingsDialog', () => {
         clientSecret: '',
       }),
     )
-    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(4))
+    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(1))
     expect(emitted()['update:visible']).toEqual([[false]])
     expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
@@ -155,22 +211,26 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(resource.save).not.toHaveBeenCalled()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
   })
-  it('routes a load failure to toast while keeping the retryable anchor', async () => {
+  it('routes a load failure to toast without an inline error', async () => {
     vi.mocked(resource.get).mockRejectedValueOnce(new Error('auth unavailable'))
     renderDialog()
 
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('auth unavailable'))
-    expect(await within(dialog).findByText('auth unavailable')).toBeVisible()
-    expect(within(dialog).getByRole('button', { name: '重新加载' })).toBeEnabled()
+    // 简化第二波 toast-only：初载失败不设行内，重试入口为关闭后重新打开
+    //（@reset 触发单 provider 重载），父卡片关闭时 refetch，无需行内重试锚点。
+    expect(within(dialog).queryByText('auth unavailable')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: '保存' })).toBeDisabled()
   })
 
-  it('reports a refresh failure as partial success without repeating the saved mutation', async () => {
-    vi.mocked(resource.get)
-      .mockResolvedValueOnce(configuredSummary)
-      .mockResolvedValueOnce(configuredSummary)
-      .mockRejectedValueOnce(new Error('refresh unavailable'))
+  it('applies the saved summary and closes without a refresh roundtrip', async () => {
+    const rotatedSummary: OAuthProviderSettingsSummary = {
+      ...configuredSummary,
+      clientId: 'rotated-client.apps.googleusercontent.com',
+    }
+    vi.mocked(resource.save).mockResolvedValueOnce(rotatedSummary)
     const { user, emitted } = renderDialog()
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
@@ -178,10 +238,10 @@ describe('OAuthProviderSettingsDialog', () => {
     await user.type(within(dialog).getByLabelText('Client Secret'), 'rotated-secret')
     await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
-    expect(await within(dialog).findByText('设置已保存，但状态刷新失败，请重新加载')).toBeVisible()
+    await waitFor(() => expect(emitted()['update:visible']).toEqual([[false]]))
     expect(resource.save).toHaveBeenCalledTimes(1)
-    expect(emitted()['update:visible']).toBeUndefined()
-    expect(within(dialog).getByLabelText('Client Secret')).toHaveValue('')
+    // 保存用返回 summary 直接关闭：无二次全量 refresh，全程仅初载 1 次 GET。
+    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(1))
     expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
 })

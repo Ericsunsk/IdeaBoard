@@ -230,7 +230,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 			return
 		}
 		var body v1CreateEventSubscriptionBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}

@@ -6,16 +6,10 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 )
 
-type imageSignature struct {
-	offset int
-	bytes  []byte
-}
-
 type imageFormatSpec struct {
 	Ext           string
 	MIME          string
 	MIMEAliases   []string
-	Magic         []imageSignature
 	UploadAllowed bool
 }
 
@@ -24,44 +18,33 @@ var imageFormatSpecs = []imageFormatSpec{
 		Ext:           ".jpg",
 		MIME:          "image/jpeg",
 		MIMEAliases:   []string{"image/jpg"},
-		Magic:         []imageSignature{{bytes: []byte{0xFF, 0xD8, 0xFF}}},
 		UploadAllowed: true,
 	},
 	{
 		Ext:           ".png",
 		MIME:          "image/png",
-		Magic:         []imageSignature{{bytes: []byte{0x89, 0x50, 0x4E, 0x47}}},
+		MIMEAliases:   []string{"image/apng", "image/vnd.mozilla.apng"},
 		UploadAllowed: true,
 	},
 	{
 		Ext:           ".gif",
 		MIME:          "image/gif",
-		Magic:         []imageSignature{{bytes: []byte{0x47, 0x49, 0x46}}},
 		UploadAllowed: true,
 	},
 	{
 		Ext:           ".bmp",
 		MIME:          "image/bmp",
 		MIMEAliases:   []string{"image/x-ms-bmp"},
-		Magic:         []imageSignature{{bytes: []byte{0x42, 0x4D}}},
 		UploadAllowed: true,
 	},
 	{
-		Ext:  ".webp",
-		MIME: "image/webp",
-		Magic: []imageSignature{
-			{bytes: []byte{0x52, 0x49, 0x46, 0x46}},
-			{offset: 8, bytes: []byte{0x57, 0x45, 0x42, 0x50}},
-		},
+		Ext:           ".webp",
+		MIME:          "image/webp",
 		UploadAllowed: true,
 	},
 	{
-		Ext:  ".avif",
-		MIME: "image/avif",
-		Magic: []imageSignature{
-			{offset: 4, bytes: []byte{0x66, 0x74, 0x79, 0x70}},
-			{offset: 8, bytes: []byte{0x61, 0x76, 0x69, 0x66}},
-		},
+		Ext:           ".avif",
+		MIME:          "image/avif",
 		UploadAllowed: true,
 	},
 }
@@ -151,37 +134,12 @@ func ImageMIMEFromExtension(ext string) string {
 	return imageFormatsByExt[normalizedExt].MIME
 }
 
-// detectExtensionViaMimetype sniffs the canonical extension with the shared
-// magic database, gated through the upload allowlist registry. Anything the
-// registry does not know (heic, svg, …) resolves to "" and stays rejected.
-func detectExtensionViaMimetype(data []byte) string {
+// DetectImageExtensionFromBytes sniffs the canonical extension with the shared
+// magic database, gated through the upload allowlist registry. Unknown formats
+// and truncated headers resolve to ""; no per-format fallback is applied.
+func DetectImageExtensionFromBytes(data []byte) string {
 	if len(data) == 0 {
 		return ""
 	}
 	return ImageExtensionFromMIME(mimetype.Detect(data).String())
-}
-
-func DetectImageExtensionFromBytes(data []byte) string {
-	// Precise full-content sniffing first: net/http.DetectContentType only
-	// inspects the first 512 bytes and misses container formats (avif/heic).
-	if ext := detectExtensionViaMimetype(data); ext != "" {
-		return ext
-	}
-	// Compat fallback for truncated headers the shared database declines
-	// (e.g. a bare "GIF" prefix): keep the previous allowlist-scoped match.
-	for _, spec := range imageFormatSpecs {
-		if validateImageMagic(data, spec.Ext) == nil {
-			return spec.Ext
-		}
-	}
-	return ""
-}
-
-func imageSignaturesByExtension(ext string) []imageSignature {
-	normalizedExt, ok := NormalizeImageExtension(ext)
-	if !ok {
-		return nil
-	}
-	spec := imageFormatsByExt[normalizedExt]
-	return spec.Magic
 }

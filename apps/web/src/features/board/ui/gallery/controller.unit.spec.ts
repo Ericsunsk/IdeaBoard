@@ -88,7 +88,7 @@ describe('createGalleryController', () => {
     expect(harness.navigation.openBoard).toHaveBeenCalledWith('created-board')
   })
 
-  it('closes the menu before rename and suppresses exactly the click caused by committing the input', async () => {
+  it('closes the menu before rename and opens the board once the rename commits', async () => {
     const harness = createHarness()
     const board = makeBoard('board-1', 'Original')
     harness.controller.commands.toggleBoardMenu(board.id)
@@ -106,9 +106,6 @@ describe('createGalleryController', () => {
       nextName: 'Renamed',
     })
     expect(harness.feedback.renamed).toHaveBeenCalledOnce()
-
-    harness.controller.commands.openBoardFromCard(board.id)
-    expect(harness.navigation.openBoard).not.toHaveBeenCalled()
 
     harness.controller.commands.openBoardFromCard(board.id)
     expect(harness.navigation.openBoard).toHaveBeenCalledWith(board.id)

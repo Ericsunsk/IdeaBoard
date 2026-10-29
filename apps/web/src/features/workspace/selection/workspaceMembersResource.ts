@@ -279,6 +279,7 @@ export function classifyWorkspaceMemberError(error: unknown): WorkspaceMemberFai
       return 'unknown-user'
     case 'workspace_not_found':
       return 'hidden'
+    case 'forbidden':
     case 'workspace_forbidden':
       return 'forbidden'
     case 'workspace_default_protected':
@@ -287,6 +288,8 @@ export function classifyWorkspaceMemberError(error: unknown): WorkspaceMemberFai
       return 'last-owner'
     case 'workspace_member_limit_reached':
       return 'member-limit'
+    case 'conflict':
+    case 'idempotency_conflict':
     case 'workspace_idempotency_conflict':
       return 'idempotency-conflict'
     case 'bad_request':

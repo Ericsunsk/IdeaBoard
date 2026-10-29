@@ -1989,6 +1989,62 @@
         ]
       }
     },
+    "src/core/composables/useConfirmDialog.ts": {
+      "ConfirmIntent": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmIntent"
+        ]
+      },
+      "ConfirmOptions": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmOptions"
+        ]
+      },
+      "ConfirmPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmPort"
+        ]
+      },
+      "ConfirmRequest": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmRequest"
+        ]
+      },
+      "ConfirmState": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmState"
+        ]
+      },
+      "ConfirmSurface": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#ConfirmSurface"
+        ]
+      },
+      "activeConfirm": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#activeConfirm"
+        ]
+      },
+      "useConfirm": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#useConfirm"
+        ]
+      },
+      "useConfirmDialog": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useConfirmDialog.ts#useConfirmDialog"
+        ]
+      }
+    },
     "src/core/composables/useLogoutRedirect.ts": {
       "useLogoutRedirect": {
         "kind": "canonical-public",
@@ -2170,20 +2226,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/core/composables/useSupportChannels.ts#useSupportChannels"
-        ]
-      }
-    },
-    "src/core/composables/useUserConfirmDialog.ts": {
-      "UserConfirmRequest": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/composables/useUserConfirmDialog.ts#UserConfirmRequest"
-        ]
-      },
-      "useUserConfirmDialog": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/composables/useUserConfirmDialog.ts#useUserConfirmDialog"
         ]
       }
     },
@@ -6050,50 +6092,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/toast.ts#useAdminToast"
-        ]
-      }
-    },
-    "src/features/admin/shared/session/feedback/useAdminConfirm.ts": {
-      "AdminConfirmIntent": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmIntent"
-        ]
-      },
-      "AdminConfirmOptions": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmOptions"
-        ]
-      },
-      "AdminConfirmPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmPort"
-        ]
-      },
-      "AdminConfirmRequest": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmRequest"
-        ]
-      },
-      "AdminConfirmState": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmState"
-        ]
-      },
-      "activeAdminConfirm": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#activeAdminConfirm"
-        ]
-      },
-      "useAdminConfirm": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#useAdminConfirm"
         ]
       }
     },
@@ -18638,7 +18636,7 @@
         "src/core/components/DataTableFrame.component.spec.ts",
         "src/core/components/IbFormField.component.spec.ts",
         "src/core/components/StatusBadge.component.spec.ts",
-        "src/core/components/UserConfirmDialog.component.spec.ts",
+        "src/core/components/ConfirmDialog.component.spec.ts",
         "src/features/account/session/billing/useBillingRecords.unit.spec.ts",
         "src/features/account/session/rewards/useRewardHistory.unit.spec.ts",
         "src/features/account/session/usage/useUsage.unit.spec.ts",
@@ -18703,7 +18701,6 @@
         "src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.component.spec.ts",
         "src/features/admin/settings/ui/cards/support-channels/AdminSupportChannelsEditor.component.spec.ts",
         "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.component.spec.ts",
-        "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
         "src/features/admin/shared/ui/shell/AdminDialogActions.component.spec.ts",
         "src/features/admin/shared/ui/shell/AdminDialogShell.component.spec.ts",
         "src/features/admin/shared/ui/shell/AdminDrawer.component.spec.ts",

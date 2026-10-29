@@ -103,7 +103,6 @@ async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
     domainMessages: {
       control_not_found: '加载存储供应商失败',
       not_found: '加载存储供应商失败',
-      404: '加载存储供应商失败',
     },
     map: (data: { providers: GeneratedStorageProviderMeta[] }) =>
       (data.providers ?? []).map(normalizeGeneratedProvider),
@@ -116,7 +115,6 @@ async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
     domainMessages: {
       control_not_found: '加载存储配置失败',
       not_found: '加载存储配置失败',
-      404: '加载存储配置失败',
     },
     map: (data: { profiles: GeneratedStorageProfile[] }) =>
       (data.profiles ?? []).map(normalizeGeneratedProfile),
@@ -150,7 +148,6 @@ async function saveAdminStorageProfile(
     throw withControlCopy(error, '保存存储配置失败', {
       control_not_found: '保存存储配置失败',
       not_found: '保存存储配置失败',
-      404: '保存存储配置失败',
     })
   }
 }
@@ -168,7 +165,6 @@ async function applyAdminStorageProfileRecord(
     throw withControlCopy(error, '设为当前失败', {
       control_not_found: '设为当前失败',
       not_found: '设为当前失败',
-      404: '设为当前失败',
     })
   }
   const applied = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
@@ -194,7 +190,6 @@ async function testAdminStorageProfileRecord(
     throw withControlCopy(error, '连接失败', {
       control_not_found: '连接失败',
       not_found: '连接失败',
-      404: '连接失败',
     })
   }
   return requireContractData<{ message: string }>(body, '连接失败')
@@ -213,7 +208,6 @@ async function deleteAdminStorageProfileRecord(
     throw withControlCopy(error, '删除失败', {
       control_not_found: '删除失败',
       not_found: '删除失败',
-      404: '删除失败',
     })
   }
   return requireContractData<{ message: string }>(body, '删除失败')
@@ -227,7 +221,6 @@ async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
     throw withControlCopy(error, '获取 Bucket 信息失败', {
       control_not_found: '获取 Bucket 信息失败',
       not_found: '获取 Bucket 信息失败',
-      404: '获取 Bucket 信息失败',
     })
   }
   const data = requireContractData<{ info: { domains?: string[] } }>(body, '获取 Bucket 信息失败')

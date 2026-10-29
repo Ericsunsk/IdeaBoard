@@ -360,6 +360,45 @@ func TestIdempotencyKeyHeaderOnly(t *testing.T) {
 	}
 }
 
+func TestLenientJSONIgnoresUnknownFields(t *testing.T) {
+	type payload struct {
+		Name string `json:"name"`
+	}
+	// Unknown fields bind fine.
+	var ignored payload
+	if err := DecodeLenient([]byte(`{"name":"w","extra":1}`), &ignored); err != nil || ignored.Name != "w" {
+		t.Fatalf("lenient body err=%v", err)
+	}
+	// Malformed JSON and trailing payloads still fail.
+	var broken payload
+	if err := DecodeLenient([]byte(`{"name":}`), &broken); err == nil {
+		t.Fatal("malformed body must be rejected by lenient decoding")
+	}
+	var trailing payload
+	if err := DecodeLenient([]byte(`{"name":"w"} {"name":"x"}`), &trailing); err == nil {
+		t.Fatal("trailing payload must be rejected by lenient decoding")
+	}
+	// The gin binder ignores unknown fields but still rejects malformed
+	// bodies and trailing payloads.
+	bind := func(body string) error {
+		gin.SetMode(gin.TestMode)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/boards", strings.NewReader(body))
+		var dst payload
+		return BindLenientJSON(c, &dst)
+	}
+	if err := bind(`{"name":"w","extra":1}`); err != nil {
+		t.Fatalf("BindLenientJSON unknown field err=%v", err)
+	}
+	if err := bind(`{"name":}`); err == nil {
+		t.Fatal("BindLenientJSON must reject malformed JSON")
+	}
+	if err := bind(`{"name":"w"} {"name":"x"}`); err == nil {
+		t.Fatal("BindLenientJSON must reject trailing payloads")
+	}
+}
+
 func TestStrictJSONRejectsUnknownFields(t *testing.T) {
 	type payload struct {
 		Name string `json:"name"`
@@ -468,6 +507,7 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeUploadStateConflict:       http.StatusConflict,
 		CodeUploadIdempotencyConflict: http.StatusConflict,
 		CodeUploadValidationFailed:    http.StatusUnprocessableEntity,
+		CodeMediaUnsupportedType:      http.StatusUnsupportedMediaType,
 		CodeMediaNotFound:             http.StatusNotFound,
 		CodeMediaNotReady:             http.StatusConflict,
 		CodeMediaArchived:             http.StatusGone,

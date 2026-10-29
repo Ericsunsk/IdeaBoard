@@ -3,6 +3,8 @@ package imageformat
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/png"
@@ -157,11 +159,15 @@ func TestDetectExtensionRejectsHeicDespiteSharedDatabase(t *testing.T) {
 	}
 }
 
-func TestDetectExtensionKeepsTruncatedGIFCompat(t *testing.T) {
-	// A bare "GIF" prefix is below the shared database threshold: the
-	// allowlist-scoped legacy check preserves the previous acceptance.
-	if ext := DetectImageExtensionFromBytes([]byte{0x47, 0x49, 0x46}); ext != ".gif" {
-		t.Fatalf("expected truncated gif compat, got %q", ext)
+func TestDetectExtensionRejectsTruncatedGIF(t *testing.T) {
+	// A bare "GIF" prefix is below the shared database threshold: with
+	// the allowlist-scoped fallback removed it stays rejected as unknown.
+	if ext := DetectImageExtensionFromBytes([]byte{0x47, 0x49, 0x46}); ext != "" {
+		t.Fatalf("expected truncated gif rejection, got %q", ext)
+	}
+	// The full 6-byte GIF magic still sniffs in one pass.
+	if ext := DetectImageExtensionFromBytes([]byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61}); ext != ".gif" {
+		t.Fatalf("expected full gif magic to sniff, got %q", ext)
 	}
 }
 
@@ -179,5 +185,43 @@ func TestValidateImageMagicRejectsConfidentMismatch(t *testing.T) {
 		t.Fatal("expected png bytes claimed as jpg to fail")
 	} else if !strings.Contains(err.Error(), "不匹配") {
 		t.Fatalf("expected mismatch error, got %v", err)
+	}
+}
+
+func TestInspectDetectedAcceptsAPNGAsPNG(t *testing.T) {
+	var base bytes.Buffer
+	if err := png.Encode(&base, image.NewNRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	chunk := func(kind string, payload []byte) []byte {
+		out := make([]byte, 12+len(payload))
+		binary.BigEndian.PutUint32(out[:4], uint32(len(payload)))
+		copy(out[4:8], kind)
+		copy(out[8:], payload)
+		binary.BigEndian.PutUint32(out[8+len(payload):], crc32.ChecksumIEEE(out[4:8+len(payload)]))
+		return out
+	}
+	// Complete one-frame APNG: animation and frame control follow IHDR,
+	// while the original PNG IDAT contains the default animation frame.
+	animation := make([]byte, 8)
+	binary.BigEndian.PutUint32(animation[:4], 1)
+	frame := make([]byte, 26)
+	binary.BigEndian.PutUint32(frame[4:8], 2)
+	binary.BigEndian.PutUint32(frame[8:12], 2)
+	binary.BigEndian.PutUint16(frame[20:22], 1)
+	binary.BigEndian.PutUint16(frame[22:24], 10)
+	data := append([]byte{}, base.Bytes()[:33]...)
+	data = append(data, chunk("acTL", animation)...)
+	data = append(data, chunk("fcTL", frame)...)
+	data = append(data, base.Bytes()[33:]...)
+	if _, err := png.Decode(bytes.NewReader(data)); err != nil {
+		t.Fatalf("invalid APNG fixture: %v", err)
+	}
+	facts, err := InspectDetectedBytes(data)
+	if err != nil {
+		t.Fatalf("inspect valid APNG: %v", err)
+	}
+	if facts.Extension != ".png" || facts.MIMEType != "image/png" || facts.Width != 2 || facts.Height != 2 {
+		t.Fatalf("unexpected APNG facts: %+v", facts)
 	}
 }

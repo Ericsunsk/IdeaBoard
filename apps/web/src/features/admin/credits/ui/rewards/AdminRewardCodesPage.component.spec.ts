@@ -54,8 +54,8 @@ vi.mock('../../../../../core/composables/useAppClipboard', () => ({
   }),
 }))
 
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => confirm,
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => confirm,
 }))
 
 describe('AdminRewardCodesPage', () => {

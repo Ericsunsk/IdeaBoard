@@ -86,8 +86,8 @@ vi.mock('../../session/useAdminMonitorFeedback', () => ({
   }),
 }))
 
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }))
 
 const SlotStub = defineComponent({

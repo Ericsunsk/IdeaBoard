@@ -1,7 +1,7 @@
 import { nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminUsersFeedback } from './useUsersFeedback'
-import type { AdminConfirmPort } from '../../shared'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import { useAdminUsersContext } from './context'
 import type { AdminUsersPage, AdminUsersQueryFilters } from './resource'
 
@@ -125,6 +125,6 @@ function createContext(
 ) {
   return useAdminUsersContext({
     feedback: feedback as unknown as AdminUsersFeedback,
-    confirm: { confirm: vi.fn().mockResolvedValue(true) } as AdminConfirmPort,
+    confirm: { confirm: vi.fn().mockResolvedValue(true) } as ConfirmPort,
   })
 }

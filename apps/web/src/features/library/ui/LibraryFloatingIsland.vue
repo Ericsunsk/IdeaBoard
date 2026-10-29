@@ -220,7 +220,8 @@
   />
 
   <!-- 二次确认对话框 -->
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="confirmDialog.visible.value"
     :title="confirmDialog.title.value"
     :message="confirmDialog.message.value"
@@ -252,9 +253,9 @@ import { toCanvasLibraryImportDescriptor, type LibraryAssetView } from '../core/
 import { createPointerDropTargets } from '../../../core/interaction/pointerDropTargets'
 import { startPointerDrag } from '../../../core/interaction/pointerDrag'
 import type { CanvasLibraryImportDescriptor } from '../core/transfer'
-import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../core/components/ConfirmDialog.vue'
 import LoadErrorPanel from '../../../core/components/LoadErrorPanel.vue'
-import { useUserConfirmDialog } from '../../../core/composables/useUserConfirmDialog'
+import { useConfirmDialog } from '../../../core/composables/useConfirmDialog'
 import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
@@ -309,7 +310,7 @@ const searchIslandClass = computed(() =>
     : 'fixed top-[84px] bottom-4 left-4 sm:bottom-6 sm:left-6 w-[calc(100vw-32px)] sm:w-[350px]',
 )
 
-const confirmDialog = useUserConfirmDialog()
+const confirmDialog = useConfirmDialog()
 const toast = useAppToast()
 const saveOperations = computed(() =>
   props.saveModule.operations.value

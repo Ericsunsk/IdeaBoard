@@ -53,8 +53,8 @@ vi.mock('../../session/accounts/resource', async () => {
 })
 
 const confirmMock = vi.hoisted(() => vi.fn())
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: confirmMock }),
 }))
 
 vi.mock('../../session/wallets/resource', async () => {

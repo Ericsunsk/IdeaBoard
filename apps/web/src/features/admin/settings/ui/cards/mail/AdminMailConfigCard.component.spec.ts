@@ -12,8 +12,8 @@ vi.mock('../../../../shared/session/feedback/toast', async (importOriginal) => (
   useAdminToast: () => toast,
 }))
 
-vi.mock('../../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: confirmMock }),
 }))
 
 const summary: MailConfigSummary = {

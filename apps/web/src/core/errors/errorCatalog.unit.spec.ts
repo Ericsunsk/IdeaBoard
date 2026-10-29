@@ -17,7 +17,7 @@ describe('User-facing error catalog', () => {
         Object.assign(new Error('provider raw detail'), { code: 'vision_search_timeout' }),
         'Fallback',
       ),
-    ).toBe('Visual Search took too long. Please try again.')
+    ).toBe('Visual Search failed. Please try again.')
     expect(userFacingErrorCopy(new Error('provider raw detail'), 'Fallback')).toBe('Fallback')
   })
 
@@ -43,9 +43,7 @@ describe('User-facing error catalog', () => {
     const error = Object.assign(new Error('provider raw detail'), {
       code: 'vision_search_timeout',
     })
-    expect(userFacingErrorCopy(error, 'Fallback')).toBe(
-      'Visual Search took too long. Please try again.',
-    )
+    expect(userFacingErrorCopy(error, 'Fallback')).toBe('Visual Search failed. Please try again.')
     expect(
       userFacingErrorCopy(error, 'Fallback', {
         vision_search_timeout: 'account.errors.workspaceRequired',

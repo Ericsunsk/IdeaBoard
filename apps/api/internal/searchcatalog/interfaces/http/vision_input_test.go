@@ -12,34 +12,34 @@ import (
 	"testing"
 
 	librarydomain "ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
 )
 
-func TestLibraryVisionHostAllowlist(t *testing.T) {
-	if !isLibraryImageHost("images.unsplash.com") || !isLibraryImageHost("images.pexels.com") {
-		t.Fatal("expected curated image hosts to be allowed")
+func TestParseHTTPSVisionImageURL(t *testing.T) {
+	for _, good := range []string{
+		"https://images.unsplash.com/photo-1",
+		"https://images.pexels.com/photo-2",
+		"https://cdn.example/photo-3?w=800",
+		"https://example.com:443/photo-4",
+		"https://evil.example/x",
+	} {
+		if _, ok := parseHTTPSVisionImageURL(good); !ok {
+			t.Fatalf("parse %q = false, want true", good)
+		}
 	}
-	if isLibraryImageHost("evil.example") {
-		t.Fatal("unexpected host allowed")
-	}
-}
-
-func TestVisionImageAllowHostsIncludesCuratedCDNs(t *testing.T) {
-	restore := safehttp.ConfigurePolicyProvider(visionTestOutboundPolicy{hosts: []string{"vision.example"}})
-	defer restore()
-
-	got := visionImageAllowHosts(context.Background())
-	want := []string{"vision.example", "images.unsplash.com", "plus.unsplash.com", "images.pexels.com"}
-	if len(got) != len(want) {
-		t.Fatalf("allow hosts = %#v, want %#v", got, want)
-	}
-	for index, host := range want {
-		if got[index] != host {
-			t.Fatalf("allow hosts[%d] = %q, want %q", index, got[index], host)
+	for _, bad := range []string{
+		"",
+		"http://images.unsplash.com/x",
+		"https://images.unsplash.com:8080/x",
+		"https://user@example.com/x",
+		"data:image/png;base64,abcd",
+		"not a url",
+	} {
+		if _, ok := parseHTTPSVisionImageURL(bad); ok {
+			t.Fatalf("parse %q = true, want false", bad)
 		}
 	}
 }
@@ -85,7 +85,7 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 	}
 	request := httptest.NewRequest(http.MethodPost, "/", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
-	reader := &visionLibraryAssetReaderStub{asset: librarydomain.Asset{OriginalURL: "https://evil.example/image.png"}}
+	reader := &visionLibraryAssetReaderStub{asset: librarydomain.Asset{OriginalURL: "http://evil.example/image.png"}}
 
 	_, err := (multipartVisionInputReader{materializer: visionReferenceMaterializer{libraryReader: reader}}).Read(request, 42)
 	if !errors.Is(err, domain.ErrVisionImageUnavailable) {
@@ -178,26 +178,42 @@ func TestParseExternalReferences(t *testing.T) {
 	}
 }
 
-func TestReadExternalVisionImageDisallowsInvalidHosts(t *testing.T) {
-	ref := VisionExternalReference{
-		Provider:   "unsplash",
-		ID:         "abc",
-		PreviewURL: "https://evil.example/image.jpg",
+func TestReadExternalVisionImageRejectsNonHTTPSBeforeFetch(t *testing.T) {
+	previous := visionImageRequest
+	visionImageRequest = func(_ context.Context, request *http.Request) (*http.Response, error) {
+		t.Error("non-https reference must be rejected before any fetch")
+		return nil, errors.New("must not fetch")
 	}
-	_, err := readExternalVisionImage(context.Background(), ref)
-	if !errors.Is(err, domain.ErrVisionImageUnavailable) {
-		t.Fatalf("expected domain.ErrVisionImageUnavailable for evil host, got %v", err)
-	}
+	t.Cleanup(func() { visionImageRequest = previous })
 
-	// Provider mismatch (unsplash provider with pexels host)
-	mismatchRef := VisionExternalReference{
-		Provider:   "unsplash",
-		ID:         "abc",
-		PreviewURL: "https://images.pexels.com/image.jpg",
+	for _, raw := range []string{
+		"http://images.unsplash.com/image.jpg",
+		"https://images.unsplash.com:8080/image.jpg",
+		"https://user@images.unsplash.com/image.jpg",
+		"not a url",
+	} {
+		ref := VisionExternalReference{Provider: "unsplash", ID: "abc", PreviewURL: raw}
+		if _, err := readExternalVisionImage(context.Background(), ref); !errors.Is(err, domain.ErrVisionImageUnavailable) {
+			t.Fatalf("preview %q: error = %v, want domain.ErrVisionImageUnavailable", raw, err)
+		}
 	}
-	_, err = readExternalVisionImage(context.Background(), mismatchRef)
-	if !errors.Is(err, domain.ErrVisionImageUnavailable) {
-		t.Fatalf("expected domain.ErrVisionImageUnavailable for mismatched provider host, got %v", err)
+}
+
+func TestReadExternalVisionImageSurfacesTransportFailure(t *testing.T) {
+	previous := visionImageRequest
+	visionImageRequest = func(_ context.Context, request *http.Request) (*http.Response, error) {
+		if request.URL.Hostname() != "cdn.example" {
+			t.Fatalf("request host = %q, want cdn.example", request.URL.Hostname())
+		}
+		return nil, errors.New("transport blocked private target")
+	}
+	t.Cleanup(func() { visionImageRequest = previous })
+
+	// Any public https host passes validation (no CDN list); transport
+	// failures (private DNS/dial, redirects) surface as unavailable.
+	ref := VisionExternalReference{Provider: "unsplash", ID: "abc", PreviewURL: "https://cdn.example/image.jpg"}
+	if _, err := readExternalVisionImage(context.Background(), ref); !errors.Is(err, domain.ErrVisionImageUnavailable) {
+		t.Fatalf("expected domain.ErrVisionImageUnavailable for transport failure, got %v", err)
 	}
 }
 

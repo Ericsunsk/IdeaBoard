@@ -774,7 +774,9 @@ describe('canvas workspace task transport', () => {
     expect(accessLossMocks.revalidate).not.toHaveBeenCalled()
   })
 
-  it('maps a 402 quote to insufficient-credits and a 422 quote to not-ready data', async () => {
+  it('maps a 402 quote to insufficient-credits while a 422 quote now throws for submit to surface', async () => {
+    // 简化第二波：422/`validation_failed` 不再中转为 not-ready，直接抛出由
+    // submit 错误透出（后端全验为准），成功/失败终态不变。
     mocks.quoteWorkspaceTask.mockRejectedValueOnce(
       Object.assign(new Error('Idea不足'), { status: 402, code: 'task_insufficient_credits' }),
     )
@@ -787,14 +789,14 @@ describe('canvas workspace task transport', () => {
     )
     await expect(
       fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
-    ).resolves.toMatchObject({ ready: false, service: 'generation' } satisfies Partial<
-      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
-    >)
+    ).rejects.toMatchObject({ status: 422, code: 'validation_failed' })
   })
 
-  it('marks submit-unmappable media not-ready at quote time without network', async () => {
-    // Submit/quote 口径统一 (#P1-1): image_urls、numeric ids、storage
-    // URL、data-URL mask 与 submit 同规则，quote 阶段即标 not-ready。
+  it('lets submit-unmappable media ride the quote network with submit surfacing the failure', async () => {
+    // 简化第二波：quote 只做 service 白名单最小检查，media-urls/media-ids/
+    // storage-URL/data-URL mask 等 submit 口径校验不在 quote 阶段预检；
+    // quote 照常走网络（价格探针），submit 侧 toWorkspaceCreateInput 照旧
+    // fail-closed，终态同为失败（报错时机从 quote 提前变为 submit 透出）。
     const cases: Array<{ name: string; request: Parameters<typeof toWorkspaceCreateInput>[0] }> = [
       {
         name: 'image_urls',
@@ -825,18 +827,38 @@ describe('canvas workspace task transport', () => {
     ]
     for (const { request } of cases) {
       mocks.quoteWorkspaceTask.mockClear()
+      mocks.quoteWorkspaceTask.mockResolvedValueOnce({
+        unit_credits: 6,
+        total_credits: 6,
+        price_version_id: 2,
+        price_version: 2,
+        quantity: 1,
+      })
       await expect(fetchCanvasWorkspaceTaskReadiness(request)).resolves.toMatchObject({
-        ready: false,
-        error_code: 'validation_failed',
+        ready: true,
       } satisfies Partial<
         import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
       >)
-      expect(mocks.quoteWorkspaceTask).not.toHaveBeenCalled()
+      expect(mocks.quoteWorkspaceTask).toHaveBeenCalledTimes(1)
+      // submit 侧照旧 fail-closed：同一请求在 submit 映射即抛，后端为准。
+      expect(() => toWorkspaceCreateInput(request)).toThrowError(
+        expect.objectContaining({ name: 'CanvasWorkspaceTaskUnmappableError' }),
+      )
     }
   })
 
-  it('marks full inpaint submits without a mask not-ready with explicit guidance', async () => {
+  it('lets full inpaint submits without a mask ride the quote network with submit surfacing the failure', async () => {
+    // 简化第二波：inpaint 意图五键推断分支已砍，缺 mask 不再在 quote 阶段以
+    // 明确指引标 not-ready；quote 照常走网络，submit/后端 422 透出失败
+    //（残留：指引文案不如之前明确）。
     mocks.quoteWorkspaceTask.mockClear()
+    mocks.quoteWorkspaceTask.mockResolvedValueOnce({
+      unit_credits: 6,
+      total_credits: 6,
+      price_version_id: 2,
+      price_version: 2,
+      quantity: 1,
+    })
     await expect(
       fetchCanvasWorkspaceTaskReadiness({
         prompt: 'redraw',
@@ -846,14 +868,10 @@ describe('canvas workspace task transport', () => {
           use_mask: true,
         } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
       }),
-    ).resolves.toMatchObject({
-      ready: false,
-      error_code: 'validation_failed',
-      message: 'Mark the area to inpaint first.',
-    } satisfies Partial<
+    ).resolves.toMatchObject({ ready: true, service: 'inpaint' } satisfies Partial<
       import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
     >)
-    expect(mocks.quoteWorkspaceTask).not.toHaveBeenCalled()
+    expect(mocks.quoteWorkspaceTask).toHaveBeenCalledTimes(1)
   })
 
   it('keeps generic inpaint price probes quotable without mask context', async () => {

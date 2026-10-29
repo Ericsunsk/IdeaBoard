@@ -1,7 +1,7 @@
-import type { AdminConfirmPort } from './useAdminConfirm'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 
 export async function confirmSettingsSave(
-  confirm: AdminConfirmPort,
+  confirm: ConfirmPort,
   options: {
     title: string
     message: string

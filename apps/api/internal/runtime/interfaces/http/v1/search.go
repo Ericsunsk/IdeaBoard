@@ -329,7 +329,7 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 			return
 		}
 		var body v1CreateVisionQueryBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -619,7 +619,7 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // Schemas (results are provider URL + source metadata only, never bytes):
 //
 //	WorkspaceSearchResult: {provider: {enum: [unsplash, pexels]}, source_id, title?, author?, source_url: uri, preview_url: uri, original_url: uri, width: integer>=0, height: integer>=0}
-//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, items: {type: string, pattern: '^lasset_'}}, upload_ids?: {type: array, items: {type: string, pattern: '^upload_'}}, image_urls?: {type: array, items: {type: string, format: uri}}}} (maxItems 4 across all three ref kinds combined; at least one of user_text/refs required; library refs resolve against owned workspace library assets, upload refs against live-or-completed sessions with staged bytes verified at resolve time (unknown 404 upload_not_found, expired 410, failed 409, unstaged 422), external refs must be allowlisted https CDN URLs (images.unsplash.com, plus.unsplash.com, images.pexels.com) or 422; no client bytes anywhere)
+//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, items: {type: string, pattern: '^lasset_'}}, upload_ids?: {type: array, items: {type: string, pattern: '^upload_'}}, image_urls?: {type: array, items: {type: string, format: uri}}}} (maxItems 4 across all three ref kinds combined; at least one of user_text/refs required; library refs resolve against owned workspace library assets, upload refs against live-or-completed sessions with staged bytes verified at resolve time (unknown 404 upload_not_found, expired 410, failed 409, unstaged 422), external refs must be public https image URLs (no exotic ports, no userinfo, no literal private IPs) or 422; no client bytes anywhere)
 //	WorkspaceVisionQuery: {operation_id: {pattern: '^visq_'}, status: {const: succeeded}, query: string, replayed?: boolean, created_at: date-time}
 //
 // Error codes frozen: search_provider_unavailable (503), search_vision_provider_error (502),

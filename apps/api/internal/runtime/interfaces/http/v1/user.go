@@ -31,7 +31,7 @@ func (h *contractV1Handler) updateUser(c *gin.Context) {
 		return
 	}
 	var body v1UpdateUserBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+	if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 		writeV1InputError(c)
 		return
 	}

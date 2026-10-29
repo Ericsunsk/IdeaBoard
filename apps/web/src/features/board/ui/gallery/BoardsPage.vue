@@ -164,8 +164,9 @@
       </p>
     </main>
 
-    <!-- 删除二次确认：统一走 UserConfirmDialog intent=danger（参考 LibraryFloatingIsland）。Busy 提交时组件内部锁住 mask/Escape/close-control。 -->
-    <UserConfirmDialog
+    <!-- 删除二次确认：统一走 ConfirmDialog surface="user" intent=danger（参考 LibraryFloatingIsland）。Busy 提交时组件内部锁住 mask/Escape/close-control。 -->
+    <ConfirmDialog
+      surface="user"
       :is-visible="deleteDialogVisible"
       :title="t('workspace.deleteDialog.title')"
       :message="
@@ -190,7 +191,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
-import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../../core/components/ConfirmDialog.vue'
 import { catalogClasses } from './skin'
 import { USER_CANVAS_PATH } from '../../../workspace/routePaths'
 import { WorkspaceHeader, useWorkspaceSelection } from '../../../workspace'
@@ -276,7 +277,7 @@ function onShareBoardIntent(boardId: string) {
   sharePanel.open(board.id, board.name)
 }
 
-// UserConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
+// ConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
 // 关闭后的清理（等价于旧 handleDeleteDialogAfterHide 的后半段，focus
 // 恢复由组件内部 lifecycle 负责）。
 function handleDeleteConfirmVisibleUpdate(isVisible: boolean) {

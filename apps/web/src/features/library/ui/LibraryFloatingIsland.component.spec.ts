@@ -102,7 +102,7 @@ function mountIsland(presentation: 'search' | 'canvas' = 'search', isTransitionE
         LibraryAssetLightbox: true,
         LibraryFolderDialogs: true,
         LibraryFolderContextMenu: true,
-        UserConfirmDialog: true,
+        ConfirmDialog: true,
       },
     },
   })

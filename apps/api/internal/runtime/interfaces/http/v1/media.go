@@ -304,6 +304,16 @@ func renderMediaValidationError(c *gin.Context, err error) {
 	renderMediaStoreError(c, err)
 }
 
+// renderMediaUnsupportedType renders 415 for bytes whose sniffed format is
+// unknown to the upload allowlist (heic, svg, truncated headers, …).
+// Mismatched-but-known formats stay 422 through the validation renderers.
+func renderMediaUnsupportedType(c *gin.Context, field string) {
+	contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeMediaUnsupportedType),
+		contract.CodeMediaUnsupportedType, runtimehttp.MsgMediaValidationFailed,
+		contract.FieldErrors{Fields: map[string]string{field: "unsupported"}})
+	c.Abort()
+}
+
 // mediaBoards exposes the narrow #936 board-access port consumed by asset
 // authorization: h.deps.Boards satisfies workspacemedia.BoardAccess
 // structurally (GetBoardRole + ListBoardsReferencingAsset). A nil store
@@ -386,7 +396,7 @@ func (h *contractV1Handler) createUploadSession(c *gin.Context) {
 			return
 		}
 		var body v1CreateUploadBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -557,7 +567,12 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 			return
 		}
 	}
-	if sniffed := v1SniffedImageMIME(data); sniffed != session.MIMEType {
+	sniffed := v1SniffedImageMIME(data)
+	if sniffed == "" {
+		renderMediaUnsupportedType(c, "mime_type")
+		return
+	}
+	if sniffed != session.MIMEType {
 		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("mime_type"))
 		return
 	}
@@ -662,7 +677,7 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 			return
 		}
 		var body v1CompleteUploadBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}

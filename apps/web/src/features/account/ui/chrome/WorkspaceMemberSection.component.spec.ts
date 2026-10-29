@@ -111,6 +111,7 @@ function classifyReason(code: string): string {
     case 'workspace_not_found':
       return 'hidden'
     case 'workspace_forbidden':
+    case 'forbidden':
       return 'forbidden'
     case 'workspace_default_protected':
       return 'default-protected'
@@ -119,6 +120,8 @@ function classifyReason(code: string): string {
     case 'workspace_member_limit_reached':
       return 'member-limit'
     case 'workspace_idempotency_conflict':
+    case 'idempotency_conflict':
+    case 'conflict':
       return 'idempotency-conflict'
     case 'bad_request':
     case 'validation_failed':
@@ -233,6 +236,7 @@ const DialogContentStub = defineComponent({
 const DialogTitleStub = defineComponent({ template: '<h2><slot /></h2>' })
 const HandoverConfirmationStub = defineComponent({
   props: {
+    surface: { type: String, default: 'user' },
     isVisible: Boolean,
     title: { type: String, default: '' },
     message: { type: String, default: '' },
@@ -252,7 +256,7 @@ const dialogStubs = {
   DialogContent: DialogContentStub,
   DialogDescription: DialogPassthroughStub,
   DialogTitle: DialogTitleStub,
-  UserConfirmDialog: HandoverConfirmationStub,
+  ConfirmDialog: HandoverConfirmationStub,
 }
 
 const ME = 'usr_me'
@@ -512,7 +516,7 @@ describe('WorkspaceSettingsDialog members', () => {
       idempotencyKey?: string
     }
     expect(invite.idempotencyKey).toMatch(/^workspace:members\.invite:/)
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.', expect.anything()))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.'))
     expect(await team.findByText('new@example.com')).toBeVisible()
     expect(await team.findByText('Pending invitations')).toBeVisible()
   })
@@ -557,7 +561,7 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  test('warns when inviting an email that already has a pending invite', async () => {
+  test('duplicate pending invite converges through the backend conflict mapping', async () => {
     fakeMembers.invites.set('ws_team2', [
       {
         id: 'wsi_pending1',
@@ -575,19 +579,23 @@ describe('WorkspaceSettingsDialog members', () => {
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
     const team = within(await screen.findByRole('region', { name: 'Members of Team 2' }))
     await team.findByText('pending@example.com')
+    fakeMembers.failNext = { op: 'invite', code: 'conflict' }
 
     await user.type(team.getByLabelText('Invite by email'), 'pending@example.com')
     await user.click(team.getByRole('button', { name: 'Invite' }))
 
+    // No client pre-check: the request reaches the backend (the fake throws
+    // before recording the call) and the 409 converges through
+    // classifyWorkspaceMemberError + roster invalidation.
     await waitFor(() =>
       expect(toast.warning).toHaveBeenCalledWith(
-        'An invitation has already been sent to this email.',
+        'Someone changed members just now. The latest list is shown.',
       ),
     )
-    expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
-  test('already-member emails warn without calling create invite', async () => {
+  test('already-member emails go through the backend instead of a client pre-check', async () => {
     const { user } = renderMembersDialog()
 
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
@@ -598,9 +606,11 @@ describe('WorkspaceSettingsDialog members', () => {
     await user.click(team.getByRole('button', { name: 'Invite' }))
 
     await waitFor(() =>
-      expect(toast.warning).toHaveBeenCalledWith('This user is already a member.'),
+      expect(fakeMembers.calls).toContainEqual(
+        expect.objectContaining({ op: 'invite', email: 'boss@example.com' }),
+      ),
     )
-    expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.'))
   })
 
   test('revokes a pending member invite', async () => {

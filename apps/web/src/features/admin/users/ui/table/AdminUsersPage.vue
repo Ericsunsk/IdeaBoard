@@ -271,7 +271,7 @@ import { AdminRowActionsPopover } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import { AdminTable } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import {
   adminFramedIconButtonClass,
   adminTableClass,
@@ -302,7 +302,7 @@ type ActionPopupPanel = {
 }
 
 const feedback = useUsersFeedback()
-const adminConfirm = useAdminConfirm()
+const adminConfirm = useConfirm()
 const userActionPopoverRef = ref<ActionPopupPanel | null>(null)
 const walletDialogUser = ref<AdminUserRowView | null>(null)
 const walletDialogVisible = computed({

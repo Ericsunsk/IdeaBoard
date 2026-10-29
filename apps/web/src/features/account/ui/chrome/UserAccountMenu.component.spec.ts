@@ -1136,7 +1136,7 @@ describe('UserAccountMenu', () => {
       expect(workspace.onDelete).not.toHaveBeenCalled()
     })
 
-    it('deletes a plain workspace through UserConfirmDialog with typed confirmation', async () => {
+    it('deletes a plain workspace through ConfirmDialog with typed confirmation', async () => {
       const workspace = workspaceControls({
         onDelete: vi.fn().mockResolvedValue(undefined),
       })
@@ -1155,7 +1155,7 @@ describe('UserAccountMenu', () => {
       await view.user.click(deleteButton)
       const dialog = await screen.findByRole('dialog', { name: 'Delete workspace' })
       expect(dialog).toBeVisible()
-      // UserConfirmDialog renders the message twice (sr-only description +
+      // ConfirmDialog renders the message twice (sr-only description +
       // visible body), so assert on the set, not a single node.
       expect(
         within(dialog).getAllByText(
@@ -1217,7 +1217,7 @@ describe('UserAccountMenu', () => {
       await view.user.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
       await waitFor(() => expect(workspace.onDelete).toHaveBeenCalledWith('ws_team2'))
-      // Busy: UserConfirmDialog disables both controls and the parent
+      // Busy: ConfirmDialog disables both controls and the parent
       // ignores dismissals, so the confirm stays open.
       expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeDisabled()
       expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()

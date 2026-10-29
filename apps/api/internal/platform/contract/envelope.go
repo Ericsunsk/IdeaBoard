@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -129,11 +130,14 @@ func RenderCode(c *gin.Context, code Code, message string) {
 // ErrTrailingPayload reports a second JSON value after the document body.
 var ErrTrailingPayload = errors.New("contract: unexpected trailing JSON payload")
 
-// DecodeStrict unmarshals data while rejecting unknown fields (Baseline
-// 5.1: unknown fields are rejected by default; additionalProperties only
-// where the contract defines an extensible map) and trailing payloads.
-// Callers render failures as 400 (CodeBadRequest) with details.fields
-// describing the offending fields.
+// DecodeStrict unmarshals data while rejecting unknown fields. It is the
+// binding for sensitive writes only (Baseline 5.1 scoped): billing and
+// funds movement (checkout, quotes, transfers, quotas, task submit/cancel
+// Holds), permission and membership changes (roles, invites, board access,
+// organization closure), admin Control Plane mutations, and the versioned
+// board-document union (unknown payload fields signal version skew; silent
+// drops would corrupt documents). Callers render failures as 400
+// (CodeBadRequest) with details.fields describing the offending fields.
 func DecodeStrict(data []byte, v any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
@@ -150,8 +154,9 @@ func DecodeStrict(data []byte, v any) error {
 	return nil
 }
 
-// BindStrictJSON binds the request body with unknown fields rejected
-// (Baseline 5.1 default). It reads the body as-is; the global request
+// BindStrictJSON binds the request body with unknown fields rejected.
+// It is the binding for sensitive writes only (see DecodeStrict); content
+// writes use BindLenientJSON. It reads the body as-is; the global request
 // body-limit middleware still bounds its size.
 func BindStrictJSON(c *gin.Context, dst any) error {
 	if c == nil || c.Request == nil || c.Request.Body == nil {
@@ -162,4 +167,62 @@ func BindStrictJSON(c *gin.Context, dst any) error {
 		return err
 	}
 	return DecodeStrict(raw, dst)
+}
+
+// DecodeLenient unmarshals data while ignoring unknown fields (content
+// writes: boards, workspaces, organizations, library, media, events,
+// search, user profile). Trailing payloads are still rejected: a second
+// JSON value is malformed framing, never forward-compatible extension.
+func DecodeLenient(data []byte, v any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(v); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return ErrTrailingPayload
+		}
+		return err
+	}
+	return nil
+}
+
+// isUnknownFieldError reports the json.Decoder unknown-field failure
+// (DisallowUnknownFields). It never matches syntax errors, type errors,
+// or trailing payloads, which stay hard bind failures.
+func isUnknownFieldError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "unknown field")
+}
+
+// BindLenientJSON binds the request body while ignoring unknown fields
+// (content writes only; sensitive writes stay on BindStrictJSON). Unknown
+// fields are logged with a warn (path + decoder error) so forward-version
+// drift stays observable; malformed JSON and trailing payloads still fail.
+func BindLenientJSON(c *gin.Context, dst any) error {
+	if c == nil || c.Request == nil || c.Request.Body == nil {
+		return errors.New("contract: missing request body")
+	}
+	raw, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return err
+	}
+	if strictErr := DecodeStrict(raw, dst); strictErr == nil {
+		return nil
+	} else if !isUnknownFieldError(strictErr) {
+		return strictErr
+	} else {
+		if lenientErr := DecodeLenient(raw, dst); lenientErr != nil {
+			return lenientErr
+		}
+		path := ""
+		if c.Request != nil && c.Request.URL != nil {
+			path = c.Request.URL.Path
+		}
+		if full := c.FullPath(); full != "" {
+			path = full
+		}
+		slog.Warn("contract: ignoring unknown request fields", "path", path, "err", strictErr)
+		return nil
+	}
 }

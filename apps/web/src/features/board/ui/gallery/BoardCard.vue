@@ -90,7 +90,7 @@
             <MoreHoriz class="size-[18px]" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="end" @close-auto-focus="onMenuCloseAutoFocus">
+        <DropdownMenuContent side="top" align="end">
           <DropdownMenuItem
             v-for="item in menuItems"
             :key="item.label"
@@ -198,16 +198,6 @@ const canWriteBoard = computed(() =>
 const canShareBoard = computed(() => props.board.capabilities?.manage === true)
 
 const cardRootEl = ref<HTMLElement | null>(null)
-// Timestamp of the last menu-driven rename request. Reka fires
-// closeAutoFocus after the select event, before the parent's prop update
-// lands, so the child tracks the request locally to suppress the focus
-// steal. One-shot: consumed by the next closeAutoFocus handler.
-const renameRequestAt = ref(0)
-
-function requestRename() {
-  renameRequestAt.value = Date.now()
-  emit('rename-action')
-}
 
 const menuItems = computed(() => [
   ...(canWriteBoard.value
@@ -215,7 +205,7 @@ const menuItems = computed(() => [
         {
           key: 'rename',
           label: t('common.actions.rename'),
-          command: requestRename,
+          command: () => emit('rename-action'),
         },
       ]
     : []),
@@ -262,34 +252,13 @@ function onRenameInput(event: Event) {
   emit('rename-input', (event.target as HTMLInputElement).value)
 }
 
-// Blur commits only when focus truly leaves the card. The Reka menu close
-// returns focus to its trigger (inside the card); that spurious blur must
-// not enter the async PATCH chain. An explicit relatedTarget decides; only
-// when it is null (runtime quirk) do we fall back to document.activeElement.
+// Blur commits when focus truly leaves the card: a move to another element
+// inside the card (e.g. the menu trigger) keeps the rename open, any other
+// target commits.
 function onRenameBlur(event: FocusEvent) {
   const next = event.relatedTarget as Node | null
-  if (next instanceof Node) {
-    if (cardRootEl.value?.contains(next)) return
-    emit('commit-rename')
-    return
-  }
-  if (typeof document !== 'undefined') {
-    const active = document.activeElement
-    if (active instanceof Node && active !== document.body && cardRootEl.value?.contains(active)) {
-      return
-    }
-  }
+  if (next instanceof Node && cardRootEl.value?.contains(next)) return
   emit('commit-rename')
-}
-
-// Suppress the Reka closeAutoFocus focus steal for the rename-triggering
-// menu close so the rename input keeps focus. Normal menu closes (no rename
-// pending, not renaming) keep the default focus-restore behavior.
-function onMenuCloseAutoFocus(event: Event) {
-  const isRecentRenameRequest = Date.now() - renameRequestAt.value < 500
-  if (!props.isRenaming && !isRecentRenameRequest) return
-  event.preventDefault()
-  renameRequestAt.value = 0
 }
 
 function onCardKeyboardActivate(event: KeyboardEvent) {

@@ -93,7 +93,7 @@ func newDetectTestRepo(t *testing.T, token string) *ConfigRepository {
 // (payload vs 500).
 func stubModelsDevCatalog(t *testing.T, handler http.HandlerFunc) {
 	t.Helper()
-	restore := safehttp.ConfigurePolicyProvider(stubOutboundPolicy{hosts: []string{modelsDevHost, "127.0.0.1"}})
+	restore := safehttp.ConfigurePolicyProvider(stubOutboundPolicy{hosts: []string{"127.0.0.1"}})
 	t.Cleanup(restore)
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

@@ -418,7 +418,8 @@
   <!-- Ownership transfer confirmation: ordinary danger confirm (no typing) for
     initiation, primary for acceptance. Backend still enforces owner-only
     initiation and recipient-only decisions. -->
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="handover.confirmation.value != null"
     :title="handoverTitle"
     :message="handoverMessage"
@@ -430,7 +431,8 @@
   />
 
   <!-- Member removal confirmation modal dialog -->
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="section.confirmingRemoveId.value != null"
     :title="removeDialogTitle"
     :message="removeDialogMessage"
@@ -465,7 +467,7 @@ import {
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../../core/components/ConfirmDialog.vue'
 import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'

@@ -6,10 +6,9 @@
     :busy="isSaving"
     :loading="isLoading && !summary"
     :loading-label="OAUTH_MESSAGES.oauthLoading"
-    :error="loadError"
+    :error="null"
     @reset="resetAndLoad"
     @update:visible="emit('update:visible', $event)"
-    @retry="load"
   >
     <form v-if="summary" class="flex flex-col gap-3.5 py-1" novalidate @submit.prevent="submit">
       <!-- 1. 顶部 Provider 选择与启用卡片网格 -->
@@ -23,7 +22,7 @@
               ? 'border-primary bg-primary-faint shadow-raised'
               : 'border-border bg-muted/40 hover:border-border hover:bg-muted'
           "
-          @click="selectedProvider = provider.value"
+          @click="selectProvider(provider.value)"
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <button
@@ -175,7 +174,7 @@
       <AdminDialogActions
         :confirm-label="OAUTH_MESSAGES.oauthSave"
         :loading="isSaving"
-        :disabled="isLoading || Boolean(loadError) || !summary"
+        :disabled="isLoading || !summary"
         :cancel-disabled="isBusy"
         confirm-variant="default"
         @cancel="requestClose"
@@ -214,10 +213,7 @@ import {
   type OAuthProviderSettingsResource,
   type OAuthProviderSettingsSummary,
 } from '../../../session/oauth/resource'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '@/core/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '@/core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 
@@ -247,8 +243,6 @@ const providerEnabled = reactive<Record<string, boolean>>({})
 const initialProviderEnabled = reactive<Record<string, boolean>>({})
 const isLoading = ref(false)
 const isSaving = ref(false)
-const providerSwitching = ref(false)
-const loadError = ref('')
 const form = useForm({
   initialValues: { enabled: false, clientId: '', clientSecret: '' },
   schema: () =>
@@ -261,8 +255,7 @@ const form = useForm({
       ),
     }),
 })
-let providerLoadEpoch = 0
-const isBusy = computed(() => isSaving.value || (isLoading.value && !summary.value))
+const isBusy = computed(() => isSaving.value || isLoading.value)
 const providerLabel = computed(() => getOAuthProviderLabel(selectedProvider.value))
 const secretPlaceholder = computed(() =>
   OAUTH_MESSAGES.oauthSecretPlaceholder(Boolean(summary.value?.clientSecretConfigured)),
@@ -273,17 +266,25 @@ function oauthProviderLogo(provider: OAuthProviderCode): string {
 }
 
 function openLogoPicker(event: Event, provider: OAuthProviderCode) {
+  if (isBusy.value) return
   selectedProvider.value = provider
   activeLogoProvider.value = provider
   logoPickerPopoverRef.value?.toggle(event)
 }
 
+function selectProvider(provider: OAuthProviderCode) {
+  if (!isBusy.value) selectedProvider.value = provider
+}
+
 watch(selectedProvider, (provider) => {
   if (!props.visible) return
   clearSensitiveState()
-  loadError.value = ''
   const cachedSummary = providerSummaries.value[provider]
-  if (cachedSummary) applySummary(cachedSummary)
+  // 按需单 provider GET：已缓存直接复用，不再每次切换都全量往返。
+  if (cachedSummary) {
+    applySummary(cachedSummary)
+    return
+  }
   void loadSelectedProvider(provider)
 })
 
@@ -293,45 +294,25 @@ function activeResource() {
 
 function resetAndLoad() {
   clearSensitiveState()
-  loadError.value = ''
-  void load()
+  void loadSelectedProvider(selectedProvider.value)
 }
 
-async function load() {
-  if (isBusy.value) return
-  isLoading.value = true
-  loadError.value = ''
-  try {
-    const state = await fetchProviderState()
-    applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
-    applyProviderSummaries(state.summaries)
-  } catch (error) {
-    // 初载失败走 toast；loadError 保留为 frame 状态真相源（可重试 + 禁用保存）。
-    loadError.value = formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed)
-    toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
-  } finally {
-    isLoading.value = false
-  }
-}
-
+// Opening and uncached provider switches share the same guarded load.
 async function loadSelectedProvider(provider: OAuthProviderCode) {
-  const epoch = ++providerLoadEpoch
-  providerSwitching.value = true
+  if (isBusy.value) return
+  // A form is usable only after the selected provider has loaded successfully.
+  summary.value = null
+  isLoading.value = true
   try {
     const nextSummary = await activeResource().get(provider)
     providerSummaries.value[provider] = nextSummary
-    if (epoch !== providerLoadEpoch) return
     if (selectedProvider.value === provider) applySummary(nextSummary)
     providerEnabled[provider] = nextSummary.enabled
     initialProviderEnabled[provider] = nextSummary.enabled
   } catch (error) {
-    if (epoch === providerLoadEpoch) {
-      // provider 切换加载失败走 toast；行内 anchor 保留可重试 + 禁用保存。
-      loadError.value = formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed)
-      toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
-    }
+    toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
   } finally {
-    if (epoch === providerLoadEpoch) providerSwitching.value = false
+    isLoading.value = false
   }
 }
 
@@ -340,15 +321,45 @@ function setProviderEnabled(provider: OAuthProviderCode, enabled: boolean) {
   if (provider === selectedProvider.value) form.values.enabled = enabled
 }
 
-const submit = form.handleSubmit(async (values) => {
-  if (isBusy.value || providerSwitching.value || !summary.value) return
-  const changedProviders = oauthLoginProviders
+// Load unvisited providers before validating their pending enablement changes.
+async function ensureChangedProviderSummaries(providers: OAuthProviderCode[]) {
+  await Promise.all(
+    providers.map(async (provider) => {
+      if (providerSummaries.value[provider]) return
+      const nextSummary = await activeResource().get(provider)
+      providerSummaries.value[provider] = nextSummary
+      // 不覆盖用户的待保存拨动：providerEnabled 保持开关状态，initial
+      // 记后端真相源供对比；若拨动与后端一致，重算后自动消为未变更。
+      if (initialProviderEnabled[provider] === undefined) {
+        initialProviderEnabled[provider] = nextSummary.enabled
+      }
+    }),
+  )
+}
+
+function changedProvidersOf(): OAuthProviderCode[] {
+  return oauthLoginProviders
     .map((provider) => provider.value)
     .filter(
       (provider) =>
         provider !== selectedProvider.value &&
         providerEnabled[provider] !== initialProviderEnabled[provider],
     )
+}
+
+const submit = form.handleSubmit(async (values) => {
+  if (isBusy.value || !summary.value) return
+
+  // 先按当前缓存算候选，懒补齐缺失摘要后再重算，避免未访问过的 provider
+  // 因 initial 缺失而误判或漏掉 incomplete 拦截。
+  const candidates = changedProvidersOf()
+  try {
+    await ensureChangedProviderSummaries(candidates)
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
+    return
+  }
+  const changedProviders = changedProvidersOf()
   const incompleteProvider = changedProviders.find(
     (provider) => providerEnabled[provider] && !providerSummaries.value[provider]?.configured,
   )
@@ -374,18 +385,24 @@ const submit = form.handleSubmit(async (values) => {
         }),
       ),
     ]
-    const [savedSummary] = await Promise.all(saveRequests)
+    const savedSummaries = await Promise.all(saveRequests)
+    const [savedSummary, ...savedChanged] = savedSummaries
+    // Save responses refresh the dialog cache; the parent refetches on close.
+    savedChanged.forEach((nextSummary, index) => {
+      const provider = changedProviders[index]!
+      providerSummaries.value[provider] = nextSummary
+      providerEnabled[provider] = nextSummary.enabled
+      initialProviderEnabled[provider] = nextSummary.enabled
+    })
     clearSensitiveState()
-    if (savedSummary) applySummary(savedSummary)
-    toast.success(OAUTH_MESSAGES.oauthSaved(providerLabel.value))
-    try {
-      const state = await fetchProviderState()
-      applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
-      applyProviderSummaries(state.summaries)
-      emit('update:visible', false)
-    } catch {
-      loadError.value = OAUTH_MESSAGES.oauthRefreshFailed
+    if (savedSummary) {
+      providerSummaries.value[currentProvider] = savedSummary
+      providerEnabled[currentProvider] = savedSummary.enabled
+      initialProviderEnabled[currentProvider] = savedSummary.enabled
+      applySummary(savedSummary)
     }
+    toast.success(OAUTH_MESSAGES.oauthSaved(providerLabel.value))
+    emit('update:visible', false)
   } catch (error) {
     clearSensitiveState()
     toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthSaveFailed))
@@ -393,27 +410,6 @@ const submit = form.handleSubmit(async (values) => {
     isSaving.value = false
   }
 })
-
-async function fetchProviderState() {
-  const entries = await Promise.all(
-    oauthLoginProviders.map(
-      async (provider) => [provider.value, await activeResource().get(provider.value)] as const,
-    ),
-  )
-  const summaries = Object.fromEntries(entries)
-  const firstSummary = summaries[selectedProvider.value] ?? entries[0]?.[1]
-  if (!firstSummary) throw new Error(OAUTH_MESSAGES.oauthConfigMissing)
-  return { summaries, firstSummary }
-}
-
-function applyProviderSummaries(nextSummaries: Record<string, OAuthProviderSettingsSummary>) {
-  providerSummaries.value = nextSummaries
-  for (const provider of oauthLoginProviders) {
-    const enabled = nextSummaries[provider.value]?.enabled ?? false
-    providerEnabled[provider.value] = enabled
-    initialProviderEnabled[provider.value] = enabled
-  }
-}
 
 function applySummary(nextSummary: OAuthProviderSettingsSummary) {
   summary.value = nextSummary

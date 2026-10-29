@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "25d1924f659c13cef363d2bdc100c5d77afc9c74",
+  "checkpointSha": "b3a12c7eb75e4211073f8695565fc9ba5f3d39e3",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 275, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 273, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -6872,12 +6872,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/core/components/LoadErrorPanel.vue",
+          "from": "src/core/components/ConfirmDialog.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/core/components/UserConfirmDialog.vue",
+          "from": "src/core/components/LoadErrorPanel.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -7791,7 +7791,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/core/components/UserConfirmDialog.vue",
+          "from": "src/core/components/ConfirmDialog.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
@@ -9087,6 +9087,136 @@
       "ownershipScope": ["src/core/components/ChartRenderer.vue"],
       "impureRuntimePaths": []
     },
+    "src/core/components/ConfirmDialog.vue": {
+      "consumerEdges": [
+        {
+          "from": "src/core/components/ConfirmDialog.component.spec.ts",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/AdminLayout.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OverviewPanel.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 9,
+      "fanOut": 10,
+      "fanOutTargets": [
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/core/components/DialogShell.vue",
+        "src/core/components/dialogShell.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useConfirmDialog.ts",
+        "src/core/utils/errorMessages.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "node_modules/reka-ui/dist/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/components/DialogShell.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/components/dialogShell.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 9,
+      "targetFanOut": 10,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/components/ConfirmDialog.vue"],
+      "impureRuntimePaths": []
+    },
     "src/core/components/DataTableColumn.vue": {
       "consumerEdges": [
         {
@@ -9504,119 +9634,6 @@
       "ownershipScope": ["src/core/components/StudioName.vue"],
       "impureRuntimePaths": []
     },
-    "src/core/components/UserConfirmDialog.vue": {
-      "consumerEdges": [
-        {
-          "from": "src/core/components/UserConfirmDialog.component.spec.ts",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/organization/ui/OverviewPanel.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/test/p1ThemeContracts.browser.spec.ts",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 8,
-      "fanOut": 8,
-      "fanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue-i18n/index.js",
-        "node_modules/vue/index.js",
-        "src/components/ui/button/index.ts",
-        "src/components/ui/input/index.ts",
-        "src/core/components/DialogShell.vue",
-        "src/core/components/dialogShell.ts",
-        "src/core/composables/useAppClipboard.ts"
-      ],
-      "outboundEdges": [
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/core/components/DialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/core/components/dialogShell.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/core/composables/useAppClipboard.ts",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 8,
-      "targetFanOut": 8,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/core/components/UserConfirmDialog.vue"],
-      "impureRuntimePaths": []
-    },
     "src/core/components/formFieldContract.ts": {
       "consumerEdges": [
         {
@@ -9736,11 +9753,6 @@
     "src/core/composables/useAppClipboard.ts": {
       "consumerEdges": [
         {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/core/composables/useAppClipboard.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/core/composables/useAppClipboard.unit.spec.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
@@ -9771,7 +9783,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 6,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9779,7 +9791,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9800,6 +9812,11 @@
         },
         {
           "from": "src/app/router/index.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -9949,7 +9966,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 31,
+      "fanIn": 32,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
       "outboundEdges": [
@@ -9963,7 +9980,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 31,
+      "targetFanIn": 32,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10087,6 +10104,150 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/core/composables/useAsyncAction.ts"],
+      "impureRuntimePaths": []
+    },
+    "src/core/composables/useConfirmDialog.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/core/components/ConfirmDialog.component.spec.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/composables/useConfirmDialog.unit.spec.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/useRewardCodeRowActions.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/session/useAdminModelCatalogWorkspace.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminTaskCancel.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/useStorageContext.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/workspace.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStoragePage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/commands.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/context.contract.spec.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/context.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/confirmations.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 23,
+      "fanOut": 1,
+      "fanOutTargets": ["node_modules/vue/index.js"],
+      "outboundEdges": [
+        {
+          "from": "src/core/composables/useConfirmDialog.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 23,
+      "targetFanOut": 1,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/composables/useConfirmDialog.ts"],
       "impureRuntimePaths": []
     },
     "src/core/composables/useLogoutRedirect.ts": {
@@ -10446,50 +10607,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/core/composables/useSupportChannels.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/core/composables/useUserConfirmDialog.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/core/composables/useUserConfirmDialog.unit.spec.ts",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/confirmations.ts",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "type-only"
-        }
-      ],
-      "fanIn": 3,
-      "fanOut": 1,
-      "fanOutTargets": ["node_modules/vue/index.js"],
-      "outboundEdges": [
-        {
-          "from": "src/core/composables/useUserConfirmDialog.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 3,
-      "targetFanOut": 1,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/core/composables/useUserConfirmDialog.ts"],
       "impureRuntimePaths": []
     },
     "src/core/config/pagination.ts": {
@@ -12062,11 +12179,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -12413,7 +12525,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 146,
+      "fanIn": 145,
       "fanOut": 7,
       "fanOutTargets": [
         "fs",
@@ -12510,7 +12622,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 146,
+      "targetFanIn": 145,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14958,6 +15070,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/components/ConfirmDialog.vue",
+          "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/utils/errorMessages.unit.spec.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
@@ -14998,7 +15115,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 9,
+      "fanIn": 10,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -15006,7 +15123,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15648,6 +15765,7 @@
         "src/components/ui/skeleton/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/auth/passwordPolicy.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/DataTableColumn.vue",
         "src/core/components/DataTableFrame.vue",
         "src/core/components/DialogShell.vue",
@@ -15656,7 +15774,6 @@
         "src/core/components/RangedLineChartCard.vue",
         "src/core/components/SiteBrandLogo.vue",
         "src/core/components/StatusBadge.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useAppToast.ts",
@@ -17331,7 +17448,7 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
@@ -17411,7 +17528,7 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
@@ -19390,11 +19507,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/core/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/form/AdminInput.vue",
           "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
@@ -19470,7 +19582,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 17,
+      "fanIn": 16,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -19478,7 +19590,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 17,
+      "targetFanIn": 16,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -19803,11 +19915,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/session/useAdminTaskCancel.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19958,11 +20065,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/settings/session/storage/useStorageContext.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/settings/session/storage/useStorageFeedback.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19971,11 +20073,6 @@
           "from": "src/features/admin/settings/session/storage/workspace.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/session/storage/workspace.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/admin/settings/session/support/resource.ts",
@@ -20118,21 +20215,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/session/commands.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/session/context.contract.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/session/context.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/users/session/resource.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -20153,8 +20235,8 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 123,
-      "fanOut": 59,
+      "fanIn": 118,
+      "fanOut": 60,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -20197,6 +20279,7 @@
         "src/core/components/formFieldContract.ts",
         "src/core/components/serviceIcons.ts",
         "src/core/composables/useAppToast.ts",
+        "src/core/composables/useConfirmDialog.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
         "src/core/config/runtimeUrls.ts",
@@ -20493,6 +20576,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -20510,16 +20598,6 @@
         {
           "from": "src/features/admin/shared/session/feedback/toast.ts",
           "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/useAdminConfirm.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -20705,21 +20783,6 @@
         {
           "from": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
           "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "node_modules/reka-ui/dist/index.cjs",
           "kind": "runtime"
         },
         {
@@ -21487,8 +21550,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 123,
-      "targetFanOut": 59,
+      "targetFanIn": 118,
+      "targetFanOut": 60,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -22046,11 +22109,11 @@
       ],
       "fanIn": 2,
       "fanOut": 1,
-      "fanOutTargets": ["src/features/admin/shared/session/feedback/useAdminConfirm.ts"],
+      "fanOutTargets": ["src/core/composables/useConfirmDialog.ts"],
       "outboundEdges": [
         {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
           "kind": "type-only"
         }
       ],
@@ -22193,16 +22256,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -22218,7 +22271,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 29,
+      "fanIn": 27,
       "fanOut": 2,
       "fanOutTargets": ["src/core/composables/useAppToast.ts", "src/core/utils/errorMessages.ts"],
       "outboundEdges": [
@@ -22237,7 +22290,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 29,
+      "targetFanIn": 27,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -22247,65 +22300,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/admin/shared/session/feedback/toast.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/features/admin/shared/session/feedback/useAdminConfirm.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/admin/shared/index.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/useAdminConfirm.unit.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/test/p1ThemeContracts.browser.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 6,
-      "fanOut": 1,
-      "fanOutTargets": ["node_modules/vue/index.js"],
-      "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 6,
-      "targetFanOut": 1,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/admin/shared/session/feedback/useAdminConfirm.ts"],
       "impureRuntimePaths": []
     },
     "src/features/admin/shared/session/timeRange.ts": {
@@ -22893,70 +22887,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminAlert.vue"],
-      "impureRuntimePaths": []
-    },
-    "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue": {
-      "consumerEdges": [
-        {
-          "from": "src/features/admin/shared/index.ts",
-          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/test/p1ThemeContracts.browser.spec.ts",
-          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 3,
-      "fanOut": 4,
-      "fanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs",
-        "src/features/admin/shared/core/uiClasses.ts",
-        "src/features/admin/shared/session/feedback/toast.ts",
-        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
-      ],
-      "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "node_modules/reka-ui/dist/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/core/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 3,
-      "targetFanOut": 4,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue"],
       "impureRuntimePaths": []
     },
     "src/features/admin/shared/ui/feedback/AdminEmptyState.vue": {
@@ -25823,9 +25753,9 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/DialogShell.vue",
         "src/core/components/LoadErrorPanel.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/config/pagination.ts",
@@ -26770,12 +26700,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -27806,9 +27736,9 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/DialogShell.vue",
         "src/core/components/LoadErrorPanel.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/config/pagination.ts",
@@ -28753,12 +28683,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -29329,9 +29259,9 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/DialogShell.vue",
         "src/core/components/LoadErrorPanel.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/config/pagination.ts",
@@ -30276,12 +30206,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -33616,11 +33546,6 @@
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
           "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
-          "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
@@ -43824,13 +43749,13 @@
         "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/input/index.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/DialogShell.vue",
         "src/core/components/IbFormField.vue",
         "src/core/components/LoadErrorPanel.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppToast.ts",
-        "src/core/composables/useUserConfirmDialog.ts",
+        "src/core/composables/useConfirmDialog.ts",
         "src/core/config/pagination.ts",
         "src/core/config/runtimeUrls.ts",
         "src/core/contracts/externalImageProviders.ts",
@@ -44282,12 +44207,12 @@
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -44297,7 +44222,7 @@
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
           "kind": "runtime"
         },
         {
@@ -44392,7 +44317,7 @@
         },
         {
           "from": "src/features/library/ui/confirmations.ts",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
+          "to": "src/core/composables/useConfirmDialog.ts",
           "kind": "type-only"
         },
         {
@@ -45647,8 +45572,8 @@
         "src/components/ui/spinner/index.ts",
         "src/core/auth/adminAccess.ts",
         "src/core/auth/routePolicy.ts",
+        "src/core/components/ConfirmDialog.vue",
         "src/core/components/StudioName.vue",
-        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
@@ -45955,7 +45880,7 @@
         },
         {
           "from": "src/features/workspace/organization/ui/OverviewPanel.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
           "kind": "runtime"
         },
         {

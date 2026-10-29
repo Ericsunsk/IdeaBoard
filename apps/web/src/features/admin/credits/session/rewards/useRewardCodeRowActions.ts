@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { useOptimisticToggle } from '../../../shared'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
@@ -16,7 +16,7 @@ export function useRewardCodeRowActions(options: {
 }) {
   const resource = options.resource ?? createAdminRewardCodeResource()
   const feedback = useRewardCodesFeedback()
-  const confirm = useAdminConfirm()
+  const confirm = useConfirm()
   // 行开关乐观收口到共享 useOptimisticToggle：intent 同 tick 翻转，
   // pending 只压开关；成功后保留覆盖等回填 reconcile，失败回滚。
   // Status 胶囊四态仍跟服务端 status，投影只覆盖 enabled。

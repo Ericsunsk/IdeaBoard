@@ -185,6 +185,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '415':
+          description: Unknown image format (media_unsupported_type, e.g. heic/svg).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '501':
@@ -1718,8 +1727,9 @@ paths:
         header (scope board:create): missing keys render 400
         idempotency_key_required, key reuse with a different request
         renders 409 board_idempotency_conflict, same key+hash replays the
-        first result. Unknown body fields are rejected with 400; blank or
-        overlong names render 422 validation_failed.
+        first result. Unknown body fields are ignored (warn-logged,
+        content-write leniency); blank or overlong names render 422
+        validation_failed.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -4183,7 +4193,8 @@ paths:
       description: >-
         Stages the raw image bytes matching the session declaration
         (size, checksum, MIME). Raw image bytes body (never JSON, never
-        multipart). Retryable: 422 validation mismatches change no state.
+        multipart). Retryable: 422 validation mismatches change no state;
+        unknown image formats render 415 media_unsupported_type.
         Success reuses the UploadSession envelope. Requires the
         Idempotency-Key header (scope upload:bytes): key reuse with a
         different body renders 409 upload_idempotency_conflict.
@@ -4226,6 +4237,15 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '410':
           description: Upload session expired (upload_expired).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '415':
+          description: Unknown image format (media_unsupported_type, e.g. heic/svg).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'

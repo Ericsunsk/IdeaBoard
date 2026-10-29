@@ -1930,6 +1930,7 @@ paths:
         Preview uses GET /api/v1/public/branding/logo?key={key}, which returns
         rendered image bytes. Validation applies a 50MB image
         cap and detected-format allowlist, without trusting the filename.
+        Unknown image formats render 415 media_unsupported_type.
         The control guard cannot buffer multipart bodies, so this route
         registers as a POST read-guard and enforces the mutation
         guarantees in-handler: a header-only Idempotency-Key is
@@ -1974,6 +1975,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+        '415':
+          description: Unknown image format (media_unsupported_type).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlErrorEnvelope'
         '429':
           $ref: '#/components/responses/RateLimited'
   /platform/settings/support-channels:

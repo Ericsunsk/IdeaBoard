@@ -129,7 +129,7 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 		return
 	}
 	var body v1CreateOrganizationBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+	if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 		writeV1InputError(c)
 		return
 	}
@@ -236,7 +236,7 @@ func (h *contractV1Handler) updateOrganization(c *gin.Context) {
 		return role == tenancy.RoleOwner || role == tenancy.RoleAdmin
 	}}, func(octx v1OrganizationCtx) {
 		var body v1UpdateOrganizationBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -300,7 +300,7 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 			return
 		}
 		var body v1CreateOrganizationWorkspaceBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}

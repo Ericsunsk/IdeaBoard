@@ -13,12 +13,8 @@ import '../app/style.css'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import ActionButton from '../core/components/ActionButton.vue'
-import UserConfirmDialog from '../core/components/UserConfirmDialog.vue'
-import {
-  activeAdminConfirm,
-  useAdminConfirm,
-} from '../features/admin/shared/session/feedback/useAdminConfirm'
-import AdminConfirmDialog from '../features/admin/shared/ui/feedback/AdminConfirmDialog.vue'
+import ConfirmDialog from '../core/components/ConfirmDialog.vue'
+import { activeConfirm, useConfirm } from '../core/composables/useConfirmDialog'
 import { dialogMotionTransitionName } from '../core/motion/dialogMotion'
 
 declare module 'vitest/internal/browser' {
@@ -44,7 +40,7 @@ async function setMotion(isReduced: boolean) {
 describe('P1 theme, control state and focus browser contracts', () => {
   afterEach(async () => {
     cleanup()
-    activeAdminConfirm.value?.cancel()
+    activeConfirm.value?.cancel()
     useTheme().setTheme('light')
     await setMotion(false)
   })
@@ -52,7 +48,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
   beforeEach(async () => {
     document.documentElement.classList.add('light')
     i18n.global.locale.value = 'en'
-    activeAdminConfirm.value = null
+    activeConfirm.value = null
     await setMotion(false)
   })
 
@@ -339,13 +335,14 @@ describe('P1 theme, control state and focus browser contracts', () => {
     ['light', true],
     ['dark', true],
   ] as const)(
-    'renders real UserConfirmDialog focus and loading in %s (reduced=%s)',
+    'renders real ConfirmDialog surface=user focus and loading in %s (reduced=%s)',
     async (mode, isReduced) => {
       useTheme().setTheme(mode)
       await setMotion(isReduced)
       const confirmAction = vi.fn()
-      const { rerender, emitted } = renderWithUser(UserConfirmDialog, {
+      const { rerender, emitted } = renderWithUser(ConfirmDialog, {
         props: {
+          surface: 'user',
           isVisible: true,
           title: 'Delete item',
           message: 'Cannot undo',
@@ -381,7 +378,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
     ['light', true],
     ['dark', true],
   ] as const)(
-    'renders real AdminConfirmDialog focus and loading in %s (reduced=%s)',
+    'renders real ConfirmDialog surface=admin focus and loading in %s (reduced=%s)',
     async (mode, isReduced) => {
       useTheme().setTheme(mode)
       await setMotion(isReduced)
@@ -392,14 +389,14 @@ describe('P1 theme, control state and focus browser contracts', () => {
             settle = resolve
           }),
       )
-      const pending = useAdminConfirm().confirm({
+      const pending = useConfirm().confirm({
         title: 'Delete user',
         message: 'Audit action',
         confirmLabel: 'Delete',
         intent: 'danger',
         onConfirm: action,
       })
-      renderWithUser(AdminConfirmDialog)
+      renderWithUser(ConfirmDialog, { props: { surface: 'admin' } })
       const dialog = await screen.findByRole('alertdialog', { name: 'Delete user' })
       const cancel = screen.getByRole('button', { name: '取消' })
       const confirm = screen.getByRole('button', { name: 'Delete' })

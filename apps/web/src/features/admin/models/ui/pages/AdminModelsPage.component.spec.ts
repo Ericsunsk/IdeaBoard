@@ -13,8 +13,8 @@ const gatewayFakes = vi.hoisted(() => ({
   previewRoute: vi.fn(),
 }))
 
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock }),
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({ confirm: confirmMock }),
 }))
 
 // Detect/observed/route-preview have no control equivalent (fail-closed in

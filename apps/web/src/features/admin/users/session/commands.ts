@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import type { AdminUsersFeedback } from './useUsersFeedback'
-import type { AdminConfirmPort } from '../../shared'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import {
   banAdminUser,
   deleteAdminUser,
@@ -61,7 +61,7 @@ export const banDurationOptions: Array<{ label: string; value: number }> = [
 export function useAdminUserCommands(
   options: {
     feedback: AdminUsersFeedback
-    confirm: AdminConfirmPort
+    confirm: ConfirmPort
   },
   dependencies: AdminUserCommandDependencies = {},
 ) {

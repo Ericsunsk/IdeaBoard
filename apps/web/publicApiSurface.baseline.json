@@ -2220,6 +2220,7 @@
   "src/core/components/ChartCard.vue": ["default"],
   "src/core/components/ChartPanel.vue": ["ChartPanelSize", "default"],
   "src/core/components/ChartRenderer.vue": ["default"],
+  "src/core/components/ConfirmDialog.vue": ["default"],
   "src/core/components/DataTableColumn.vue": [
     "DataTableColumnBodySlotProps",
     "DataTableColumnSlots",
@@ -2231,7 +2232,6 @@
   "src/core/components/SiteBrandLogo.vue": ["default"],
   "src/core/components/StatusBadge.vue": ["AppStatusBadgeSize", "AppStatusTone", "default"],
   "src/core/components/StudioName.vue": ["default"],
-  "src/core/components/UserConfirmDialog.vue": ["default"],
   "src/core/components/formFieldContract.ts": [
     "FormFieldContractProps",
     "FormFieldContractSlotProps",
@@ -2245,6 +2245,17 @@
     "AsyncActionFeedback",
     "AsyncActionLoadingHandle",
     "useAsyncAction"
+  ],
+  "src/core/composables/useConfirmDialog.ts": [
+    "ConfirmIntent",
+    "ConfirmOptions",
+    "ConfirmPort",
+    "ConfirmRequest",
+    "ConfirmState",
+    "ConfirmSurface",
+    "activeConfirm",
+    "useConfirm",
+    "useConfirmDialog"
   ],
   "src/core/composables/useLogoutRedirect.ts": ["useLogoutRedirect"],
   "src/core/composables/useMenuTriggerFocusRestore.ts": ["useMenuTriggerFocusRestore"],
@@ -2281,7 +2292,6 @@
     "normalizeSupportChannels",
     "useSupportChannels"
   ],
-  "src/core/composables/useUserConfirmDialog.ts": ["UserConfirmRequest", "useUserConfirmDialog"],
   "src/core/config/pagination.ts": ["PAGE_SIZES", "normalizePageSize"],
   "src/core/config/runtimeUrls.ts": [
     "API_BASE_URL",
@@ -2954,12 +2964,6 @@
     "AdminChartCard",
     "AdminCollectionPageShell",
     "AdminColumn",
-    "AdminConfirmDialog",
-    "AdminConfirmIntent",
-    "AdminConfirmOptions",
-    "AdminConfirmPort",
-    "AdminConfirmRequest",
-    "AdminConfirmState",
     "AdminControlUnavailableError",
     "AdminCursorValue",
     "AdminDialogActions",
@@ -3037,7 +3041,6 @@
     "TaskMetricKey",
     "TaskMetricStatsSnapshot",
     "TaskStatus",
-    "activeAdminConfirm",
     "adminAnomalyPopoverClass",
     "adminBrandLogoMap",
     "adminBrandLogoProxyUrl",
@@ -3150,7 +3153,6 @@
     "useAdminBrandLogoResource",
     "useAdminChartReady",
     "useAdminCollectionQuery",
-    "useAdminConfirm",
     "useAdminCursorCollection",
     "useAdminSubHeaderTarget",
     "useAdminToast",
@@ -3207,15 +3209,6 @@
     "formatAdminDisplayError",
     "useAdminToast"
   ],
-  "src/features/admin/shared/session/feedback/useAdminConfirm.ts": [
-    "AdminConfirmIntent",
-    "AdminConfirmOptions",
-    "AdminConfirmPort",
-    "AdminConfirmRequest",
-    "AdminConfirmState",
-    "activeAdminConfirm",
-    "useAdminConfirm"
-  ],
   "src/features/admin/shared/session/timeRange.ts": [
     "AdminTimeRangeBucket",
     "AdminTimeRangeOption",
@@ -3252,7 +3245,6 @@
     "useAdminChartReady"
   ],
   "src/features/admin/shared/ui/feedback/AdminAlert.vue": ["AdminAlertSeverity", "default"],
-  "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue": ["default"],
   "src/features/admin/shared/ui/feedback/AdminEmptyState.vue": ["default"],
   "src/features/admin/shared/ui/form/AdminFormField.vue": ["default"],
   "src/features/admin/shared/ui/form/AdminInput.vue": ["default"],

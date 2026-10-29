@@ -20,7 +20,7 @@ type CatalogCommandDependencies = {
   feedback: BoardFeedback
   warn: (...data: unknown[]) => void
   state: CatalogCommandState
-  clearRename(suppressNextOpen: boolean): void
+  clearRename(): void
   resetDeleteState(): void
 }
 
@@ -222,13 +222,13 @@ export function createCommandHandlers({
           feedback.renameValidationFailed(result)
           return
         case 'invalid-name':
-          clearRename(true)
+          clearRename()
           feedback.renameValidationFailed(result)
           return
         case 'revision-conflict':
         case 'idempotency-conflict':
         case 'sync-failed':
-          clearRename(true)
+          clearRename()
           feedback.renameSyncFailed(result)
           state.catalogRecoveryBoardId.value =
             result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
@@ -242,7 +242,7 @@ export function createCommandHandlers({
           return
       }
     }
-    clearRename(true)
+    clearRename()
     feedback.renamed()
   }
 
@@ -274,7 +274,7 @@ export function createCommandHandlers({
         return
       }
       if (state.renamingBoardId.value === board.id) {
-        clearRename(false)
+        clearRename()
       }
       resetDeleteState()
       feedback.deleted()

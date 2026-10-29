@@ -205,11 +205,12 @@ func TestV1LibraryFolderLifecycle(t *testing.T) {
 		t.Fatalf("duplicate name = %d %v, want 409", status, dup)
 	}
 
-	// Unknown-field rejection (Baseline 5.1 strict decoding).
-	status, _, strict := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.foldersPath(), userID: fx.owner,
-		body: `{"data":{"name":"x","bogus":1}}`, headers: map[string]string{contract.IdempotencyKeyHeader: "folder-key-4"}})
-	if status != http.StatusBadRequest || v1ErrorCode(t, strict) != string(contract.CodeBadRequest) {
-		t.Fatalf("unknown field = %d %v, want 400 bad_request", status, strict)
+	// Unknown fields are ignored with a warn on content writes (lenient
+	// binding): the folder is still created.
+	status, _, lenient := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.foldersPath(), userID: fx.owner,
+		body: `{"data":{"name":"lenient","bogus":1}}`, headers: map[string]string{contract.IdempotencyKeyHeader: "folder-key-5"}})
+	if status != http.StatusCreated || lenient["data"].(map[string]any)["name"] != "lenient" {
+		t.Fatalf("unknown field = %d %v, want 201 with unknown ignored", status, lenient)
 	}
 
 	// Rename + pagination walk.
@@ -223,14 +224,15 @@ func TestV1LibraryFolderLifecycle(t *testing.T) {
 			t.Fatalf("create %s = %d", name, status)
 		}
 	}
+	// Four folders now (inspo-2, lenient, b, c): drain both pages.
 	status, _, firstPage := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: fx.foldersPath() + "?page_size=2", userID: fx.member})
 	if status != http.StatusOK || len(firstPage["data"].([]any)) != 2 || firstPage["meta"].(map[string]any)["has_more"] != true {
 		t.Fatalf("page 1 = %d %v, want 2 items + has_more", status, firstPage)
 	}
 	cursor := firstPage["meta"].(map[string]any)["next_cursor"].(string)
 	status, _, secondPage := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: fx.foldersPath() + "?page_size=2&cursor=" + cursor, userID: fx.member})
-	if status != http.StatusOK || len(secondPage["data"].([]any)) != 1 || secondPage["meta"].(map[string]any)["has_more"] != false {
-		t.Fatalf("page 2 = %d %v, want 1 item exhausted", status, secondPage)
+	if status != http.StatusOK || len(secondPage["data"].([]any)) != 2 || secondPage["meta"].(map[string]any)["has_more"] != false {
+		t.Fatalf("page 2 = %d %v, want 2 items exhausted", status, secondPage)
 	}
 
 	// Malformed + unknown folder ids converge to 404 (legacy integer

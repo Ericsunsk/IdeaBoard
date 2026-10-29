@@ -28,9 +28,6 @@ const modelsReferenceNote = errorrender.MsgAigatewayApplicationPackage
 
 // Machine-readable error codes for the degraded reference result.
 const (
-	// ModelsReferenceCodeAllowlist means models.dev is not in the egress
-	// allowlist: the admin must add it under the outbound policy.
-	ModelsReferenceCodeAllowlist = "allowlist_missing"
 	// ModelsReferenceCodeUpstream means the upstream fetch failed: the
 	// result is empty, the catalog flow is unaffected.
 	ModelsReferenceCodeUpstream = "upstream_error"
@@ -164,8 +161,8 @@ func resetModelsReferenceCache() {
 
 // GetModelReference resolves one model's reference facts from models.dev.
 // modelID wins when set; otherwise provider+model compose "provider/model".
-// Only invalid input returns an error; allowlist gaps, upstream failures
-// and misses degrade into a Found=false result with an explicit ErrorCode.
+// Only invalid input returns an error; upstream failures and misses degrade
+// into a Found=false result with an explicit ErrorCode.
 func (r *ConfigRepository) GetModelReference(ctx context.Context, modelID, provider, model string, refresh bool) (ModelReference, error) {
 	id := strings.TrimSpace(modelID)
 	if id == "" {
@@ -182,11 +179,6 @@ func (r *ConfigRepository) GetModelReference(ctx context.Context, modelID, provi
 	}
 	base := ModelReference{ModelID: id, Source: ModelsReferenceSource, Note: modelsReferenceNote}
 
-	if !modelsDevAllowlisted(ctx) {
-		base.ErrorCode = ModelsReferenceCodeAllowlist
-		base.Message = errorrender.MsgGetModelReference2
-		return base, nil
-	}
 	facts, fetchErr := loadModelsReferenceFacts(ctx, refresh)
 	if fetchErr != nil {
 		base.ErrorCode = ModelsReferenceCodeUpstream

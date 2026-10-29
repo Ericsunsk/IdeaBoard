@@ -36,7 +36,7 @@ func InspectBytes(data []byte, ext string) (Facts, error) {
 func InspectDetectedBytes(data []byte) (Facts, error) {
 	ext := DetectImageExtensionFromBytes(data)
 	if ext == "" {
-		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
+		return Facts{}, fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, errorrender.MsgInspectDetectedBytes)
 	}
 	return InspectBytes(data, ext)
 }
@@ -46,7 +46,7 @@ func InspectDetectedBytes(data []byte) (Facts, error) {
 func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return Facts{}, fmt.Errorf(errorrender.MsgInspect, ext)
+		return Facts{}, fmt.Errorf("%w: %s", ErrUnsupportedImageFormat, fmt.Sprintf(errorrender.MsgInspect, ext))
 	}
 	if source == nil {
 		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)

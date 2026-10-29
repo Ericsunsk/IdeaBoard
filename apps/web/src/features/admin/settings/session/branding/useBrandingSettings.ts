@@ -46,14 +46,15 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
     normalize: normalizeSiteBrandingSetting,
     isSame: isSameBrandingSetting,
     validate: validateSiteBrandingSetting,
-    save: (draft) => saveMutation.mutateAsync(draft),
-    synchronizeCache: async (savedSetting) => {
-      writeBrandingQueryCache(queryClient, savedSetting)
-      writeSiteBrandingQueryCache(queryClient, savedSetting)
+    save: async (draft) => {
+      const saved = await saveMutation.mutateAsync(draft)
+      writeBrandingQueryCache(queryClient, saved)
+      writeSiteBrandingQueryCache(queryClient, saved)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ADMIN_BRANDING_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: SITE_BRANDING_QUERY_KEY }),
       ])
+      return saved
     },
     feedback: options.feedback,
   })

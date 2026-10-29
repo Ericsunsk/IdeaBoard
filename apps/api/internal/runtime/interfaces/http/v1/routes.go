@@ -527,9 +527,11 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	// Billing scope (ADR-0038) is the creation scope and nothing else:
 	// personal workspaces resolve to the caller's Personal survivor,
 	// organization scopes use the shared org pool. There is no
-	// billing_account_id / new_billing_account option; unknown fields fail
-	// closed at strict binding above, and scope changes after creation do
-	// not exist (the link surface is removed).
+	// billing_account_id / new_billing_account option: retired billing
+	// fields fail closed at strict binding above (pinned by
+	// TestV1CreateWorkspaceRejectsBillingFields, no store touch), and
+	// scope changes after creation do not exist (the link surface is
+	// removed). Strict stays: billing scope is funds-adjacent.
 	ctx := c.Request.Context()
 	// Organization-scoped creation requires org visibility: hidden orgs
 	// (unknown id or caller holds no membership) converge to 404

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { ref } from 'vue'
-import type { AdminConfirmPort } from '../../shared'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import type { AdminTaskRow } from './useAdminTaskList'
 import type { AdminTaskCancellationFeedback } from './useAdminMonitorFeedback'
 import {
@@ -11,7 +11,7 @@ import {
 } from '../resource'
 
 type UseAdminTaskCancelOptions = {
-  confirm: AdminConfirmPort
+  confirm: ConfirmPort
   feedback: AdminTaskCancellationFeedback
 }
 

@@ -403,7 +403,8 @@
     </template>
   </section>
 
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="isCloseArmed"
     :title="t('workspace.management.closeTitle')"
     :message="t('workspace.management.closeHint')"
@@ -417,7 +418,8 @@
     @confirm="close"
   />
 
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="isLeaveArmed"
     :title="t('workspace.management.leaveTitle')"
     :message="t('workspace.management.leaveConfirm', { name: displayName })"
@@ -428,7 +430,8 @@
     @confirm="leave()"
   />
 
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="memberToRemove !== null"
     :title="t('workspace.switcher.members.removeAction')"
     :message="
@@ -459,7 +462,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../../core/components/ConfirmDialog.vue'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { useUserStore } from '../../../auth'
 import {

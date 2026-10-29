@@ -1,12 +1,12 @@
 import { useAsyncAction } from '@/core/composables/useAsyncAction'
-import type { AdminConfirmPort } from '../../../shared/index'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import type { AdminStorageResource } from './resource'
 import { createAdminStorageWorkspace } from './workspace'
 import { useStorageFeedback, type AdminStorageFeedback } from './useStorageFeedback'
 import { useStorageProfileEditor } from './useStorageProfileEditor'
 
 export type UseAdminStorageContextOptions = {
-  confirm: AdminConfirmPort
+  confirm: ConfirmPort
   feedback?: AdminStorageFeedback
   resource?: AdminStorageResource
 }

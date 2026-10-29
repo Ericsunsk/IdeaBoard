@@ -114,6 +114,8 @@ func StatusForCode(code Code) int {
 		return http.StatusBadGateway
 	case "vision_search_timeout":
 		return http.StatusGatewayTimeout
+	case "media_unsupported_type":
+		return http.StatusUnsupportedMediaType
 	case "task_insufficient_credits":
 		return http.StatusPaymentRequired
 	case "board_precondition_required":

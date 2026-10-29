@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -101,23 +102,43 @@ func NormalizeOutboundPolicySetting(setting OutboundPolicySetting) (OutboundPoli
 }
 
 func normalizeOutboundAllowHost(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || len(raw) > maxOutboundAllowHostLength || strings.Contains(raw, "://") || strings.ContainsAny(raw, " /?#@\\\\") {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", errorrender.NewValidationError(errorrender.MsgNormalizeOutboundAllowHost)
+	}
+	// Accept pasted URLs/origins: strip one scheme and any path, query or
+	// fragment, then normalize the host[:port] remainder. Only genuinely
+	// unusable entries (userinfo, wildcards, whitespace, bad ports/IPs)
+	// still fail.
+	if i := strings.Index(value, "://"); i >= 0 {
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.User != nil || strings.TrimSpace(parsed.Hostname()) == "" {
+			return "", errorrender.NewValidationError(errorrender.MsgNormalizeOutboundAllowHost)
+		}
+		value = strings.TrimSpace(parsed.Hostname())
+		if port := strings.TrimSpace(parsed.Port()); port != "" {
+			value = net.JoinHostPort(value, port)
+		}
+	} else if i := strings.IndexAny(value, "/?#"); i >= 0 {
+		value = strings.TrimSpace(value[:i])
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" || len(value) > maxOutboundAllowHostLength || strings.ContainsAny(value, " \t\n\r@\\") {
 		return "", errorrender.NewValidationError(errorrender.MsgNormalizeOutboundAllowHost)
 	}
 
-	host := raw
+	host := value
 	port := ""
 	portValue := 0
-	if parsedHost, parsedPort, err := net.SplitHostPort(raw); err == nil {
+	if parsedHost, parsedPort, err := net.SplitHostPort(value); err == nil {
 		host, port = parsedHost, parsedPort
 		parsedPortValue, parseErr := strconv.Atoi(port)
 		portValue = parsedPortValue
 		if parseErr != nil || portValue < 1 || portValue > 65535 {
 			return "", errorrender.NewValidationError(errorrender.MsgNormalizeOutboundAllowHost2)
 		}
-	} else if strings.HasPrefix(raw, "[") || strings.Count(raw, ":") > 1 {
-		if net.ParseIP(raw) == nil {
+	} else if strings.HasPrefix(value, "[") || strings.Count(value, ":") > 1 {
+		if net.ParseIP(value) == nil {
 			return "", errorrender.NewValidationError(errorrender.MsgNormalizeOutboundAllowHost3)
 		}
 	}

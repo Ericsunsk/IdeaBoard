@@ -129,7 +129,6 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const deleteDialogVisible = ref(false)
   const pendingDeleteBoard = ref<CatalogEntry | null>(null)
   const isDeletePending = ref(false)
-  let suppressNextBoardOpen = false
 
   const { visibleBoards, rangeCounts } = createBoardViews({
     boards: () => dependencies.catalog.viewModel.boards.value,
@@ -140,7 +139,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
 
   const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
     activeMenuBoardId.value = null
-    clearRename(false)
+    clearRename()
     catalogRecoveryBoardId.value = null
     resetDeleteState()
     // The persisted range is isolated per User + Workspace: a scope switch
@@ -204,14 +203,13 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     renameDraft.value = nextName
   }
 
-  function clearRename(suppressNextOpen: boolean) {
+  function clearRename() {
     renamingBoardId.value = null
     renameDraft.value = ''
-    suppressNextBoardOpen = suppressNextOpen
   }
 
   function cancelRename() {
-    clearRename(true)
+    clearRename()
   }
 
   function openBoardFromCard(boardId: string) {
@@ -219,10 +217,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       activeMenuBoardId.value = null
       return
     }
-    if (renamingBoardId.value || suppressNextBoardOpen) {
-      suppressNextBoardOpen = false
-      return
-    }
+    if (renamingBoardId.value) return
     dependencies.navigation.openBoard(boardId)
   }
 

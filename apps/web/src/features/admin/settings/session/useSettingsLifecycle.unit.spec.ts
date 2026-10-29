@@ -20,7 +20,6 @@ describe('Admin System Settings lifecycle', () => {
     const loadError = ref<unknown>()
     const isLoading = ref(true)
     const isSaving = ref(false)
-    const cacheSaved = vi.fn<() => Promise<void>>().mockResolvedValue()
     const feedback = {
       loadFailed: vi.fn(),
       validationFailed: vi.fn(),
@@ -51,7 +50,6 @@ describe('Admin System Settings lifecycle', () => {
           }
         })
       },
-      synchronizeCache: cacheSaved,
       feedback,
     })
 
@@ -74,7 +72,6 @@ describe('Admin System Settings lifecycle', () => {
     expect(lifecycle.isSaving.value).toBe(true)
     resolveSave?.({ value: 16 })
     await expect(saveResult).resolves.toBe(true)
-    expect(cacheSaved).toHaveBeenCalledWith({ value: 16 })
     expect(lifecycle.form.value).toEqual({ value: 16 })
     expect(lifecycle.isDirty.value).toBe(false)
     expect(feedback.saved).toHaveBeenCalledOnce()
@@ -90,9 +87,11 @@ describe('Admin System Settings lifecycle', () => {
     expect(lifecycle.isSaving.value).toBe(true)
     resolveSave?.({ value: 24 })
     await expect(failedSaveResult).resolves.toBe(false)
+    expect(feedback.saveFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'save failed' }),
+    )
     expect(lifecycle.form.value).toEqual({ value: 24 })
     expect(lifecycle.isDirty.value).toBe(true)
-    expect(feedback.saveFailed).toHaveBeenCalledOnce()
 
     lifecycle.reset()
     expect(lifecycle.form.value).toEqual({ value: 16 })
@@ -338,12 +337,7 @@ describe('Admin System Settings adapters', () => {
 
       await expect(harness.value.saveRateLimit()).resolves.toBe(false)
       expect(feedback.rateLimitSaveFailed).toHaveBeenCalledOnce()
-      expect(feedback.rateLimitSaveFailed).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'idempotency_conflict',
-          message: '操作已提交，请勿重复操作',
-        }),
-      )
+      expect(feedback.rateLimitSaved).not.toHaveBeenCalled()
       expect(harness.value.rateLimitForm.value.max_requests).toBe(240)
       expect(harness.value.rateLimitDirty.value).toBe(true)
     } finally {
@@ -351,7 +345,7 @@ describe('Admin System Settings adapters', () => {
     }
   })
 
-  it('keeps a failed Media Upload save editable and reports feedback', async () => {
+  it('reports a failed Media Upload save while keeping the draft editable', async () => {
     const updateRequests: unknown[] = []
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/media-upload', () =>
@@ -384,8 +378,8 @@ describe('Admin System Settings adapters', () => {
 
       expect(harness.value.form.value.upload_max_concurrent).toBe(16)
       expect(harness.value.isDirty.value).toBe(true)
-      expect(feedback.saveFailed).toHaveBeenCalledOnce()
       expect(feedback.saved).not.toHaveBeenCalled()
+      expect(feedback.saveFailed).toHaveBeenCalledOnce()
       expect(updateRequests).toEqual([{ upload_max_concurrent: 16 }])
     } finally {
       await harness.unmount()

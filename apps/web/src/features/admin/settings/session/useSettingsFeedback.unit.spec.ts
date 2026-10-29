@@ -150,8 +150,8 @@ describe('Admin access settings feedback', () => {
       '窗口必须大于 0',
       '阈值必须大于 0',
       '加载访问控制设置失败',
-      '保存失败',
-      '保存失败',
+      '保存访问限流失败',
+      '保存登录锁定失败',
       '更新注册状态失败',
     ])
   })
@@ -159,7 +159,13 @@ describe('Admin access settings feedback', () => {
 
 describe('Admin generic setting feedback', () => {
   it.each([
-    ['media upload', useAdminMediaUploadSettingsFeedback, '加载上传设置失败', '上传设置已保存', '保存上传设置失败'],
+    [
+      'media upload',
+      useAdminMediaUploadSettingsFeedback,
+      '加载上传设置失败',
+      '上传设置已保存',
+      '保存上传设置失败',
+    ],
     [
       'outbound policy',
       useAdminOutboundPolicyFeedback,
@@ -167,7 +173,13 @@ describe('Admin generic setting feedback', () => {
       '私有地址访问策略已保存',
       '保存私有地址访问策略失败',
     ],
-    ['support channels', useAdminSupportChannelsFeedback, '读取客户支持失败', '客户支持已保存', '保存客户支持失败'],
+    [
+      'support channels',
+      useAdminSupportChannelsFeedback,
+      '读取客户支持失败',
+      '客户支持已保存',
+      '保存客户支持失败',
+    ],
   ] as const)(
     '%s covers load/save pairs with safe fallbacks',
     (_label, useFeedback, loadFallback, savedMessage, saveFallback) => {
@@ -187,6 +199,8 @@ describe('Admin generic setting feedback', () => {
         loadFallback,
         saveFallback,
       ])
+      feedback.saveFailed(new Error('api-key: sk_live_abc123'))
+      expect(toast.error).toHaveBeenLastCalledWith(saveFallback)
     },
   )
 })

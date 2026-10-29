@@ -170,31 +170,18 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
     }
   }
 
+  // Invite is backend-authoritative: only the empty-email guard stays
+  // client-side (no request worth sending). Duplicate/limit/pending races
+  // and Default protection converge through classifyWorkspaceMemberError
+  // (backend 403/409/422) with the shared roster invalidation below; the
+  // limit hint itself stays visible in the template (counter + disabled
+  // input), not as a pre-flight toast.
   async function inviteMember(): Promise<void> {
-    if (isDefaultWorkspace.value) {
-      toast.error(t('workspace.switcher.members.noPermission'))
-      return
-    }
     const email = inviteEmail.value.trim()
     if (!email) {
       toast.error(t('workspace.switcher.members.emailEmpty'))
       return
     }
-    if (roster.value.some((entry) => entry.email?.toLowerCase() === email.toLowerCase())) {
-      toast.warning(t('workspace.switcher.members.alreadyMember'))
-      return
-    }
-    if (
-      pendingInvites.value.some((inv) => inv.invitee_email.toLowerCase() === email.toLowerCase())
-    ) {
-      toast.warning(t('workspace.switcher.members.alreadyInvited'))
-      return
-    }
-    if (isLimitReached.value) {
-      toast.warning(t('workspace.switcher.members.memberLimitReached'))
-      return
-    }
-    if (isPending('invite')) return
     await trackPending('invite', async () => {
       let invite: WorkspaceMemberInvite
       try {
@@ -217,21 +204,9 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
           [invite.id]: invite.token,
         }
       }
-      const claimUrl = invite.token ? getInviteClaimUrl(invite.token) : null
-      if (claimUrl) {
-        toast.success(t('workspace.switcher.members.invited'), {
-          action: {
-            label: t('workspace.switcher.members.copyInviteLink'),
-            onClick: () => {
-              void copyText(claimUrl).then((isCopied) => {
-                if (isCopied) toast.info(t('workspace.switcher.members.inviteLinkCopied'))
-              })
-            },
-          },
-        })
-      } else {
-        toast.success(t('workspace.switcher.members.invited'))
-      }
+      // Single toast only: the invite link stays reachable from the pending
+      // invite row (per-row copy button via getInviteLink/copyInviteLink).
+      toast.success(t('workspace.switcher.members.invited'))
       // Roster invalidation covers this write: the inviter's view is the
       // workspace-scoped roster + pending invites. No syncInvite* call is
       // needed here — those helpers serve the invitee-side accept/decline

@@ -692,8 +692,11 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 			t.Fatalf("missing file status = %d, want 400", status)
 		}
 		status, payload := serveUpload(h.engine, newUploadRequest(t, "ext-up-3", []byte("not an image"), "logo.png"))
-		if status != http.StatusBadRequest {
-			t.Fatalf("bad content status = %d (%v), want 400", status, payload)
+		if status != http.StatusUnsupportedMediaType {
+			t.Fatalf("bad content status = %d (%v), want 415", status, payload)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeMediaUnsupportedType) {
+			t.Fatalf("code = %q, want media_unsupported_type", code)
 		}
 	})
 

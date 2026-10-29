@@ -465,7 +465,7 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 			return
 		}
 		var body v1CreateBoardBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
@@ -541,7 +541,7 @@ func (h *contractV1Handler) renameBoard(c *gin.Context) {
 			return
 		}
 		var body v1RenameBoardBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		if bindErr := contract.BindLenientJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}

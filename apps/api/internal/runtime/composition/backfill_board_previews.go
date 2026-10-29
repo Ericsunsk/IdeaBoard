@@ -35,7 +35,7 @@ With --dry-run only the first batch is reported and no writes are issued.`,
 }
 
 func runBackfillBoardPreviews(batchSize, maxBoards int, dryRun bool) {
-	cfg := loadConfigOrFatal()
+	cfg := loadBackfillConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, database.PostgresDSN(cfg.Database))

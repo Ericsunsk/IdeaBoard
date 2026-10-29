@@ -154,7 +154,7 @@ export const getCreateBoardUrl = (workspaceId: string) => {
 }
 
 /**
- * Creates a board at revision 1 with the empty document snapshot; the creator is the implicit owner. The server fixes workspace_access to none: creation requests cannot widen access. A missing per-user Default workspace is provisioned idempotently as a side effect. Requires the Idempotency-Key header (scope board:create): missing keys render 400 idempotency_key_required, key reuse with a different request renders 409 board_idempotency_conflict, same key+hash replays the first result. Unknown body fields are rejected with 400; blank or overlong names render 422 validation_failed.
+ * Creates a board at revision 1 with the empty document snapshot; the creator is the implicit owner. The server fixes workspace_access to none: creation requests cannot widen access. A missing per-user Default workspace is provisioned idempotently as a side effect. Requires the Idempotency-Key header (scope board:create): missing keys render 400 idempotency_key_required, key reuse with a different request renders 409 board_idempotency_conflict, same key+hash replays the first result. Unknown body fields are ignored (warn-logged, content-write leniency); blank or overlong names render 422 validation_failed.
  * @summary Create a board (workspace members only)
  */
 export const createBoard = async (

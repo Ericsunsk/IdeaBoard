@@ -2,8 +2,9 @@
 // the gateway identity (account plus gateway IDs) and the gateway token.
 // Values live in platform system settings so rotation needs no redeploy;
 // the token is encrypted at rest and never leaves the process in plaintext
-// except toward Cloudflare. Reads are masked summaries; request-time reads
-// resolve the full credential or fail closed.
+// except toward the configured gateway URL (operator-controlled; URL
+// changes are audit-logged). Reads are masked summaries; request-time
+// reads resolve the full credential or fail closed.
 package application
 
 import (
@@ -101,8 +102,8 @@ func (r *ConfigRepository) GetSummary(ctx context.Context) (GatewaySummary, erro
 		GatewayID:       gatewayID,
 		TokenConfigured: strings.TrimSpace(values[configKeyTokenCiphertext]) != "",
 	}
-	// Gateway identity derives from the stored Cloudflare URL: the sole
-	// egress is pinned, so a configured gateway is always first-party.
+	// Gateway identity derives from the stored URL path
+	// /v1/{account}/{gateway}; custom hosts stay non-first-party.
 	if accountID, gatewayID := extractGatewayIdentity(baseURL); accountID != "" && gatewayID != "" {
 		summary.IsFirstParty = true
 	}
@@ -156,8 +157,27 @@ func gatewayBaseURL(accountID, gatewayID string) string {
 	return "https://gateway.ai.cloudflare.com/v1/" + accountID + "/" + gatewayID
 }
 
+// gatewayHostForAudit returns the lowercase hostname of a base URL, or ""
+// when it does not parse. Audit-only: never carries secrets.
+func gatewayHostForAudit(baseURL string) string {
+	trimmed := strings.TrimSpace(baseURL)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."))
+}
+
 // validateUpdateInput checks actor identity and gateway identity without
 // touching storage. Errors are safe to display.
+//
+// Base URL policy is open-host: any http(s) URL with a host passes the
+// scheme/host check (Msg3) plus the credential/query/fragment check
+// (Msg4). There is no host allowlist; URL changes rely on the admin
+// audit record (actor + old/new host) instead of prevention.
 func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, gatewayID string, token string, rotate bool, err error) {
 	if actorID <= 0 {
 		return "", "", "", "", false, errors.New("admin actor is required")
@@ -180,11 +200,7 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput4)
 		}
-		// Sole egress: only the Cloudflare AI Gateway host is accepted.
-		// Any other host fails closed; there is no custom-egress path.
-		if !strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."), "gateway.ai.cloudflare.com") {
-			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput3)
-		}
+		// Any host passes; /v1/{account}/{gateway} paths fill missing IDs.
 		parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
 		if len(parts) >= 3 && parts[0] == "v1" {
 			if accountID == "" && gatewayAccountIDPattern.MatchString(parts[1]) {
@@ -220,20 +236,25 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 //
 // Merge rule: an empty base_url plus empty identity keeps the stored URL
 // (token-only rotation). Explicit account/gateway IDs rebuild the
-// Cloudflare URL; switching hosts is rejected (sole egress). Token rotates
-// only when provided.
+// Cloudflare URL when no base URL is given. Any http(s) host is accepted;
+// URL changes are deterred by audit (actor + old/new host), not by an
+// allowlist. Token rotates only when provided; the token value never
+// enters logs or audit metadata (only a rotated boolean does).
 func (r *ConfigRepository) Update(ctx context.Context, input UpdateInput, actorID int64) error {
 	if r == nil || r.settings == nil {
 		return errors.New("AI gateway config repository is unavailable")
 	}
+	// Previous host for the audit record (host-level old→new).
+	stored, loadErr := r.GetSummary(ctx)
+	prevHost := ""
+	if loadErr == nil {
+		prevHost = gatewayHostForAudit(stored.BaseURL)
+	}
 	if strings.TrimSpace(input.BaseURL) == "" && strings.TrimSpace(input.AccountID) == "" && strings.TrimSpace(input.GatewayID) == "" {
-		stored, err := r.GetSummary(ctx)
-		if err != nil {
-			return fmt.Errorf("load existing AI gateway config: %w", err)
+		if loadErr != nil {
+			return fmt.Errorf("load existing AI gateway config: %w", loadErr)
 		}
-		if strings.TrimSpace(stored.BaseURL) != "" {
-			input.BaseURL = stored.BaseURL
-		}
+		input.BaseURL = stored.BaseURL
 	}
 	baseURL, accountID, gatewayID, token, tokenRotated, err := validateUpdateInput(input, actorID)
 	if err != nil {
@@ -256,10 +277,13 @@ func (r *ConfigRepository) Update(ctx context.Context, input UpdateInput, actorI
 		)
 	}
 	metadata, err := json.Marshal(map[string]any{
-		"operation":     "save",
-		"base_url":      baseURL,
-		"gateway_id":    gatewayID,
-		"token_rotated": tokenRotated,
+		"operation":          "save",
+		"base_url":           baseURL,
+		"base_url_host":      gatewayHostForAudit(baseURL),
+		"prev_base_url_host": prevHost,
+		"account_id":         accountID,
+		"gateway_id":         gatewayID,
+		"token_rotated":      tokenRotated,
 	})
 	if err != nil {
 		return fmt.Errorf("encode AI gateway audit: %w", err)

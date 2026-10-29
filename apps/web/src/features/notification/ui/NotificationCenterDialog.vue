@@ -292,7 +292,8 @@
 
   <!-- Clear-read confirmation: bulk archive with the read count and a pointer
     to the Archived tab, where the archived items can be found again. -->
-  <UserConfirmDialog
+  <ConfirmDialog
+    surface="user"
     :is-visible="isClearReadConfirmVisible"
     :title="t('notification.modal.clearReadConfirmTitle')"
     :message="t('notification.modal.clearReadConfirmDesc', { count: readItemsCount })"
@@ -320,7 +321,7 @@ import Tabs from '@/components/ui/tabs/Tabs.vue'
 import TabsList from '@/components/ui/tabs/TabsList.vue'
 import TabsTrigger from '@/components/ui/tabs/TabsTrigger.vue'
 import { Skeleton } from '@/components/ui/skeleton'
-import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../core/components/ConfirmDialog.vue'
 import type { NotificationDTO } from '@/api/generated-query/public/model'
 import NotificationItem from './NotificationItem.vue'
 import { useNotifications } from '../session/useNotifications'

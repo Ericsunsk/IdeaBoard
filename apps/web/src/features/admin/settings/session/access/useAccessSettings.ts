@@ -195,19 +195,19 @@ function useRateLimitSetting(
     normalize: normalizeRateLimitSetting,
     isSame: isSameRateLimitSetting,
     validate: validateRateLimitSettings,
-    save: async (draft) =>
-      normalizeRateLimitSetting(
+    save: async (draft) => {
+      const saved = normalizeRateLimitSetting(
         await saveRateLimitMutation.mutateAsync({
           window_seconds: Number(draft.window_seconds),
           max_requests: Number(draft.max_requests),
         }),
-      ),
-    synchronizeCache: async (savedSetting) => {
+      )
       writeRateLimitSettingQueryCache(queryClient, {
-        window_seconds: Number(savedSetting.window_seconds),
-        max_requests: Number(savedSetting.max_requests),
+        window_seconds: Number(saved.window_seconds),
+        max_requests: Number(saved.max_requests),
       })
       await queryClient.invalidateQueries({ queryKey: ADMIN_RATE_LIMIT_QUERY_KEY })
+      return saved
     },
     feedback: {
       loadFailed: options.feedback.loadFailed,
@@ -257,19 +257,19 @@ function useLoginLockoutSetting(
     normalize: normalizeLoginLockoutSetting,
     isSame: isSameLoginLockoutSetting,
     validate: validateLoginLockoutSettings,
-    save: async (draft) =>
-      normalizeLoginLockoutSetting(
+    save: async (draft) => {
+      const saved = normalizeLoginLockoutSetting(
         await saveLoginLockoutMutation.mutateAsync({
           threshold: Number(draft.threshold),
           duration_seconds: Number(draft.duration_seconds),
         }),
-      ),
-    synchronizeCache: async (savedSetting) => {
+      )
       writeLoginLockoutSettingQueryCache(queryClient, {
-        threshold: Number(savedSetting.threshold),
-        duration_seconds: Number(savedSetting.duration_seconds),
+        threshold: Number(saved.threshold),
+        duration_seconds: Number(saved.duration_seconds),
       })
       await queryClient.invalidateQueries({ queryKey: ADMIN_LOGIN_LOCKOUT_QUERY_KEY })
+      return saved
     },
     feedback: {
       loadFailed: options.feedback.loadFailed,

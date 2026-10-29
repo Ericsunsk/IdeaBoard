@@ -778,7 +778,9 @@ type v1QuoteTaskBody struct {
 // account balance through the workspace billing reads, which resolve the
 // same stable account.
 func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
-	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx, body v1QuoteTaskBody) {
+	// Quotes price server-side funds state: strict binding stays (unknown
+	// fields 400, enforcing the #847 workflow_kind rename like submit).
+	withV1WorkspaceBodyStrict(h, c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx, body v1QuoteTaskBody) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		quantity := int64(1)

@@ -110,7 +110,7 @@ import { getAdminServiceOrder, adminDashboardRootClass } from '../../../shared'
 import { formatAdminDisplayError, useAdminToast } from '../../../shared'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { confirmSettingsSave } from '../../../shared'
 import { createAdminBillableCatalogResource } from '../../session/pricing/billableCatalogResource'
 import { createAdminModelPoolResource } from '../../session/pricing/modelPoolResource'
@@ -158,7 +158,7 @@ const publishPending = ref(false)
 const availabilityPending = reactive<Record<string, boolean>>({})
 const deletePending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
-const confirm = useAdminConfirm()
+const confirm = useConfirm()
 const pricingFeedback = useBillingPricingFeedback()
 
 const searchKeyword = ref('')

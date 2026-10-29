@@ -10,8 +10,8 @@ import {
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
-vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({
     confirm: confirmMock,
   }),
 }))

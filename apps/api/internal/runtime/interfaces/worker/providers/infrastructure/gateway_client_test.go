@@ -41,31 +41,25 @@ func TestNewGatewayClientRejectsBadConfig(t *testing.T) {
 		{Token: "token"},
 		{BaseURL: "ftp://gateway.ai.cloudflare.com/v1/a/g", Token: "token"},
 		{BaseURL: "https:///v1/a/g", Token: "token"},
-		// Sole-egress pin: any non-Cloudflare host is a startup error.
-		{BaseURL: "https://gateway.example.com/v1/a/g", Token: "token"},
-		{BaseURL: "http://127.0.0.1:8080/v1/a/g", Token: "token"},
 	} {
 		if _, err := NewGatewayClient(cfg); err == nil {
 			t.Fatalf("NewGatewayClient(%+v) succeeded, want error", cfg)
 		}
 	}
-	if _, err := NewGatewayClient(GatewayClientConfig{
-		BaseURL: "https://gateway.ai.cloudflare.com/v1/a/g",
-		Token:   "token",
-	}); err != nil {
-		t.Fatalf("NewGatewayClient(CF host) error = %v, want nil", err)
+	// Open egress: any http(s) host passes (audited, not allowlisted).
+	for _, cfg := range []GatewayClientConfig{
+		{BaseURL: "https://gateway.ai.cloudflare.com/v1/a/g", Token: "token"},
+		{BaseURL: "https://gateway.example.com/v1/a/g", Token: "token"},
+	} {
+		if _, err := NewGatewayClient(cfg); err != nil {
+			t.Fatalf("NewGatewayClient(%+v) error = %v, want open-host pass", cfg, err)
+		}
 	}
-	if _, err := NewGatewayClientForTest(GatewayClientConfig{
+	if _, err := NewGatewayClient(GatewayClientConfig{
 		BaseURL: "http://127.0.0.1:8080/v1/a/g",
 		Token:   "token",
 	}); err != nil {
-		t.Fatalf("NewGatewayClientForTest(loopback) error = %v, want nil", err)
-	}
-	if _, err := NewGatewayClientForTest(GatewayClientConfig{
-		BaseURL: "https://gateway.example.com/v1/a/g",
-		Token:   "token",
-	}); err == nil {
-		t.Fatal("NewGatewayClientForTest(non-loopback non-CF) succeeded, want error")
+		t.Fatalf("NewGatewayClient(loopback) error = %v, want nil", err)
 	}
 }
 
@@ -185,10 +179,7 @@ func newGatewayCaptureServer(t *testing.T, capture *gatewayCapture, status int, 
 
 func newGatewayTestClient(t *testing.T, server *httptest.Server) *GatewayClient {
 	t.Helper()
-	// Unit paths bypass NewGatewayClient's sole-egress pin (production
-	// always constructs through it): the httptest server is loopback by
-	// design, so the client is built directly to exercise Do() shaping,
-	// headers, and receipt parsing without dialing Cloudflare.
+	// Direct construction: the httptest server is loopback by design.
 	return &GatewayClient{
 		baseURL:  strings.TrimRight(strings.TrimSpace(server.URL), "/"),
 		token:    "test-token",

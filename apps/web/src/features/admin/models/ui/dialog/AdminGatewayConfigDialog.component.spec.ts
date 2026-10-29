@@ -105,23 +105,43 @@ describe('AdminGatewayConfigDialog', () => {
     expect(onUpdateVisible).toHaveBeenCalledWith(false)
   })
 
-  it('allows custom domain save without Account ID and Gateway ID', async () => {
-    // 身份字段选填：不填也能保存，缺身份时由探测报错引导补全。
-    vi.mocked(mockResource.get).mockResolvedValue({
-      base_url: 'https://my-custom-gateway.company.com',
-      token_configured: true,
-    })
-
+  it('blocks custom domain save without Account ID and Gateway ID', async () => {
+    // 自定义域名缺身份直接报错。
     const { user } = renderDialog()
 
-    const baseUrlInput = await screen.findByPlaceholderText(/gateway/i)
-    await fireEvent.update(baseUrlInput, 'https://my-custom-gateway.company.com')
+    await screen.findByPlaceholderText(/gateway/i)
+    await fireEvent.update(
+      screen.getByDisplayValue(
+        'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+      ),
+      'https://my-custom-gateway.company.com',
+    )
+    await fireEvent.update(screen.getByPlaceholderText(/32 位/), '')
+    await fireEvent.update(screen.getByPlaceholderText(/网关标识/), '')
+
+    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    await user.click(saveButton)
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('自定义域名需填写 Account ID 与 Gateway ID')
+    })
+    expect(mockResource.update).not.toHaveBeenCalled()
+  })
+
+  it('saves default-host URL without Account ID and Gateway ID', async () => {
+    // 官方域名从 URL 派生身份：缺身份仍可保存。
+    const { user } = renderDialog()
+
+    await screen.findByPlaceholderText(/gateway/i)
+    await fireEvent.update(screen.getByPlaceholderText(/32 位/), '')
+    await fireEvent.update(screen.getByPlaceholderText(/网关标识/), '')
 
     const saveButton = screen.getByRole('button', { name: '添加网关' })
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith({
-      base_url: 'https://my-custom-gateway.company.com',
+      base_url:
+        'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
       account_id: '',
       gateway_id: '',
     })

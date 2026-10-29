@@ -65,7 +65,7 @@ func (a *liveDispatchGatewayCallerAdapter) CallGatewayAPI(ctx context.Context, i
 
 func liveDispatchGatewayFactory(serverURL string) runtimeports.GatewayClientFactory {
 	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{
+		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{
 			BaseURL: serverURL, Token: "test-token",
 		})
 	}

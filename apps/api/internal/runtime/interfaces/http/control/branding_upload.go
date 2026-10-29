@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"io"
@@ -221,6 +222,11 @@ func validateControlUploadFile(c *gin.Context, fh *multipart.FileHeader) (string
 	facts, err := imageformat.InspectFileHeader(fh)
 	if err != nil {
 		slog.Warn("control branding logo inspect failed", "err", err)
+		if errors.Is(err, imageformat.ErrUnsupportedImageFormat) {
+			contract.RenderError(c, http.StatusUnsupportedMediaType, contract.CodeMediaUnsupportedType,
+				runtimehttp.MsgValidateControlUploadFile2+imageformat.SupportedUploadImageLabel()+runtimehttp.MsgValidateControlUploadFile3)
+			return "", false
+		}
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest8)
 		return "", false
 	}

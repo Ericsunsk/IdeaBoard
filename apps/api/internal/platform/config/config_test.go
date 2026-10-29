@@ -435,14 +435,113 @@ func TestValidateForMigrationSkipsServingSecrets(t *testing.T) {
 	if err := cfg.ValidateForMigration(); err != nil {
 		t.Fatalf("ValidateForMigration() error = %v", err)
 	}
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("Validate succeeded without serving secrets, want error")
+	// Production serve still fail-fasts on the full serving set.
+	resetConfigEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+	if err := Load().Validate(); err == nil {
+		t.Fatal("Validate succeeded in production without serving secrets, want error")
 	}
 
 	resetConfigEnv(t)
 	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	if err := Load().ValidateForMigration(); err == nil {
 		t.Fatal("ValidateForMigration succeeded without API_PG_PASSWORD, want error")
+	}
+}
+
+func TestValidateDegradesServingSecretsOutsideProduction(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+	t.Setenv("PUBLIC_ORIGIN", "http://localhost:5173")
+	t.Setenv("CREDITS_WELCOME_IDENTITY_KEY", "test-credits-identity-key")
+	t.Setenv("REWARDS_CODE_HMAC_KEYS", `{"current":{"version":"v1","key":"test"},"previous":null}`)
+	cfg := Load()
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() in development without auth/ticket inputs error = %v, want warn-and-degrade pass", err)
+	}
+	if got := cfg.degradedServingKeys(); len(got) == 0 {
+		t.Fatal("degradedServingKeys is empty with serving secrets missing, want the warn list")
+	}
+}
+
+func TestLoadAndValidateRejectsMissingRuntimeDependencies(t *testing.T) {
+	for _, env := range []string{"development", "test", "production"} {
+		for _, mode := range []string{"all", "http-only", "worker-only"} {
+			for _, missing := range []string{"PUBLIC_ORIGIN", "CREDITS_WELCOME_IDENTITY_KEY", "REWARDS_CODE_HMAC_KEYS"} {
+				t.Run(env+"/"+mode+"/"+missing, func(t *testing.T) {
+					resetConfigEnv(t)
+					t.Setenv("APP_ENV", env)
+					t.Setenv("API_MODE", mode)
+					t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+					t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+					t.Setenv("PUBLIC_ORIGIN", "http://localhost:5173")
+					t.Setenv("CREDITS_WELCOME_IDENTITY_KEY", "test-credits-identity-key")
+					t.Setenv("REWARDS_CODE_HMAC_KEYS", `{"current":{"version":"v1","key":"test"},"previous":null}`)
+					t.Setenv("AUTH_INTERNAL_KEY", "0123456789abcdef0123456789abcdef")
+					t.Setenv("RT_TICKET_SECRET", "test-realtime-ticket-secret")
+					t.Setenv(missing, "")
+
+					if _, err := LoadAndValidate(); err == nil || !strings.Contains(err.Error(), missing) {
+						t.Fatalf("LoadAndValidate() error = %v, want %s before runtime construction", err, missing)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestValidateBootCriticalStillRequiredOutsideProduction(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+	if err := Load().Validate(); err == nil {
+		t.Fatal("Validate succeeded in development without API_PG_PASSWORD, want error")
+	}
+	resetConfigEnv(t)
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	if err := Load().Validate(); err == nil {
+		t.Fatal("Validate succeeded in development without APP_SECRETS_ENCRYPTION_KEY, want error")
+	}
+}
+
+func TestValidateForInitAdminTrimsToUsedInputs(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+	t.Setenv("AUTH_INTERNAL_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("CREDITS_WELCOME_IDENTITY_KEY", "test-credits-identity-key")
+	t.Setenv("INIT_ADMIN_EMAIL", "admin@example.com")
+	t.Setenv("INIT_ADMIN_PASSWORD", "admin-secret")
+	if err := Load().ValidateForInitAdmin(); err != nil {
+		t.Fatalf("ValidateForInitAdmin() without ticket/rewards/origin error = %v", err)
+	}
+	resetConfigEnv(t)
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
+	if err := Load().ValidateForInitAdmin(); err == nil {
+		t.Fatal("ValidateForInitAdmin succeeded without API_PG_PASSWORD, want error")
+	}
+}
+
+func TestValidateForInitCreditWalletsTrimsToUsedInputs(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	t.Setenv("CREDITS_WELCOME_IDENTITY_KEY", "test-credits-identity-key")
+	if err := Load().ValidateForInitCreditWallets(); err != nil {
+		t.Fatalf("ValidateForInitCreditWallets() without other serving secrets error = %v", err)
+	}
+}
+
+func TestValidateForBackfillRequiresOnlyDatabase(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("API_PG_PASSWORD", "runtime-secret-value")
+	if err := Load().ValidateForBackfill(); err != nil {
+		t.Fatalf("ValidateForBackfill() with database password error = %v", err)
+	}
+	resetConfigEnv(t)
+	if err := Load().ValidateForBackfill(); err == nil {
+		t.Fatal("ValidateForBackfill succeeded without API_PG_PASSWORD, want error")
 	}
 }
 
@@ -455,12 +554,14 @@ func TestValidateRejectsMissingSecretsEncryptionKey(t *testing.T) {
 	}
 }
 func TestValidateFailsFastOnMissingPublicOrigin(t *testing.T) {
+	// Public origins are runtime-construction prerequisites in every environment.
 	resetConfigEnv(t)
+	t.Setenv("APP_ENV", "production")
 	t.Setenv("PUBLIC_ORIGIN", "")
 	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	cfg := Load()
 	if err := cfg.Validate(); err == nil {
-		t.Fatal("Validate succeeded without PUBLIC_ORIGIN, want error")
+		t.Fatal("Validate succeeded in production without PUBLIC_ORIGIN, want error")
 	}
 }
 

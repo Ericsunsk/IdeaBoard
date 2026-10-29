@@ -8,8 +8,8 @@ import type { AdminModelItem } from '../core/catalogData'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 
-vi.mock('../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({
+vi.mock('@/core/composables/useConfirmDialog', () => ({
+  useConfirm: () => ({
     confirm: vi.fn().mockResolvedValue(true),
   }),
 }))

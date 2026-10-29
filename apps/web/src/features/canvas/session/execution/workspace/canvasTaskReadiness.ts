@@ -13,23 +13,21 @@
 // shortfall throws the insufficient-credits preflight (top-up call to
 // action), restriction and Board denials read not-ready with their
 // codes.
+//
+// Quote mapping validates the service and leaves submit-specific media checks
+// to submission. Transport validation errors propagate to the caller; only
+// billing and access gates become readiness results.
 
 import type { ApiClientError } from '../../../../../api/client'
 import { quoteWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
 import type { Service } from '../../../../../core/contracts/imageServices'
-import { i18n } from '../../../../../core/i18n'
 import { readinessErrorCopy } from '../../../../../core/errors/errorCatalog'
 import type {
   CanvasTaskRequestData,
   SubmitTaskReadinessData,
 } from '../../../core/execution/canvasTaskRequest'
 import { insufficientCreditsPreflightError } from '../task-runner/canvasBillingPreflight'
-import {
-  errorStatus,
-  isCanvasWorkspaceTaskUnmappableError,
-  toWorkspaceCreateInput,
-  toWorkspaceQuoteInput,
-} from './canvasTaskContractMapping'
+import { toWorkspaceQuoteInput } from './canvasTaskContractMapping'
 import { requireCanvasWorkspaceId } from './canvasTaskCancellation'
 
 export function toSubmitTaskReadiness(
@@ -66,53 +64,6 @@ function toNotReady(service: Service, message: string, errorCode: string): Submi
   return { ready: false, message, error_code: errorCode, service }
 }
 
-/**
- * Submit/quote 口径预检 (#P1-1): quote 阶段即执行与 submit 相同的
- * `toWorkspaceCreateInput` fail-closed 校验（image_urls、numeric ids、
- * storage URL、data-URL mask），不通过直接标 not-ready，不等 submit 才
- * toast。inpaint 缺 mask 走服务端 422，但完整 submit 意图（携带
- * use_mask/mask 键或媒体输入）无 mask_asset_id 时同样在 quote 阶段以
- * 明确指引标 not-ready，避免闪现 pending 节点再清除。纯价格探针（无
- * mask 上下文的泛 service 询价）不受 mask 检查影响。
- */
-function quoteMediaPreflightNotReady(
-  request: CanvasTaskRequestData,
-): SubmitTaskReadinessData | null {
-  try {
-    toWorkspaceCreateInput(request)
-  } catch (error) {
-    if (!isCanvasWorkspaceTaskUnmappableError(error)) throw error
-    // 未知 service 是编程错误，仍由 `toWorkspaceQuoteInput` fail-closed
-    // 抛出；其余 fail-closed（media-urls/media-ids/params/board）在
-    // quote 阶段即标 not-ready（createInput 先校验 service，能走到
-    // 这里的 service 必为合法 slug）。
-    if (error.reason === 'service') throw error
-    return toNotReady(request.service as Service, error.message, 'validation_failed')
-  }
-  const service = request.service as Service
-  if (service === 'inpaint') {
-    const params = request.params ?? {}
-    const hasInpaintIntent =
-      'mask_asset_id' in params ||
-      'use_mask' in params ||
-      'mask_image_url' in params ||
-      'mask_image_urls' in params ||
-      (Array.isArray(request.media_asset_ids) && request.media_asset_ids.length > 0)
-    if (hasInpaintIntent && !`${params.mask_asset_id ?? ''}`.trim()) {
-      return toNotReady(
-        service,
-        i18n.global.t('canvas.execution.markInpaintAreaFirst'),
-        'validation_failed',
-      )
-    }
-  }
-  return null
-}
-
-/**
- * Quote 传输错误 -> readiness 映射（与 submit 门控同码表）：
- * 返回 not-ready 数据，或对非映射错误直接抛出。
- */
 function mapQuoteTransportError(service: Service, error: unknown): SubmitTaskReadinessData {
   const apiError = error as ApiClientError
   const code = apiError?.code
@@ -133,13 +84,6 @@ function mapQuoteTransportError(service: Service, error: unknown): SubmitTaskRea
   ) {
     return toNotReady(service, readinessErrorCopy(code), code)
   }
-  if (errorStatus(error) === 422 || code === 'validation_failed') {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : i18n.global.t('common.errors.billingInfoUnavailable')
-    return toNotReady(service, message, 'validation_failed')
-  }
   throw error
 }
 
@@ -148,10 +92,6 @@ export async function fetchCanvasWorkspaceTaskReadiness(
   options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData> {
   const workspaceId = requireCanvasWorkspaceId()
-  // 口径预检先于网络：与 submit 同规则的媒体 fail-closed 校验在 quote
-  // 阶段即标 not-ready（无 task、无 hold、无网络调用）。
-  const preflight = quoteMediaPreflightNotReady(request)
-  if (preflight) return preflight
   const input = toWorkspaceQuoteInput(request)
   try {
     const snapshot = await quoteWorkspaceTask(

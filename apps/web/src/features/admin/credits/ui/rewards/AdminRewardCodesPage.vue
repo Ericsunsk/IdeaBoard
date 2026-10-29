@@ -235,12 +235,12 @@ import {
 import { useRewardCodeList } from '../../session/rewards/useRewardCodeList'
 import { useRewardCodeRowActions } from '../../session/rewards/useRewardCodeRowActions'
 import { useRewardCodesFeedback } from '../../session/rewards/useRewardCodesFeedback'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { confirmSettingsSave } from '../../../shared'
 import { REWARD_CODES_MESSAGES } from './messages'
 
 const resource = createAdminRewardCodeResource()
-const confirm = useAdminConfirm()
+const confirm = useConfirm()
 const {
   searchKeyword,
   statusFilter,

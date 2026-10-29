@@ -19,7 +19,6 @@ type AdminSettingsLifecycleOptions<T> = {
   isSame: (current: T, synced: T) => boolean
   validate: (draft: T) => string
   save: (draft: T) => Promise<T>
-  synchronizeCache: (saved: T) => Promise<void>
   feedback: AdminSettingsFeedback
 }
 
@@ -49,7 +48,6 @@ export function useSettingsLifecycle<T>(options: AdminSettingsLifecycleOptions<T
     try {
       const saved = await options.save(normalizedDraft)
       hydrate(saved)
-      await options.synchronizeCache(saved)
       options.feedback.saved()
       return true
     } catch (error) {

@@ -77,7 +77,7 @@ func runInitCreditWallets(args []string) {
 	if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
 		fatal("usage: ideaboard init-credit-wallets <verified-identities.json>")
 	}
-	cfg := loadConfigOrFatal()
+	cfg := loadInitCreditWalletsConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
 	if err != nil || len(rawKey) != 32 {
@@ -125,7 +125,7 @@ func runFinalizeMigrate() {
 }
 
 func runInitAdmin() {
-	cfg := loadConfigOrFatal()
+	cfg := loadInitAdminConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	requireAuthInternalKeyForProduction(cfg)
 	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
@@ -205,6 +205,41 @@ func loadMigrationConfigOrFatal() *config.Config {
 	cfg := config.Load()
 	if err := cfg.ValidateForMigration(); err != nil {
 		fatal("invalid migration configuration", "err", err)
+	}
+	return cfg
+}
+
+// loadInitAdminConfigOrFatal loads configuration for init-admin. Only the
+// inputs the command uses are required (database, secrets key, internal
+// auth key, welcome identity key, admin seed); ticket, rewards, and origin
+// inputs are never consulted. Like the migration path, imgproxy is never
+// contacted.
+func loadInitAdminConfigOrFatal() *config.Config {
+	cfg := config.Load()
+	if err := cfg.ValidateForInitAdmin(); err != nil {
+		fatal("invalid init-admin configuration", "err", err)
+	}
+	return cfg
+}
+
+// loadInitCreditWalletsConfigOrFatal loads configuration for
+// init-credit-wallets. Only the database and the welcome identity key are
+// required; every other serving input is never consulted.
+func loadInitCreditWalletsConfigOrFatal() *config.Config {
+	cfg := config.Load()
+	if err := cfg.ValidateForInitCreditWallets(); err != nil {
+		fatal("invalid init-credit-wallets configuration", "err", err)
+	}
+	return cfg
+}
+
+// loadBackfillConfigOrFatal loads configuration for backfill-board-previews.
+// The command only reads and writes board rows, so only the database
+// settings are required.
+func loadBackfillConfigOrFatal() *config.Config {
+	cfg := config.Load()
+	if err := cfg.ValidateForBackfill(); err != nil {
+		fatal("invalid backfill configuration", "err", err)
 	}
 	return cfg
 }

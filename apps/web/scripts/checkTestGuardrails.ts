@@ -282,12 +282,6 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies payment configuration remains neutral while product and webhook health use readiness tones.',
     },
   ],
-  'src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts': [
-    {
-      reason:
-        'Verifies the confirmation dialog uses the shared strong-card surface; DOM visibility checks cannot detect a surface token regression.',
-    },
-  ],
   'src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts': [
     {
       reason:
@@ -453,6 +447,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
     {
       reason:
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',
+    },
+  ],
+  'src/core/components/ConfirmDialog.component.spec.ts': [
+    {
+      reason:
+        'Verifies the confirmation dialog uses the shared strong-card surface; DOM visibility checks cannot detect a surface token regression.',
     },
   ],
   'src/core/components/DataTableFrame.component.spec.ts': [

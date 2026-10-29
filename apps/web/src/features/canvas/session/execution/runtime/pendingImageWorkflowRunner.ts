@@ -90,8 +90,8 @@ export type PendingImageWorkflowRunnerOptions = {
 /**
  * quote/submit 共用重试预算 (#P1-4): assert 与 submit 各最多 2 次
  * 尝试（初始 + 单次重试），仅可重试错误（network / 503 定价瞬态 /
- * 原始 503-429-422）进入重试；确定性失败（空池、余额、校验
- * not-ready）不重试。用户手动重提不受影响（无状态锁）。
+ * 原始 503-429）进入重试；确定性失败（空池、余额、校验 422）不重试。
+ * 用户手动重提不受影响（无状态锁）。
  *
  * 数值见 `../canvasBudgets`（冻结预算表，零变更收敛）。
  *
@@ -190,7 +190,7 @@ export function createPendingImageWorkflowRunner(
         return submission.taskId
       } catch (error) {
         // 共用重试预算 (#P1-4): 可重试错误（network / 503 定价瞬态 /
-        // 原始 503-429-422）单次重试；空池、余额、校验类确定性失败与
+        // 原始 503-429）单次重试；空池、余额、校验类确定性失败与
         // 手动重提路径不受影响。
         if (
           isExecutionCurrent(intent) &&

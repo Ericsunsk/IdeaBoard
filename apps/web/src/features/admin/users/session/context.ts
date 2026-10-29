@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import type { AdminUsersFeedback } from './useUsersFeedback'
-import type { AdminConfirmPort } from '../../shared'
+import type { ConfirmPort } from '@/core/composables/useConfirmDialog'
 import { useAdminUserCommands } from './commands'
 import type { AdminUserSessionCommands } from './sessionCommands'
 import { useAdminUsersResource, type AdminUsersQueryFilters } from './resource'
@@ -64,7 +64,7 @@ function createAdminUsersQueryState() {
 export function useAdminUsersContext(
   options: {
     feedback: AdminUsersFeedback
-    confirm: AdminConfirmPort
+    confirm: ConfirmPort
   },
   dependencies: AdminUsersContextDependencies = {},
 ) {

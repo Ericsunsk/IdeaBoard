@@ -29,9 +29,11 @@ migrate 失败整栈停住并报错，不带病起服务。日常开发无需手
 不要再从 example 覆盖它；`migration.env` 仍是本机文件，缺失才创建）：
 
 > [!IMPORTANT]
-> 本地先填齐 7 个必填再起服务：`API_PG_PASSWORD`、`AUTH_INTERNAL_KEY`、
-> `RT_TICKET_SECRET`、`APP_SECRETS_ENCRYPTION_KEY`、`CREDITS_WELCOME_IDENTITY_KEY`、
-> `REWARDS_CODE_HMAC_KEYS`、`PUBLIC_ORIGIN`——缺一即启动 fail-closed（行为不变）。
+> 本地启动前需配置 `API_PG_PASSWORD`、`APP_SECRETS_ENCRYPTION_KEY`、
+> `CREDITS_WELCOME_IDENTITY_KEY`、`REWARDS_CODE_HMAC_KEYS` 和 `PUBLIC_ORIGIN`；
+> 它们是 runtime 初始化依赖，缺失会在打开连接前报错。`AUTH_INTERNAL_KEY` 和
+> `RT_TICKET_SECRET` 在非生产环境缺失时警告，相关接口 fail-closed；完整本地功能
+> 仍需配置这两项。Production 必须填齐全部 7 项。
 
 ```bash
 cd docker

@@ -79,8 +79,18 @@ function normalizeHostWithPort(host: string): string | null {
 }
 
 function normalizeAllowHost(value: string): string | null {
-  const host = value.trim().toLowerCase()
-  if (!host || host.length > 255 || host.includes('://') || /[\s/?#@\\]/.test(host)) {
+  let host = value.trim().toLowerCase()
+  if (!host) return null
+  // Accept pasted URLs/origins: strip one scheme and any path, query or
+  // fragment, then normalize the host[:port] remainder.
+  const schemeIndex = host.indexOf('://')
+  if (schemeIndex >= 0) {
+    host = host.slice(schemeIndex + 3)
+  }
+  const cut = host.search(/[/?#]/)
+  if (cut >= 0) host = host.slice(0, cut)
+  host = host.trim().toLowerCase()
+  if (!host || host.length > 255 || /[\s/?#@\\]/.test(host)) {
     return null
   }
 

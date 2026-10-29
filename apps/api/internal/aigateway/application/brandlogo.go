@@ -20,8 +20,8 @@ import (
 
 // Brand logo proxy seam: admin-only read-only passthrough of models.dev
 // provider logos (/logos/{provider}.svg). It rides the models.dev read
-// module (same host allowlist pre-check, same shared outbound client)
-// without a second models.dev client: provider IDs are strictly validated
+// module (same shared outbound client, public hosts need no allowlist
+// entry) without a second models.dev client: provider IDs are
 // strictly validated (lowercase alphanumerics plus hyphen) so the upstream
 // path can never escape /logos/*.svg, successful fetches sit in a long-TTL
 // memory cache (logos rarely change), and every miss or failure degrades to
@@ -100,16 +100,11 @@ func normalizeBrandLogoProvider(raw string) (string, error) {
 
 // loadBrandLogo returns the SVG bytes for one validated provider. Fallback
 // is reported explicitly: false means upstream bytes, true means the
-// embedded default mark (allowlist gap or upstream failure). Only invalid
-// input is an error.
+// embedded default mark (upstream failure). Only invalid input is an error.
 func loadBrandLogo(ctx context.Context, provider string) ([]byte, bool, error) {
 	id, err := normalizeBrandLogoProvider(provider)
 	if err != nil {
 		return nil, false, err
-	}
-
-	if !modelsDevAllowlisted(ctx) {
-		return []byte(defaultBrandLogoSVG), true, nil
 	}
 
 	brandLogoCache.RLock()
@@ -137,7 +132,7 @@ func loadBrandLogo(ctx context.Context, provider string) ([]byte, bool, error) {
 // fetchBrandLogoUpstream performs one bounded single-shot GET against
 // {modelsDevLogoBaseURL}/{provider}.svg through the shared models.dev
 // outbound helper. The provider is pre-validated so the URL shape is fixed;
-// the runtime egress policy still gates the host exactly like the reference
+// the runtime egress policy still applies exactly like the reference
 // seam. False means "serve the default mark" (no retry: the next card
 // render retries upstream naturally since fallbacks are never cached).
 func fetchBrandLogoUpstream(ctx context.Context, provider string) ([]byte, bool) {
@@ -178,9 +173,9 @@ func isBrandLogoSVG(body []byte) bool {
 }
 
 // GetBrandLogo serves the admin brand-logo passthrough as image/svg+xml.
-// Degraded outcomes (allowlist gap, upstream failure, upstream miss) still
-// return HTTP 200 with the default mark and a fallback marker header so
-// admin cards never break; only invalid input (bad provider) is a 400.
+// Degraded outcomes (upstream failure, upstream miss) still return HTTP 200
+// with the default mark and a fallback marker header so admin cards never
+// break; only invalid input (bad provider) is a 400.
 // Authorization rides the outer Control Plane guard (controlProxyRaw + guard).
 func (h *Handler) GetBrandLogo(c *gin.Context) {
 	body, fallback, err := loadBrandLogo(c.Request.Context(), c.Query("provider"))

@@ -47,26 +47,46 @@ func modelsDevCatalogPayload(input float64, lastUpdated string) string {
 	}}}`, lastUpdated, input)
 }
 
-func TestGetModelReferenceAllowlistReject(t *testing.T) {
-	// models.dev 不在 egress allowlist：直接降级，不发起任何上游请求。
-	repo := stubModelsDevUpstream(t, []string{"example.com"}, func(w http.ResponseWriter, r *http.Request) {
-		t.Error("models.dev fetch must not run without allowlist")
+func TestGetModelReferenceNeedsNoAllowlistEntry(t *testing.T) {
+	// models.dev 不在 egress allowlist：公网只读仍直接抓取，不再降级。
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(modelsDevCatalogPayload(1.25, "2026-01-01")))
 	})
-	ref, err := repo.GetModelReference(context.Background(), "openai/gpt-5", "", "", false)
+	ref, err := repo.GetModelReference(context.Background(), "testprov/testmodel", "", "", false)
 	if err != nil {
 		t.Fatalf("GetModelReference() error = %v", err)
 	}
-	if ref.Found || ref.ErrorCode != ModelsReferenceCodeAllowlist {
-		t.Fatalf("reference = %+v, want allowlist_missing degradation", ref)
+	if !ref.Found || ref.InputUSDPerMTok != 1.25 {
+		t.Fatalf("reference = %+v, want fetched facts without allowlist entry", ref)
 	}
 	if ref.Source != ModelsReferenceSource || ref.Note == "" {
 		t.Fatalf("reference = %+v, want source models.dev with non-settlement note", ref)
 	}
 }
 
+func TestGetModelReferenceTransportStillGatesPrivateUnlisted(t *testing.T) {
+	// 传输层仍是唯一强制门：回环 stub 不在 policy 中时，预检/Dial 复检
+	// 直接拒绝，上游 handler 收不到请求，降级为 upstream_error。
+	called := false
+	repo := stubModelsDevUpstream(t, []string{"example.com"}, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+	ref, err := repo.GetModelReference(context.Background(), "testprov/testmodel", "", "", false)
+	if err != nil {
+		t.Fatalf("GetModelReference() error = %v", err)
+	}
+	if ref.Found || ref.ErrorCode != ModelsReferenceCodeUpstream {
+		t.Fatalf("reference = %+v, want upstream_error degradation", ref)
+	}
+	if called {
+		t.Fatal("models.dev fetch must not dispatch when transport rejects the target")
+	}
+}
+
 func TestGetModelReferenceUpstreamDegrades(t *testing.T) {
 	// 上游 4xx：空结果 + upstream_error，不阻塞调用方。
-	repo := stubModelsDevUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	})
 	ref, err := repo.GetModelReference(context.Background(), "testprov/testmodel", "", "", false)
@@ -82,7 +102,7 @@ func TestGetModelReferenceCacheHitRefreshAndExpiry(t *testing.T) {
 	var payload atomic.Value
 	payload.Store(modelsDevCatalogPayload(1.25, "2026-01-01"))
 	var hits atomic.Int64
-	repo := stubModelsDevUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(payload.Load().(string)))
@@ -125,7 +145,7 @@ func TestGetModelReferenceCacheHitRefreshAndExpiry(t *testing.T) {
 }
 
 func TestGetModelReferenceLookupForms(t *testing.T) {
-	repo := stubModelsDevUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(modelsDevCatalogPayload(1.25, "2026-01-01")))
 	})
@@ -176,7 +196,7 @@ func modelsDevCatalogEnrichedPayload() string {
 func TestGetModelReferenceEnrichment(t *testing.T) {
 	// 上游 enrichment 全字段：能力 booleans 上游原名直透，modalities 原样，
 	// knowledge/release_date/family/status 透传，description 永不透传。
-	repo := stubModelsDevUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(modelsDevCatalogEnrichedPayload()))
 	})
@@ -220,7 +240,7 @@ func TestGetModelReferenceEnrichment(t *testing.T) {
 func TestGetModelReferenceEnrichmentMissingGraceful(t *testing.T) {
 	// 上游缺失 enrichment：指针保持 nil、字符串留空、modalities 为 nil，
 	// Found 仍 true，前端一律暂无数据。
-	repo := stubModelsDevUpstream(t, []string{modelsDevHost, "127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
+	repo := stubModelsDevUpstream(t, []string{"127.0.0.1"}, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(modelsDevCatalogEnrichedPayload()))
 	})

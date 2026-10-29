@@ -149,10 +149,11 @@ func TestV1BoardsLifecycle(t *testing.T) {
 	if status != 400 || v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("missing key = %d %v, want 400 idempotency_key_required", status, payload)
 	}
-	// Unknown fields are rejected (Baseline 5.1).
-	status, payload = boardIDEMKey(t, f.engine, http.MethodPost, f.boardsPath(""), f.owner, "bad-shape", `{"data":{"name":"X","bogus":1}}`)
-	if status != 400 || v1ErrorCode(t, payload) != string(contract.CodeBadRequest) {
-		t.Fatalf("unknown field = %d %v, want 400 bad_request", status, payload)
+	// Unknown fields are ignored with a warn on content writes (lenient
+	// binding): the board is still created.
+	status, payload = boardIDEMKey(t, f.engine, http.MethodPost, f.boardsPath(""), f.owner, "lenient-shape", `{"data":{"name":"X","bogus":1}}`)
+	if status != 201 || v1Data(t, payload).(map[string]any)["name"] != "X" {
+		t.Fatalf("unknown field = %d %v, want 201 with unknown ignored", status, payload)
 	}
 	// Create.
 	status, payload = boardIDEMKey(t, f.engine, http.MethodPost, f.boardsPath(""), f.owner, "create-1", `{"data":{"name":"Atlas"}}`)
@@ -164,7 +165,7 @@ func TestV1BoardsLifecycle(t *testing.T) {
 	if !contract.IsBoardID(createdID) {
 		t.Fatalf("board id = %q, want board_ prefix", createdID)
 	}
-	// List with cursor pagination (fixture board + Atlas).
+	// List with cursor pagination (fixture board + X + Atlas).
 	status, _, listPayload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath("?page_size=1"), userID: f.owner})
 	if status != 200 {
 		t.Fatalf("list = %d %v", status, listPayload)
@@ -172,10 +173,26 @@ func TestV1BoardsLifecycle(t *testing.T) {
 	if len(listPayload["data"].([]any)) != 1 || listPayload["meta"].(map[string]any)["has_more"] != true {
 		t.Fatalf("page = %v, want 1 item with has_more", listPayload)
 	}
+	names := map[string]bool{}
+	for _, item := range listPayload["data"].([]any) {
+		names[item.(map[string]any)["name"].(string)] = true
+	}
 	cursor := listPayload["meta"].(map[string]any)["next_cursor"].(string)
-	status, _, second := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath("?page_size=1&cursor=" + cursor), userID: f.owner})
-	if status != 200 || len(second["data"].([]any)) != 1 || second["meta"].(map[string]any)["has_more"] != false {
-		t.Fatalf("second page = %d %v", status, second)
+	for {
+		status, _, page := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath("?page_size=1&cursor=" + cursor), userID: f.owner})
+		if status != 200 || len(page["data"].([]any)) != 1 {
+			t.Fatalf("page = %d %v, want 1 item", status, page)
+		}
+		for _, item := range page["data"].([]any) {
+			names[item.(map[string]any)["name"].(string)] = true
+		}
+		if page["meta"].(map[string]any)["has_more"] == false {
+			break
+		}
+		cursor = page["meta"].(map[string]any)["next_cursor"].(string)
+	}
+	if len(names) != 3 {
+		t.Fatalf("pages cover %v, want fixture + X + Atlas", names)
 	}
 	// Read + rename + archive + restore on the fixture board.
 	detailPath := f.boardPath("")

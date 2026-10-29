@@ -86,9 +86,9 @@ describe('DialogShell', () => {
     expect(onOpenUpdate).not.toHaveBeenCalled()
   })
 
-  it('keeps Admin confirm on alertdialog and user confirm on dialog', () => {
-    // Alert semantics stay split: AdminConfirmDialog owns `alertdialog`,
-    // user confirms (UserConfirmDialog / DialogShell presets) own `dialog`.
+  it('keeps admin confirm on alertdialog and user confirm on dialog', () => {
+    // One ConfirmDialog switches semantics by surface: `surface="admin"` owns
+    // `alertdialog`, `surface="user"` (DialogShell presets) owns `dialog`.
     expect(dialogShellPresets.confirm.hasClose).toBe(false)
     expect(dialogShellPresets.share.hasClose).toBe(true)
   })

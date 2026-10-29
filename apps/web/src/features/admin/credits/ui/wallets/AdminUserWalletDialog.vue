@@ -166,7 +166,7 @@ import ActionButton from '@/core/components/ActionButton.vue'
 import { useFailureToast } from '@/core/composables/useFailureToast'
 import { createUniqueId } from '@/core/utils/ids'
 import { AdminDialogShell } from '../../../shared'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { useAdminCreditsBillingOperationsFeedback } from '../../session/shared/feedback'
 import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import {
@@ -198,7 +198,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:isVisible': [isVisible: boolean]; 'refresh-users': [] }>()
 const { t } = useI18n()
-const confirm = useAdminConfirm()
+const confirm = useConfirm()
 const feedback = useAdminCreditsBillingOperationsFeedback()
 
 const isAccountMode = computed(() => props.target.kind === 'billingAccount')

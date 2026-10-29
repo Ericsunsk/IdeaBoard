@@ -111,6 +111,11 @@ const (
 	CodeMediaArchived             Code = "media_archived"
 	CodeMediaIdempotencyConflict  Code = "media_idempotency_conflict"
 	CodeMediaValidationFailed     Code = "media_validation_failed"
+	// Unknown image formats (heic, svg, truncated headers, …) sniffed at
+	// the raw-bytes upload ingresses. Wire-stable: mismatched-but-known
+	// formats stay media_validation_failed (422); only unknown containers
+	// render here, so clients stop retrying the same bytes as 422.
+	CodeMediaUnsupportedType Code = "media_unsupported_type"
 
 	// Workspace billing codes (issue #804). Wire-stable: do not rename
 	// without coordinating the OpenAPI contract and callers. The wallet

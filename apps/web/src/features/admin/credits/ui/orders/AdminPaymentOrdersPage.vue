@@ -108,7 +108,7 @@ import { AdminSelect } from '../../../shared'
 import { AdminSwitch } from '../../../shared'
 import { AdminFilterPopover } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import { useAdminConfirm } from '../../../shared'
+import { useConfirm } from '@/core/composables/useConfirmDialog'
 import { usePaymentOrdersFeedback } from '../../session/orders/usePaymentOrdersFeedback'
 import { useFailureToast } from '@/core/composables/useFailureToast'
 import { adminFramedIconButtonClass } from '../../../shared'
@@ -141,7 +141,7 @@ const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
 const detailLoading = ref(false)
 const refundLoading = ref(false)
-const adminConfirm = useAdminConfirm()
+const adminConfirm = useConfirm()
 const feedback = usePaymentOrdersFeedback()
 const refundIdempotencyKeys = new Map<string, string>()
 let detailRequestEpoch = 0

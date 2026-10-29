@@ -1,11 +1,10 @@
 package searchcatalog
 
 // V1 vision file/external-ref input bounds (issue #809 media gap
-// batch): upload_ stage-then-reference ids and allowlisted external
+// batch): upload_ stage-then-reference ids and public external
 // image URLs share the 4-ref cap with library refs.
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ func TestValidateV1VisionQueryInputUploadsAndURLs(t *testing.T) {
 		UserText:        "dunes",
 		LibraryAssetIDs: []string{"lasset_ABCDEF123456"},
 		UploadIDs:       []string{upload, upload},
-		ImageURLs:       []string{"https://images.unsplash.com/photo-1", "https://images.unsplash.com/photo-1"},
+		ImageURLs:       []string{"https://images.unsplash.com/photo-1", "https://cdn.example/photo-2", "https://cdn.example/photo-2"},
 	}
 	normalized, err := ValidateV1VisionQueryInput(valid)
 	if err != nil {
@@ -24,8 +23,8 @@ func TestValidateV1VisionQueryInputUploadsAndURLs(t *testing.T) {
 	if len(normalized.UploadIDs) != 1 || normalized.UploadIDs[0] != upload {
 		t.Fatalf("upload ids = %v, want deduped [%s]", normalized.UploadIDs, upload)
 	}
-	if len(normalized.ImageURLs) != 1 {
-		t.Fatalf("image urls = %v, want deduped single", normalized.ImageURLs)
+	if len(normalized.ImageURLs) != 2 {
+		t.Fatalf("image urls = %v, want deduped pair", normalized.ImageURLs)
 	}
 
 	// Upload-only input (no text, no library refs) is valid.
@@ -45,9 +44,12 @@ func TestValidateV1VisionQueryInputUploadsAndURLs(t *testing.T) {
 			UploadIDs:       []string{"upload_CCCCCCCCCCCC", "upload_DDDDDDDDDDDD"},
 			ImageURLs:       []string{"https://images.unsplash.com/x"},
 		}},
-		{"evil url", V1VisionQueryInput{ImageURLs: []string{"https://evil.example/x"}}},
-		{"lookalike url", V1VisionQueryInput{ImageURLs: []string{"https://images.unsplash.com.attacker.example/x"}}},
+		{"evil url", V1VisionQueryInput{ImageURLs: []string{"https://[::1]/x"}}},
+		{"loopback url", V1VisionQueryInput{ImageURLs: []string{"https://127.0.0.1/x"}}},
+		{"private url", V1VisionQueryInput{ImageURLs: []string{"https://10.0.0.8/x"}}},
 		{"plain http url", V1VisionQueryInput{ImageURLs: []string{"http://images.unsplash.com/x"}}},
+		{"exotic port url", V1VisionQueryInput{ImageURLs: []string{"https://images.unsplash.com:8080/x"}}},
+		{"userinfo url", V1VisionQueryInput{ImageURLs: []string{"https://user@images.unsplash.com/x"}}},
 		{"empty", V1VisionQueryInput{}},
 		{"blank text only", V1VisionQueryInput{UserText: "   "}},
 	}
@@ -64,6 +66,8 @@ func TestIsV1VisionExternalImageURL(t *testing.T) {
 		"https://plus.unsplash.com/photo-2",
 		"https://images.pexels.com/photos/3",
 		"https://IMAGES.UNSPLASH.COM/upper",
+		"https://cdn.example/photo-4",
+		"https://unsplash.com/photos/x",
 	} {
 		if !IsV1VisionExternalImageURL(good) {
 			t.Fatalf("allow %q = false, want true", good)
@@ -71,19 +75,17 @@ func TestIsV1VisionExternalImageURL(t *testing.T) {
 	}
 	for _, bad := range []string{
 		"",
-		"https://evil.example/x",
-		"https://images.unsplash.com.attacker.example/x",
 		"http://images.unsplash.com/x",
 		"https://images.unsplash.com:8080/x",
+		"https://user@images.unsplash.com/x",
+		"https://127.0.0.1/x",
+		"https://10.0.0.8/x",
+		"https://[::1]/x",
 		"data:image/png;base64,abcd",
 		"not a url",
-		"https://unsplash.com/photos/x",
 	} {
 		if IsV1VisionExternalImageURL(bad) {
 			t.Fatalf("reject %q = true, want false", bad)
 		}
-	}
-	if got := strings.Join(V1VisionExternalImageHosts, ","); got == "" {
-		t.Fatal("allowlist is empty (fail-closed misconfigured as fail-open risk)")
 	}
 }

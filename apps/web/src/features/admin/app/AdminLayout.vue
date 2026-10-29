@@ -54,7 +54,7 @@
       </main>
     </div>
 
-    <AdminConfirmDialog />
+    <ConfirmDialog surface="admin" />
   </div>
 </template>
 
@@ -62,7 +62,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { authTransport, useUserStore } from '../../auth'
-import { AdminConfirmDialog } from '../shared'
+import ConfirmDialog from '@/core/components/ConfirmDialog.vue'
 import AdminSidebar from './AdminSidebar.vue'
 import AdminHeaderBar from './AdminHeaderBar.vue'
 import {

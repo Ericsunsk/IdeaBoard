@@ -331,8 +331,9 @@
     @busy="isCreating = $event"
   />
 
-  <!-- 永久删除二次确认：统一走 UserConfirmDialog intent=danger（参考 BoardsPage）。Busy 提交时组件内部锁住 mask/Escape/close-control。输入工作区名匹配后才可确认，防误触。 -->
-  <UserConfirmDialog
+  <!-- 永久删除二次确认：统一走 ConfirmDialog surface="user" intent=danger（参考 BoardsPage）。Busy 提交时组件内部锁住 mask/Escape/close-control。输入工作区名匹配后才可确认，防误触。 -->
+  <ConfirmDialog
+    surface="user"
     :is-visible="isDeleteDialogVisible"
     :title="t('workspace.switcher.archiveTitle')"
     :message="t('workspace.switcher.archiveConfirm', { name: pendingDeleteName })"
@@ -377,7 +378,7 @@ import type {
 import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
 import { provideWorkspaceSettingsReads } from '../../session/workspace-settings'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
-import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import ConfirmDialog from '../../../../core/components/ConfirmDialog.vue'
 import WorkspaceLimitsSection from './WorkspaceLimitsSection.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
@@ -699,7 +700,7 @@ function closeDeleteDialog() {
   pendingDeleteItem.value = null
 }
 
-// UserConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
+// ConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
 // 关闭后的清理。
 function handleDeleteConfirmVisibleUpdate(isVisible: boolean) {
   if (isVisible || isDeleting.value) return

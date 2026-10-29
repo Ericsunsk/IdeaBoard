@@ -636,29 +636,31 @@ func TestV1VisionQueryUnstagedUploadRejected(t *testing.T) {
 	}
 }
 
-// TestV1VisionQueryExternalURLs proves external refs are validated
-// against the tree CDN allowlist (https exact-host) and fail closed
-// otherwise.
+// TestV1VisionQueryExternalURLs proves external refs accept any public
+// https URL (no CDN allowlist; the single gate is the safehttp transport
+// at fetch time) and fail closed otherwise.
 func TestV1VisionQueryExternalURLs(t *testing.T) {
 	f, _, extractor, _ := newV1VisionGapsFixture(t)
 
-	good := `{"data":{"user_text":"dunes","image_urls":["https://images.unsplash.com/photo-1"]}}`
+	good := `{"data":{"user_text":"dunes","image_urls":["https://images.unsplash.com/photo-1","https://cdn.example.com/photo-2"]}}`
 	status, created := v1VisionGapsPost(t, f, "vision-ext-1", good, f.member)
 	if status != http.StatusCreated {
-		t.Fatalf("allowlisted vision = %d %v, want 201", status, created)
+		t.Fatalf("public vision = %d %v, want 201", status, created)
 	}
 	refs := extractor.lastInput.References
-	if len(refs) != 1 || refs[0].ImageURL != "https://images.unsplash.com/photo-1" || refs[0].Kind != "external" {
-		t.Fatalf("extractor refs = %+v, want one external ref", refs)
+	if len(refs) != 2 || refs[0].ImageURL != "https://images.unsplash.com/photo-1" || refs[0].Kind != "external" ||
+		refs[1].ImageURL != "https://cdn.example.com/photo-2" || refs[1].Kind != "external" {
+		t.Fatalf("extractor refs = %+v, want two external refs", refs)
 	}
 
 	for name, url := range map[string]string{
-		"evil host":    "https://evil.example/photo-1",
-		"lookalike":    "https://images.unsplash.com.attacker.example/photo-1",
 		"plain http":   "http://images.unsplash.com/photo-1",
+		"exotic port":  "https://images.unsplash.com:8080/photo-1",
+		"userinfo":     "https://user@images.unsplash.com/photo-1",
+		"loopback":     "https://127.0.0.1/photo-1",
+		"private":      "https://10.0.0.8/photo-1",
 		"non-url":      "not a url",
 		"data URL":     "data:image/png;base64,abcd",
-		"unlisted cdn": "https://cdn.example.com/photo-1",
 	} {
 		body := fmt.Sprintf(`{"data":{"image_urls":[%q]}}`, url)
 		status, payload := v1VisionGapsPost(t, f, "vision-ext-bad-"+strings.ReplaceAll(name, " ", "-"), body, f.member)

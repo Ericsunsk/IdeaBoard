@@ -1144,6 +1144,12 @@ func TestV1PutUploadBytesValidation(t *testing.T) {
 		v1ErrorCode(t, payload) != string(contract.CodeUploadValidationFailed) {
 		t.Fatalf("mime-mismatch PUT = %d %v, want 422 upload_validation_failed", status, payload)
 	}
+	// Same size, unknown format (non-image bytes): 415, not 422.
+	unknown := bytes.Repeat([]byte("A"), len(staged))
+	if status, payload := put(uploadID, unknown, f.owner, "gaps-put-unknown", "image/png"); status != http.StatusUnsupportedMediaType ||
+		v1ErrorCode(t, payload) != string(contract.CodeMediaUnsupportedType) {
+		t.Fatalf("unknown-format PUT = %d %v, want 415 media_unsupported_type", status, payload)
+	}
 	// Header lies while bytes are right.
 	if status, payload := put(uploadID, staged, f.owner, "gaps-put-badheader", "image/gif"); status != http.StatusUnprocessableEntity ||
 		v1ErrorCode(t, payload) != string(contract.CodeUploadValidationFailed) {
@@ -1261,9 +1267,28 @@ func TestV1AvatarUpload(t *testing.T) {
 	}
 
 	// Non-image bytes, oversize body, anonymous, missing key.
-	if status, payload := put([]byte("not an image at all...."), f.owner, "avatar-bad", "image/png"); status != http.StatusUnprocessableEntity ||
-		v1ErrorCode(t, payload) != string(contract.CodeMediaValidationFailed) {
-		t.Fatalf("bad avatar = %d %v, want 422 media_validation_failed", status, payload)
+	if status, payload := put([]byte("not an image at all...."), f.owner, "avatar-bad", "image/png"); status != http.StatusUnsupportedMediaType ||
+		v1ErrorCode(t, payload) != string(contract.CodeMediaUnsupportedType) {
+		t.Fatalf("bad avatar = %d %v, want 415 media_unsupported_type", status, payload)
+	}
+	// heic/svg stay rejected at the edge (allowlist unchanged): unknown
+	// containers sniff to "" and render 415, never 422 or success.
+	heic := []byte{
+		0x00, 0x00, 0x00, 0x18,
+		0x66, 0x74, 0x79, 0x70,
+		0x68, 0x65, 0x69, 0x63,
+		0x00, 0x00, 0x00, 0x00,
+		0x68, 0x65, 0x69, 0x63,
+		0x00, 0x00, 0x00, 0x00,
+	}
+	if status, payload := put(heic, f.owner, "avatar-heic", "image/heic"); status != http.StatusUnsupportedMediaType ||
+		v1ErrorCode(t, payload) != string(contract.CodeMediaUnsupportedType) {
+		t.Fatalf("heic avatar = %d %v, want 415 media_unsupported_type", status, payload)
+	}
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"></svg>`)
+	if status, payload := put(svg, f.owner, "avatar-svg", "image/svg+xml"); status != http.StatusUnsupportedMediaType ||
+		v1ErrorCode(t, payload) != string(contract.CodeMediaUnsupportedType) {
+		t.Fatalf("svg avatar = %d %v, want 415 media_unsupported_type", status, payload)
 	}
 	if status, payload := put(make([]byte, v1AvatarMaxBytes+1), f.owner, "avatar-big", "image/png"); status != http.StatusUnprocessableEntity ||
 		v1ErrorCode(t, payload) != string(contract.CodeMediaValidationFailed) {

@@ -27,35 +27,12 @@ const (
 	// defaultGatewayOutboundTarget names gateway egress in outbound
 	// logs/metrics.
 	defaultGatewayOutboundTarget = "ai-gateway"
-	// cloudflareGatewayHost is the sole AI egress host. Any other BaseURL
-	// host is rejected fail-closed at startup; there is no custom-egress
-	// path. Request-time policy must additionally authorize the host via
-	// the outbound allowlist.
-	cloudflareGatewayHost = "gateway.ai.cloudflare.com"
 )
 
-// isCloudflareGatewayHost reports whether host is the pinned sole egress
-// (case-insensitive, trailing-dot tolerant). Subdomains and lookalikes do
-// not match: only the exact host passes.
-func isCloudflareGatewayHost(host string) bool {
-	return strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(host), "."), cloudflareGatewayHost)
-}
-
-// isLoopbackHost reports whether host is a loopback name for test-only
-// clients (httptest servers bind 127.0.0.1 by default).
-func isLoopbackHost(host string) bool {
-	switch strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), ".")) {
-	case "localhost", "127.0.0.1", "::1":
-		return true
-	default:
-		return false
-	}
-}
-
-// GatewayClientConfig wires the sole AI egress. The token is a Cloudflare
-// gateway token (least privilege); provider keys stay in Cloudflare (BYOK).
-// There is no custom-egress knob: every AI inference call goes through the
-// Cloudflare AI Gateway host.
+// GatewayClientConfig wires the AI gateway egress. The token is an
+// operator-held gateway token (least privilege). Any http(s) host is
+// accepted; URL changes are audited, and request-time policy must still
+// authorize the host via the outbound allowlist.
 type GatewayClientConfig struct {
 	// BaseURL is the gateway root, e.g.
 	// https://gateway.ai.cloudflare.com/v1/{account}/{gateway}.
@@ -82,10 +59,9 @@ type GatewayClientConfig struct {
 	Resilience *GatewayResilience
 }
 
-// GatewayClient sends every AI request through Cloudflare AI Gateway.
-// Transport rides the standard outbound client with a timeout cap and one
-// send per call; egress stays pinned to the configured
-// gateway host via the safehttp SSRF allowlist underneath.
+// GatewayClient sends every AI request through the configured gateway URL.
+// Egress goes to the configured host via the safehttp SSRF allowlist
+// underneath (request-time policy must authorize it).
 type GatewayClient struct {
 	baseURL    string
 	token      string
@@ -100,22 +76,9 @@ type GatewayClient struct {
 var _ runtimeports.GatewayClient = (*GatewayClient)(nil)
 
 // NewGatewayClient validates the egress configuration fail-fast: a missing
-// base URL or token, a non-http(s) URL, and any non-Cloudflare host are all
-// startup errors, never silent fallbacks.
+// base URL or token and a non-http(s) URL are startup errors. Any host is
+// accepted; request-time policy must still authorize it.
 func NewGatewayClient(cfg GatewayClientConfig) (*GatewayClient, error) {
-	return newGatewayClient(cfg, false)
-}
-
-// NewGatewayClientForTest builds a GatewayClient against loopback test
-// servers (httptest), bypassing the Cloudflare host pin. Production must
-// use NewGatewayClient. Only loopback hosts (localhost, 127.0.0.1, ::1)
-// pass; any other non-CF host is still rejected fail-closed, so a test
-// helper can never become a production custom-egress path.
-func NewGatewayClientForTest(cfg GatewayClientConfig) (*GatewayClient, error) {
-	return newGatewayClient(cfg, true)
-}
-
-func newGatewayClient(cfg GatewayClientConfig, allowLoopbackForTest bool) (*GatewayClient, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	if baseURL == "" {
 		return nil, fmt.Errorf("gateway base URL is required")
@@ -123,11 +86,6 @@ func newGatewayClient(cfg GatewayClientConfig, allowLoopbackForTest bool) (*Gate
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
 		return nil, fmt.Errorf("gateway base URL must be an http(s) URL with a host")
-	}
-	if !isCloudflareGatewayHost(parsed.Hostname()) {
-		if !allowLoopbackForTest || !isLoopbackHost(parsed.Hostname()) {
-			return nil, fmt.Errorf("gateway base URL host %q is not the Cloudflare AI Gateway", parsed.Hostname())
-		}
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
 		return nil, fmt.Errorf("gateway token is required")

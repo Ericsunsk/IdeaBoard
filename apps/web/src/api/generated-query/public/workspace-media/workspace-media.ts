@@ -272,7 +272,7 @@ export const getStageWorkspaceUploadBytesUrl = (workspaceId: string, uploadId: s
 }
 
 /**
- * Stages the raw image bytes matching the session declaration (size, checksum, MIME). Raw image bytes body (never JSON, never multipart). Retryable: 422 validation mismatches change no state. Success reuses the UploadSession envelope. Requires the Idempotency-Key header (scope upload:bytes): key reuse with a different body renders 409 upload_idempotency_conflict.
+ * Stages the raw image bytes matching the session declaration (size, checksum, MIME). Raw image bytes body (never JSON, never multipart). Retryable: 422 validation mismatches change no state; unknown image formats render 415 media_unsupported_type. Success reuses the UploadSession envelope. Requires the Idempotency-Key header (scope upload:bytes): key reuse with a different body renders 409 upload_idempotency_conflict.
  * @summary Stage declared upload bytes (members only, retryable)
  */
 export const stageWorkspaceUploadBytes = async (
