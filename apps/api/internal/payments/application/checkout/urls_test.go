@@ -1,6 +1,7 @@
 package checkout_test
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -38,7 +39,13 @@ func TestNormalizeReturnBaseURL(t *testing.T) {
 
 func TestReturnURLAndNewPublicOrderNumber(t *testing.T) {
 	returnURL := checkout.ReturnURL("https://app.example.com", "token value", "success")
-	if !strings.Contains(returnURL, "payment_return=token+value") || !strings.HasSuffix(returnURL, "checkout_return=success") {
+	parsed, err := url.Parse(returnURL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", returnURL, err)
+	}
+	if parsed.Query().Get("account") != "recharge" ||
+		parsed.Query().Get("payment_return") != "token value" ||
+		parsed.Query().Get("checkout_return") != "success" {
 		t.Fatalf("ReturnURL() = %q", returnURL)
 	}
 	number, err := checkout.NewPublicOrderNumber(time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC))

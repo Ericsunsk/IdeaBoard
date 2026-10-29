@@ -107,7 +107,7 @@ import { AdminDialogShell } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import { createAdminGatewayResource, type GatewayProviderOption } from '../../resource'
 import { useAdminModelCatalogFeedback } from '../../session/useAdminModelCatalogFeedback'
-import { modelIdentityKey, type AdminModelItem } from '../../core/catalogData'
+import { formatProviderName, modelIdentityKey, type AdminModelItem } from '../../core/catalogData'
 import { buildModelItemFromManual, hasModelProviderPrefix } from '../../core/modelForm'
 import { MODELS_MESSAGES } from '../pages/messages'
 
@@ -142,7 +142,10 @@ const modelId = ref('')
 const existingKeySet = computed(() => new Set(props.existingModels.map(modelIdentityKey)))
 
 const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.display_name, value: p.slug })),
+  providers.value.map((p) => ({
+    label: p.display_name?.trim() ? p.display_name : formatProviderName(p.slug),
+    value: p.slug,
+  })),
 )
 
 const selectedProvider = computed(() =>

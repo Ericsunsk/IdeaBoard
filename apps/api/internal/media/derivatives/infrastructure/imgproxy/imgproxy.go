@@ -88,7 +88,7 @@ var AvatarSizes = []int{32, 64, 128, 256}
 const DefaultAvatarSize = 64
 
 // AvatarURL builds a signed pull URL that renders the source object as a
-// square webp crop with the given expiry.
+// square webp crop with the given expiry at one of AvatarSizes.
 func (c Config) AvatarURL(size int, source string, expires time.Time) (string, error) {
 	if !slices.Contains(AvatarSizes, size) {
 		return "", fmt.Errorf("unknown avatar size %d", size)

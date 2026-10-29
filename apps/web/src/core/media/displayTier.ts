@@ -7,11 +7,11 @@
 // the rendered tiers. Anything wider than the largest display tier maps
 // to `original` (the `/content` byte route), never a larger derivative.
 
-const MEDIA_DISPLAY_TIER_MAX_SIDE = {
-  thumb: 256,
-  preview: 640,
-  'large-preview': 1280,
-} as const
+const MEDIA_DISPLAY_TIER_STEPS: Array<{ readonly max: number; readonly tier: MediaDisplayTier }> = [
+  { max: 256, tier: 'thumb' },
+  { max: 640, tier: 'preview' },
+  { max: 1280, tier: 'large-preview' },
+]
 
 export type MediaDisplayTier = 'thumb' | 'preview' | 'large-preview' | 'original'
 
@@ -25,8 +25,5 @@ export type MediaDisplayTier = 'thumb' | 'preview' | 'large-preview' | 'original
 export function resolveMediaDisplayTier(effectiveWidthPx: unknown): MediaDisplayTier {
   const width = Number(effectiveWidthPx)
   if (!Number.isFinite(width) || width <= 0) return 'large-preview'
-  if (width <= MEDIA_DISPLAY_TIER_MAX_SIDE.thumb) return 'thumb'
-  if (width <= MEDIA_DISPLAY_TIER_MAX_SIDE.preview) return 'preview'
-  if (width <= MEDIA_DISPLAY_TIER_MAX_SIDE['large-preview']) return 'large-preview'
-  return 'original'
+  return MEDIA_DISPLAY_TIER_STEPS.find((s) => width <= s.max)?.tier ?? 'original'
 }

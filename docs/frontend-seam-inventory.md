@@ -354,9 +354,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 44,
-      "measuredFanOut": 3,
+      "measuredFanOut": 4,
       "targetFanIn": 44,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "ownershipScope": [
         "src/api/contractKernel.ts"
       ],
@@ -389,6 +389,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": [
         "src/core/utils/errorMessages.ts",
         "src/core/utils/guards.ts",
+        "src/core/utils/ids.ts",
         "src/core/utils/opaqueIds.ts"
       ],
       "notes": "API transport entry; generated code remains generator-owned."
@@ -5531,9 +5532,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 19,
-      "measuredFanOut": 0,
+      "measuredFanOut": 1,
       "targetFanIn": 19,
-      "targetFanOut": 0,
+      "targetFanOut": 1,
       "ownershipScope": [
         "src/api/idempotencyKey.ts"
       ],
@@ -5557,7 +5558,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "workspaceUploadIdempotencyKey",
         "workspaceVisionQueryIdempotencyKey"
       ],
-      "targetFanOutTargets": [],
+      "targetFanOutTargets": [
+        "src/core/utils/ids.ts"
+      ],
       "notes": "API transport entry; generated code remains generator-owned."
     },
     {
@@ -13666,6 +13669,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/contractKernel.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/idempotencyKey.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
@@ -13731,9 +13744,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 13,
+      "targetFanIn": 15,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/utils/ids.ts"
@@ -13940,6 +13953,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/boards.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
@@ -13948,11 +13971,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceMembersResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "targetFanIn": 11,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/utils/opaqueIds.ts"
@@ -24696,9 +24724,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 32,
-      "measuredFanOut": 69,
+      "measuredFanOut": 70,
       "targetFanIn": 32,
-      "targetFanOut": 69,
+      "targetFanOut": 70,
       "ownershipScope": [
         "src/features/workspace/"
       ],
@@ -24810,6 +24838,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/router/queryParams.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/guards.ts",
+        "src/core/utils/opaqueIds.ts",
         "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/features/account/index.ts",
@@ -25599,7 +25628,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | Entry | Kind | Owner | Exports | Fan-in measured → target | Fan-out measured → target |
 |---|---|---|---|---|---|
 | `src/api/client.ts` | canonical | api | 5 | 13 → 13 | 5 → 5 |
-| `src/api/contractKernel.ts` | canonical | api | 24 | 44 → 44 | 3 → 3 |
+| `src/api/contractKernel.ts` | canonical | api | 24 | 44 → 44 | 4 → 4 |
 | `src/api/generated-query/control/control-billing/control-billing.ts` | canonical | api | 63 | 4 → 4 | 4 → 4 |
 | `src/api/generated-query/control/control-credits/control-credits.ts` | canonical | api | 175 | 4 → 4 | 4 → 4 |
 | `src/api/generated-query/control/control-payments/control-payments.ts` | canonical | api | 39 | 3 → 3 | 4 → 4 |
@@ -25626,7 +25655,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts` | canonical | api | 16 | 2 → 2 | 4 → 4 |
 | `src/api/generated-query/public/workspace-search/workspace-search.ts` | canonical | api | 16 | 3 → 3 | 4 → 4 |
 | `src/api/generated-query/public/workspaces/workspaces.ts` | canonical | api | 40 | 3 → 3 | 4 → 4 |
-| `src/api/idempotencyKey.ts` | canonical | api | 18 | 19 → 19 | 0 → 0 |
+| `src/api/idempotencyKey.ts` | canonical | api | 18 | 19 → 19 | 1 → 1 |
 | `src/api/mediaAssetDelivery.ts` | canonical | api | 25 | 27 → 27 | 4 → 4 |
 | `src/api/mediaWorkspaceScope.ts` | canonical | api | 3 | 7 → 7 | 0 → 0 |
 | `src/api/sessionUserType.ts` | canonical | api | 1 | 17 → 17 | 0 → 0 |
@@ -25728,10 +25757,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/utils/dateTime.ts` | canonical | core | 5 | 6 → 6 | 3 → 3 |
 | `src/core/utils/errorMessages.ts` | canonical | core | 4 | 10 → 10 | 0 → 0 |
 | `src/core/utils/formValidation.ts` | canonical | core | 3 | 4 → 4 | 0 → 0 |
-| `src/core/utils/ids.ts` | canonical | core | 3 | 13 → 13 | 0 → 0 |
+| `src/core/utils/ids.ts` | canonical | core | 3 | 15 → 15 | 0 → 0 |
 | `src/core/utils/imageUploadSupport.ts` | canonical | core | 3 | 8 → 8 | 2 → 2 |
 | `src/core/utils/number.ts` | canonical | core | 3 | 14 → 14 | 0 → 0 |
-| `src/core/utils/opaqueIds.ts` | canonical | core | 5 | 8 → 8 | 0 → 0 |
+| `src/core/utils/opaqueIds.ts` | canonical | core | 5 | 11 → 11 | 0 → 0 |
 | `src/core/utils/polling.ts` | canonical | core | 5 | 6 → 6 | 0 → 0 |
 | `src/core/utils/storage.ts` | canonical | core | 8 | 15 → 15 | 0 → 0 |
 | `src/core/utils/workspaceId.ts` | canonical | core | 2 | 8 → 8 | 1 → 1 |
@@ -25861,7 +25890,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/legal/routePaths.ts` | canonical | legal | 4 | 5 → 5 | 0 → 0 |
 | `src/features/library/index.ts` | canonical | library | 83 | 27 → 27 | 51 → 51 |
 | `src/features/search/index.ts` | canonical | search | 21 | 2 → 2 | 49 → 49 |
-| `src/features/workspace/index.ts` | canonical | workspace | 58 | 32 → 32 | 69 → 69 |
+| `src/features/workspace/index.ts` | canonical | workspace | 58 | 32 → 32 | 70 → 70 |
 | `src/features/workspace/routePaths.ts` | canonical | workspace | 9 | 34 → 34 | 1 → 1 |
 | `src/features/workspace/routes/workspaceRoutes.ts` | canonical | workspace | 2 | 3 → 3 | 14 → 14 |
 | `src/features/workspace/selection/workspaceContext.ts` | canonical | workspace | 20 | 4 → 4 | 11 → 11 |

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -328,12 +329,7 @@ func isProviderURL(raw string, allowedHosts []string) bool {
 		return false
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	for _, allowed := range allowedHosts {
-		if host == allowed {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowedHosts, host)
 }
 
 func classifyProviderError(err error) domain.FailureCategory {

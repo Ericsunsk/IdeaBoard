@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/testsupport"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,7 +101,7 @@ func (f *fakeSearchBackend) Search(ctx context.Context, query string, providers 
 	}
 	filtered := make([]searchcatalog.V1SearchResult, 0, len(f.items))
 	for _, item := range f.items {
-		if v1ProviderSelected(providers, item.Provider) {
+		if slices.Contains(providers, item.Provider) {
 			filtered = append(filtered, item)
 		}
 	}

@@ -35,17 +35,6 @@
           :placeholder="MODELS_MESSAGES.gatewayPathPlaceholder"
           @update:model-value="emit('update:customPath', String($event))"
         />
-        <div class="flex flex-wrap gap-1">
-          <button
-            v-for="pathOpt in commonGatewayPaths"
-            :key="pathOpt"
-            type="button"
-            class="rounded-control bg-card border border-border px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:text-primary cursor-pointer"
-            @click="emit('update:customPath', pathOpt)"
-          >
-            {{ pathOpt }}
-          </button>
-        </div>
       </div>
 
       <!-- 额外自定义参数 (JSON) -->
@@ -114,14 +103,6 @@ watch(
     }
   },
 )
-
-const commonGatewayPaths = [
-  'api/v1/chat/completions',
-  'v1/chat/completions',
-  'v1/images/generations',
-  'v1/images/cutout',
-  'v1/images/upscale',
-]
 
 function formatCustomParamsJSON() {
   try {

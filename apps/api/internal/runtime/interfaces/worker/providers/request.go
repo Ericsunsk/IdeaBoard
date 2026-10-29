@@ -369,30 +369,41 @@ func parseSizeFromParams(params map[string]interface{}) (int, int) {
 		}
 	}
 
-	switch ratio {
-	case "3:2":
-		w, h = 1536, 1024
-	case "16:9":
-		w, h = 1792, 1024
-	case "1:1":
-		w, h = 1024, 1024
-	case "2:3":
-		w, h = 1024, 1536
-	case "3:4":
-		w, h = 1024, 1365
-	case "9:16":
-		w, h = 1024, 1792
-	default:
-		w, h = 1024, 1024
+	wr, hr := 1.0, 1.0
+	trimmedRatio := strings.TrimSpace(ratio)
+	if trimmedRatio != "" {
+		parts := strings.Split(trimmedRatio, ":")
+		if len(parts) == 2 {
+			wVal, errW := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+			hVal, errH := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			if errW == nil && errH == nil && wVal > 0 && hVal > 0 {
+				wr, hr = wVal, hVal
+			}
+		}
 	}
 
-	// 根据清晰度缩放
-	switch quality {
+	k := 1
+	switch strings.ToLower(strings.TrimSpace(quality)) {
 	case "2k":
-		w, h = w*2, h*2
+		k = 2
 	case "4k":
-		w, h = w*4, h*4
+		k = 4
 	}
+
+	baseLength := float64(1024 * k)
+	r := wr / hr
+
+	var wFloat, hFloat float64
+	if r >= 1.0 {
+		wFloat = baseLength
+		hFloat = math.Round(baseLength / r)
+	} else {
+		hFloat = baseLength
+		wFloat = math.Round(baseLength * r)
+	}
+
+	w = int(math.Max(64, math.Round(wFloat/64.0)*64.0))
+	h = int(math.Max(64, math.Round(hFloat/64.0)*64.0))
 
 	return w, h
 }

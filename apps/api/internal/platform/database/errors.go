@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -36,6 +37,19 @@ func IsDuplicateConstraintError(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == "23505"
+	}
+	return false
+}
+
+// IsConstraintViolation reports whether err is a Postgres unique constraint
+// violation (code 23505) matching constraintName under case-insensitive trimmed comparison.
+func IsConstraintViolation(err error, constraintName string) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505" && strings.EqualFold(strings.TrimSpace(pgErr.ConstraintName), strings.TrimSpace(constraintName))
 	}
 	return false
 }

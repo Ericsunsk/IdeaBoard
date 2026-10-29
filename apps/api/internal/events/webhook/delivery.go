@@ -27,14 +27,12 @@ func WebhookRetryDelay(attempt int) time.Duration {
 	if attempt <= 1 {
 		return 0
 	}
-	delay := webhookBackoffBase
-	for i := 2; i < attempt; i++ {
-		delay *= 2
-		if delay >= webhookBackoffCap {
-			return webhookBackoffCap
-		}
+	shift := attempt - 2
+	if shift > 30 {
+		shift = 30
 	}
-	if delay > webhookBackoffCap {
+	delay := webhookBackoffBase * (1 << shift)
+	if delay > webhookBackoffCap || delay < 0 { // overflow guard
 		return webhookBackoffCap
 	}
 	return delay

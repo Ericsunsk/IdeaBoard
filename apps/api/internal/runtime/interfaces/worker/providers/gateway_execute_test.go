@@ -394,7 +394,7 @@ func TestCallGatewayAPIUnknownSlugUsesCustomNamespace(t *testing.T) {
 		}),
 	}
 	if _, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "myco/custom-model", ExecutionToken: "tok-custom", AttemptNo: 1,
+		Task: task, Model: "custom-myco/custom-model", ExecutionToken: "tok-custom", AttemptNo: 1,
 	}); err != nil {
 		t.Fatalf("CallGatewayAPI returned error: %v", err)
 	}

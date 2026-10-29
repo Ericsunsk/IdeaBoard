@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -166,10 +167,5 @@ func validSource(provider, raw string) bool {
 	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" || (parsed.Port() != "" && parsed.Port() != "443") {
 		return false
 	}
-	for _, host := range imageHosts(provider) {
-		if parsed.Hostname() == host {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(imageHosts(provider), parsed.Hostname())
 }

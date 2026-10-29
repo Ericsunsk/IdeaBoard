@@ -65,7 +65,7 @@
             "
             @click="selectProvider(p)"
           >
-            {{ p.display_name }}
+            {{ p.display_name?.trim() ? p.display_name : formatProviderName(p.slug) }}
           </button>
         </div>
       </div>
@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { AdminInput } from '../../../../shared'
+import { formatProviderName } from '../../../core/catalogData'
 import type { GatewayProviderOption } from '../../../resource'
 import { MODELS_MESSAGES } from '../../pages/messages'
 

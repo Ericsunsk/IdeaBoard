@@ -9,7 +9,7 @@ import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/
 import type { CompleteUploadRequest, CreateUploadRequest } from './generated-query/public/model'
 import { buildContractRequestHeaders, newRequestId, requireContractData } from './contractKernel'
 import { withSignal } from '../core/utils/request'
-import { assertOpaqueId } from '../core/utils/opaqueIds'
+import { assertOpaqueId, isOpaqueIdWithPrefix } from '../core/utils/opaqueIds'
 import { isRecord } from '../core/utils/guards'
 import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../core/i18n'
@@ -332,10 +332,7 @@ export type WorkspaceUploadCreateInput = {
 
 /** Mirrors the backend `board_` public-id shape (prefix + alnum/`-`/`_` suffix). */
 export function isBoardPublicIdShape(raw: unknown): raw is string {
-  if (typeof raw !== 'string') return false
-  const trimmed = raw.trim()
-  if (!trimmed.startsWith('board_') || trimmed.length <= 'board_'.length) return false
-  return /^[A-Za-z0-9_-]+$/.test(trimmed.slice('board_'.length))
+  return typeof raw === 'string' && isOpaqueIdWithPrefix(raw.trim(), 'board')
 }
 
 export type WorkspaceUploadCompleteInput = {

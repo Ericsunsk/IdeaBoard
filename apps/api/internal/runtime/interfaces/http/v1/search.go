@@ -278,15 +278,6 @@ func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
 // pagination_cursor_invalid at the handler.
 var errV1CursorInvalid = errors.New("v1 search cursor invalid")
 
-func v1ProviderSelected(providers []string, candidate string) bool {
-	for _, provider := range providers {
-		if provider == candidate {
-			return true
-		}
-	}
-	return false
-}
-
 type v1CreateVisionQueryBody struct {
 	Data struct {
 		UserText        string   `json:"user_text"`

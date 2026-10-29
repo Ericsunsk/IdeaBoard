@@ -19,6 +19,7 @@ import { workspaceMemberIdempotencyKey } from '../../../api/idempotencyKey'
 import { userErrorCode } from '../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../core/query/queryDefaults'
 import { withSignal } from '../../../core/utils/request'
+import { isOpaqueIdWithPrefix } from '../../../core/utils/opaqueIds'
 
 // Workspace member transport and roster Query ownership.
 //
@@ -84,8 +85,6 @@ export type WorkspaceMemberFailureReason =
 
 const WORKSPACE_MEMBER_ROLES: readonly WorkspaceMemberRole[] = ['owner', 'admin', 'member']
 
-const USER_PUBLIC_ID_PATTERN = /^usr_[A-Za-z0-9_-]+$/
-
 /** The server answered with a member envelope this client cannot use. */
 export class WorkspaceMemberPayloadError extends Error {
   constructor(field: string) {
@@ -96,12 +95,12 @@ export class WorkspaceMemberPayloadError extends Error {
 
 function requireWorkspaceId(workspaceId: string): string {
   const normalized = workspaceId.trim()
-  if (!/^ws_[A-Za-z0-9_-]+$/.test(normalized)) throw new WorkspaceMemberPayloadError('workspace_id')
+  if (!isOpaqueIdWithPrefix(normalized, 'ws')) throw new WorkspaceMemberPayloadError('workspace_id')
   return normalized
 }
 
 function toMemberUserId(value: unknown, field: string): string {
-  if (typeof value === 'string' && USER_PUBLIC_ID_PATTERN.test(value.trim())) {
+  if (typeof value === 'string' && isOpaqueIdWithPrefix(value.trim(), 'usr')) {
     return value.trim()
   }
   throw new WorkspaceMemberPayloadError(field)

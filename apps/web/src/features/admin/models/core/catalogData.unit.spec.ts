@@ -5,6 +5,7 @@ import {
   formatObservedFailure,
   formatObservedMargin,
   formatObservedRate,
+  formatProviderName,
   isCloudflareHosted,
   matchesModelKeyword,
   MODEL_HOSTING_CLOUDFLARE,
@@ -103,5 +104,20 @@ describe('catalogData vocabulary', () => {
     expect(formatObservedMargin(12)).toBe('+12')
     expect(formatObservedMargin(-3)).toBe('-3')
     expect(formatObservedMargin(0)).toBe('0')
+  })
+
+  it('formats provider slugs algorithmically without hardcoded dictionaries', () => {
+    expect(formatProviderName('fal-ai')).toBe('Fal AI')
+    expect(formatProviderName('silicon-flow')).toBe('Silicon Flow')
+    expect(formatProviderName('google-ai-studio')).toBe('Google AI Studio')
+    expect(formatProviderName('my-custom-llm')).toBe('My Custom LLM')
+    expect(formatProviderName('workers-ai')).toBe('Workers AI')
+    expect(formatProviderName('openai')).toBe('Openai')
+    expect(formatProviderName('deepseek')).toBe('Deepseek')
+    expect(formatProviderName('openrouter')).toBe('Openrouter')
+    expect(formatProviderName('anthropic')).toBe('Anthropic')
+    expect(formatProviderName('custom_provider_api')).toBe('Custom Provider API')
+    expect(formatProviderName('')).toBe('')
+    expect(formatProviderName('   ')).toBe('')
   })
 })

@@ -1097,16 +1097,14 @@ func matchV1MediaETag(header, etag string) bool {
 // `attachment` for anything else, so a future MIME can never execute as
 // active content on the app origin.
 func v1MediaDisposition(mime, filename string) string {
-	switch strings.ToLower(strings.TrimSpace(strings.Split(mime, ";")[0])) {
-	case "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp", "image/avif":
+	if _, ok := imageformat.NormalizeImageMIME(mime); ok {
 		return "inline"
-	default:
-		name := strings.TrimSpace(filename)
-		if name == "" {
-			name = "asset"
-		}
-		return `attachment; filename="` + strings.ReplaceAll(name, `"`, "") + `"`
 	}
+	name := strings.TrimSpace(filename)
+	if name == "" {
+		name = "asset"
+	}
+	return `attachment; filename="` + strings.ReplaceAll(name, `"`, "") + `"`
 }
 
 func (h *contractV1Handler) contentMediaAsset(c *gin.Context) {

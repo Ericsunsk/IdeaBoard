@@ -99,21 +99,14 @@ func notFound(err error) error {
 }
 
 func isPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	lowered := strings.ToLower(err.Error())
-	return strings.Contains(lowered, "uq_workspaces_public_id") ||
-		strings.Contains(lowered, "uq_organizations_public_id")
+	return database.IsConstraintViolation(err, "uq_workspaces_public_id") ||
+		database.IsConstraintViolation(err, "uq_organizations_public_id")
 }
 
 // isDefaultConflict reports a duplicate violation of the single-Default
 // partial unique index (a second Default create for the same owner).
 func isDefaultConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "ux_workspaces_default_owner")
+	return database.IsConstraintViolation(err, "ux_workspaces_default_owner")
 }
 
 func nullInt64(value int64) pgtype.Int8 {

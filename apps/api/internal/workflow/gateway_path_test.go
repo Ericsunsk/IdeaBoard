@@ -8,18 +8,18 @@ func TestGatewayProviderPath(t *testing.T) {
 	cases := map[string]string{
 		"openrouter":   "openrouter",
 		"fal":          "fal",
-		"fal-ai":       "fal",
-		"fal_ai":       "fal",
+		"fal-ai":       "fal-ai",
+		"fal_ai":       "fal_ai",
 		"openai":       "openai",
 		"Anthropic":    "anthropic",
-		"gemini":       "google-ai-studio",
-		"azureopenai":  "azure-openai",
-		"perplexity":   "perplexity-ai",
-		"bedrock":      "aws-bedrock",
-		"vertex_ai":    "google-vertex-ai",
+		"gemini":       "gemini",
+		"azureopenai":  "azureopenai",
+		"perplexity":   "perplexity",
+		"bedrock":      "bedrock",
+		"vertex_ai":    "vertex_ai",
 		"deepseek":     "deepseek",
-		"google":       "custom-google",
-		"myllm":        "custom-myllm",
+		"google":       "google",
+		"myllm":        "myllm",
 		"custom-myllm": "custom-myllm",
 		"   ":          "",
 	}
@@ -28,8 +28,8 @@ func TestGatewayProviderPath(t *testing.T) {
 			t.Fatalf("GatewayProviderPath(%q) = %q, want %q", input, got, want)
 		}
 	}
-	if IsFirstPartyGatewayProvider("myllm") {
-		t.Fatal("IsFirstPartyGatewayProvider(myllm) = true, want false")
+	if IsFirstPartyGatewayProvider("custom-myllm") {
+		t.Fatal("IsFirstPartyGatewayProvider(custom-myllm) = true, want false")
 	}
 	if !IsFirstPartyGatewayProvider("OpenAI") {
 		t.Fatal("IsFirstPartyGatewayProvider(OpenAI) = false, want true")
@@ -82,8 +82,9 @@ func TestResolveRoute(t *testing.T) {
 		// customParams 参与 chat 判定：执行与预览同一答案（旧分裂点）。
 		{"openai", "dall-e-3", "", `{"type":"chat"}`, "v1/chat/completions", GatewayPathSourceChat, true, "openai"},
 		{"custom-llm", "any-model", "", `{"protocol":"chat"}`, "v1/chat/completions", GatewayPathSourceChat, true, "custom-llm"},
-		{"fal", "flux-dev", "", "", "flux-dev", GatewayPathSourceFal, false, "fal"},
-		{"fal_ai", "fal-ai/flux-pro/v1.1", "", "", "fal-ai/flux-pro/v1.1", GatewayPathSourceFal, false, "fal"},
+		{"fal", "flux-dev", "", "", "fal-ai/flux-dev", GatewayPathSourceFal, false, "fal"},
+		{"fal_ai", "fal-ai/flux-pro/v1.1", "", "", "fal-ai/flux-pro/v1.1", GatewayPathSourceFal, false, "fal_ai"},
+		{"fal-ai", "fast-sdxl", "", "", "fal-ai/fast-sdxl", GatewayPathSourceFal, false, "fal-ai"},
 		{"openai", "dall-e-3", "custom/endpoint/v2", "", "custom/endpoint/v2", GatewayPathSourceOverride, false, "openai"},
 	}
 	for _, tc := range cases {
@@ -92,6 +93,55 @@ func TestResolveRoute(t *testing.T) {
 			t.Fatalf("ResolveRoute(%q, %q, %q, %q) = %+v, want path %q src %q chat %v ns %q",
 				tc.provider, tc.model, tc.override, tc.params, got, tc.wantPath, tc.wantSrc, tc.wantChat, tc.wantNS)
 		}
+	}
+}
+
+func TestInferGatewayPathSourceTableDriven(t *testing.T) {
+	// Model-routed provider (fal)
+	path, src := InferGatewayPathSource("fal", "birefnet", "", false)
+	if path != "fal-ai/birefnet" || src != GatewayPathSourceFal {
+		t.Fatalf("InferGatewayPathSource(fal, birefnet) = %q, %q; want fal-ai/birefnet, %q", path, src, GatewayPathSourceFal)
+	}
+
+	// Model-routed provider with existing owner
+	path, src = InferGatewayPathSource("fal", "fal-ai/birefnet", "", false)
+	if path != "fal-ai/birefnet" || src != GatewayPathSourceFal {
+		t.Fatalf("InferGatewayPathSource(fal, fal-ai/birefnet) = %q, %q; want fal-ai/birefnet, %q", path, src, GatewayPathSourceFal)
+	}
+
+	// Convention providers (openrouter, anthropic)
+	path, src = InferGatewayPathSource("openrouter", "meta-llama/llama-3", "", true)
+	if path != "api/v1/chat/completions" || src != GatewayPathSourceOpenRouter {
+		t.Fatalf("InferGatewayPathSource(openrouter) = %q, %q; want api/v1/chat/completions, %q", path, src, GatewayPathSourceOpenRouter)
+	}
+
+	path, src = InferGatewayPathSource("anthropic", "claude-3", "", true)
+	if path != "v1/messages" || src != GatewayPathSourceAnthropic {
+		t.Fatalf("InferGatewayPathSource(anthropic) = %q, %q; want v1/messages, %q", path, src, GatewayPathSourceAnthropic)
+	}
+
+	// Model path with slash for non-fal provider
+	path, src = InferGatewayPathSource("replicate", "blackforestlabs/flux-1-schnell", "", false)
+	if path != "blackforestlabs/flux-1-schnell" || src != GatewayPathSourceOverride {
+		t.Fatalf("InferGatewayPathSource(replicate) = %q, %q; want blackforestlabs/flux-1-schnell, %q", path, src, GatewayPathSourceOverride)
+	}
+
+	// Override wins over everything
+	path, src = InferGatewayPathSource("fal", "birefnet", "custom/cutout", false)
+	if path != "custom/cutout" || src != GatewayPathSourceOverride {
+		t.Fatalf("InferGatewayPathSource(override) = %q, %q; want custom/cutout, %q", path, src, GatewayPathSourceOverride)
+	}
+
+	// Fallback to chat
+	path, src = InferGatewayPathSource("custom-provider", "model", "", true)
+	if path != "v1/chat/completions" || src != GatewayPathSourceChat {
+		t.Fatalf("InferGatewayPathSource(fallback chat) = %q, %q; want v1/chat/completions, %q", path, src, GatewayPathSourceChat)
+	}
+
+	// Fallback to generations
+	path, src = InferGatewayPathSource("custom-provider", "model", "", false)
+	if path != "v1/images/generations" || src != GatewayPathSourceGenerations {
+		t.Fatalf("InferGatewayPathSource(fallback generations) = %q, %q; want v1/images/generations, %q", path, src, GatewayPathSourceGenerations)
 	}
 }
 

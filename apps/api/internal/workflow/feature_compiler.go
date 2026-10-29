@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -156,12 +157,7 @@ const (
 // these compiled facts into the typed map so persisted Controls cannot
 // disagree with the plan.
 func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput, opts ...ReadOption) (FeatureExecutionPlan, error) {
-	ready := false
-	for _, opt := range opts {
-		if opt == ReadReady {
-			ready = true
-		}
-	}
+	ready := slices.Contains(opts, ReadReady)
 	feature, ok := ParseAIImageFeatureSlug(input.Feature)
 	if !ok {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(

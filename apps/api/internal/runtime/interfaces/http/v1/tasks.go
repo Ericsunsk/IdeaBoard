@@ -358,6 +358,52 @@ func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 	return dto
 }
 
+// reconcileTaskResolution arbitrates output resolution between top-level envelope
+// declaration (body.data.resolution) and task parameters (params[paramkeys.OutputResolution]).
+//
+// Returns:
+//   - canonical: the normalized resolution (e.g. "1k", "2k", "4k") or empty if none provided.
+//   - valid: false if an explicit resolution value fails syntax/domain normalization.
+//   - conflict: true if top-level and plan-level declarations disagree or cannot be reconciled.
+func reconcileTaskResolution(topResolution string, planResolution any) (canonical string, valid bool, conflict bool) {
+	top := strings.TrimSpace(topResolution)
+
+	if planResolution == nil {
+		if top == "" {
+			return "", true, false
+		}
+		topCanonical, topValid := workflow.NormalizeOutputResolution(top)
+		if !topValid {
+			return "", false, false
+		}
+		return topCanonical, true, false
+	}
+
+	planStr, isString := planResolution.(string)
+	if !isString || strings.TrimSpace(planStr) == "" {
+		if top != "" {
+			return "", true, true
+		}
+		return "", true, false
+	}
+
+	planCanonical, planValid := workflow.NormalizeOutputResolution(planStr)
+	if !planValid {
+		return "", false, false
+	}
+
+	if top == "" {
+		return planCanonical, true, false
+	}
+
+	topCanonical, topValid := workflow.NormalizeOutputResolution(top)
+	if !topValid || topCanonical != planCanonical {
+		return "", true, true
+	}
+
+	return planCanonical, true, false
+}
+
 func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
@@ -417,54 +463,22 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		if body.Data.Resolution != nil {
 			resolution = strings.TrimSpace(*body.Data.Resolution)
 		}
-		if raw, ok := params[paramkeys.OutputResolution]; ok && raw != nil {
-			planResolution, isString := raw.(string)
-			if isString && strings.TrimSpace(planResolution) != "" {
-				canonical, valid := workflow.NormalizeOutputResolution(planResolution)
-				if !valid {
-					// Preserve malformed values for the canonical compiler or
-					// reject them here when the envelope also supplied a value.
-					if resolution != "" {
-						renderTaskError(c, &workspacetasks.ValidationError{
-							Fields: map[string]string{"resolution": "invalid"},
-						})
-						return
-					}
-					resolution = strings.TrimSpace(planResolution)
-				} else {
-					params[paramkeys.OutputResolution] = canonical
-					if resolution == "" {
-						resolution = canonical
-					} else if resolutionCanonical, topValid := workflow.NormalizeOutputResolution(resolution); !topValid || resolutionCanonical != canonical {
-						renderTaskError(c, &workspacetasks.ValidationError{
-							Fields: map[string]string{"resolution": "mismatch"},
-						})
-						return
-					} else {
-						resolution = resolutionCanonical
-					}
-				}
-			} else if resolution != "" {
-				// Keep the canonical compiler as the authority for malformed
-				// params values; a top-level value must not silently override it.
-				renderTaskError(c, &workspacetasks.ValidationError{
-					Fields: map[string]string{"resolution": "mismatch"},
-				})
-				return
-			}
+		canonicalResolution, valid, conflict := reconcileTaskResolution(resolution, params[paramkeys.OutputResolution])
+		if conflict {
+			renderTaskError(c, &workspacetasks.ValidationError{
+				Fields: map[string]string{"resolution": "mismatch"},
+			})
+			return
 		}
-		if resolution != "" {
-			canonical, valid := workflow.NormalizeOutputResolution(resolution)
-			if !valid {
-				renderTaskError(c, &workspacetasks.ValidationError{
-					Fields: map[string]string{"resolution": "invalid"},
-				})
-				return
-			}
-			resolution = canonical
-			if _, exists := params[paramkeys.OutputResolution]; !exists {
-				params[paramkeys.OutputResolution] = canonical
-			}
+		if !valid {
+			renderTaskError(c, &workspacetasks.ValidationError{
+				Fields: map[string]string{"resolution": "invalid"},
+			})
+			return
+		}
+		resolution = canonicalResolution
+		if canonicalResolution != "" {
+			params[paramkeys.OutputResolution] = canonicalResolution
 		}
 		// Canonical request hash for idempotent replay (same key+hash ->
 		// same task_id; conflict hash -> 409).

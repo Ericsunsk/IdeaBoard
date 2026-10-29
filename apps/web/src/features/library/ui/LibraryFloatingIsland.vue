@@ -194,6 +194,7 @@
 
   <!-- 用户 Folder 的右键操作菜单 -->
   <LibraryFolderContextMenu
+    ref="folderContextMenuRef"
     :context-menu="contextMenu"
     :surface-class="appOverlayMenuSurfaceClass"
     :item-class="appOverlayMenuItemClass"
@@ -234,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import { onClickOutside, onKeyStroke } from '@vueuse/core'
 import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -406,12 +408,30 @@ const initialized = ref(false)
 const isHeaderCollapsed = ref(false)
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const galleryRef = ref<InstanceType<typeof LibraryAssetGallery> | null>(null)
+const folderContextMenuRef = ref<InstanceType<typeof LibraryFolderContextMenu> | null>(null)
 const contextMenu = ref<{
   folder: LibraryFolderTab
   x: number
   y: number
   trigger: HTMLElement | null
 } | null>(null)
+
+onClickOutside(
+  () => (folderContextMenuRef.value?.$el instanceof HTMLElement ? folderContextMenuRef.value.$el : null),
+  () => {
+    if (contextMenu.value) {
+      closeFolderMenu(false)
+    }
+  },
+)
+
+onKeyStroke('Escape', (event) => {
+  if (contextMenu.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    closeFolderMenu(true)
+  }
+})
 
 // 文件夹弹窗状态
 const folderDialogVisible = ref(false)
@@ -513,20 +533,6 @@ async function requestRemove(asset: LibraryAssetView) {
   }
 }
 
-function handleDocumentPointerDown(event: PointerEvent) {
-  if ((event.target as HTMLElement | null)?.closest('[data-library-folder-menu]')) return
-  closeFolderMenu(false)
-}
-
-function handleDocumentKeydown(event: KeyboardEvent) {
-  if (!contextMenu.value) return
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    closeFolderMenu(true)
-  }
-}
-
 function handleWindowResize() {
   closeFolderMenu()
   windowWidth.value = window.innerWidth
@@ -575,14 +581,10 @@ onMounted(() => {
     }
     void workspace.loadAssets(true)
   })
-  document.addEventListener('pointerdown', handleDocumentPointerDown)
-  document.addEventListener('keydown', handleDocumentKeydown)
   window.addEventListener('resize', handleWindowResize)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', handleDocumentPointerDown)
-  document.removeEventListener('keydown', handleDocumentKeydown)
   window.removeEventListener('resize', handleWindowResize)
   unsubscribeMutation()
 })

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -219,10 +220,8 @@ func validateManifestDependencies(fragments []Fragment, positions map[string]int
 
 func isCanonicalManifest(manifest Manifest) bool {
 	for _, fragment := range manifest.Fragments {
-		for _, required := range requiredFragmentNames {
-			if fragment.Name == required {
-				return true
-			}
+		if slices.Contains(requiredFragmentNames, fragment.Name) {
+			return true
 		}
 	}
 	return false

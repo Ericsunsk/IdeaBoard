@@ -63,10 +63,7 @@ func sessionFromRow(workspacePublicID string, row dbsqlc.UploadSession) *Session
 }
 
 func isSessionPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_upload_sessions_public_id")
+	return database.IsConstraintViolation(err, "uq_upload_sessions_public_id")
 }
 
 // CreateSession validates the declaration, reserves the server-side

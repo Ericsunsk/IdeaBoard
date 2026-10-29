@@ -64,6 +64,45 @@ export interface ModelObservedSnapshot {
   skuMargins: ModelObservedSkuMargin[]
 }
 
+const KNOWN_ACRONYMS = new Set([
+  'ai',
+  'api',
+  'llm',
+  'cf',
+  'ui',
+  'sdk',
+  'tts',
+  'asr',
+  'ocr',
+  'nlp',
+  'url',
+  'id',
+  'db',
+])
+
+/**
+ * Pure algorithmic transformation for provider display names (ADR-0008):
+ * - Trim and lowercase
+ * - Split by '-' or '_'
+ * - Capitalize each word (Title Case)
+ * - Acronyms (e.g. AI, API, LLM, CF, UI) become fully uppercase
+ * Zero hardcoded provider dictionaries or maps.
+ */
+export function formatProviderName(slug: string): string {
+  const clean = (slug || '').trim().toLowerCase()
+  if (!clean) return ''
+  const parts = clean.split(/[-_]+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  return parts
+    .map((part) => {
+      if (KNOWN_ACRONYMS.has(part)) {
+        return part.toUpperCase()
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1)
+    })
+    .join(' ')
+}
+
 export function isCloudflareHosted(provider: string): boolean {
   const normalized = (provider || '').toLowerCase()
   return normalized.includes('workers') || normalized.includes('cloudflare')

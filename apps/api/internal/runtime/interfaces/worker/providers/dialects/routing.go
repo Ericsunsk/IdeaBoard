@@ -39,42 +39,20 @@ func Resolve(operation workflow.RuntimeOperation, provider, model, pathOverride,
 	if err != nil {
 		return Route{}, err
 	}
-	switch adapter {
-	case providerdomain.ProviderRuntimeAdapterCutout, providerdomain.ProviderRuntimeAdapterUpscale:
+	if adapter == providerdomain.ProviderRuntimeAdapterCutout || adapter == providerdomain.ProviderRuntimeAdapterUpscale {
 		if trimmed := strings.TrimSpace(customParamsJSON); trimmed != "" && trimmed != "{}" {
 			return Route{}, fmt.Errorf("pipeline operation %q does not accept custom params", string(operation))
 		}
-		defaultPath := map[providerdomain.ProviderRuntimeAdapter]string{
-			providerdomain.ProviderRuntimeAdapterCutout:  "v1/images/cutout",
-			providerdomain.ProviderRuntimeAdapterUpscale: "v1/images/upscale",
-		}[adapter]
-		path := strings.Trim(strings.TrimSpace(pathOverride), "/")
-		source := workflow.GatewayPathSourceOverride
-		if path == "" {
-			path = defaultPath
-			// Pipeline defaults bypass InferGatewayPathSource: no override
-			// rule produced them, and routing never branches on Source.
-			source = ""
-		}
-		return Route{
-			Adapter:   adapter,
-			Namespace: workflow.GatewayProviderPath(provider),
-			Path:      path,
-			Source:    source,
-			IsChat:    workflow.IsChatModel(provider, model, ""),
-			Dialect:   dialectFromJudgment(workflow.IsChatModel(provider, model, ""), provider),
-		}, nil
-	default:
-		resolved := workflow.ResolveRoute(provider, model, pathOverride, customParamsJSON)
-		return Route{
-			Adapter:   adapter,
-			Namespace: resolved.Namespace,
-			Path:      resolved.Path,
-			Source:    resolved.Source,
-			IsChat:    resolved.IsChat,
-			Dialect:   dialectFromJudgment(resolved.IsChat, provider),
-		}, nil
 	}
+	resolved := workflow.ResolveRoute(provider, model, pathOverride, customParamsJSON)
+	return Route{
+		Adapter:   adapter,
+		Namespace: resolved.Namespace,
+		Path:      resolved.Path,
+		Source:    resolved.Source,
+		IsChat:    resolved.IsChat,
+		Dialect:   dialectFromJudgment(resolved.IsChat, provider),
+	}, nil
 }
 
 // adapterForOperation routes one runtime operation to its execution adapter
@@ -101,7 +79,7 @@ func dialectFromJudgment(isChat bool, provider string) Dialect {
 	if isChat {
 		return NewChatDialect()
 	}
-	if entry, _ := workflow.ResolveProvider(provider); entry.Slug == "fal" {
+	if workflow.IsFalProvider(provider) {
 		return NewFalDialect()
 	}
 	return NewGenericDialect()

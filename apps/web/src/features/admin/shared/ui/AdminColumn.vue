@@ -1,6 +1,6 @@
 <template><slot /></template>
 
-<script setup lang="ts" generic="TRow extends object">
+<script setup lang="ts" generic="TRow extends object = any">
 defineProps<{
   field?: string | undefined
   header?: string | undefined
@@ -10,11 +10,10 @@ defineProps<{
 }>()
 
 // Slot props mirror the column body contract so templates
-// keep working unchanged. Rows vary per table and pass through untouched,
-// hence the intentionally loose data type (same looseness as its predecessor).
+// keep working unchanged. Rows vary per table and pass through untouched.
 defineSlots<{
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- table rows are heterogeneous by design; narrowing here would force casts at all 50+ call sites
-  body?: (props: { data: any; field?: string | undefined; index?: number | undefined }) => any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- slot render output can be any VNode/renderable
+  body?: (props: { data: TRow; field?: string | undefined; index?: number | undefined }) => any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- slot render output can be any VNode/renderable
   header?: () => any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- passthrough outlet for direct mounting; the table reads (never renders) column vnodes

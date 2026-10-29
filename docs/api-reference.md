@@ -109,7 +109,7 @@ Idempotency-Key: <unique-uuid-or-token>
 | `GET` | `/user` | 获取个人公开主页/基本资料 | 无 |
 | `PATCH`| `/user` | 修改个人资料 (姓名等) | `{ name }` |
 | `POST` | `/user/avatar` | 上传个人自定义头像 | `multipart/form-data (file)` |
-| `GET` | `/public/users/{uid}/avatar` | 获取指定用户头像图 (支持尺寸缩放) | `Query: size=32\|64\|128` |
+| `GET` | `/public/users/{uid}/avatar` | 获取指定用户头像图 (支持尺寸缩放) | `Query: size=32\|64\|128\|256` |
 | `GET` | `/public/branding/logo` | 获取系统 Branding Logo 资源 | 无 |
 | `GET` | `/support-channels` | 获取系统对外支持渠道 (客服邮箱/社群等) | 无 |
 | `GET` | `/user/notifications` | 分页获取个人站内通知列表 | `Query: cursor, limit` |

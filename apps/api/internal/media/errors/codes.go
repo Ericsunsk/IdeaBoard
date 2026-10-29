@@ -10,6 +10,8 @@
 // against `*Error` to read the code; never use a raw string for comparison.
 package errors
 
+import "slices"
+
 // Code is the stable identifier for a media error. The wire form is the
 // underlying string constant; do not rename a constant without coordinating
 // the front-end and the runbook.
@@ -122,10 +124,5 @@ func (c Code) Blame() Blame {
 // Valid reports whether c is a known code. Use it to validate a value
 // read from a database column or a remote payload.
 func (c Code) Valid() bool {
-	for _, candidate := range AllCodes() {
-		if candidate == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(AllCodes(), c)
 }

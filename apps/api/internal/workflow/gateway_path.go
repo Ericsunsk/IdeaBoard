@@ -13,31 +13,23 @@ import (
 // previews always agree on one implementation.
 
 // GatewayProviderPath renders the gateway-relative path prefix for one
-// provider slug: the registry's native namespace, or the customer
-// custom-provider namespace for slugs without one.
+// provider slug: the clean lowercase slug.
 func GatewayProviderPath(provider string) string {
 	clean := strings.ToLower(strings.TrimSpace(provider))
 	if clean == "" {
 		return ""
 	}
-	if entry, _ := ResolveProvider(clean); entry.GatewayNamespace != "" {
-		return entry.GatewayNamespace
-	}
-	if strings.HasPrefix(clean, "custom-") {
-		return clean
-	}
-	return "custom-" + clean
+	return clean
 }
 
 // IsFirstPartyGatewayProvider reports whether a provider slug resolves to a
-// native gateway namespace (no custom- prefixing applied).
+// native gateway namespace (non-custom provider).
 func IsFirstPartyGatewayProvider(provider string) bool {
 	clean := strings.ToLower(strings.TrimSpace(provider))
-	if clean == "" {
+	if clean == "" || strings.HasPrefix(clean, "custom-") {
 		return false
 	}
-	entry, known := ResolveProvider(clean)
-	return known && entry.GatewayNamespace != ""
+	return true
 }
 
 // GatewayPathSource names which inference rule produced a gateway path.
@@ -133,20 +125,43 @@ func InferGatewayPathSource(provider, model, pathOverride string, isChatModel bo
 		return path, GatewayPathSourceOverride
 	}
 
-	p := strings.ToLower(strings.TrimSpace(provider))
-	if p == "openrouter" {
+	cleanProvider := strings.ToLower(strings.TrimSpace(provider))
+	if cleanProvider == "openrouter" {
 		return "api/v1/chat/completions", GatewayPathSourceOpenRouter
 	}
-	if p == "anthropic" {
+	if cleanProvider == "anthropic" {
 		return "v1/messages", GatewayPathSourceAnthropic
 	}
 	if isChatModel {
 		return "v1/chat/completions", GatewayPathSourceChat
 	}
-	if p == "fal" || p == "fal_ai" {
-		return model, GatewayPathSourceFal
+
+	cleanModel := strings.TrimSpace(model)
+	isFal := IsFalProvider(cleanProvider)
+	if cleanModel != "" {
+		if strings.Contains(cleanModel, "/") {
+			if isFal {
+				return cleanModel, GatewayPathSourceFal
+			}
+			return cleanModel, GatewayPathSourceOverride
+		}
+		if isFal {
+			return "fal-ai/" + cleanModel, GatewayPathSourceFal
+		}
 	}
+
 	return "v1/images/generations", GatewayPathSourceGenerations
+}
+
+// IsFalProvider reports whether a provider is Fal or a Fal variant.
+func IsFalProvider(provider string) bool {
+	clean := strings.ToLower(strings.TrimSpace(provider))
+	switch clean {
+	case "fal", "fal_ai", "fal-ai", "fal.ai":
+		return true
+	default:
+		return strings.HasPrefix(clean, "fal-") || strings.HasPrefix(clean, "fal_")
+	}
 }
 
 // RouteResolution is the single routing answer shared by execution and

@@ -83,11 +83,13 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
     const startTime = now - durationMs
 
     const labels: string[] = []
-    const pendingCounts = new Array(bucketCount).fill(0)
-    const runningCounts = new Array(bucketCount).fill(0)
-    const successCounts = new Array(bucketCount).fill(0)
-    const errorCounts = new Array(bucketCount).fill(0)
-    const cancelledCounts = new Array(bucketCount).fill(0)
+    const bucketMap: Record<string, number[]> = {
+      [adminTaskStatuses.pending]: new Array(bucketCount).fill(0),
+      [adminTaskStatuses.running]: new Array(bucketCount).fill(0),
+      [adminTaskStatuses.completed]: new Array(bucketCount).fill(0),
+      [adminTaskStatuses.failed]: new Array(bucketCount).fill(0),
+      [adminTaskStatuses.cancelled]: new Array(bucketCount).fill(0),
+    }
 
     for (let i = 0; i < bucketCount; i++) {
       const time = new Date(startTime + i * bucketDurationMs)
@@ -105,40 +107,21 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
       let index = Math.floor((taskTime - startTime) / bucketDurationMs)
       if (index < 0) index = 0
       if (index >= bucketCount) index = bucketCount - 1
-      if (t.status === adminTaskStatuses.pending) {
-        pendingCounts[index]++
-      } else if (t.status === adminTaskStatuses.running) {
-        runningCounts[index]++
-      } else if (t.status === adminTaskStatuses.completed) {
-        successCounts[index]++
-      } else if (t.status === adminTaskStatuses.failed) {
-        errorCounts[index]++
-      } else if (t.status === adminTaskStatuses.cancelled) {
-        cancelledCounts[index]++
+      const bucket = bucketMap[t.status]
+      const count = bucket?.[index]
+      if (bucket && count !== undefined) {
+        bucket[index] = count + 1
       }
     }
 
     return {
       labels,
-      pendingCounts,
-      runningCounts,
-      successCounts,
-      errorCounts,
-      cancelledCounts,
+      bucketMap,
     }
   })
 
   const timelineChartData = computed(() => {
-    const { labels, pendingCounts, runningCounts, successCounts, errorCounts, cancelledCounts } =
-      timelineBuckets.value
-
-    const seriesDataMap: Record<string, number[]> = {
-      [adminTaskStatuses.pending]: pendingCounts,
-      [adminTaskStatuses.running]: runningCounts,
-      [adminTaskStatuses.completed]: successCounts,
-      [adminTaskStatuses.failed]: errorCounts,
-      [adminTaskStatuses.cancelled]: cancelledCounts,
-    }
+    const { labels, bucketMap } = timelineBuckets.value
 
     const datasets = taskMetricDefinitions
       .filter((metric) => {
@@ -150,7 +133,7 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
           ({
             type: 'line',
             label: metric.label,
-            data: seriesDataMap[metric.status!] ?? [],
+            data: bucketMap[metric.status!] ?? [],
             borderColor: adminChartTheme[metric.chartColorRole!],
             backgroundColor: withAlpha(
               adminChartTheme[metric.chartColorRole!],
@@ -177,23 +160,11 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
   })
 
   const timelineMaxCount = computed(() => {
-    const { pendingCounts, runningCounts, successCounts, errorCounts, cancelledCounts } =
-      timelineBuckets.value
+    const { bucketMap } = timelineBuckets.value
 
-    const activeSeries: number[][] = []
-    if (filterStatus.value === null) {
-      activeSeries.push(pendingCounts, runningCounts, successCounts, errorCounts, cancelledCounts)
-    } else if (filterStatus.value === adminTaskStatuses.pending) {
-      activeSeries.push(pendingCounts)
-    } else if (filterStatus.value === adminTaskStatuses.running) {
-      activeSeries.push(runningCounts)
-    } else if (filterStatus.value === adminTaskStatuses.completed) {
-      activeSeries.push(successCounts)
-    } else if (filterStatus.value === adminTaskStatuses.failed) {
-      activeSeries.push(errorCounts)
-    } else if (filterStatus.value === adminTaskStatuses.cancelled) {
-      activeSeries.push(cancelledCounts)
-    }
+    const singleSeries = filterStatus.value !== null ? bucketMap[filterStatus.value] : undefined
+    const activeSeries: number[][] =
+      filterStatus.value === null ? Object.values(bucketMap) : singleSeries ? [singleSeries] : []
 
     let max = 0
     for (const series of activeSeries) {

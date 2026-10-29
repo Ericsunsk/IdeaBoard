@@ -11,19 +11,14 @@ export function normalizePromptAspectRatio(value: unknown): PromptAspectRatio {
   )
 }
 
-export function resolvePromptAspectRatioValue(ratio: PromptAspectRatio): number | null {
-  switch (ratio) {
-    case '1:1':
-      return 1
-    case '3:4':
-      return 4 / 3
-    case '4:3':
-      return 3 / 4
-    case '9:16':
-      return 16 / 9
-    case '16:9':
-      return 9 / 16
-    default:
-      return null
+export function resolvePromptAspectRatioValue(ratio: PromptAspectRatio | string): number | null {
+  const parts = ratio.trim().split(':')
+  if (parts.length === 2) {
+    const w = Number(parts[0])
+    const h = Number(parts[1])
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+      return h / w
+    }
   }
+  return null
 }

@@ -410,12 +410,8 @@ func EnsureWorkspaceAccountWithQueries(ctx context.Context, q *dbsqlc.Queries, w
 }
 
 func isPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	lowered := strings.ToLower(err.Error())
-	return strings.Contains(lowered, "uq_workspaces_public_id") ||
-		strings.Contains(lowered, "uq_organizations_public_id")
+	return database.IsConstraintViolation(err, "uq_workspaces_public_id") ||
+		database.IsConstraintViolation(err, "uq_organizations_public_id")
 }
 
 func ownerTypeOf(row dbsqlc.BillingAccount) string {

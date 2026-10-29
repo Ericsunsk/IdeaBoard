@@ -2,8 +2,6 @@ package runtime
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +9,7 @@ import (
 	"ideaboard/api/internal/media/storage/application/integrity"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/platform/contract"
 )
 
 var _ ports.ObjectStore = (*Service)(nil)
@@ -54,7 +53,7 @@ func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.
 	if err != nil {
 		return ports.PresignedURL{}, fmt.Errorf("presign: %w", err)
 	}
-	presignID, err := newPresignID()
+	presignID, err := contract.MintPublicID("psg_", 12)
 	if err != nil {
 		return ports.PresignedURL{}, fmt.Errorf("presign: %w", err)
 	}
@@ -65,12 +64,4 @@ func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.
 		StorageProfileID: profile.ID,
 		PresignID:        presignID,
 	}, nil
-}
-
-func newPresignID() (string, error) {
-	var buf [12]byte
-	if _, err := rand.Read(buf[:]); err != nil {
-		return "", fmt.Errorf("generate presign id: %w", err)
-	}
-	return "psg_" + hex.EncodeToString(buf[:]), nil
 }

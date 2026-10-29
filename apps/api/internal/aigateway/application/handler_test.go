@@ -236,7 +236,7 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 	})
 
 	t.Run("preview honors path override and custom namespace", func(t *testing.T) {
-		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"myco/my-model","custom_path":"v1/custom/go","custom_params":"{\"type\":\"chat\"}"}`)
+		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"custom-myco/my-model","custom_path":"v1/custom/go","custom_params":"{\"type\":\"chat\"}"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}

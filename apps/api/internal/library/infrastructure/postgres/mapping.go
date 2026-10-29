@@ -108,24 +108,15 @@ func resolveAssetFolder(ctx context.Context, q *dbsqlc.Queries, workspaceInterna
 }
 
 func isFolderNameConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_library_folders_workspace_name")
+	return database.IsConstraintViolation(err, "uq_library_folders_workspace_name")
 }
 
 func isFolderPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_library_folders_public_id")
+	return database.IsConstraintViolation(err, "uq_library_folders_public_id")
 }
 
 func isAssetPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_library_assets_public_id")
+	return database.IsConstraintViolation(err, "uq_library_assets_public_id")
 }
 
 func nullText(value string) pgtype.Text {
@@ -146,10 +137,7 @@ func int4Param(value int32) pgtype.Int4 {
 }
 
 func isMaterializationPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_library_materializations_public_id")
+	return database.IsConstraintViolation(err, "uq_library_materializations_public_id")
 }
 
 // materializationFromDetail builds the API snapshot from one joined

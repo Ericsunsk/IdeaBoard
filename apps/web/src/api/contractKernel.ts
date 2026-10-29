@@ -11,6 +11,7 @@
 import { formatDisplayErrorMessage } from '../core/utils/errorMessages'
 import { opaqueIdPattern } from '../core/utils/opaqueIds'
 import { isRecord } from '../core/utils/guards'
+import { createUniqueId } from '../core/utils/ids'
 
 export type ContractMeta = {
   request_id?: string | undefined
@@ -230,9 +231,7 @@ export function getRequestId(headers: ReadableHeaders): string | null {
 }
 
 export function newRequestId(): string {
-  const randomUUID = (globalThis.crypto as Crypto | undefined)?.randomUUID
-  if (typeof randomUUID === 'function') return randomUUID.call(globalThis.crypto)
-  return `req_${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffffff).toString(36)}`
+  return createUniqueId()
 }
 
 export function buildContractRequestHeaders(options?: {

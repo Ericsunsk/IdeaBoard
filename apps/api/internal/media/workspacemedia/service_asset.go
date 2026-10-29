@@ -33,10 +33,7 @@ func assetFromRow(workspacePublicID string, row dbsqlc.MediaAsset) *Asset {
 }
 
 func isAssetPublicIDConflict(err error) bool {
-	if !database.IsDuplicateConstraintError(err) {
-		return false
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "uq_media_assets_public_id")
+	return database.IsConstraintViolation(err, "uq_media_assets_public_id")
 }
 
 // GetAsset resolves a workspace-scoped asset. Cross-workspace and

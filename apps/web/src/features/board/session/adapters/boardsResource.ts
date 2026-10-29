@@ -19,6 +19,7 @@ import type { BoardDocument } from '../../../../api/generated-query/public/model
 import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
 import { getBoardScope, isBoardScopeCurrent, type BoardScope } from '../catalog/scope'
 import { withSignal } from '../../../../core/utils/request'
+import { isOpaqueIdWithPrefix } from '../../../../core/utils/opaqueIds'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../core/utils/workspaceId'
 import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
@@ -505,7 +506,7 @@ export type ShareAccessWrite = {
 export type ShareAccessInput = Pick<WorkspaceBoardAccessFact, 'workspaceAccess' | 'memberUserIds'>
 
 function toUserPublicId(value: unknown, field: string): string {
-  if (typeof value === 'string' && /^usr_[A-Za-z0-9_-]+$/.test(value.trim())) return value.trim()
+  if (typeof value === 'string' && isOpaqueIdWithPrefix(value.trim(), 'usr')) return value.trim()
   throw new BoardPayloadError(field)
 }
 

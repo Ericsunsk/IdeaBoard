@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "844932a70226047d5a7798d879f172dc35c95f74",
+  "checkpointSha": "c58669efa36f7a649c91c08d225894f4ce44abfd",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -320,10 +320,11 @@
         }
       ],
       "fanIn": 44,
-      "fanOut": 3,
+      "fanOut": 4,
       "fanOutTargets": [
         "src/core/utils/errorMessages.ts",
         "src/core/utils/guards.ts",
+        "src/core/utils/ids.ts",
         "src/core/utils/opaqueIds.ts"
       ],
       "outboundEdges": [
@@ -337,6 +338,7 @@
           "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
+        { "from": "src/api/contractKernel.ts", "to": "src/core/utils/ids.ts", "kind": "runtime" },
         {
           "from": "src/api/contractKernel.ts",
           "to": "src/core/utils/opaqueIds.ts",
@@ -348,7 +350,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 44,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5470,15 +5472,17 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
+      "fanOut": 1,
+      "fanOutTargets": ["src/core/utils/ids.ts"],
+      "outboundEdges": [
+        { "from": "src/api/idempotencyKey.ts", "to": "src/core/utils/ids.ts", "kind": "runtime" }
+      ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 0,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -15152,6 +15156,8 @@
     },
     "src/core/utils/ids.ts": {
       "consumerEdges": [
+        { "from": "src/api/contractKernel.ts", "to": "src/core/utils/ids.ts", "kind": "runtime" },
+        { "from": "src/api/idempotencyKey.ts", "to": "src/core/utils/ids.ts", "kind": "runtime" },
         {
           "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/utils/ids.ts",
@@ -15218,7 +15224,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 15,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -15226,7 +15232,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 13,
+      "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15434,6 +15440,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/boards.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
@@ -15442,9 +15458,14 @@
           "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceMembersResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 11,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -15452,7 +15473,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 8,
+      "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -25751,6 +25772,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/core/document/promptAspectRatio.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/core/media/references.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -25882,6 +25908,11 @@
         },
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
@@ -25933,6 +25964,11 @@
         {
           "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/boards.ts",
+          "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
         {
@@ -27734,6 +27770,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/core/document/promptAspectRatio.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/core/media/references.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -27865,6 +27906,11 @@
         },
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
@@ -27916,6 +27962,11 @@
         {
           "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/boards.ts",
+          "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
         {
@@ -29257,6 +29308,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/core/document/promptAspectRatio.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/core/media/references.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -29388,6 +29444,11 @@
         },
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
@@ -29439,6 +29500,11 @@
         {
           "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/boards.ts",
+          "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
         {
@@ -44129,6 +44195,11 @@
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
@@ -45472,7 +45543,7 @@
         }
       ],
       "fanIn": 32,
-      "fanOut": 69,
+      "fanOut": 70,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -45521,6 +45592,7 @@
         "src/core/router/queryParams.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/guards.ts",
+        "src/core/utils/opaqueIds.ts",
         "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/features/account/index.ts",
@@ -46042,6 +46114,11 @@
         },
         {
           "from": "src/features/workspace/selection/workspaceMembersResource.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceMembersResource.ts",
           "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
@@ -46426,7 +46503,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 32,
-      "targetFanOut": 69,
+      "targetFanOut": 70,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

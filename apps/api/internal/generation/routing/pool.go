@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -47,12 +48,7 @@ func (e ModelPoolEntry) Supports(requested Resolution) bool {
 	if !e.Enabled || len(e.SupportedResolutions) == 0 {
 		return false
 	}
-	for _, res := range e.SupportedResolutions {
-		if res == requested {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(e.SupportedResolutions, requested)
 }
 
 // Pool is one service's routable pool: the per-service monotonically

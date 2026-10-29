@@ -1,12 +1,8 @@
+import { createUniqueId } from '../core/utils/ids'
+
 // Task cancellation is an idempotent command keyed by its target task.
 export function taskCancellationIdempotencyKey(taskID: string): string {
   return `task-cancel:${taskID}`
-}
-
-function randomKeySuffix(): string {
-  const randomUUID = (globalThis.crypto as Crypto | undefined)?.randomUUID
-  if (typeof randomUUID === 'function') return randomUUID.call(globalThis.crypto)
-  return `${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffffff).toString(36)}`
 }
 
 // Single mint behind every caller-generated key: `scope` carries the
@@ -14,7 +10,7 @@ function randomKeySuffix(): string {
 // attempt must reuse the returned value; a new user intent needs a
 // fresh call.
 function createIdempotencyKey(scope: string): string {
-  return `${scope}:${randomKeySuffix()}`
+  return `${scope}:${createUniqueId()}`
 }
 
 // Workspace creation key: caller-generated per command attempt. Concurrent

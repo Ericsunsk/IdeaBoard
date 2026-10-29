@@ -1,4 +1,5 @@
 import { createPrefixedId } from '../../../../core/utils/ids'
+import { isOpaqueIdWithPrefix } from '../../../../core/utils/opaqueIds'
 import { readLocalStorageItem, writeLocalStorageJson } from '../../../../core/utils/storage'
 import { getRecoverableBoardScope, scopedBoardStorageKey } from './scope'
 
@@ -127,7 +128,7 @@ function toValidHasDirectGrant(value: unknown): boolean | undefined {
 function toValidCreatorUserId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const normalized = value.trim()
-  return /^usr_[A-Za-z0-9_-]+$/.test(normalized) ? normalized : undefined
+  return isOpaqueIdWithPrefix(normalized, 'usr') ? normalized : undefined
 }
 
 function toValidOwnerAvatarUrl(value: unknown): string | undefined {

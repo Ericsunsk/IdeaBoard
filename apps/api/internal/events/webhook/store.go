@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -563,19 +564,12 @@ func (sub *WebhookSubscription) Matches(typ string) bool {
 	if len(sub.EventTypes) == 0 {
 		return true
 	}
-	for _, want := range sub.EventTypes {
-		if want == strings.TrimSpace(typ) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(sub.EventTypes, strings.TrimSpace(typ))
 }
 
 func appendIfMissing(ids []string, id string) []string {
-	for _, candidate := range ids {
-		if candidate == id {
-			return ids
-		}
+	if slices.Contains(ids, id) {
+		return ids
 	}
 	return append(ids, id)
 }

@@ -25,7 +25,25 @@ func NormalizeReturnBaseURL(raw string) (string, error) {
 }
 
 func ReturnURL(baseURL, publicToken, source string) string {
-	return baseURL + "?account=recharge&payment_return=" + url.QueryEscape(publicToken) + "&checkout_return=" + source
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		values := url.Values{
+			"account":         {"recharge"},
+			"payment_return":  {publicToken},
+			"checkout_return": {source},
+		}
+		separator := "?"
+		if strings.Contains(baseURL, "?") {
+			separator = "&"
+		}
+		return baseURL + separator + values.Encode()
+	}
+	values := parsed.Query()
+	values.Set("account", "recharge")
+	values.Set("payment_return", publicToken)
+	values.Set("checkout_return", source)
+	parsed.RawQuery = values.Encode()
+	return parsed.String()
 }
 
 func NewPublicOrderNumber(now time.Time) (string, error) {

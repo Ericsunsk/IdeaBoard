@@ -2,8 +2,6 @@ package workspacetasks
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -495,15 +493,12 @@ func isValidChecksum(s string) bool {
 
 // NewExecutionToken mints a fresh execution token for retry fencing
 // (reset + River backoff, new token per attempt, bounded by retry_count).
-// Tokens are opaque hex with an exec_ prefix; they are never public ids
-// and never enter IsValidPublicID checks, so they intentionally bypass
-// contract.MintPublicID (which only mints prefixed public ids).
 func NewExecutionToken() (string, error) {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
+	token, err := contract.MintPublicID("exec_", 16)
+	if err != nil {
 		return "", fmt.Errorf("workspacetasks: mint execution token: %w", err)
 	}
-	return "exec_" + hex.EncodeToString(buf), nil
+	return token, nil
 }
 
 // ShouldRetry reports whether a failed attempt may requeue (reset + River
