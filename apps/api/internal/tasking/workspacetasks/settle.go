@@ -138,13 +138,14 @@ func (s *Service) StagedEvents() []TaskEvent {
 	return staged
 }
 
-func (s *Service) stageWithTokenAt(taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
+func (s *Service) stageWithTokenAt(taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time, outputs []events.V1TaskCompletedOutput) {
 	if occurredAt.IsZero() {
 		occurredAt = s.clock()
 	}
 	s.events = append(s.events, TaskEvent{
 		EventID: events.StableEventID(taskID, string(status), executionToken),
 		TaskID:  taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: occurredAt.UTC(),
+		Outputs: outputs,
 	})
 }
 
@@ -432,12 +433,24 @@ func (s *Service) verifyOutputAssets(ctx context.Context, workspaceID string, ou
 	}
 	// Sentinel-only readiness (P0-4): the AssetReader seam owns the
 	// archived/ready comparison and reports it through sentinels.
-	for _, ref := range outputs {
+	for i, ref := range outputs {
 		if ref.Kind != OutputKindAsset {
 			continue
 		}
-		if _, err := s.assets.GetAsset(ctx, workspaceID, ref.AssetID); err != nil {
+		info, err := s.assets.GetAsset(ctx, workspaceID, ref.AssetID)
+		if err != nil {
 			return fmt.Errorf("workspacetasks: output asset: %w", mapAssetGateError(err))
+		}
+		if info != nil {
+			if outputs[i].Width == 0 && info.Width > 0 {
+				outputs[i].Width = info.Width
+			}
+			if outputs[i].Height == 0 && info.Height > 0 {
+				outputs[i].Height = info.Height
+			}
+			if outputs[i].MIMEType == "" && info.MIMEType != "" {
+				outputs[i].MIMEType = info.MIMEType
+			}
 		}
 	}
 	return nil

@@ -26,6 +26,8 @@ package http
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -34,7 +36,6 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/platform/settings"
-	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
@@ -71,17 +72,16 @@ func newContractInventoryRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	RegisterRoutes(router, Dependencies{
-		PublicSearchHandler: &searchhttp.SearchHandler{},
-		PaymentWebhook:      nil,
-		Internal:            InternalRouteDeps{},
-		CORSMiddleware:      func(c *gin.Context) { c.Next() },
-		RateLimit:           inventoryRateLimitStub{},
+		PaymentWebhook: nil,
+		Internal:       InternalRouteDeps{},
+		CORSMiddleware: func(c *gin.Context) { c.Next() },
+		RateLimit:      inventoryRateLimitStub{},
 	}, nil, FrontendRouteOptions{})
 	return router
 }
 
 // classifyContractRoute maps a registered path to exactly one bucket.
-// Legacy /api/user and /api/admin paths are unclassified on purpose:
+// Legacy /api/user, /api/admin, /api/settings/branding, and /api/search paths are unclassified on purpose:
 // they must not be registered anymore (see the legacy-zero test below).
 // Frontend SPA routes are not registered when frontendFS is nil.
 func classifyContractRoute(path string) (contractInventoryBucket, bool) {
@@ -91,7 +91,7 @@ func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	case path == ContractV1GroupPath || strings.HasPrefix(path, ContractV1GroupPath+"/"):
 		return bucketPublic, true
 	case path == "/api/health" || path == "/api/livez" || path == "/api/readyz" ||
-		path == "/api/settings/branding" || path == "/api/search" || path == "/api/media/previews/:token/:tier":
+		path == "/api/media/previews/:token/:tier":
 		return bucketPublic, true
 	case path == "/api/auth" || strings.HasPrefix(path, "/api/auth/"):
 		return bucketAuth, true
@@ -105,11 +105,12 @@ func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	}
 }
 
-// isLegacyCutPath reports the deleted legacy groups. Any registered route
+// isLegacyCutPath reports the deleted legacy groups and bypass routes. Any registered route
 // under them is a hard-cut violation, not an undocumented endpoint.
 func isLegacyCutPath(path string) bool {
 	return path == "/api/user" || strings.HasPrefix(path, "/api/user/") ||
-		path == "/api/admin" || strings.HasPrefix(path, "/api/admin/")
+		path == "/api/admin" || strings.HasPrefix(path, "/api/admin/") ||
+		path == "/api/settings/branding" || path == "/api/search"
 }
 
 func TestContractInventoryEveryRouteHasExactlyOneBucket(t *testing.T) {
@@ -140,6 +141,18 @@ func TestContractInventoryEveryRouteHasExactlyOneBucket(t *testing.T) {
 	}
 	t.Logf("route inventory buckets: public=%d control=%d auth=%d infra=%d (legacy=0)",
 		counts[bucketPublic], counts[bucketControl], counts[bucketAuth], counts[bucketInfra])
+}
+
+func TestLegacyBypassRoutesAreCut(t *testing.T) {
+	router := newContractInventoryRouter()
+	for _, path := range []string{"/api/settings/branding", "/api/search"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 for legacy cut route %s, got %d (body: %s)", path, rec.Code, rec.Body.String())
+		}
+	}
 }
 
 func TestContractInventorySkeletonContractsExist(t *testing.T) {

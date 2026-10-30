@@ -21,6 +21,7 @@ import {
   syncBoardToServer,
 } from '../sync/boardSync'
 import { getBoardById, replaceBoards } from './boards'
+import { getBoardScope } from './scope'
 import { createBoardRepository, type BoardRepository } from './repository'
 
 const WORKSPACE_ID = 'ws_query123'
@@ -58,9 +59,21 @@ describe('production Board repository Query integration', () => {
     repositories.push(result)
     return result
   }
-  function openDocument(catalog: BoardRepository) {
+  async function openDocument(catalog: BoardRepository) {
     stops.push(catalog.observeDocument('board-1'))
-    return catalog.commands.hydrate({ shouldIncludeDocuments: true, onlyBoardIds: ['board-1'] })
+    const result = await catalog.commands.hydrate({
+      shouldIncludeDocuments: true,
+      onlyBoardIds: ['board-1'],
+    })
+    // A cold bundle does not establish a complete list; wait for the
+    // production catalog observer's separate full read before observing it.
+    if (result.isOk)
+      await vi.waitFor(() =>
+        expect(
+          queryClient.getQueryData(boardQueryKeys.list(getBoardScope().workspaceId!)),
+        ).toBeDefined(),
+      )
+    return result
   }
   function remote(revision: number, text = 'server', workspaceId = WORKSPACE_ID) {
     apiState.boardsResponse.data = apiState.boardsResponse.data.filter(
@@ -141,7 +154,7 @@ describe('production Board repository Query integration', () => {
     const documentReads = () =>
       mocks.request.mock.calls
         .map(([url]) => String(url))
-        .filter((url) => url.endsWith('/document'))
+        .filter((url) => url.endsWith('/bundle') || url.endsWith('/document'))
     const catalog = repository()
     await catalog.commands.hydrate()
     expect(documentReads()).toEqual([])
@@ -149,7 +162,7 @@ describe('production Board repository Query integration', () => {
     stops.push(() => scope.stop())
     const session = scope.run(() => createBoardSessionRepository())!
     await session.load('board-1')
-    expect(documentReads()).toEqual([`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`])
+    expect(documentReads()).toEqual([`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/bundle`])
     const oldQuery = queryClient.getQueryCache().find({
       queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
       exact: true,
@@ -158,8 +171,8 @@ describe('production Board repository Query integration', () => {
     await session.load('board-2')
     expect(oldQuery.getObserversCount()).toBe(0)
     expect(documentReads()).toEqual([
-      `/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`,
-      `/v1/workspaces/${WORKSPACE_ID}/boards/board-2/document`,
+      `/v1/workspaces/${WORKSPACE_ID}/boards/board-1/bundle`,
+      `/v1/workspaces/${WORKSPACE_ID}/boards/board-2/bundle`,
     ])
     const currentQuery = queryClient.getQueryCache().find({
       queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-2'),
@@ -191,7 +204,7 @@ describe('production Board repository Query integration', () => {
         queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
         exact: true,
       })!
-      expect(oldQuery.getObserversCount()).toBe(1)
+      await vi.waitFor(() => expect(oldQuery.getObserversCount()).toBe(1))
 
       if (transition === 'auth') clearStoredAuth()
       else getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
@@ -250,6 +263,11 @@ describe('production Board repository Query integration', () => {
     let resolveOld!: (value: unknown) => void
     let oldSignal: AbortSignal | undefined
     const oldDocument = apiState.documentById['board-1']
+    const oldBundle = {
+      meta: apiState.boardsResponse.data[0],
+      document: oldDocument,
+      realtime: { ticket: 'test_ticket', expires_at: '' },
+    }
     const newState = createMockWorkspaceBoardApiState()
     addRemoteBoardFixture(newState, OTHER_WORKSPACE_ID, {
       id: 'board-1',
@@ -262,10 +280,13 @@ describe('production Board repository Query integration', () => {
     const oldRead = new Promise((resolve) => {
       resolveOld = resolve
     })
-    pendingReads.push(() => resolveOld({ data: oldDocument }))
+    pendingReads.push(() => resolveOld({ data: oldBundle }))
     mocks.request.mockImplementation(
       (url: string, config: { signal?: AbortSignal; method?: string }) => {
-        if (url.includes(`/workspaces/${WORKSPACE_ID}/`) && url.endsWith('/document')) {
+        if (
+          url.includes(`/workspaces/${WORKSPACE_ID}/`) &&
+          (url.endsWith('/bundle') || url.endsWith('/document'))
+        ) {
           oldSignal = config.signal
           return oldRead
         }
@@ -276,15 +297,17 @@ describe('production Board repository Query integration', () => {
     )
     const hydrate = openDocument(catalog)
     await vi.waitFor(() =>
-      expect(mocks.request.mock.calls.some(([url]) => String(url).endsWith('/document'))).toBe(
-        true,
-      ),
+      expect(
+        mocks.request.mock.calls.some(
+          ([url]) => String(url).endsWith('/bundle') || String(url).endsWith('/document'),
+        ),
+      ).toBe(true),
     )
     getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
     expect(oldSignal?.aborted).toBe(true)
     const newHydrate = openDocument(catalog)
     await expect(newHydrate).resolves.toEqual({ isOk: true })
-    resolveOld({ data: oldDocument })
+    resolveOld({ data: oldBundle })
     await expect(hydrate).resolves.toMatchObject({ isOk: false })
     expect(
       queryClient.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-1')),
@@ -567,4 +590,63 @@ describe('production Board repository Query integration', () => {
       if (transition === 'scope') expect(catalog.viewModel.boards.value[0]?.revision).toBe(9)
     },
   )
+  it.each([true, false])(
+    'target hydration preserves unrelated synced drafts (preserve=%s)',
+    async (shouldPreserveLocalNewer) => {
+      addRemoteBoardFixture(apiState, WORKSPACE_ID, {
+        id: 'board-2',
+        name: 'Second',
+        createdAt: 100,
+        updatedAt: 1000,
+        revision: 7,
+        state: makePromptBoardState(1000, 'second server'),
+      })
+      await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
+      setBoardState('board-2', makePromptBoardState(2000, 'second unsynced draft'))
+      const secondMeta = getBoardById('board-2')
+      const scope = effectScope()
+      stops.push(() => scope.stop())
+      const session = scope.run(() => createBoardSessionRepository())!
+      if (shouldPreserveLocalNewer) await session.load('board-1')
+      else
+        await hydrateBoardsFromServer({
+          shouldIncludeDocuments: true,
+          shouldPreserveLocalNewer,
+          onlyBoardIds: ['board-1'],
+        })
+      expect(getBoardState('board-2')?.promptNodes[0]?.text).toBe('second unsynced draft')
+      expect(getBoardById('board-2')).toEqual(secondMeta)
+    },
+  )
+
+  it('cold Canvas entry still fetches the complete Gallery catalog', async () => {
+    queryClient.clear()
+    replaceBoards([])
+    replaceBoardStateMap({})
+    addRemoteBoardFixture(apiState, WORKSPACE_ID, {
+      id: 'board-2',
+      name: 'Second',
+      createdAt: 100,
+      updatedAt: 1000,
+      revision: 7,
+      state: makePromptBoardState(1000, 'second server'),
+    })
+    const scope = effectScope()
+    stops.push(() => scope.stop())
+    const session = scope.run(() => createBoardSessionRepository())!
+    await session.load('board-1')
+    expect(queryClient.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toBeUndefined()
+    const catalog = repository()
+    expect(
+      await catalog.commands.hydrate({
+        shouldIncludeDocuments: false,
+        shouldForce: false,
+      }),
+    ).toEqual({ isOk: true })
+    expect(catalog.viewModel.boards.value.map((board) => board.id).sort()).toEqual([
+      'board-1',
+      'board-2',
+    ])
+    expect(queryClient.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toHaveLength(2)
+  })
 })

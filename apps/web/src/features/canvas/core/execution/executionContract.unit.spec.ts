@@ -11,15 +11,16 @@ describe('buildExecutionTaskRequest', () => {
 
     const request = buildExecutionTaskRequest({
       prompt: 'demo',
-      imageUrls: ['https://assets.example.com/reference.png'],
+      mediaAssetIds: [' asset_reference ', 'asset_reference'],
       params: {
-        mask_image_url: 'https://assets.example.com/mask.png',
+        mask_asset_id: 'asset_mask',
       },
     })
 
-    expect(request.image_urls).toEqual(['https://assets.example.com/reference.png'])
+    expect(request.media_asset_ids).toEqual(['asset_reference'])
+    expect(request).not.toHaveProperty('image_urls')
     expect(request.params).toEqual({
-      mask_image_url: 'https://assets.example.com/mask.png',
+      mask_asset_id: 'asset_mask',
     })
   })
 })

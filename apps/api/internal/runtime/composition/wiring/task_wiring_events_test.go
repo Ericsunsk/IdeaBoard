@@ -139,21 +139,21 @@ func TestSettlerEventBridgePublishesValidatedWorkspaceEnvelopes(t *testing.T) {
 	}
 }
 
-func (s *bridgeStubSettler) Complete(_ context.Context, workspaceID, taskID string, _ []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusCompleted, s.completeErr)
+func (s *bridgeStubSettler) Complete(_ context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+	return s.settle(workspaceID, taskID, workspacetasks.StatusCompleted, s.completeErr, outputs)
 }
 
 func (s *bridgeStubSettler) Fail(_ context.Context, workspaceID, taskID, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusFailed, s.failErr)
+	return s.settle(workspaceID, taskID, workspacetasks.StatusFailed, s.failErr, nil)
 }
 
 func (s *bridgeStubSettler) Retry(_ context.Context, workspaceID, taskID string, _ bool) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusPending, s.retryErr)
+	return s.settle(workspaceID, taskID, workspacetasks.StatusPending, s.retryErr, nil)
 }
 
 // settle models the production Service: it stages its event only on the
 // post-commit line, so a failing settlement stages nothing.
-func (s *bridgeStubSettler) settle(workspaceID, taskID string, status workspacetasks.Status, err error) (*workspacetasks.WorkspaceTask, error) {
+func (s *bridgeStubSettler) settle(workspaceID, taskID string, status workspacetasks.Status, err error, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	s.phase = phaseSettling
 	s.calls++
@@ -162,6 +162,7 @@ func (s *bridgeStubSettler) settle(workspaceID, taskID string, status workspacet
 	if err == nil {
 		s.staged = append(s.staged, workspacetasks.TaskEvent{
 			TaskID: taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: time.Now().UTC(),
+			Outputs: workspacetasks.BuildTaskCompletedOutputs(workspaceID, outputs),
 		})
 	}
 
@@ -457,6 +458,16 @@ func TestSettlerEventBridgeEmitsMediaAssetReadyPerAssetOutput(t *testing.T) {
 	}
 	if got[0].Type != events.EventV1TaskCompleted {
 		t.Fatalf("first envelope type = %q, want task.completed before the asset hints", got[0].Type)
+	}
+	var completedData events.V1TaskCompletedData
+	if err := json.Unmarshal(got[0].Data, &completedData); err != nil {
+		t.Fatalf("decode completed data: %v", err)
+	}
+	if len(completedData.Outputs) != len(outputs) {
+		t.Fatalf("completed outputs = %d, want %d", len(completedData.Outputs), len(outputs))
+	}
+	if completedData.Outputs[0].AssetID != "asset_readytest01" || !completedData.Outputs[0].PreviewReady {
+		t.Fatalf("completed output 0 = %+v", completedData.Outputs[0])
 	}
 	seen := make(map[string]bool, 2)
 	for _, envelope := range got[1:] {

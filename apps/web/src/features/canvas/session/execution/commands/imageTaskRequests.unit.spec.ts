@@ -31,19 +31,20 @@ import {
 const source = {
   url: 'https://assets.example.com/source.png',
   ratio: 1,
+  assetId: 'asset_source42',
 }
 
 describe('imageTaskRequests', () => {
-  it('prefers AssetID over runtime URL for internal Canvas sources', () => {
+  it('submits only canonical AssetID inputs for internal Canvas sources', () => {
     const request = buildDirectActionTaskRequest({
-      source: { ...source, mediaAssetId: 42 },
+      source: { ...source, url: '' },
       action: IMAGE_NODE_ACTION.variations,
       imageSize: null,
       prompt: 'vary this image',
       outputCount: 1,
     })
 
-    expect(request.image_asset_ids).toEqual([42])
+    expect(request.media_asset_ids).toEqual(['asset_source42'])
     expect(request).not.toHaveProperty('image_urls')
   })
 
@@ -124,17 +125,33 @@ describe('imageTaskRequests', () => {
     const request = buildGenerationTaskRequest({
       prompt: '  repeatable textile pattern  ',
       aspectRatio: '1:1',
-      imageUrls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
+      mediaAssetIds: ['asset_ref1', 'asset_ref2'],
       outputCount: 3,
     })
 
     expect(request).toEqual({
       prompt: 'repeatable textile pattern',
-      priority: 1,
       service: EXECUTION_SERVICE.generation,
-      image_urls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
+      media_asset_ids: ['asset_ref1', 'asset_ref2'],
       params: { output_count: 3, output_resolution: '1k', ratio: '1:1' },
     })
+  })
+
+  it('rejects a generation reference without an AssetID instead of dropping it', () => {
+    const plan: GenerationExecutionPlan = {
+      kind: 'generation',
+      sourceNodeId: 'prompt-1',
+      source,
+      referenceImages: [source, { url: 'https://assets.example.com/unbound.png', ratio: 1 }],
+      prompt: 'use both references',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      resultOptions: {},
+    }
+
+    expect(() => buildImageExecutionTaskRequest(plan)).toThrow(
+      'Canvas execution requires an asset-backed image',
+    )
   })
 
   it('builds style variation params under the nested variation contract', () => {
@@ -161,7 +178,7 @@ describe('imageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('variation_strength')
   })
 
-  it('rejects direct action requests without an image URL', () => {
+  it('rejects direct action requests without an AssetID', () => {
     expect(() =>
       buildDirectActionTaskRequest({
         source: { url: '   ', ratio: 1 },
@@ -170,7 +187,7 @@ describe('imageTaskRequests', () => {
         prompt: '',
         outputCount: 1,
       }),
-    ).toThrow('The image is missing a URL.')
+    ).toThrow('Canvas execution requires an asset-backed image')
   })
 
   it('keeps cutout submit params limited to image sizing', () => {
@@ -222,13 +239,13 @@ describe('imageTaskRequests', () => {
 
   it('prefers the media asset ID over an empty runtime URL for upscale', () => {
     const request = buildUpscaleTaskRequest({
-      source: { ...source, mediaAssetId: 42 },
+      source: { ...source, url: '' },
       imageSize: { width: 1200, height: 800 },
       prompt: '',
       outputCount: 1,
     })
 
-    expect(request.image_asset_ids).toEqual([42])
+    expect(request.media_asset_ids).toEqual(['asset_source42'])
     expect(request).not.toHaveProperty('image_urls')
   })
 
@@ -273,7 +290,7 @@ describe('imageTaskRequests', () => {
       EXECUTION_SERVICE.upscale,
     ])
     for (const request of requests) {
-      expect(request.image_urls).toEqual([source.url])
+      expect(request.media_asset_ids).toEqual([source.assetId])
       if (request.service === EXECUTION_SERVICE.upscale) {
         expect(request.prompt).toBe('')
         expect(request.params).not.toHaveProperty('output_count')
@@ -293,8 +310,8 @@ describe('imageTaskRequests', () => {
   it('builds single-output inpaint params with source dimensions and no reference contract', () => {
     const request = buildImageInpaintTaskRequest({
       prompt: 'redraw the selected area',
-      originalImageUrl: source.url,
-      maskImageUrl: 'https://assets.example.com/mask.png',
+      originalImageAssetId: source.assetId,
+      maskAssetId: 'asset_mask1',
       imageSize: { width: 1200, height: 800 },
     })
 
@@ -309,24 +326,33 @@ describe('imageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('reference_image_urls')
   })
 
-  it('emits mask_asset_id and drops mask_image_url once the mask is a workspace asset', () => {
+  it('uses only the uploaded mask AssetID', () => {
     const request = buildImageInpaintTaskRequest({
       prompt: 'redraw the selected area',
-      originalImageUrl: source.url,
-      maskImageUrl: 'https://assets.example.com/mask.png',
+      originalImageAssetId: source.assetId,
       maskAssetId: ' asset_mask1 ',
       imageSize: { width: 1200, height: 800 },
-      originalImageMediaAssetId: 'asset_aaa1',
     })
 
     expect(request.service).toBe(EXECUTION_SERVICE.inpaint)
-    expect(request.media_asset_ids).toEqual(['asset_aaa1'])
+    expect(request.media_asset_ids).toEqual([source.assetId])
     expect(request.params).toMatchObject({
       output_count: 1,
       mask_asset_id: 'asset_mask1',
       use_mask: true,
     } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams)
     expect(request.params).not.toHaveProperty('mask_image_url')
+  })
+
+  it('rejects an inpaint request without an uploaded mask AssetID', () => {
+    expect(() =>
+      buildImageInpaintTaskRequest({
+        prompt: 'redraw the selected area',
+        originalImageAssetId: source.assetId,
+        maskAssetId: ' ',
+        imageSize: null,
+      }),
+    ).toThrow('Canvas execution requires an asset-backed image')
   })
 
   it('builds outpaint params under the nested outpaint contract', () => {
@@ -369,7 +395,7 @@ describe('imageTaskRequests', () => {
   it('builds Fusion weighted reference params without submitting', () => {
     const request = buildFusionTaskRequest({
       prompt: '[fusion] blend references',
-      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      mediaAssetIds: ['asset_a', 'asset_b'],
       inputWeights: [0.35, 0.65],
       outputCount: 3,
       outputResolution: '4k',
@@ -381,7 +407,7 @@ describe('imageTaskRequests', () => {
     expect(request).toMatchObject({
       prompt: '[fusion] blend references',
       service: EXECUTION_SERVICE.fusion,
-      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      media_asset_ids: ['asset_a', 'asset_b'],
       params: {
         output_count: 3,
         output_resolution: '4k',
@@ -396,7 +422,7 @@ describe('imageTaskRequests', () => {
   it('builds Fusion weighted reference params with size and aspect ratio', () => {
     const request = buildFusionTaskRequest({
       prompt: '[fusion] blend references',
-      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      mediaAssetIds: ['asset_a', 'asset_b'],
       inputWeights: [0.4, 0.6],
       sizeSource: { width: 1024, height: 768 },
       targetSize: { width: 1280, height: 720 },
@@ -406,7 +432,7 @@ describe('imageTaskRequests', () => {
     expect(request).toMatchObject({
       prompt: '[fusion] blend references',
       service: EXECUTION_SERVICE.fusion,
-      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      media_asset_ids: ['asset_a', 'asset_b'],
       params: {
         custom_width: 1280,
         custom_height: 720,
@@ -431,8 +457,24 @@ describe('imageTaskRequests', () => {
       taskPrompt: '[fusion] blend references',
       outputCount: 2,
       aspectRatio: '4:3',
-      inputImages: [],
-      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      inputImages: [
+        {
+          id: 'a',
+          sourceType: 'external',
+          sourceId: 'a',
+          url: 'https://assets.example.com/a.png',
+          ratio: 1,
+          assetId: 'asset_a',
+        },
+        {
+          id: 'b',
+          sourceType: 'external',
+          sourceId: 'b',
+          url: 'https://assets.example.com/b.png',
+          ratio: 1,
+          assetId: 'asset_b',
+        },
+      ],
       blendPoint: { x: 0.5, y: 0.5 },
       stageWidth: 280,
       inputWeights: [0.25, 0.75],
@@ -454,7 +496,7 @@ describe('imageTaskRequests', () => {
     expect(buildImageExecutionTaskRequest(plan)).toMatchObject({
       prompt: '[fusion] blend references',
       service: EXECUTION_SERVICE.fusion,
-      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      media_asset_ids: ['asset_a', 'asset_b'],
       params: {
         custom_width: 1200,
         custom_height: 900,
@@ -508,8 +550,24 @@ describe('imageTaskRequests', () => {
       taskPrompt: '[fusion] blend',
       outputCount: 1,
       aspectRatio: 'auto',
-      inputImages: [],
-      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      inputImages: [
+        {
+          id: 'a',
+          sourceType: 'external',
+          sourceId: 'a',
+          url: 'https://assets.example.com/a.png',
+          ratio: 1,
+          assetId: 'asset_a',
+        },
+        {
+          id: 'b',
+          sourceType: 'external',
+          sourceId: 'b',
+          url: 'https://assets.example.com/b.png',
+          ratio: 1,
+          assetId: 'asset_b',
+        },
+      ],
       blendPoint: { x: 0.5, y: 0.5 },
       stageWidth: 320,
       inputWeights: [0.5, 0.5],
@@ -529,7 +587,7 @@ describe('imageTaskRequests', () => {
       buildImageExecutionTaskRequest(outpaintPlan, { width: 1000, height: 1000 }),
     ).toMatchObject({
       service: EXECUTION_SERVICE.outpaint,
-      image_urls: [source.url],
+      media_asset_ids: [source.assetId],
       params: {
         outpaint: {
           target_width: 1100,
@@ -539,7 +597,7 @@ describe('imageTaskRequests', () => {
     })
     expect(buildImageExecutionTaskRequest(fusionPlan)).toMatchObject({
       service: EXECUTION_SERVICE.fusion,
-      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      media_asset_ids: ['asset_a', 'asset_b'],
       params: {
         fusion: {
           input_weights: [0.5, 0.5],
@@ -552,7 +610,7 @@ describe('imageTaskRequests', () => {
     const plan: ImageInpaintExecutionPlan = {
       kind: 'inpaint',
       sourceNodeId: 'image-1',
-      source: { ...source, mediaAssetId: 42 },
+      source: { ...source, url: '' },
       prompt: 'replace object',
       rawMaskDataUrl: 'data:image/png;base64,mask',
       outputCount: 1,
@@ -562,15 +620,14 @@ describe('imageTaskRequests', () => {
     expect(
       buildPreparedImageInpaintTaskRequest({
         plan,
-        maskImageUrl: 'https://assets.example.com/mask.png',
+        maskAssetId: 'asset_mask1',
         imageSize: { width: 900, height: 600 },
       }),
     ).toMatchObject({
       service: EXECUTION_SERVICE.inpaint,
       params: {
         output_count: 1,
-        original_image_asset_id: 42,
-        mask_image_url: 'https://assets.example.com/mask.png',
+        mask_asset_id: 'asset_mask1',
         custom_width: 900,
         custom_height: 600,
         original_image_width: 900,
@@ -581,7 +638,7 @@ describe('imageTaskRequests', () => {
     expect(
       buildPreparedImageInpaintTaskRequest({
         plan,
-        maskImageUrl: 'https://assets.example.com/mask.png',
+        maskAssetId: 'asset_mask1',
         imageSize: { width: 900, height: 600 },
       }).params,
     ).not.toHaveProperty('reference_image_urls')

@@ -147,10 +147,11 @@ export function seedBoardDocumentQuery(
 /**
  * Create/rename/save local write-back of one list meta. Carries the
  * server-minted or server-advanced identity; never invents revisions.
+ * A single board cannot establish a complete catalog on a cold cache.
  */
 export function writeBoardListMeta(workspaceId: string, meta: WorkspaceBoardMeta): void {
   queryClient.setQueryData<WorkspaceBoardMeta[]>(boardQueryKeys.list(workspaceId), (previous) => {
-    if (!previous) return [meta]
+    if (!previous) return undefined
     if (previous.some((entry) => entry.id === meta.id)) {
       return previous.map((entry) => (entry.id === meta.id ? meta : entry))
     }

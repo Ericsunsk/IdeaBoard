@@ -4,6 +4,7 @@ import {
   getBoard,
   getBoardAccess,
   getBoardDocument,
+  getWorkspaceBoardBundle,
   listBoards,
   issueBoardRealtimeTicket,
   replaceBoardDocument,
@@ -582,6 +583,64 @@ export async function replaceBoardSharing(
   return toShareAccessFact(envelope.data)
 }
 
+type CachedRealtimeTicket = {
+  ticket: string
+  expiresAtMs: number
+}
+const realtimeTicketCache = new Map<string, CachedRealtimeTicket>()
+
+function ticketKey(workspaceId: string, boardId: string): string {
+  return `${workspaceId}:${boardId}`
+}
+
+function cacheBoardRealtimeTicket(
+  workspaceId: string,
+  boardId: string,
+  ticket: string,
+  expiresAt: string,
+): void {
+  const expiresAtMs = Date.parse(expiresAt)
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) return
+  realtimeTicketCache.set(ticketKey(workspaceId, boardId), { ticket, expiresAtMs })
+}
+
+function getCachedBoardRealtimeTicket(workspaceId: string, boardId: string): string | null {
+  const key = ticketKey(workspaceId, boardId)
+  const cached = realtimeTicketCache.get(key)
+  if (!cached) return null
+  if (Date.now() >= cached.expiresAtMs - 5_000) {
+    realtimeTicketCache.delete(key)
+    return null
+  }
+  return cached.ticket
+}
+
+/** Fetches the consolidated board bundle: meta, document snapshot, and realtime ticket in 1 RTT. */
+export async function fetchWorkspaceBoardBundle(
+  workspaceId: string,
+  boardId: string,
+  options: BoardsRequestOptions = {},
+): Promise<{
+  meta: WorkspaceBoardMeta
+  document: WorkspaceBoardDocument
+}> {
+  const workspace = workspaceId.trim()
+  const board = boardId.trim()
+  if (!workspace || !board) throw new BoardPayloadError('board bundle scope')
+  const envelope = await getWorkspaceBoardBundle(workspace, board, requestConfig(options))
+  const data = envelope?.data
+  if (!data?.meta || !data?.document) throw new BoardPayloadError('board bundle')
+  const meta = toWorkspaceBoardMeta(data.meta)
+  const document = toWorkspaceBoardDocument(data.document)
+  if (data.realtime?.ticket && data.realtime?.expires_at) {
+    cacheBoardRealtimeTicket(workspace, board, data.realtime.ticket, data.realtime.expires_at)
+  }
+  return {
+    meta,
+    document,
+  }
+}
+
 /** Mints an opaque room ticket for the explicitly selected workspace Board. */
 export async function requestBoardRealtimeTicket(
   workspaceId: string,
@@ -591,6 +650,10 @@ export async function requestBoardRealtimeTicket(
   const workspace = workspaceId.trim()
   const board = boardId.trim()
   if (!workspace || !board) throw new BoardPayloadError('realtime ticket scope')
+  const cached = getCachedBoardRealtimeTicket(workspace, board)
+  if (cached) {
+    return cached
+  }
   const envelope = await issueBoardRealtimeTicket(workspace, board, requestConfig(options))
   const ticket = envelope?.data?.ticket
   if (typeof ticket !== 'string' || !ticket.trim()) throw new BoardPayloadError('realtime ticket')

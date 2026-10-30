@@ -29,6 +29,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   BadRequestResponse,
   BoardAccessEnvelope,
+  BoardBundleEnvelope,
   BoardDocumentEnvelope,
   BoardEnvelope,
   BoardRevisionDetailEnvelope,
@@ -277,7 +278,7 @@ export const getGetBoardUrl = (workspaceId: string, boardId: string) => {
 }
 
 /**
- * Malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. The revision counter is returned as the ETag response header. The payload carries the creator identity, common sharing role, access version, derived posture, caller relationship, and capabilities.
+ * Malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. The ETag validates the complete caller-specific metadata representation; document revision remains the concurrency token for document writes. The payload carries the creator identity, common sharing role, access version, derived posture, caller relationship, and capabilities.
  * @summary Get a board (any board role)
  */
 export const getBoard = async (
@@ -300,7 +301,7 @@ export const getGetBoardQueryKey = (
 
 export const getGetBoardQueryOptions = <
   TData = Awaited<ReturnType<typeof getBoard>>,
-  TError = UnauthorizedResponse | NotFoundResponse,
+  TError = void | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
@@ -331,7 +332,7 @@ export const getGetBoardQueryOptions = <
 }
 
 export type GetBoardQueryResult = NonNullable<Awaited<ReturnType<typeof getBoard>>>
-export type GetBoardQueryError = UnauthorizedResponse | NotFoundResponse
+export type GetBoardQueryError = void | UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get a board (any board role)
@@ -339,7 +340,7 @@ export type GetBoardQueryError = UnauthorizedResponse | NotFoundResponse
 
 export function useGetBoard<
   TData = Awaited<ReturnType<typeof getBoard>>,
-  TError = UnauthorizedResponse | NotFoundResponse,
+  TError = void | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
@@ -692,6 +693,102 @@ export const useRestoreBoard = <
 > => {
   return useMutation(getRestoreBoardMutationOptions(options), queryClient)
 }
+export const getGetWorkspaceBoardBundleUrl = (workspaceId: string, boardId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/bundle`
+}
+
+/**
+ * Returns the complete board bundle needed for hydration and collaboration: board metadata, document snapshot, and an HMAC realtime presence ticket. Always returns a full response with a fresh short-lived ticket and Cache-Control: no-store; conditional requests do not return 304.
+ * @summary Get board bundle (meta, document, and realtime ticket in 1 RTT)
+ */
+export const getWorkspaceBoardBundle = async (
+  workspaceId: string,
+  boardId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<BoardBundleEnvelope> => {
+  return publicMutator<BoardBundleEnvelope>(getGetWorkspaceBoardBundleUrl(workspaceId, boardId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetWorkspaceBoardBundleQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  boardId: MaybeRefOrGetter<string>,
+) => {
+  return ['workspaces', workspaceId, 'boards', boardId, 'bundle'] as const
+}
+
+export const getGetWorkspaceBoardBundleQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkspaceBoardBundle>>,
+  TError = UnauthorizedResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  boardId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBoardBundle>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetWorkspaceBoardBundleQueryKey(workspaceId, boardId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceBoardBundle>>> = ({
+    signal,
+  }) =>
+    getWorkspaceBoardBundle(toValue(workspaceId), toValue(boardId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(workspaceId) !== null &&
+        toValue(workspaceId) !== undefined &&
+        toValue(boardId) !== null &&
+        toValue(boardId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBoardBundle>>, TError, TData>
+}
+
+export type GetWorkspaceBoardBundleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkspaceBoardBundle>>
+>
+export type GetWorkspaceBoardBundleQueryError = UnauthorizedResponse | NotFoundResponse
+
+/**
+ * @summary Get board bundle (meta, document, and realtime ticket in 1 RTT)
+ */
+
+export function useGetWorkspaceBoardBundle<
+  TData = Awaited<ReturnType<typeof getWorkspaceBoardBundle>>,
+  TError = UnauthorizedResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  boardId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBoardBundle>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetWorkspaceBoardBundleQueryOptions(workspaceId, boardId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getGetBoardDocumentUrl = (workspaceId: string, boardId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/document`
 }

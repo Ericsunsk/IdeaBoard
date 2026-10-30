@@ -139,7 +139,7 @@ describe('ImageExecutionPlan', () => {
     expect(plan.outputCount).toBe(4)
     expect(plan.aspectRatio).toBe('16:9')
     expect(plan.outputResolution).toBe('4k')
-    expect(plan.imageUrls).toEqual([
+    expect(plan.inputImages.map((image) => image.url)).toEqual([
       'https://example.com/b.png',
       'https://example.com/external.png',
       'https://example.com/source.png',

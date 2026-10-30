@@ -59,6 +59,38 @@ describe('resultDisplay', () => {
     expect(loadImageSize).toHaveBeenCalled()
   })
 
+  it('skips receipt derivative wait and image size probe when output has width, height, and previewReady: true', async () => {
+    const waitForReceiptDerivative: ReceiptDerivativeWaiter = vi.fn(async () => {})
+    const loadImageSize = vi.fn(async () => ({ width: 400, height: 200 }))
+
+    const resolved = await resolveTaskImageResultDisplay(
+      {
+        workspaceId: 'ws_test123',
+        assetId: 'asset_1',
+        width: 800,
+        height: 600,
+        isPreviewReady: true,
+        mimeType: 'image/png',
+      },
+      1,
+      loadImageSize,
+      undefined,
+      waitForReceiptDerivative,
+    )
+
+    expect(resolved).toMatchObject({
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
+      ratio: 0.75,
+      width: 800,
+      height: 600,
+      mimeType: 'image/png',
+      mediaRef: { assetId: 'asset_1', derivativeTier: 'preview' },
+    })
+    expect(waitForReceiptDerivative).not.toHaveBeenCalled()
+    expect(loadImageSize).not.toHaveBeenCalled()
+    expect(metadataMock).not.toHaveBeenCalled()
+  })
+
   it('warns and resolves when an injected waiter rejects without abort', async () => {
     const failure = new Error('event wait unavailable')
     const waitForReceiptDerivative: ReceiptDerivativeWaiter = vi.fn(async () => {

@@ -31,28 +31,16 @@ export type ListUserRewardRedemptionsParams = {
 }
 
 export type RewardRedemption = WorkspaceRewardRedemption
+export type RewardRedemptionItem = WorkspaceRewardRedemptionHistoryItem
 
-export type RewardRedemptionHistoryItem = WorkspaceRewardRedemptionHistoryItem
-
-export type RewardRedemptionHistoryPage = {
-  redemptions: RewardRedemptionHistoryItem[]
+export type RewardRedemptionPageData = {
+  redemptions: RewardRedemptionItem[]
   next_cursor?: string
 }
 
-export type RewardRedeemResult = {
-  redemption: RewardRedemption
-  history_item: RewardRedemptionHistoryItem
-  credited_amount: number
-  available_balance: number
-  // Beneficiary stable funds identity (ba_): the caller's initial
-  // personal Billing Account. The requesting workspace is authZ scope
-  // only and never changes the beneficiary (#921).
-  billing_account_id: string
+export type RewardRedeemResult = RedeemWorkspaceRewardResult & {
   replayed: boolean
 }
-
-export type RewardRedemptionItem = RewardRedemptionHistoryItem
-export type RewardRedemptionPageData = RewardRedemptionHistoryPage
 
 export const rewardRedemptionsQueryKeys = {
   all: ['workspace', 'rewards', 'redemptions'] as const,
@@ -79,11 +67,7 @@ export async function redeemRewardCode(
     i18n.global.t('account.errors.redeemCodeInvalid'),
   )
   return {
-    redemption: result.redemption,
-    history_item: result.history_item,
-    credited_amount: result.credited_amount,
-    available_balance: result.available_balance,
-    billing_account_id: result.billing_account_id,
+    ...result,
     replayed: result.replayed === true,
   }
 }
@@ -92,7 +76,7 @@ export async function fetchRewardRedemptions(
   workspaceId: string,
   params: ListUserRewardRedemptionsParams,
   signal?: AbortSignal,
-): Promise<RewardRedemptionHistoryPage> {
+): Promise<RewardRedemptionPageData> {
   const id = requireAccountWorkspaceId(workspaceId)
   const fallback = i18n.global.t('account.errors.rewardsHistoryLoadFailed')
   // Paginated list bodies already carry the contract `{data, meta}` shape,
@@ -116,13 +100,7 @@ export async function fetchRewardRedemptions(
   }>(body, fallback)
   if (!Array.isArray(page?.data) || page?.meta == null) throw new Error(fallback)
   return {
-    redemptions: page.data.map((item) => ({
-      id: item.id,
-      reward_code_display_name: item.reward_code_display_name,
-      credited_amount: item.credited_amount,
-      masked_code_hint: item.masked_code_hint,
-      redeemed_at: item.redeemed_at,
-    })),
+    redemptions: page.data,
     ...(page.meta.has_more && page.meta.next_cursor ? { next_cursor: page.meta.next_cursor } : {}),
   }
 }

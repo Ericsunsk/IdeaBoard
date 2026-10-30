@@ -17,6 +17,7 @@ func TestResolveProviderPublicImageURLAcceptsHTTPSAndUploadPaths(t *testing.T) {
 	}{
 		{name: "absolute", ref: "https://cdn.example.test/image.png?size=1", want: "https://cdn.example.test/image.png?size=1"},
 		{name: "upload", ref: "/uploads/image.png", want: "https://api.example.test/uploads/image.png"},
+		{name: "data URL", ref: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==", want: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := ResolveProviderPublicImageURL(base, test.ref, "输入图像")

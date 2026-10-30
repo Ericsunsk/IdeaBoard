@@ -618,6 +618,63 @@ describe('waitWorkspaceTaskTerminal', () => {
     await expect(pending).resolves.toMatchObject({ id: TASK_ID, status: 'completed' })
   })
 
+  it('resolves immediately from self-contained task.completed outputs without an event-triggered GET', async () => {
+    stubEventSource()
+    let getCalls = 0
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/tasks/:taskId', () => {
+        getCalls += 1
+        return HttpResponse.json(taskPayload('running'))
+      }),
+    )
+    const pending = waitWorkspaceTaskTerminal(WORKSPACE_ID, TASK_ID, { timeoutMs: 5000 })
+    await vi.waitFor(() => expect(MockEventSource.instances[0]).toBeDefined())
+    expect(getCalls).toBe(2)
+
+    MockEventSource.instances[0]?.emit(
+      'task.completed',
+      envelopeFixture({
+        id: 'evt_done_self_contained',
+        type: 'task.completed',
+        data: {
+          task_id: TASK_ID,
+          outputs_uri: `/api/v1/workspaces/${WORKSPACE_ID}/tasks/${TASK_ID}/outputs`,
+          outputs: [
+            {
+              asset_id: 'asset_fast_123',
+              role: 'result',
+              url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/asset_fast_123/content`,
+              width: 1024,
+              height: 1024,
+              mime_type: 'image/png',
+              // eslint-disable-next-line governance/boolean-prefix -- Wire contract field
+              preview_ready: true,
+            },
+          ],
+        },
+      }),
+    )
+
+    const resolved = await pending
+    expect(resolved).toMatchObject({
+      id: TASK_ID,
+      status: 'completed',
+      output_refs: [
+        {
+          kind: 'asset',
+          asset_id: 'asset_fast_123',
+          role: 'result',
+          width: 1024,
+          height: 1024,
+          mime_type: 'image/png',
+          // eslint-disable-next-line governance/boolean-prefix -- Wire contract field
+          preview_ready: true,
+        },
+      ],
+    })
+    expect(getCalls).toBe(2)
+  })
+
   it('falls back to polling when EventSource is unavailable', async () => {
     vi.stubGlobal('EventSource', undefined)
     let calls = 0

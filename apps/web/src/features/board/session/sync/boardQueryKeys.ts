@@ -14,6 +14,9 @@ export const boardQueryKeys = {
   /** Per-board server document snapshot (revision + payload). */
   document: (workspaceId: string, boardId: string) =>
     ['boards', workspaceId, 'board', boardId, 'document'] as const,
+  /** Per-board consolidated bundle (meta + document + realtime ticket). */
+  bundle: (workspaceId: string, boardId: string) =>
+    ['boards', workspaceId, 'board', boardId, 'bundle'] as const,
   /** Per-board access fact (selected members + common role + version; Creator only). */
   access: (workspaceId: string, boardId: string) =>
     ['boards', workspaceId, 'board', boardId, 'access'] as const,

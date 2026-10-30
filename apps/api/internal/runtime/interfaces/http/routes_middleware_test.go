@@ -1,10 +1,5 @@
 package http
 
-// The legacy /api/user + /api/admin upload bypasses were deleted with the
-// #809 hard cut: no POST path bypasses the global JSON body limit anymore
-// (the v1 workspace upload/media surface is JSON session-based). These
-// tests pin the always-false classifier, including its nil-safety.
-
 import (
 	"net/http"
 	"net/url"
@@ -24,6 +19,10 @@ func TestIsUploadRequestClassifiesURLPathsWithoutFilesystemCleaning(t *testing.T
 		{name: "board traversal is not reclassified", path: "/api/user/boards/board-1/../uploads", want: false},
 		{name: "board missing id", path: "/api/user/boards//uploads", want: false},
 		{name: "board extra segment", path: "/api/user/boards/board-1/uploads/", want: false},
+		{name: "direct workspace media upload", path: "/api/v1/workspaces/ws_123/media-assets/direct", want: true},
+		{name: "missing workspace", path: "/api/v1/workspaces//media-assets/direct", want: false},
+		{name: "extra segment", path: "/api/v1/workspaces/ws_123/media-assets/direct/extra", want: false},
+		{name: "traversal", path: "/api/v1/workspaces/../media-assets/direct", want: false},
 		{name: "v1 workspace upload honors the global limit", path: "/api/v1/workspaces/ws_123/uploads", want: false},
 	}
 
@@ -44,7 +43,7 @@ func TestIsUploadRequestHandlesMalformedRequests(t *testing.T) {
 	if isUploadRequest(&http.Request{Method: http.MethodPost}) {
 		t.Fatal("request without URL should not be classified as upload")
 	}
-	if isUploadRequest(&http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/api/admin/upload"}}) {
+	if isUploadRequest(&http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/api/v1/workspaces/ws_123/media-assets/direct"}}) {
 		t.Fatal("non-POST request should not be classified as upload")
 	}
 }

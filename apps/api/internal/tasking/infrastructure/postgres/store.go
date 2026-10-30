@@ -1194,8 +1194,13 @@ func (s *Store) CompleteTask(ctx context.Context, workspaceID, taskID string, ou
 			return err
 		}
 		completed = done
+		outputsData := workspacetasks.BuildTaskCompletedOutputs(completed.WorkspaceID, outputs)
 		return s.insertTaskOutboxTx(ctx, tx, completed, workspacetasks.StatusCompleted, events.EventV1TaskCompleted,
-			events.V1TaskCompletedData{TaskID: completed.ID, OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs"})
+			events.V1TaskCompletedData{
+				TaskID:     completed.ID,
+				OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs",
+				Outputs:    outputsData,
+			})
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -1231,8 +1236,13 @@ func (s *Store) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, ta
 		}
 		return nil, err
 	}
+	outputsData := workspacetasks.BuildTaskCompletedOutputs(completed.WorkspaceID, outputs)
 	if err := s.insertTaskOutboxTx(ctx, tx, completed, workspacetasks.StatusCompleted, events.EventV1TaskCompleted,
-		events.V1TaskCompletedData{TaskID: completed.ID, OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs"}); err != nil {
+		events.V1TaskCompletedData{
+			TaskID:     completed.ID,
+			OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs",
+			Outputs:    outputsData,
+		}); err != nil {
 		return nil, err
 	}
 	return completed, nil

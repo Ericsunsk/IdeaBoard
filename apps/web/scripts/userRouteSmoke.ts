@@ -9,7 +9,7 @@
  * Authenticated flows are an explicit documented gap (see below).
  *
  * Live backend probes (GET /api/health, /api/livez, /api/readyz,
- * GET /api/settings/branding) run only when USER_ROUTE_SMOKE_API_BASE_URL
+ * GET /api/v1/settings/branding) run only when USER_ROUTE_SMOKE_API_BASE_URL
  * points at a reachable API; otherwise they are reported as skipped.
  *
  * Hermetic: only GET reads, no mutations, no test users, no DB writes.
@@ -186,17 +186,17 @@ async function probeLiveBackend(apiBaseUrl: string): Promise<ApiProbeResult[]> {
     })
   }
   try {
-    const { status, body } = await fetchJson(`${apiBaseUrl}/api/settings/branding`)
+    const { status, body } = await fetchJson(`${apiBaseUrl}/api/v1/settings/branding`)
     const data = body?.data as { project_name?: unknown } | null | undefined
-    const ok = status === 200 && body?.code === 0 && typeof data?.project_name === 'string'
+    const ok = status === 200 && typeof data?.project_name === 'string'
     results.push({
-      label: '/api/settings/branding',
+      label: '/api/v1/settings/branding',
       status: ok ? 'passed' : 'failed',
       detail: ok ? '200 anonymous branding read' : `unexpected: HTTP ${status}`,
     })
   } catch (error) {
     results.push({
-      label: '/api/settings/branding',
+      label: '/api/v1/settings/branding',
       status: 'failed',
       detail: error instanceof Error ? error.message : String(error),
     })

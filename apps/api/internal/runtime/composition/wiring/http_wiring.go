@@ -173,10 +173,10 @@ func NewAppRouter(
 		Events:      tenancyevents.NewCollaborationEventDispatcher(notificationCommands, taskServices.invitationMailQueue),
 		Transaction: invitations.PostgresTransaction(repos.db),
 	}
+	publicSearchHandler := searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()}), mediaPreviews)
 	registerHTTPRoutes(router,
 		runtimehttp.Dependencies{
-			PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()}), mediaPreviews),
-			PaymentWebhook:      paymentWebhookHandler,
+			PaymentWebhook: paymentWebhookHandler,
 			Internal: runtimehttp.InternalRouteDeps{
 				UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey),
 				// Board presence admit for the Y.js server: same ticket
@@ -187,19 +187,20 @@ func NewAppRouter(
 			},
 			CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 			RateLimit:      services.runtimeSettings,
-			Branding:       services.runtimeSettings,
 			MediaPreviews:  mediaPreviews,
 			REDMetrics:     redMetrics,
 			ReadyChecker:   readyChecker,
 		},
 		authDeps,
 		v1.ContractV1Deps{
-			SupportChannels:  services.runtimeSettings,
-			Store:            tenancyStore,
-			Notifications:    notificationCommands,
-			Invitations:      collaboration,
-			InvitationReader: v1.NewInvitationReader(repos.userRepo, services.authServiceClient),
-			Users:            userDirectory,
+			SupportChannels:     services.runtimeSettings,
+			Branding:            services.runtimeSettings,
+			PublicSearchHandler: publicSearchHandler,
+			Store:               tenancyStore,
+			Notifications:       notificationCommands,
+			Invitations:         collaboration,
+			InvitationReader:    v1.NewInvitationReader(repos.userRepo, services.authServiceClient),
+			Users:               userDirectory,
 			// #944 creation-time account display and authorization: the same
 			// stable billing-account store the billing surface and task
 			// preflights use, so new workspaces link to an authorized
@@ -344,6 +345,7 @@ func NewAppRouter(
 			// Required read-only snapshot for the billing overview fan-out
 			// (REPEATABLE READ with ambient-carrier join).
 			Snapshot: billingoverview.PostgresSnapshot(repos.db),
+			Branding: services.runtimeSettings,
 		},
 		// Control administration shares domain handlers and stores. The guard
 		// enforces authorization, rate limits, idempotency and durable audit.

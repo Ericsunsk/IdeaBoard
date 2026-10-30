@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/tasking/settlement"
 
@@ -124,9 +125,9 @@ type TaskBillingStore interface {
 // durable. The owned/borrowed deferral lives in the deep settlement kernel
 // (settlement.StageOrDefer on the dbutil post-commit interface); this stays
 // a thin adapter binding the service's staging closure.
-func (s *Service) stageSettlementEvent(ctx context.Context, owned bool, taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
+func (s *Service) stageSettlementEvent(ctx context.Context, owned bool, taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time, outputs []events.V1TaskCompletedOutput) {
 	settlement.StageOrDefer(ctx, owned, func(context.Context) {
-		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
+		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt, outputs)
 	})
 }
 
@@ -351,7 +352,7 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		return nil, err
 	}
 	committed = true
-	s.stageSettlementEvent(ctx, owned, created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt, nil)
 	return created, nil
 }
 
@@ -454,7 +455,8 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 		return nil, err
 	}
 	committed = true
-	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
+	completedOutputs := BuildTaskCompletedOutputs(workspaceID, outputs)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt, completedOutputs)
 	return completed, nil
 }
 
@@ -489,7 +491,7 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 		return nil, err
 	}
 	committed = true
-	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt, nil)
 	return failed, nil
 }
 
@@ -529,14 +531,14 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 			return nil, false, err
 		}
 		committed = true
-		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
+		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt, nil)
 		return flipped, false, nil
 	}
 	// Borrowed (ambient) transaction (#889): the guard commits later
 	// together with the audit row, so the stage defers through the same
 	// post-commit hook every other settlement uses (see
 	// stageSettlementEvent).
-	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt, nil)
 	return flipped, false, nil
 }
 
@@ -580,6 +582,6 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	// commit, through the same owned/borrowed deferral every other flip
 	// uses: a staged event means a committed fact, and publishing it is
 	// the caller's post-commit job (never inside this transaction).
-	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusPending, retried.ExecutionToken, retried.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusPending, retried.ExecutionToken, retried.UpdatedAt, nil)
 	return retried, nil
 }

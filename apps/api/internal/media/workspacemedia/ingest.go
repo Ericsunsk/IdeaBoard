@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ type IngestImageParams struct {
 	FilenameStem           string
 	Data                   []byte
 	ExpectedChecksumSHA256 string
+	TargetBoardPublicID    string
 }
 
 // IngestImage registers validated bytes through the upload session protocol.
@@ -34,7 +36,7 @@ func IngestImage(ctx context.Context, sessions SessionStore, objects MediaObject
 	}
 	facts, err := imageformat.InspectDetectedBytes(params.Data)
 	if err != nil {
-		return nil, fmt.Errorf("workspacemedia: unsupported image: %w", err)
+		return nil, fmt.Errorf("workspacemedia: inspect image (%v): %w", err, NewFieldValidationError("file"))
 	}
 	sum := sha256.Sum256(params.Data)
 	checksum := hex.EncodeToString(sum[:])
@@ -42,11 +44,22 @@ func IngestImage(ctx context.Context, sessions SessionStore, objects MediaObject
 		return nil, errors.New("图片校验失败: checksum mismatch")
 	}
 	workspaceID := strings.TrimSpace(params.WorkspaceID)
+	stem := strings.TrimSpace(params.FilenameStem)
+	if ext := filepath.Ext(stem); ext != "" {
+		stem = strings.TrimSuffix(stem, ext)
+	}
+	if stem == "" {
+		stem = "upload"
+	}
 	session, err := sessions.CreateSession(ctx, CreateSessionParams{
-		WorkspaceID: workspaceID, OwnerUserID: params.OwnerUserID,
-		Filename: strings.TrimSpace(params.FilenameStem) + facts.Extension,
-		MIMEType: facts.MIMEType, SizeBytes: int64(len(params.Data)),
-		ChecksumSHA256: checksum, MediaKind: MediaKindImage,
+		WorkspaceID:         workspaceID,
+		OwnerUserID:         params.OwnerUserID,
+		Filename:            stem + facts.Extension,
+		MIMEType:            facts.MIMEType,
+		SizeBytes:           int64(len(params.Data)),
+		ChecksumSHA256:      checksum,
+		MediaKind:           MediaKindImage,
+		TargetBoardPublicID: strings.TrimSpace(params.TargetBoardPublicID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("workspacemedia: reserve image upload: %w", err)

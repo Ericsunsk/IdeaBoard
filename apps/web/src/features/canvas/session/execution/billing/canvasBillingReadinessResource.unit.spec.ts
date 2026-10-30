@@ -39,7 +39,7 @@ describe('canvas billing readiness request contracts', () => {
     )
   })
 
-  it('uses current Fusion media with normalized weights for a valid readiness request', () => {
+  it('uses current Fusion image count for quote weights without carrying media inputs', () => {
     expect(
       buildFusionBillingReadinessRequest({
         imageUrls: [' /uploads/a.png ', '/uploads/b.png'],
@@ -48,7 +48,6 @@ describe('canvas billing readiness request contracts', () => {
     ).toMatchObject({
       prompt: '[fusion] submit readiness',
       service: 'fusion',
-      image_urls: ['/uploads/a.png', '/uploads/b.png'],
       params: {
         ratio: '1:1',
         fusion: {

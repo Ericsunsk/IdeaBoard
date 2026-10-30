@@ -1,7 +1,7 @@
 package http
 
-// Route registration tests for the post-#809 surface: frontend fallback,
-// branding, and public search. Legacy /api/user and /api/admin route
+// Route registration tests for the post-#809 surface: frontend fallback.
+// Legacy /api/user, /api/admin, /api/settings/branding, and /api/search route
 // assertions were deleted with the hard cut (see
 // contract_inventory_test.go for the legacy-zero gate).
 
@@ -10,26 +10,14 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"ideaboard/api/internal/platform/settings"
-	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-type stubBrandingSettingsProvider struct {
-	setting settings.BrandingSetting
-	err     error
-}
-
-func (p stubBrandingSettingsProvider) GetBranding(_ context.Context) (settings.BrandingSetting, error) {
-	return p.setting, p.err
-}
 
 // stubRateLimitSettingsProvider is shared with observability_test.go.
 type stubRateLimitSettingsProvider struct {
@@ -80,60 +68,3 @@ func TestRegisterFrontendRoutesAcceptsEmbeddedIndex(t *testing.T) {
 }
 
 var _ fs.FS = fstest.MapFS{}
-
-func TestPublicBrandingSettingsHandlerReturnsBranding(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(stubBrandingSettingsProvider{
-		setting: settings.BrandingSetting{
-			ProjectName: "Design Ops",
-			// Display form, as the real service returns: stored logo keys
-			// already project to the public logo route, so the boundary
-			// trusts the provider payload verbatim.
-			LogoURL: "/api/v1/public/branding/logo",
-		},
-	}))
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, RoutePublicSettingsBranding, nil)
-	router.ServeHTTP(res, req)
-
-	if res.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body=%s", res.Code, http.StatusOK, res.Body.String())
-	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"project_name":"Design Ops"`) || !strings.Contains(body, `"logo_url":"/api/v1/public/branding/logo"`) {
-		t.Fatalf("body = %s, want branding payload with the projected logo route", body)
-	}
-}
-
-func TestPublicBrandingSettingsHandlerRequiresProvider(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(nil))
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, RoutePublicSettingsBranding, nil)
-	router.ServeHTTP(res, req)
-
-	if res.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body=%s", res.Code, http.StatusInternalServerError, res.Body.String())
-	}
-}
-
-func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	registerPublicRoutes(router, nil, searchhttp.NewSearchHandler(nil, nil), nil)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, RoutePublicSearch, nil)
-	router.ServeHTTP(res, req)
-
-	if res.Code == http.StatusUnauthorized {
-		t.Fatalf("public search route unexpectedly required authentication: status=%d body=%s", res.Code, res.Body.String())
-	}
-	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), `"code":"search_unavailable"`) {
-		t.Fatalf("status = %d body=%s, want unauthenticated search_unavailable 503", res.Code, res.Body.String())
-	}
-}

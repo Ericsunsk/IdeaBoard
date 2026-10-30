@@ -73,7 +73,6 @@ export function buildFusionBillingReadinessRequest(input: {
   if (imageUrls.length < 2) return null
   return buildFusionTaskRequest({
     prompt: '[fusion] submit readiness',
-    imageUrls,
     inputWeights: imageUrls.map(() => 1 / imageUrls.length),
     outputCount: input.outputCount,
     sizeSource: null,

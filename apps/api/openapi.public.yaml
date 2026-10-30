@@ -65,6 +65,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /settings/branding:
+    get:
+      tags: [User]
+      operationId: getPublicBrandingSetting
+      summary: Read the public site branding setting (no auth)
+      description: >-
+        Returns the public site branding settings (project name and logo URL).
+        Public endpoint; no authentication required.
+      security: []
+      responses:
+        '200':
+          description: Public site branding setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicBrandingSettingEnvelope'
+        '503':
+          description: Branding settings unavailable.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /user:
     get:
       tags: [User]
@@ -932,6 +960,31 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/bootstrap:
+    get:
+      tags: [Workspaces]
+      operationId: getWorkspaceBootstrap
+      summary: Get consolidated workspace bootstrap context (workspace, billing account, wallet, branding in 1 RTT)
+      description: >-
+        Consolidates initial workspace setup and shell context into a single RTT,
+        including workspace metadata, stable billing account identity, live credit balance,
+        and public site branding.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace bootstrap data.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBootstrapEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /workspaces/{workspace_id}/members:
     get:
       tags: [WorkspaceMembers]
@@ -1768,13 +1821,19 @@ paths:
       summary: Get a board (any board role)
       description: >-
         Malformed ids, unknown boards, and callers holding no effective
-        board role converge to 404 board_not_found. The revision counter
-        is returned as the ETag response header. The payload carries the
+        board role converge to 404 board_not_found. The ETag validates the complete
+        caller-specific metadata representation; document revision remains the
+        concurrency token for document writes. The payload carries the
         creator identity, common sharing role, access version, derived
         posture, caller relationship, and capabilities.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/BoardId'
+        - name: If-None-Match
+          in: header
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Board detail.
@@ -1782,11 +1841,22 @@ paths:
             Request-Id:
               $ref: '#/components/headers/RequestId'
             ETag:
-              $ref: '#/components/headers/ETag'
+              description: Validator for the complete caller-specific metadata representation.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BoardEnvelope'
+        '304':
+          description: Board metadata unmodified for the current caller.
+          headers:
+            ETag:
+              description: Validator for the complete caller-specific metadata representation.
+              schema:
+                type: string
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1896,6 +1966,33 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/boards/{board_id}/bundle:
+    get:
+      tags: [Boards]
+      operationId: getWorkspaceBoardBundle
+      summary: Get board bundle (meta, document, and realtime ticket in 1 RTT)
+      description: >-
+        Returns the complete board bundle needed for hydration and collaboration:
+        board metadata, document snapshot, and an HMAC realtime presence ticket.
+        Always returns a full response with a fresh short-lived ticket and
+        Cache-Control: no-store; conditional requests do not return 304.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Board bundle.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardBundleEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /workspaces/{workspace_id}/boards/{board_id}/document:
     get:
       tags: [Boards]
@@ -4365,6 +4462,51 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/media-assets/direct:
+    post:
+      tags: [WorkspaceMedia]
+      operationId: uploadWorkspaceMediaDirect
+      summary: Direct upload of a workspace media asset (single request)
+      description: >-
+        Single-request image upload using the upload session protocol internally.
+        Accepts multipart/form-data with a binary file and optional board_id.
+        Returns the created media asset envelope.
+        No Idempotency-Key header is required for direct multipart upload.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Binary media asset file.
+                board_id:
+                  type: string
+                  description: Optional board public ID to bind the asset to.
+      responses:
+        '201':
+          description: Media asset created directly.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAssetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /workspaces/{workspace_id}/media-assets/batch:
     post:
       tags: [WorkspaceMedia]
@@ -4920,6 +5062,67 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /search:
+    get:
+      tags: [WorkspaceSearch]
+      operationId: searchInspiration
+      summary: Public web image search across providers (no auth)
+      description: >-
+        Public inspiration search across enabled image providers (Unsplash, Pexels).
+        Supports keyword queries, cursor-based pagination, and limit control.
+        Anonymous-capable by design; no authentication required.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search keywords (optional).
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque pagination cursor.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Requested page size (default 24, maximum 48).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 48
+      responses:
+        '200':
+          description: Inspiration search results.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSearchEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          description: Upstream provider unavailable.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Search service unavailable.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/search:
     get:
       tags: [WorkspaceSearch]
@@ -5376,6 +5579,24 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/SupportChannelsSetting'
+    PublicBrandingSetting:
+      type: object
+      required: [project_name, logo_url]
+      additionalProperties: false
+      properties:
+        project_name:
+          type: string
+          maxLength: 40
+        logo_url:
+          type: string
+          maxLength: 2048
+    PublicBrandingSettingEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/PublicBrandingSetting'
     SuccessEnvelope:
       type: object
       required: [data]
@@ -5413,6 +5634,26 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/Workspace'
+    WorkspaceBootstrap:
+      type: object
+      required: [workspace, billing_account, wallet, branding]
+      additionalProperties: false
+      properties:
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        billing_account:
+          $ref: '#/components/schemas/WorkspaceBillingAccount'
+        wallet:
+          $ref: '#/components/schemas/WorkspaceCreditsBalance'
+        branding:
+          $ref: '#/components/schemas/PublicBrandingSetting'
+    WorkspaceBootstrapEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceBootstrap'
     WorkspaceList:
       type: object
       required: [data]
@@ -5588,9 +5829,9 @@ components:
         id:
           $ref: '#/components/schemas/WorkspaceId'
         organization_id:
-          anyOf:
+          allOf:
             - $ref: '#/components/schemas/OrganizationId'
-            - nullable: true
+          nullable: true
           description: Null for personal workspaces without an organization.
         name:
           type: string
@@ -6024,9 +6265,9 @@ components:
               minLength: 1
               maxLength: 120
             organization_id:
-              anyOf:
+              allOf:
                 - $ref: '#/components/schemas/OrganizationId'
-                - nullable: true
+              nullable: true
               description: >-
                 Omitted for a Personal workspace (the caller's Personal
                 account); an organization_id creates an Organization
@@ -6462,6 +6703,24 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/BoardDocument'
+    BoardBundle:
+      type: object
+      required: [meta, document, realtime]
+      additionalProperties: false
+      properties:
+        meta:
+          $ref: '#/components/schemas/Board'
+        document:
+          $ref: '#/components/schemas/BoardDocument'
+        realtime:
+          $ref: '#/components/schemas/RealtimeTicket'
+    BoardBundleEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardBundle'
     ReplaceBoardDocumentRequest:
       type: object
       required: [data]
@@ -8376,6 +8635,63 @@ components:
             $ref: '#/components/schemas/WorkspaceSearchResult'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    PublicSearchResult:
+      type: object
+      required: [id, provider, title, author, author_url, source_url, thumbnail_url, preview_url, original_url, width, height, media_kind]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        provider:
+          $ref: '#/components/schemas/LibraryAssetProvider'
+        title:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        author_url:
+          type: string
+        source_url:
+          type: string
+        thumbnail_url:
+          type: string
+        preview_url:
+          type: string
+        original_url:
+          type: string
+        width:
+          type: integer
+          minimum: 0
+        height:
+          type: integer
+          minimum: 0
+        media_kind:
+          type: string
+        display:
+          $ref: '#/components/schemas/MediaDisplay'
+    PublicSearchResponse:
+      type: object
+      required: [query, results, has_more]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicSearchResult'
+        next_cursor:
+          type: string
+        has_more:
+          type: boolean
+    PublicSearchEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/PublicSearchResponse'
     CreateWorkspaceVisionQueryRequest:
       type: object
       required: [data]

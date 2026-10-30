@@ -15,11 +15,10 @@ import {
 import { waitCanvasWorkspaceTaskImageOutcome } from '../workspace/canvasTaskWaiting'
 import { createTaskImageObserver } from '../task-runner/taskImageOutcome'
 import {
-  createCanvasTaskClientActionId,
   type ClientActionIdFactory,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
-import { assertTaskRequestReady, submitTaskRequest } from '../workspace/canvasTaskSubmissionAdapter'
+import { submitTaskRequest } from '../workspace/canvasTaskSubmissionAdapter'
 import {
   createPendingImageWorkflowRunner,
   type PendingImageWorkflowRunner,
@@ -114,8 +113,6 @@ export function assemblePendingImageWorkflow(
     taskTransport:
       options.taskTransport ??
       ({
-        assertReady: (request) =>
-          assertTaskRequestReady(withTaskClientActionId(request, createCanvasTaskClientActionId())),
         submit: (request, clientActionId) =>
           submitTaskRequest(
             withTaskClientActionId(

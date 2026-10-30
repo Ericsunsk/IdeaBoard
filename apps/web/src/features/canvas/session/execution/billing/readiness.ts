@@ -1,7 +1,6 @@
 import {
   computed,
   inject,
-  onScopeDispose,
   provide,
   reactive,
   watchEffect,
@@ -17,7 +16,6 @@ import {
   fetchCanvasBillingReadiness,
   fetchCanvasBillingReadinessMatrix,
 } from './canvasBillingReadinessResource'
-import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 
 export type CanvasBillingQuoteState = {
   service: Service
@@ -55,10 +53,6 @@ export type CanvasBillingReadinessStore = {
     service: Service,
     request?: CanvasBillingReadinessRequest,
   ) => CanvasBillingQuoteState
-  applyReadiness: (
-    readiness: SubmitTaskReadinessData,
-    request?: CanvasBillingReadinessRequest,
-  ) => void
 }
 
 const EMPTY_STATES = Object.fromEntries(
@@ -148,14 +142,6 @@ export function createCanvasBillingReadinessStore(
     failedAt.delete(key)
     states.set(key, state)
     loadedAt.set(key, now())
-  }
-
-  function applyReadiness(
-    readiness: SubmitTaskReadinessData,
-    request?: CanvasBillingReadinessRequest,
-  ): void {
-    if (!isService(readiness.service)) return
-    applyReadinessForKey(buildReadinessStateKey(readiness.service, request), readiness)
   }
 
   async function ensureService(
@@ -251,7 +237,6 @@ export function createCanvasBillingReadinessStore(
     ensureMatrix,
     getServiceState: (service, request) =>
       states.get(buildReadinessStateKey(service, request)) ?? EMPTY_STATES[service],
-    applyReadiness,
   }
 }
 
@@ -259,8 +244,6 @@ export function provideCanvasBillingReadiness(
   store: CanvasBillingReadinessStore = createCanvasBillingReadinessStore(),
 ): CanvasBillingReadinessStore {
   provide(canvasBillingReadinessKey, store)
-  const unsubscribe = subscribeCanvasTaskReadiness(store.applyReadiness)
-  onScopeDispose(unsubscribe)
   return store
 }
 

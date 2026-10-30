@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "c58669efa36f7a649c91c08d225894f4ce44abfd",
+  "checkpointSha": "1bbb5fa7f5e2443c7d65395245834dd0d4258c68",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 273, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 274, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -15,11 +15,6 @@
         { "from": "src/api/orvalMutator.ts", "to": "src/api/client.ts", "kind": "runtime" },
         {
           "from": "src/api/workspaceUpload.contract.spec.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/composables/useSiteBranding.ts",
           "to": "src/api/client.ts",
           "kind": "runtime"
         },
@@ -49,11 +44,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/session/adapters/resource.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
@@ -64,7 +54,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 11,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/ofetch/dist/node.cjs",
@@ -88,7 +78,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 13,
+      "targetFanIn": 11,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -2499,6 +2489,11 @@
     "src/api/generated-query/public/model/board.ts": {
       "consumerEdges": [
         {
+          "from": "src/api/generated-query/public/model/boardBundle.ts",
+          "to": "src/api/generated-query/public/model/board.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/api/generated-query/public/model/boardEnvelope.ts",
           "to": "src/api/generated-query/public/model/board.ts",
           "kind": "type-only"
@@ -2519,7 +2514,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 7,
       "fanOutTargets": [
         "src/api/generated-query/public/model/boardAccessState.ts",
@@ -2571,7 +2566,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -2585,6 +2580,11 @@
     },
     "src/api/generated-query/public/model/boardDocument.ts": {
       "consumerEdges": [
+        {
+          "from": "src/api/generated-query/public/model/boardBundle.ts",
+          "to": "src/api/generated-query/public/model/boardDocument.ts",
+          "kind": "type-only"
+        },
         {
           "from": "src/api/generated-query/public/model/boardDocumentEnvelope.ts",
           "to": "src/api/generated-query/public/model/boardDocument.ts",
@@ -2601,7 +2601,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 3,
       "fanOutTargets": [
         "src/api/generated-query/public/model/boardDocumentDocument.ts",
@@ -2629,7 +2629,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -2710,6 +2710,11 @@
         },
         {
           "from": "src/api/workspaceTaskTransport.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/composables/useSiteBranding.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -2839,13 +2844,18 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/test/notificationFacts.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         }
       ],
-      "fanIn": 40,
-      "fanOut": 337,
+      "fanIn": 42,
+      "fanOut": 348,
       "fanOutTargets": [
         "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/accessIfMatchParameter.ts",
@@ -2873,6 +2883,8 @@
         "src/api/generated-query/public/model/boardAccess.ts",
         "src/api/generated-query/public/model/boardAccessEnvelope.ts",
         "src/api/generated-query/public/model/boardAccessState.ts",
+        "src/api/generated-query/public/model/boardBundle.ts",
+        "src/api/generated-query/public/model/boardBundleEnvelope.ts",
         "src/api/generated-query/public/model/boardCapabilities.ts",
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/generated-query/public/model/boardDocumentDocument.ts",
@@ -3043,6 +3055,11 @@
         "src/api/generated-query/public/model/paginationMeta.ts",
         "src/api/generated-query/public/model/preconditionFailedResponse.ts",
         "src/api/generated-query/public/model/preconditionRequiredResponse.ts",
+        "src/api/generated-query/public/model/publicBrandingSetting.ts",
+        "src/api/generated-query/public/model/publicBrandingSettingEnvelope.ts",
+        "src/api/generated-query/public/model/publicSearchEnvelope.ts",
+        "src/api/generated-query/public/model/publicSearchResponse.ts",
+        "src/api/generated-query/public/model/publicSearchResult.ts",
         "src/api/generated-query/public/model/quoteWorkspaceTaskRequest.ts",
         "src/api/generated-query/public/model/quoteWorkspaceTaskRequestData.ts",
         "src/api/generated-query/public/model/realtimeTicket.ts",
@@ -3072,6 +3089,7 @@
         "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
         "src/api/generated-query/public/model/saveMediaLibraryAssetData.ts",
         "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts",
+        "src/api/generated-query/public/model/searchInspirationParams.ts",
         "src/api/generated-query/public/model/searchWorkspaceParams.ts",
         "src/api/generated-query/public/model/searchWorkspaceProviderItem.ts",
         "src/api/generated-query/public/model/service.ts",
@@ -3122,6 +3140,7 @@
         "src/api/generated-query/public/model/uploadSessionStatus.ts",
         "src/api/generated-query/public/model/uploadTarget.ts",
         "src/api/generated-query/public/model/uploadTargetKind.ts",
+        "src/api/generated-query/public/model/uploadWorkspaceMediaDirectBody.ts",
         "src/api/generated-query/public/model/user.ts",
         "src/api/generated-query/public/model/userEnvelope.ts",
         "src/api/generated-query/public/model/userId.ts",
@@ -3137,6 +3156,8 @@
         "src/api/generated-query/public/model/workspaceBillingOverviewEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingQuote.ts",
         "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceBootstrap.ts",
+        "src/api/generated-query/public/model/workspaceBootstrapEnvelope.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSession.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSessionEnvelope.ts",
         "src/api/generated-query/public/model/workspaceCreditsBalance.ts",
@@ -3314,6 +3335,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/boardAccessState.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/boardBundle.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/boardBundleEnvelope.ts",
           "kind": "runtime"
         },
         {
@@ -4168,6 +4199,31 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/publicBrandingSetting.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/publicBrandingSettingEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/publicSearchEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/publicSearchResponse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/publicSearchResult.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/quoteWorkspaceTaskRequest.ts",
           "kind": "runtime"
         },
@@ -4309,6 +4365,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/searchInspirationParams.ts",
           "kind": "runtime"
         },
         {
@@ -4563,6 +4624,11 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/uploadWorkspaceMediaDirectBody.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/user.ts",
           "kind": "runtime"
         },
@@ -4634,6 +4700,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/workspaceBootstrap.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/workspaceBootstrapEnvelope.ts",
           "kind": "runtime"
         },
         {
@@ -4876,8 +4952,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 40,
-      "targetFanOut": 337,
+      "targetFanIn": 42,
+      "targetFanOut": 348,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4906,6 +4982,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/composables/useSupportChannels.ts",
           "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
@@ -4926,7 +5007,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 8,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -4970,7 +5051,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 7,
+      "targetFanIn": 8,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5237,6 +5318,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/search/session/adapters/resource.ts",
+          "to": "src/api/generated-query/public/workspace-search/workspace-search.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/session/adapters/workspace.contract.spec.ts",
           "to": "src/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
@@ -5247,7 +5333,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -5291,7 +5377,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5319,9 +5405,14 @@
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/workspaces/workspaces.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/api/generated-query/public/workspaces/workspaces.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -5365,7 +5456,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5379,7 +5470,11 @@
     },
     "src/api/idempotencyKey.ts": {
       "consumerEdges": [
-        { "from": "src/api/upload.ts", "to": "src/api/idempotencyKey.ts", "kind": "runtime" },
+        {
+          "from": "src/api/idempotencyKey.unit.spec.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/api/workspaceTasks.contract.spec.ts",
           "to": "src/api/idempotencyKey.ts",
@@ -5441,11 +5536,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/media/inpaintMask.ts",
-          "to": "src/api/idempotencyKey.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskCancellation.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
@@ -5471,7 +5561,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 19,
+      "fanIn": 18,
       "fanOut": 1,
       "fanOutTargets": ["src/core/utils/ids.ts"],
       "outboundEdges": [
@@ -5481,7 +5571,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 19,
+      "targetFanIn": 18,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5977,13 +6067,12 @@
         }
       ],
       "fanIn": 11,
-      "fanOut": 9,
+      "fanOut": 8,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/user/user.ts",
         "src/api/generated-query/public/workspace-media/workspace-media.ts",
-        "src/api/idempotencyKey.ts",
         "src/core/i18n/index.ts",
         "src/core/utils/guards.ts",
         "src/core/utils/opaqueIds.ts",
@@ -6006,7 +6095,6 @@
           "to": "src/api/generated-query/public/workspace-media/workspace-media.ts",
           "kind": "runtime"
         },
-        { "from": "src/api/upload.ts", "to": "src/api/idempotencyKey.ts", "kind": "runtime" },
         { "from": "src/api/upload.ts", "to": "src/core/i18n/index.ts", "kind": "runtime" },
         { "from": "src/api/upload.ts", "to": "src/core/utils/guards.ts", "kind": "runtime" },
         { "from": "src/api/upload.ts", "to": "src/core/utils/opaqueIds.ts", "kind": "runtime" },
@@ -6017,7 +6105,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 11,
-      "targetFanOut": 9,
+      "targetFanOut": 8,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -6102,6 +6190,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/api/workspaceTaskWaiterStream.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
@@ -6162,7 +6255,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 16,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
@@ -6196,7 +6289,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 16,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6396,6 +6489,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/api/workspaceTaskWaiterStream.contract.spec.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/workspaceTasks.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "runtime"
@@ -6416,7 +6514,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 6,
       "fanOutTargets": [
         "src/api/workspaceEventStream.ts",
@@ -6462,7 +6560,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10419,23 +10517,33 @@
           "from": "src/features/legal/components/PublicLegalPage.vue",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/core/composables/useSiteBranding.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/core/composables/useSiteBranding.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 9,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/client.ts",
         "src/api/contractKernel.ts",
-        "src/core/config/runtimeUrls.ts",
-        "src/core/utils/request.ts"
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/user/user.ts",
+        "src/core/config/runtimeUrls.ts"
       ],
       "outboundEdges": [
         {
           "from": "src/core/composables/useSiteBranding.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
@@ -10449,22 +10557,22 @@
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/composables/useSiteBranding.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
-          "to": "src/core/config/runtimeUrls.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
-          "to": "src/core/utils/request.ts",
+          "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         }
       ],
@@ -10472,7 +10580,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 7,
+      "targetFanIn": 9,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10742,11 +10850,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/core/execution/executionContract.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
@@ -10782,7 +10885,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 20,
+      "fanIn": 19,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -10790,7 +10893,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 20,
+      "targetFanIn": 19,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12155,11 +12258,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -12501,7 +12599,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 145,
+      "fanIn": 144,
       "fanOut": 7,
       "fanOutTargets": [
         "fs",
@@ -12598,7 +12696,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 145,
+      "targetFanIn": 144,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14168,9 +14266,19 @@
           "from": "src/features/canvas/session/board-session/repository.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 21,
+      "fanIn": 23,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/@tanstack/vue-query/build/legacy/index.cjs"],
       "outboundEdges": [
@@ -14184,7 +14292,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 21,
+      "targetFanIn": 23,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15084,14 +15192,9 @@
           "from": "src/features/canvas/session/execution/workspace/canvasTaskCancellation.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 9,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -15099,7 +15202,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
+      "targetFanIn": 9,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15705,6 +15808,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/features/account/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/features/account/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/shell/components/WorkspaceHeader.component.spec.ts",
           "to": "src/features/account/index.ts",
           "kind": "runtime"
@@ -15720,7 +15833,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 6,
       "fanOut": 104,
       "fanOutTargets": [
         "fs",
@@ -18349,7 +18462,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 6,
       "targetFanOut": 104,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -32772,11 +32885,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/execution/billing/taskReadinessEvents.ts",
-          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/canvas/session/execution/canvasBudgets.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -32864,11 +32972,6 @@
         {
           "from": "src/features/canvas/session/execution/index.ts",
           "to": "src/features/canvas/core/execution/imageActionExecution.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/media/inpaintMask.ts",
-          "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
         {
@@ -33550,16 +33653,6 @@
           "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
           "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
@@ -39389,7 +39482,7 @@
         "src/features/account/ui/chrome/UserAccountMenu.vue",
         "src/features/account/ui/chrome/userAccountMenu.types.ts",
         "src/features/canvas/ui/chrome/CanvasMiniMap.vue",
-        "src/features/notification/ui/NotificationBell.vue",
+        "src/features/notification/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/theme/appOverlayMenu.ts"
@@ -39457,7 +39550,7 @@
         },
         {
           "from": "src/features/canvas/ui/chrome/components/CanvasChrome.vue",
-          "to": "src/features/notification/ui/NotificationBell.vue",
+          "to": "src/features/notification/index.ts",
           "kind": "runtime"
         },
         {
@@ -44385,6 +44478,519 @@
       "ownershipScope": ["src/features/library/"],
       "impureRuntimePaths": []
     },
+    "src/features/notification/index.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/canvas/ui/chrome/components/CanvasChrome.vue",
+          "to": "src/features/notification/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/invite/ui/ClaimPage.vue",
+          "to": "src/features/notification/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
+          "to": "src/features/notification/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 3,
+      "fanOut": 33,
+      "fanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/notifications/notifications.ts",
+        "src/api/generated-query/public/organizations/organizations.ts",
+        "src/api/generated-query/public/user/user.ts",
+        "src/api/generated-query/public/workspaces/workspaces.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/dialog/index.ts",
+        "src/components/ui/popover/index.ts",
+        "src/components/ui/skeleton/index.ts",
+        "src/components/ui/tabs/Tabs.vue",
+        "src/components/ui/tabs/TabsList.vue",
+        "src/components/ui/tabs/TabsTrigger.vue",
+        "src/core/components/ConfirmDialog.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useFailureToast.ts",
+        "src/core/i18n/index.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/query/useQueryPolling.ts",
+        "src/features/auth/index.ts",
+        "src/test/deferred.ts",
+        "src/test/msw.ts",
+        "src/test/notificationFacts.ts",
+        "src/test/render.ts",
+        "src/test/toast.ts",
+        "vitest/browser"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/features/notification/session/notificationActionRegistry.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/notificationActionRegistry.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/notificationActionRegistry.unit.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/notificationDisplay.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/notificationDisplay.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/notificationDisplay.unit.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/readFilters.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/api/generated-query/public/notifications/notifications.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/core/query/useQueryPolling.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/api/generated-query/public/notifications/notifications.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/api/generated-query/public/organizations/organizations.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/api/generated-query/public/workspaces/workspaces.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.component.spec.ts",
+          "to": "src/test/notificationFacts.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationBell.vue",
+          "to": "src/core/lib/pageChrome.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "vitest/browser",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/test/notificationFacts.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/dialog/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/skeleton/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/tabs/Tabs.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/tabs/TabsList.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/components/ui/tabs/TabsTrigger.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/core/components/ConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationCenterDialog.vue",
+          "to": "src/core/composables/useFailureToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.component.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationItem.vue",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "src/test/notificationFacts.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "src/components/ui/popover/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/ui/NotificationPopover.vue",
+          "to": "src/components/ui/skeleton/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 3,
+      "targetFanOut": 33,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/features/notification/"],
+      "impureRuntimePaths": []
+    },
     "src/features/search/index.ts": {
       "consumerEdges": [
         {
@@ -44399,7 +45005,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 49,
+      "fanOut": 48,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
@@ -44411,7 +45017,6 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
         "src/api/generated-query/public/workspace-search/workspace-search.ts",
@@ -44634,12 +45239,12 @@
         },
         {
           "from": "src/features/search/session/adapters/resource.ts",
-          "to": "src/api/client.ts",
+          "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/session/adapters/resource.ts",
-          "to": "src/api/contractKernel.ts",
+          "to": "src/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
         },
         {
@@ -45368,7 +45973,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 49,
+      "targetFanOut": 48,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -45543,7 +46148,7 @@
         }
       ],
       "fanIn": 32,
-      "fanOut": 70,
+      "fanOut": 71,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -45580,6 +46185,7 @@
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useSiteBranding.ts",
         "src/core/composables/useSupportChannels.ts",
         "src/core/config/pagination.ts",
         "src/core/config/runtimeUrls.ts",
@@ -45588,6 +46194,7 @@
         "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/media/avatarUrl.ts",
+        "src/core/query/queryClient.ts",
         "src/core/query/queryDefaults.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/auth.ts",
@@ -45608,8 +46215,7 @@
         "src/features/legal/pages/RefundPolicyPage.vue",
         "src/features/legal/pages/TermsPage.vue",
         "src/features/legal/routePaths.ts",
-        "src/features/notification/session/useNotifications.ts",
-        "src/features/notification/ui/NotificationBell.vue",
+        "src/features/notification/index.ts",
         "src/features/search/index.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
@@ -45704,7 +46310,7 @@
         },
         {
           "from": "src/features/workspace/invite/ui/ClaimPage.vue",
-          "to": "src/features/notification/session/useNotifications.ts",
+          "to": "src/features/notification/index.ts",
           "kind": "runtime"
         },
         {
@@ -46198,6 +46804,56 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/api/generated-query/public/workspaces/workspaces.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/core/composables/useSiteBranding.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.ts",
+          "to": "src/features/account/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/core/composables/useSiteBranding.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/features/account/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/session/workspaceBootstrap.unit.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/shell/components/WorkspaceHeader.component.spec.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
           "kind": "runtime"
@@ -46279,7 +46935,7 @@
         },
         {
           "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
-          "to": "src/features/notification/ui/NotificationBell.vue",
+          "to": "src/features/notification/index.ts",
           "kind": "runtime"
         },
         {
@@ -46503,7 +47159,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 32,
-      "targetFanOut": 70,
+      "targetFanOut": 71,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -46860,12 +47516,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/shell/useWorkspaceSwitcher.ts",
           "to": "src/features/workspace/selection/workspaceContext.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 11,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -46941,7 +47602,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 11,
       "advisories": {
         "fanInTargetMismatch": false,

@@ -108,6 +108,13 @@ function readV1Document(boardId: string): Promise<unknown> {
   return Promise.resolve({ data: document })
 }
 
+function readV1Bundle(boardId = ''): Promise<unknown> {
+  const document = v1Documents[boardId]
+  if (!document)
+    return Promise.reject({ status: 404, code: 'board_not_found', msg: 'board missing' })
+  return Promise.resolve({ data: { meta: findOrCreateV1BoardDto(boardId), document } })
+}
+
 function replaceV1Document(boardId: string, config?: V1RequestConfig): Promise<unknown> {
   const payload = parseV1JsonBody(config?.body)
   const previous = v1Documents[boardId]
@@ -151,6 +158,8 @@ function routeV1BoardRequest(url: string, config: V1RequestConfig | undefined): 
       meta: { has_more: false, next_cursor: null },
     })
   }
+  const bundleMatch = path.match(/^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/bundle$/)
+  if (bundleMatch && method === 'GET') return readV1Bundle(bundleMatch[1])
   const documentMatch = path.match(/^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/document$/)
   const documentResult = documentMatch
     ? routeV1DocumentRequest(documentMatch[1] ?? '', method, config)

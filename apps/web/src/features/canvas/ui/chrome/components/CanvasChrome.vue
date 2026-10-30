@@ -205,8 +205,8 @@ const emit = defineEmits<{
   'zoom-in': []
 }>()
 
-const NotificationBell = defineAsyncComponent(
-  () => import('../../../../notification/ui/NotificationBell.vue'),
+const NotificationBell = defineAsyncComponent(() =>
+  import('@/features/notification').then((m) => m.NotificationBell),
 )
 
 const { t } = useI18n()

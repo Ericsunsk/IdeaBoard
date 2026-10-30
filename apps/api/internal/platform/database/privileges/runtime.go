@@ -50,6 +50,7 @@ var apiOwnedTableNames = []string{
 	"task_outputs",
 	"task_stat_events",
 	"task_status_event_outbox",
+	"task_submission_idempotency",
 	"tasks",
 	"upload_sessions",
 	"user_notifications",

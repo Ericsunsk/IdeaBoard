@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/testsupport"
 	"image"
 	"image/png"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -120,10 +121,15 @@ type v1MediaFixture struct {
 	other   int64
 }
 
-func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps ContractV1Deps) *gin.Engine {
+func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps ContractV1Deps, withGlobalMiddleware ...bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(runtimehttp.ContractRequestIDMiddleware())
+	if len(withGlobalMiddleware) > 0 && withGlobalMiddleware[0] {
+		runtimehttp.RegisterRoutes(router, runtimehttp.Dependencies{
+			CORSMiddleware: func(c *gin.Context) { c.Next() },
+		}, nil, runtimehttp.FrontendRouteOptions{})
+	}
 	router.Use(func(c *gin.Context) {
 		raw := strings.TrimSpace(c.GetHeader(testsupport.HeaderTestUser))
 		if raw == "" {
@@ -159,7 +165,7 @@ func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps Co
 	return router
 }
 
-func newV1MediaFixture(t *testing.T) *v1MediaFixture {
+func newV1MediaFixture(t *testing.T, withGlobalMiddleware ...bool) *v1MediaFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -181,7 +187,7 @@ func newV1MediaFixture(t *testing.T) *v1MediaFixture {
 	}
 	store.SeedWorkspaceMember(ws2.PublicID, owner, tenancy.RoleMember)
 	deps := ContractV1Deps{Media: media, MediaObjects: objects, MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), nil)}
-	engine := newV1MediaTestEngine(store, dir, deps)
+	engine := newV1MediaTestEngine(store, dir, deps, withGlobalMiddleware...)
 	return &v1MediaFixture{store: store, media: media, objects: objects, dir: dir, engine: engine, ws: ws, ws2: ws2, owner: owner, member: member, other: other}
 }
 
@@ -2033,4 +2039,178 @@ func TestRenderedImageRequestCancellation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestV1MediaUploadDirect(t *testing.T) {
+	f := newV1MediaFixture(t, true)
+	pngBytes := v1GapsPNGBytes(1024)
+
+	buildMultipart := func(fileBytes []byte, filename, boardID string) (string, string) {
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		if fileBytes != nil {
+			part, err := writer.CreateFormFile("file", filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := part.Write(fileBytes); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if boardID != "" {
+			if err := writer.WriteField("board_id", boardID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String(), writer.FormDataContentType()
+	}
+
+	directPath := "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets/direct"
+
+	t.Run("successful direct upload creates ready media asset in single request", func(t *testing.T) {
+		body, contentType := buildMultipart(pngBytes, "sample.png", "")
+		status, _, payload := doV1(t, f.engine, v1Call{
+			method:  "POST",
+			path:    directPath,
+			body:    body,
+			userID:  f.owner,
+			headers: map[string]string{"Content-Type": contentType},
+		})
+		if status != http.StatusCreated {
+			t.Fatalf("direct upload status = %d %v, want 201", status, payload)
+		}
+		data, ok := v1Data(t, payload).(map[string]any)
+		if !ok {
+			t.Fatalf("payload data = %T, want object", v1Data(t, payload))
+		}
+		assetID, _ := data["id"].(string)
+		if !contract.IsAssetID(assetID) {
+			t.Fatalf("asset id = %q, want asset_ prefix", assetID)
+		}
+		if got, _ := data["status"].(string); got != "ready" {
+			t.Fatalf("status = %q, want ready", got)
+		}
+		if got, _ := data["workspace_id"].(string); got != f.ws.PublicID {
+			t.Fatalf("workspace_id = %q, want %q", got, f.ws.PublicID)
+		}
+		if got, _ := data["mime_type"].(string); got != "image/png" {
+			t.Fatalf("mime_type = %q, want image/png", got)
+		}
+
+		// Read back metadata via GET /workspaces/{ws}/media-assets/{id}
+		getStatus, _, getPayload := doV1(t, f.engine, v1Call{
+			method: "GET",
+			path:   "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets/" + assetID,
+			userID: f.owner,
+		})
+		if getStatus != http.StatusOK {
+			t.Fatalf("get metadata = %d %v, want 200", getStatus, getPayload)
+		}
+
+		// Read back content bytes via GET /workspaces/{ws}/media-assets/{id}/content
+		contentStatus, header, contentBytes := doV1RoundTrip(t, f.engine, v1Call{
+			method: "GET",
+			path:   "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets/" + assetID + "/content",
+			userID: f.owner,
+		}, "v1-content-")
+		if contentStatus != http.StatusOK {
+			t.Fatalf("get content = %d, want 200", contentStatus)
+		}
+		if header.Get("Content-Type") != "image/png" {
+			t.Fatalf("content Content-Type = %q, want image/png", header.Get("Content-Type"))
+		}
+		if !bytes.Equal([]byte(contentBytes), pngBytes) {
+			t.Fatalf("content bytes mismatch")
+		}
+	})
+
+	t.Run("production middleware accepts files above JSON limit and enforces both upload limits", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			size int
+			want int
+		}{
+			{"3 MiB image", 3 * 1024 * 1024, http.StatusCreated},
+			{"file above 30 MiB", int(workspacemedia.MaxUploadSizeBytes) + 1, http.StatusUnprocessableEntity},
+			{"multipart above bounded overhead", int(workspacemedia.MaxUploadSizeBytes) + 2*1024*1024, http.StatusRequestEntityTooLarge},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				data := append(append([]byte(nil), pngBytes...), make([]byte, tc.size-len(pngBytes))...)
+				body, contentType := buildMultipart(data, "large.png", "")
+				status, _, payload := doV1(t, f.engine, v1Call{
+					method: http.MethodPost, path: directPath, body: body, userID: f.owner,
+					headers: map[string]string{"Content-Type": contentType},
+				})
+				if status != tc.want {
+					t.Fatalf("upload = %d %v, want %d", status, payload, tc.want)
+				}
+			})
+		}
+		status, _, _ := doV1(t, f.engine, v1Call{
+			method: http.MethodPost, path: "/api/v1/workspaces/" + f.ws.PublicID + "/uploads",
+			body: strings.Repeat("x", 3*1024*1024), userID: f.owner,
+		})
+		if status != http.StatusRequestEntityTooLarge {
+			t.Fatalf("ordinary JSON POST = %d, want 413", status)
+		}
+	})
+
+	t.Run("non-existent board_id returns 404", func(t *testing.T) {
+		body, contentType := buildMultipart(pngBytes, "sample.png", "board_nonexistent01")
+		status, _, payload := doV1(t, f.engine, v1Call{
+			method:  "POST",
+			path:    directPath,
+			body:    body,
+			userID:  f.owner,
+			headers: map[string]string{"Content-Type": contentType},
+		})
+		if status != http.StatusNotFound {
+			t.Fatalf("invalid board status = %d %v, want 404", status, payload)
+		}
+	})
+
+	t.Run("missing file part returns 400 bad request", func(t *testing.T) {
+		body, contentType := buildMultipart(nil, "", "")
+		status, _, payload := doV1(t, f.engine, v1Call{
+			method:  "POST",
+			path:    directPath,
+			body:    body,
+			userID:  f.owner,
+			headers: map[string]string{"Content-Type": contentType},
+		})
+		if status != http.StatusBadRequest {
+			t.Fatalf("missing file status = %d %v, want 400", status, payload)
+		}
+	})
+
+	t.Run("non-image file returns 422 validation error", func(t *testing.T) {
+		body, contentType := buildMultipart([]byte("this is plain text not an image"), "test.txt", "")
+		status, _, payload := doV1(t, f.engine, v1Call{
+			method:  "POST",
+			path:    directPath,
+			body:    body,
+			userID:  f.owner,
+			headers: map[string]string{"Content-Type": contentType},
+		})
+		if status != http.StatusUnprocessableEntity {
+			t.Fatalf("non-image status = %d %v, want 422", status, payload)
+		}
+	})
+
+	t.Run("non-member access returns 404", func(t *testing.T) {
+		body, contentType := buildMultipart(pngBytes, "sample.png", "")
+		status, _, _ := doV1(t, f.engine, v1Call{
+			method:  "POST",
+			path:    directPath,
+			body:    body,
+			userID:  f.other,
+			headers: map[string]string{"Content-Type": contentType},
+		})
+		if status != http.StatusNotFound {
+			t.Fatalf("non-member status = %d, want 404", status)
+		}
+	})
 }

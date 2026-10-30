@@ -21,6 +21,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/invitations"
@@ -137,8 +138,10 @@ type ContractV1Deps struct {
 	// BoardAccessOutbox acknowledges immediate delivery of transaction-committed
 	// access signals. Pending facts remain retryable by the River sweeper.
 	// Nil is reserved for in-memory tests without a durable store.
-	BoardAccessOutbox *eventoutbox.BoardAccessOutboxStore
-	SupportChannels   settings.SupportChannelsSettingProvider
+	BoardAccessOutbox   *eventoutbox.BoardAccessOutboxStore
+	SupportChannels     settings.SupportChannelsSettingProvider
+	Branding            settings.BrandingSettingProvider
+	PublicSearchHandler *searchhttp.SearchHandler
 	// UserProfile persists profile updates and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
 	UserProfile   runtimehttp.V1UserProfileDirectory
@@ -219,6 +222,8 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	deps.normalize()
 	handler := &contractV1Handler{deps: deps}
 	group.GET("/support-channels", publicSupportChannelsV1Handler(deps.SupportChannels))
+	group.GET("/settings/branding", publicBrandingSettingsV1Handler(deps.Branding))
+	group.GET("/search", publicSearchV1Handler(deps.PublicSearchHandler))
 	// Public avatar delivery (no auth: avatars are public). Registered
 	// before the session middleware so it never requires a principal;
 	// per-IP rate limiting still rides the global engine middleware.

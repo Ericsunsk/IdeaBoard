@@ -40,7 +40,7 @@ export async function installAnonymousSmokeApi(
           status: 401,
           body: { error: { code: 'unauthorized', message: 'Authentication required' } },
         },
-        '/api/settings/branding': {
+        '/api/v1/settings/branding': {
           status: 200,
           body: { data: { project_name: 'IdeaBoard', logo_url: '' } },
         },
@@ -49,7 +49,7 @@ export async function installAnonymousSmokeApi(
           body: { data: { social: {}, providers: [] } },
         },
         '/api/v1/support-channels': { status: 200, body: { data: { channels: [] } } },
-        '/api/search': {
+        '/api/v1/search': {
           status: 200,
           body: { data: { query: url.searchParams.get('q') ?? '', results: [], has_more: false } },
         },

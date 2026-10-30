@@ -1,5 +1,10 @@
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onScopeDispose } from 'vue'
 import { authTransport, useAuthOverlay, useUserStore } from '../../auth'
+import {
+  getWorkspaceSelectionStore,
+  subscribeWorkspaceSelectionChange,
+} from '../selection/workspaceContext'
+import { fetchWorkspaceBootstrap } from '../session/workspaceBootstrap'
 import { canAccessAdmin } from '../../../core/auth/adminAccess'
 import type {
   UserAccountMenuItem,
@@ -55,7 +60,20 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
       .catch(() => {
         // Session email hydration must not block workspace controls.
       })
+
+    const initialWsId = getWorkspaceSelectionStore().getSelectedId()
+    if (initialWsId) {
+      void fetchWorkspaceBootstrap(initialWsId, userId).catch(() => {})
+    }
   })
+
+  const unsubscribeWs = subscribeWorkspaceSelectionChange((newWsId) => {
+    const userId = userStore.user?.public_id
+    if (newWsId && userId) {
+      void fetchWorkspaceBootstrap(newWsId, userId).catch(() => {})
+    }
+  })
+  onScopeDispose(unsubscribeWs)
   // Validated session only (not the best-effort restored snapshot): this
   // header mounts on public pages too, and an anonymous/stale 401 reloads
   // the whole page to login via the shared auth-failure handler.

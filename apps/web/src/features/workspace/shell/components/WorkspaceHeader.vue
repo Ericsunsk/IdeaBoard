@@ -59,8 +59,8 @@ const props = withDefaults(defineProps<WorkspaceHeaderProps>(), {
   navigation: null,
 })
 
-const NotificationBell = defineAsyncComponent(
-  () => import('../../../notification/ui/NotificationBell.vue'),
+const NotificationBell = defineAsyncComponent(() =>
+  import('@/features/notification').then((m) => m.NotificationBell),
 )
 
 const router = useRouter()

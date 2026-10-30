@@ -97,7 +97,7 @@ function buildApiError(
   error.hasSafeDisplayMessage = Boolean(displayMessage)
   error.msg = displayMessage
   error.status = status
-  error.data = data?.data
+  error.data = data?.data !== undefined ? data.data : (data ?? undefined)
   if (contractError != null) {
     error.details = contractError.details
     error.requestId = contractError.requestId

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/riverpolicy"
 
 	"github.com/riverqueue/river"
@@ -193,4 +194,124 @@ func TestWebhookDispatchEnqueueFailureDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	store.Dispatch(context.Background(), testEnvelope(t))
+}
+
+type fakeReconcilePersistence struct {
+	pending []WebhookDeliveryArgs
+	err     error
+	called  bool
+}
+
+func (f *fakeReconcilePersistence) CreateSubscription(context.Context, *WebhookSubscription) error {
+	return nil
+}
+func (f *fakeReconcilePersistence) DeleteSubscription(context.Context, string, string) error {
+	return nil
+}
+func (f *fakeReconcilePersistence) LoadSubscriptions(context.Context) ([]*WebhookSubscription, error) {
+	return nil, nil
+}
+func (f *fakeReconcilePersistence) LoadSubscription(context.Context, string) (*WebhookSubscription, error) {
+	return nil, nil
+}
+func (f *fakeReconcilePersistence) EnsureDelivery(context.Context, events.V1Envelope, string) error {
+	return nil
+}
+func (f *fakeReconcilePersistence) PendingDeliveries(context.Context) ([]WebhookDeliveryArgs, error) {
+	f.called = true
+	return f.pending, f.err
+}
+func (f *fakeReconcilePersistence) RecordAttempt(context.Context, string, events.V1Envelope, WebhookAttempt, bool) error {
+	return nil
+}
+func (f *fakeReconcilePersistence) MarkDelivered(context.Context, string, events.V1Envelope) error {
+	return nil
+}
+
+func TestWebhookReconcileArgs(t *testing.T) {
+	args := WebhookReconcileArgs{}
+	if got := args.Kind(); got != WebhookReconcileJobKind {
+		t.Fatalf("kind=%q, want %q", got, WebhookReconcileJobKind)
+	}
+	if WebhookReconcileJobKind != "webhook_reconcile" {
+		t.Fatalf("job kind=%q, want webhook_reconcile", WebhookReconcileJobKind)
+	}
+}
+
+func TestWebhookReconcileWorker(t *testing.T) {
+	ctx := context.Background()
+
+	// Fail closed on nil worker or nil store.
+	if err := (*WebhookReconcileWorker)(nil).Work(ctx, nil); err == nil {
+		t.Fatal("nil worker must fail closed")
+	}
+	if err := NewWebhookReconcileWorker(nil).Work(ctx, nil); err == nil {
+		t.Fatal("worker with nil store must fail closed")
+	}
+
+	enqueuer := &fakeWebhookEnqueuer{}
+	store := NewWebhookStore(&fakeWebhookSender{status: 200}, enqueuer)
+	envelope := testEnvelope(t)
+	pending := []WebhookDeliveryArgs{
+		{SubscriptionID: "sub_rec_1", DeliveryID: envelope.ID, Envelope: envelope},
+	}
+	persistence := &fakeReconcilePersistence{pending: pending}
+	store.SetPersistence(persistence)
+
+	worker := NewWebhookReconcileWorker(store)
+	if timeout := worker.Timeout(nil); timeout != riverpolicy.RiverJobTimeoutTaskSettlementSweep {
+		t.Fatalf("timeout=%v, want %v", timeout, riverpolicy.RiverJobTimeoutTaskSettlementSweep)
+	}
+
+	if err := worker.Work(ctx, &river.Job[WebhookReconcileArgs]{}); err != nil {
+		t.Fatalf("Work() unexpected error: %v", err)
+	}
+	if !persistence.called {
+		t.Fatal("store.ReconcilePending was not called")
+	}
+	if len(enqueuer.inserts) != 1 {
+		t.Fatalf("enqueued %d jobs, want 1", len(enqueuer.inserts))
+	}
+	if enqueuer.inserts[0].SubscriptionID != "sub_rec_1" {
+		t.Fatalf("inserted sub=%q, want sub_rec_1", enqueuer.inserts[0].SubscriptionID)
+	}
+
+	// Persistence error propagates.
+	persistenceErr := errors.New("db error")
+	persistence.err = persistenceErr
+	if err := worker.Work(ctx, &river.Job[WebhookReconcileArgs]{}); !errors.Is(err, persistenceErr) {
+		t.Fatalf("Work() error = %v, want %v", err, persistenceErr)
+	}
+}
+
+func TestWebhookReconciliationPeriodicJobs(t *testing.T) {
+	jobs := WebhookReconciliationPeriodicJobs()
+	if len(jobs) != 1 {
+		t.Fatalf("periodic jobs = %d, want 1", len(jobs))
+	}
+	if jobs[0] == nil {
+		t.Fatal("periodic job must not be nil")
+	}
+
+	args, opts := webhookReconcileInsert()
+	if args.Kind() != WebhookReconcileJobKind {
+		t.Fatalf("kind = %q, want %q", args.Kind(), WebhookReconcileJobKind)
+	}
+	if opts.Queue != riverpolicy.RiverQueueTaskSettlementSweep {
+		t.Fatalf("queue = %q, want %q", opts.Queue, riverpolicy.RiverQueueTaskSettlementSweep)
+	}
+	if opts.MaxAttempts != riverpolicy.RiverMaxAttemptsTaskSettlementSweep {
+		t.Fatalf("max attempts = %d, want %d", opts.MaxAttempts, riverpolicy.RiverMaxAttemptsTaskSettlementSweep)
+	}
+	if opts.Priority != 3 {
+		t.Fatalf("priority = %d, want 3", opts.Priority)
+	}
+
+	start := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	if got := (webhookReconcileSchedule{}).Next(start); !got.Equal(start.Add(2 * time.Minute)) {
+		t.Fatalf("next = %v, want %v", got, start.Add(2*time.Minute))
+	}
+	if webhookReconcilePeriod != 2*time.Minute {
+		t.Fatalf("reconcile period = %v, want 2m", webhookReconcilePeriod)
+	}
 }

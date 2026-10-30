@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/telemetry"
 
@@ -31,22 +32,26 @@ func registerGlobalMiddleware(r *gin.Engine, deps Dependencies) {
 
 func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
 	base := requestBodyLimitMiddleware(globalRequestBodyLimitBytes)
+	// Bound multipart overhead separately from the handler's per-file limit.
+	upload := requestBodyLimitMiddleware(workspacemedia.MaxUploadSizeBytes + 1024*1024)
 	return func(c *gin.Context) {
 		if isUploadRequest(c.Request) {
-			c.Next()
+			upload(c)
 			return
 		}
 		base(c)
 	}
 }
 
-// isUploadRequest reports whether a request carries upload bytes that must
-// bypass the global JSON body limit. The legacy /api/user + /api/admin
-// upload bypasses were deleted with the #809 hard cut; the v1 workspace
-// upload/media surface is JSON session-based and honors the global limit
-// like every other JSON route. No POST path bypasses today.
-func isUploadRequest(*http.Request) bool {
-	return false
+// isUploadRequest matches only the direct workspace-media upload route.
+func isUploadRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil || req.Method != http.MethodPost {
+		return false
+	}
+	parts := strings.Split(req.URL.Path, "/")
+	return len(parts) == 7 && parts[0] == "" && parts[1] == "api" &&
+		parts[2] == "v1" && parts[3] == "workspaces" && parts[4] != "" &&
+		parts[4] != "." && parts[4] != ".." && parts[5] == "media-assets" && parts[6] == "direct"
 }
 
 func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {

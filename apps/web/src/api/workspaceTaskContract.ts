@@ -68,6 +68,11 @@ export type WorkspaceTaskOutputRef = {
   checksum_sha256?: string | undefined
   role?: string | undefined
   result_index: number
+  width?: number | undefined
+  height?: number | undefined
+  mime_type?: string | undefined
+  // eslint-disable-next-line governance/boolean-prefix -- Wire contract field
+  preview_ready?: boolean | undefined
 }
 
 export type WorkspaceTaskBillingSnapshot = {

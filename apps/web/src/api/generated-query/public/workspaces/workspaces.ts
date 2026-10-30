@@ -38,6 +38,7 @@ import type {
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UpdateWorkspaceRequest,
+  WorkspaceBootstrapEnvelope,
   WorkspaceEnvelope,
 } from '../model'
 
@@ -553,4 +554,85 @@ export const useDeleteWorkspace = <
   TContext
 > => {
   return useMutation(getDeleteWorkspaceMutationOptions(options), queryClient)
+}
+export const getGetWorkspaceBootstrapUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/bootstrap`
+}
+
+/**
+ * Consolidates initial workspace setup and shell context into a single RTT, including workspace metadata, stable billing account identity, live credit balance, and public site branding.
+ * @summary Get consolidated workspace bootstrap context (workspace, billing account, wallet, branding in 1 RTT)
+ */
+export const getWorkspaceBootstrap = async (
+  workspaceId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceBootstrapEnvelope> => {
+  return publicMutator<WorkspaceBootstrapEnvelope>(getGetWorkspaceBootstrapUrl(workspaceId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetWorkspaceBootstrapQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
+  return ['workspaces', workspaceId, 'bootstrap'] as const
+}
+
+export const getGetWorkspaceBootstrapQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkspaceBootstrap>>,
+  TError = UnauthorizedResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBootstrap>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetWorkspaceBootstrapQueryKey(workspaceId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceBootstrap>>> = ({ signal }) =>
+    getWorkspaceBootstrap(toValue(workspaceId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBootstrap>>, TError, TData>
+}
+
+export type GetWorkspaceBootstrapQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkspaceBootstrap>>
+>
+export type GetWorkspaceBootstrapQueryError = UnauthorizedResponse | NotFoundResponse
+
+/**
+ * @summary Get consolidated workspace bootstrap context (workspace, billing account, wallet, branding in 1 RTT)
+ */
+
+export function useGetWorkspaceBootstrap<
+  TData = Awaited<ReturnType<typeof getWorkspaceBootstrap>>,
+  TError = UnauthorizedResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBootstrap>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetWorkspaceBootstrapQueryOptions(workspaceId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
 }

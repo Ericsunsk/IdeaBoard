@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,8 @@ const (
 	ETagHeader = "ETag"
 	// IfMatchHeader carries the expected resource version on updates.
 	IfMatchHeader = "If-Match"
+	// IfNoneMatchHeader carries client entity tags for conditional validation (RFC 7232).
+	IfNoneMatchHeader = "If-None-Match"
 )
 
 // RequestID resolves the correlation ID: contract Request-Id first,
@@ -64,4 +67,22 @@ func IfMatch(c *gin.Context) string {
 		return ""
 	}
 	return c.GetHeader(IfMatchHeader)
+}
+
+// HandlePreconditionNotModified evaluates conditional GET preconditions using If-None-Match.
+// If clientETag matches currentETag (or is "*"), it sets ETag, responds with 304 Not Modified,
+// calls Abort(), and returns true.
+func HandlePreconditionNotModified(c *gin.Context, currentETag string) bool {
+	if currentETag == "" {
+		return false
+	}
+	clientETag := c.GetHeader("If-None-Match")
+	if clientETag != "" && (clientETag == currentETag || clientETag == "*") {
+		c.Header(ETagHeader, currentETag)
+		c.Status(http.StatusNotModified)
+		c.Writer.WriteHeaderNow()
+		c.Abort()
+		return true
+	}
+	return false
 }

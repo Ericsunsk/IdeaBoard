@@ -150,9 +150,20 @@ type V1TaskRunningData struct {
 	TaskID string `json:"task_id"`
 }
 
+type V1TaskCompletedOutput struct {
+	AssetID      string `json:"asset_id,omitempty"`
+	Role         string `json:"role,omitempty"`
+	URL          string `json:"url,omitempty"`
+	Width        int32  `json:"width,omitempty"`
+	Height       int32  `json:"height,omitempty"`
+	MIMEType     string `json:"mime_type,omitempty"`
+	PreviewReady bool   `json:"preview_ready"`
+}
+
 type V1TaskCompletedData struct {
-	TaskID     string `json:"task_id"`
-	OutputsURI string `json:"outputs_uri"`
+	TaskID     string                  `json:"task_id"`
+	OutputsURI string                  `json:"outputs_uri"`
+	Outputs    []V1TaskCompletedOutput `json:"outputs,omitempty"`
 }
 
 type V1TaskFailedData struct {
@@ -422,6 +433,23 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 		uri := stringField("outputs_uri")
 		if !strings.HasPrefix(uri, "/api/v1/workspaces/") {
 			return fmt.Errorf("events: task.completed outputs_uri must be a workspace API URI")
+		}
+		if rawOutputs, exists := fields["outputs"]; exists && rawOutputs != nil {
+			outputsList, ok := rawOutputs.([]any)
+			if !ok {
+				return fmt.Errorf("events: task.completed outputs must be an array")
+			}
+			for i, item := range outputsList {
+				m, ok := item.(map[string]any)
+				if !ok {
+					return fmt.Errorf("events: task.completed output[%d] must be an object", i)
+				}
+				if assetID, ok := m["asset_id"].(string); ok && strings.TrimSpace(assetID) != "" {
+					if !contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(assetID)) {
+						return fmt.Errorf("events: task.completed output[%d] asset_id must be asset_ opaque", i)
+					}
+				}
+			}
 		}
 	case EventV1TaskFailed:
 		if err := require(fields, "task_id", "error_code"); err != nil {

@@ -74,7 +74,7 @@ describe('canvas billing readiness store', () => {
       priceVersionId: 1,
     })
 
-    store.applyReadiness(
+    fetchReadiness.mockResolvedValueOnce(
       makeReadiness(SERVICE.generation, {
         billing: {
           ...makeReadiness(SERVICE.generation).billing!,
@@ -87,6 +87,7 @@ describe('canvas billing readiness store', () => {
       }),
     )
 
+    await store.ensureService(SERVICE.generation, { shouldForce: true })
     expect(store.getServiceState(SERVICE.generation)).toMatchObject({
       status: 'ready',
       unitCredits: 6,

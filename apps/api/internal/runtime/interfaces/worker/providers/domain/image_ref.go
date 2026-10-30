@@ -15,6 +15,9 @@ func ResolveProviderPublicImageURL(baseParsedURL *url.URL, ref, label string) (s
 	if ref == "" {
 		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL, label)
 	}
+	if strings.HasPrefix(strings.ToLower(ref), "data:image/") {
+		return ref, nil
+	}
 	parsed, err := url.Parse(ref)
 	if err != nil {
 		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL2, label, err)

@@ -50,6 +50,71 @@ describe('workspace task whole-operation deadline', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('reads authoritative Task facts when completion arrives without a prior snapshot', async () => {
+    vi.stubGlobal('EventSource', class {})
+    const completed = {
+      id: TASK_ID,
+      service: 'render',
+      status: 'completed',
+      billing_snapshot: { sku: 'ai-image:render', quantity: 4, settlement_state: 'captured' },
+    }
+    mocks.read
+      .mockRejectedValueOnce(new Error('initial read unavailable'))
+      .mockRejectedValueOnce(new Error('reconciliation unavailable'))
+      .mockResolvedValueOnce(completed)
+    const pending = waitWorkspaceTaskTerminal(WORKSPACE_ID, TASK_ID, { deadlineAt: 1_000 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.read).toHaveBeenCalledTimes(2)
+    const onEvent = mocks.subscribe.mock.calls[0]?.[1]
+    if (typeof onEvent !== 'function') throw new Error('Expected a stream listener')
+    onEvent({
+      type: 'task.completed',
+      occurred_at: '2026-10-30T00:00:00Z',
+      data: { task_id: TASK_ID, outputs: [{ asset_id: 'asset_result' }] },
+    })
+
+    await expect(pending).resolves.toBe(completed)
+    expect(mocks.read).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('retains completion received while the first authoritative snapshot is in flight', async () => {
+    vi.stubGlobal('EventSource', class {})
+    const unsubscribe = vi.fn()
+    mocks.subscribe.mockReturnValueOnce(unsubscribe)
+    const completed = {
+      id: TASK_ID,
+      service: 'render',
+      status: 'completed',
+      billing_snapshot: { sku: 'ai-image:render', quantity: 4, settlement_state: 'captured' },
+    }
+    let releaseReconciliation: ((item: typeof running) => void) | undefined
+    const reconciliation = new Promise<typeof running>((resolve) => {
+      releaseReconciliation = resolve
+    })
+    mocks.read
+      .mockRejectedValueOnce(new Error('initial read unavailable'))
+      .mockReturnValueOnce(reconciliation)
+      .mockResolvedValueOnce(completed)
+    const pending = waitWorkspaceTaskTerminal(WORKSPACE_ID, TASK_ID, { deadlineAt: 1_000 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.read).toHaveBeenCalledTimes(2)
+    const onEvent = mocks.subscribe.mock.calls[0]?.[1]
+    if (typeof onEvent !== 'function') throw new Error('Expected a stream listener')
+    onEvent({
+      type: 'task.completed',
+      occurred_at: '2026-10-30T00:00:00Z',
+      data: { task_id: TASK_ID, outputs: [{ asset_id: 'asset_result' }] },
+    })
+    expect(mocks.read).toHaveBeenCalledTimes(2)
+    releaseReconciliation?.(running)
+
+    await expect(pending).resolves.toBe(completed)
+    expect(mocks.read).toHaveBeenCalledTimes(3)
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('bounds a hanging fast GET and aborts its transport', async () => {
     mocks.read.mockImplementation(() => new Promise(() => undefined))
     const pending = waitWorkspaceTaskTerminal(WORKSPACE_ID, TASK_ID, { deadlineAt: 100 })

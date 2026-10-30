@@ -94,6 +94,9 @@ func (w *WorkspaceTaskWorker) completeExecution(
 	if err != nil {
 		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
 			slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
+			if len(outputs) > 0 {
+				w.compensateUnsettledOutputs(ctx, claimed, outputs)
+			}
 			return nil
 		}
 		// A COMMIT acknowledgement can be lost after the task and Capture are
@@ -184,14 +187,21 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 	return nil
 }
 
-// compensateUnsettledOutputs runs only after Fail returned a committed terminal
-// task. The renderer restricts cleanup to this execution's ingestion receipts.
+// compensateUnsettledOutputs runs after Fail returned a committed terminal
+// task or when completion converged with unsettled rendered outputs.
+// The renderer restricts cleanup to this execution's ingestion receipts.
 // Unknown outcomes keep assets live instead of risking a committed reference.
 func (w *WorkspaceTaskWorker) compensateUnsettledOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) {
 	if w.renderer == nil {
 		return
 	}
-	if err := w.renderer.CompensateRenderedOutputs(ctx, task, outputs); err != nil {
+	compensateTask := task
+	if compensateTask != nil && compensateTask.Status != workspacetasks.StatusFailed {
+		cloned := *compensateTask
+		cloned.Status = workspacetasks.StatusFailed
+		compensateTask = &cloned
+	}
+	if err := w.renderer.CompensateRenderedOutputs(ctx, compensateTask, outputs); err != nil {
 		slog.Warn("workspace task result compensation failed; assets stay live",
 			"task_id", task.ID, "err", err)
 	}
@@ -327,6 +337,7 @@ func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]workspacetasks.O
 		ref := workspacetasks.OutputRef{
 			Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(out.AssetID),
 			Role: strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
+			Width: int32(out.Width), Height: int32(out.Height), MIMEType: strings.TrimSpace(out.MIMEType),
 		}
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgMapWorkspaceProviderOutputs2, err)

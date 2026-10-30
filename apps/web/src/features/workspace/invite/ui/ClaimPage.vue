@@ -73,7 +73,9 @@
       </template>
 
       <!-- Declined or Cancelled State -->
-      <template v-else-if="preview.status === 'declined' || preview.status === 'cancelled' || isDeclined">
+      <template
+        v-else-if="preview.status === 'declined' || preview.status === 'cancelled' || isDeclined"
+      >
         <div class="flex flex-col items-center gap-2">
           <h1 class="m-0 text-lg font-bold text-foreground">
             {{ t('workspace.invite.claim.revokedTitle') }}
@@ -166,10 +168,7 @@ import {
   declineWorkspaceInviteByToken,
   workspaceInviteByTokenQueryOptions,
 } from '../../selection/workspaceInvitesResource'
-import {
-  syncInviteAcceptanceQueries,
-  syncInviteDeclineQueries,
-} from '@/features/notification/session/useNotifications'
+import { syncInviteAcceptanceQueries, syncInviteDeclineQueries } from '@/features/notification'
 import { HOME_PATH, USER_BOARDS_PATH, USER_LOGIN_PATH } from '../../routePaths'
 
 const route = useRoute()

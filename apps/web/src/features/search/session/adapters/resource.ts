@@ -1,24 +1,18 @@
 import { toMediaDisplay } from '../../../../core/media/mediaDisplay'
 import type { SearchPage } from '../../core/models'
-import { api } from '../../../../api/client'
+import { searchInspiration as searchInspirationTransport } from '../../../../api/generated-query/public/workspace-search/workspace-search'
 import { withSignal } from '../../../../core/utils/request'
-import { resolveContractData, type ContractSuccessEnvelope } from '../../../../api/contractKernel'
+import { resolveContractData } from '../../../../api/contractKernel'
 import { stripUndefined } from '../../../../api/stripUndefined'
 import { i18n } from '../../../../core/i18n'
 
 // Search boundary (issue #809).
 //
-// `searchInspiration` (GET `/search`, public inspiration) stays on the
-// shared envelope through the central `api.request`: that public route is
-// alive (see `registerPublicRoutes`) and anonymous-capable by design —
-// the member-only workspace search (`searchWorkspace`, workspace-scoped,
-// `ws_` required) is not a substitute. Domain shapes stay owned by
-// `../core/models`.
-//
-// TODO(2026-09-26, public inspiration gap): GET `/search` has no operation
-// in `apps/api/openapi.public.yaml`, so no generated hook exists and this
-// hand-rolled GET stays. Adopt the hook once the spec gains the operation;
-// do not run `api:generate` from this task (out of scope).
+// `searchInspiration` (GET `/api/v1/search`, public inspiration) calls the
+// generated `public/workspace-search` transport (`/api/v1/...` via `publicMutator`).
+// That public route is anonymous-capable by design — the member-only workspace
+// search (`searchWorkspace`, workspace-scoped, `ws_` required) is not a substitute.
+// Domain shapes stay owned by `../core/models`.
 
 export function generateRandomInspirationCursor(): string {
   const page = Math.floor(Math.random() * 8) + 1
@@ -32,22 +26,6 @@ const inFlightRequests = new Map<
   string,
   { promise: Promise<SearchPage>; signal?: AbortSignal | undefined }
 >()
-
-function searchInspirationUrl(query: {
-  q?: string | undefined
-  cursor?: string | undefined
-  limit?: number | undefined
-}): string {
-  const search = new URLSearchParams()
-  const cleaned = stripUndefined({
-    q: query.q || undefined,
-    cursor: query.cursor,
-    limit: query.limit == null ? undefined : String(query.limit),
-  })
-  for (const [key, value] of Object.entries(cleaned)) search.append(key, value)
-  const queryString = search.toString()
-  return queryString ? `/search?${queryString}` : '/search'
-}
 
 export async function searchInspiration(input: {
   query: string
@@ -69,14 +47,13 @@ export async function searchInspiration(input: {
   } else if (inFlight) {
     return inFlight.promise
   }
+  const params = stripUndefined({
+    q: input.query || undefined,
+    cursor: input.cursor,
+    limit: input.limit,
+  })
   const request = resolveContractData<SearchPage>(
-    api.request<ContractSuccessEnvelope<SearchPage>>(
-      searchInspirationUrl({ q: input.query, cursor: input.cursor, limit: input.limit }),
-      {
-        method: 'GET',
-        ...withSignal(input.signal),
-      },
-    ),
+    searchInspirationTransport(params, withSignal(input.signal)),
     i18n.global.t('search.loadFailed'),
   )
     .then((page) => ({

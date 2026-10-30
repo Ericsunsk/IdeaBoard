@@ -112,7 +112,6 @@ export function useCanvasExecutionWorkspace(
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      readinessRequest: taskRequest,
       fallbackRatio: source.ratio,
     })
   }

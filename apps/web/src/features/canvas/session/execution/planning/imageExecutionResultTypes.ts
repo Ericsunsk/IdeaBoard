@@ -1,8 +1,7 @@
 export type ImageExecutionInput = {
   url: string
   ratio: number
-  mediaAssetId?: number | undefined
-  /** String delivery identity for original/processing content resolution. */
+  /** Canonical workspace AssetID for submission and media delivery. */
   assetId?: string | undefined
 }
 

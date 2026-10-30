@@ -16,7 +16,7 @@ import type { WorkspaceId } from './workspaceId'
 export interface Workspace {
   id: WorkspaceId
   /** Null for personal workspaces without an organization. */
-  organization_id?: OrganizationId | unknown
+  organization_id?: OrganizationId | null
   /**
    * @minLength 1
    * @maxLength 120

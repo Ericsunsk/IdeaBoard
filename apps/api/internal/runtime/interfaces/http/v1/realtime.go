@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // v1RealtimeTicketDTO is the presence ticket body: the opaque HMAC bearer
@@ -48,22 +50,27 @@ func (h *contractV1Handler) issueRealtimeTicket(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		secret := strings.TrimSpace(h.deps.RealtimeTicketSecret)
-		if secret == "" {
-			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable46)
-			c.Abort()
-			return
-		}
-		caps := boards.CapabilitiesFor(role, true, false)
-		ticket, exp, err := realtime.Issue(secret, board.PublicID, board.AccessVersion, realtime.CapFor(caps.CanWrite), tenancy.FormatUserPublicID(identityPrincipal.PublicID()), time.Now())
+		ticketDTO, err := h.boardRealtimeTicket(board, role, identityPrincipal.PublicID())
 		if err != nil {
 			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable46)
 			c.Abort()
 			return
 		}
-		contract.RenderSuccess(c, v1RealtimeTicketDTO{
-			Ticket:    ticket,
-			ExpiresAt: exp.UTC().Format(time.RFC3339),
-		})
+		contract.RenderSuccess(c, ticketDTO)
 	})
+}
+
+// boardRealtimeTicket builds a credential only after the caller has authorized
+// a live Board. Both initial bundles and ticket refreshes use this issuance seam.
+func (h *contractV1Handler) boardRealtimeTicket(board *boards.V1Board, role boards.AccessRole, userPublicID uuid.UUID) (v1RealtimeTicketDTO, error) {
+	secret := strings.TrimSpace(h.deps.RealtimeTicketSecret)
+	if secret == "" {
+		return v1RealtimeTicketDTO{}, errors.New("realtime ticket secret is not configured")
+	}
+	caps := boards.CapabilitiesFor(role, true, false)
+	ticket, exp, err := realtime.Issue(secret, board.PublicID, board.AccessVersion, realtime.CapFor(caps.CanWrite), tenancy.FormatUserPublicID(userPublicID), time.Now())
+	if err != nil {
+		return v1RealtimeTicketDTO{}, err
+	}
+	return v1RealtimeTicketDTO{Ticket: ticket, ExpiresAt: exp.UTC().Format(time.RFC3339)}, nil
 }

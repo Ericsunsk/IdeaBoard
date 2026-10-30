@@ -114,6 +114,46 @@ export async function resolveTaskImageResultAtIndexDisplay(
   return { ...resolved, resultIndex }
 }
 
+async function waitForTaskImagePreview(
+  normalized: NonNullable<ReturnType<typeof normalizeTaskImageResult>>,
+  waitForReceiptDerivative: ReceiptDerivativeWaiter,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (
+    normalized.isPreviewReady === true &&
+    normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
+  ) {
+    return
+  }
+  try {
+    await waitForReceiptDerivative(normalized.workspaceId, normalized.assetId, signal)
+  } catch (error) {
+    signal?.throwIfAborted()
+    console.warn('[canvas] failed to await receipt derivative readiness', {
+      assetId: normalized.assetId,
+      operation: 'awaitReceiptDerivativeReady',
+      error,
+    })
+  }
+}
+
+async function resolveProbedSize(
+  normalized: NonNullable<ReturnType<typeof normalizeTaskImageResult>>,
+  url: string,
+  loadImageSize: ImageSizeLoader,
+  signal?: AbortSignal,
+): Promise<{ width: number; height: number } | null> {
+  const existing = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
+  if (existing) return existing
+  try {
+    return await loadImageSize(url, undefined, signal)
+  } catch (error) {
+    signal?.throwIfAborted()
+    console.warn('[canvas] failed to probe task image size', error)
+    return null
+  }
+}
+
 export async function resolveTaskImageResultDisplay(
   result: TaskImageResult,
   fallbackRatio: number,
@@ -130,30 +170,14 @@ export async function resolveTaskImageResultDisplay(
     normalized.assetId,
     'preview',
   )
-  try {
-    await waitForReceiptDerivative(normalized.workspaceId, normalized.assetId, signal)
-  } catch (error) {
-    signal?.throwIfAborted()
-    console.warn('[canvas] failed to await receipt derivative readiness', {
-      assetId: normalized.assetId,
-      operation: 'awaitReceiptDerivativeReady',
-      error,
-    })
-  }
 
-  let size = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
-  if (!size) {
-    try {
-      size = await loadImageSize(url, undefined, signal)
-    } catch (error) {
-      signal?.throwIfAborted()
-      console.warn('[canvas] failed to probe task image size', error)
-    }
-  }
+  await waitForTaskImagePreview(normalized, waitForReceiptDerivative, signal)
 
+  const size = await resolveProbedSize(normalized, url, loadImageSize, signal)
   signal?.throwIfAborted()
   const ratio = size ? size.height / size.width : fallbackRatio > 0 ? fallbackRatio : 1
   const mediaRef: MediaRef = { assetId: normalized.assetId, derivativeTier: 'preview' }
+
   return {
     url,
     ratio,

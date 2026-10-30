@@ -157,7 +157,6 @@ describe('HomeCanvasImageActionMenu', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureService: vi.fn(async () => undefined),
       ensureMatrix: vi.fn(async () => undefined),
-      applyReadiness: vi.fn(),
       getServiceState: (service) =>
         service === IMAGE_NODE_ACTION.cutout
           ? { service, status: 'blocked', reason: '价格未配置' }
@@ -177,7 +176,6 @@ describe('HomeCanvasImageActionMenu', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureService: vi.fn(async () => undefined),
       ensureMatrix: vi.fn(async () => undefined),
-      applyReadiness: vi.fn(),
       getServiceState: (service) => ({
         service,
         status: 'ready',

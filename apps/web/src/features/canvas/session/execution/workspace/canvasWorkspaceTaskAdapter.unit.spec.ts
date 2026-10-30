@@ -139,7 +139,6 @@ describe('toWorkspaceCreateInput', () => {
         prompt: '   ',
         service: 'upscale',
         client_action_id: 'canvas:act-1',
-        priority: 1,
         media_asset_ids: ['asset_aaa1', 'asset_aaa1', ' asset_bbb2 '],
         params: {
           output_count: 2,
@@ -235,12 +234,13 @@ describe('toWorkspaceCreateInput', () => {
         toWorkspaceCreateInput({
           prompt: '',
           service: 'generation',
-          image_urls: ['https://cdn.example/a.png'],
+          ...{ image_urls: ['https://cdn.example/a.png'] },
         }),
       'media-urls',
     )
     expectUnmappable(
-      () => toWorkspaceCreateInput({ prompt: '', service: 'generation', image_asset_ids: [12] }),
+      () =>
+        toWorkspaceCreateInput({ prompt: '', service: 'generation', ...{ image_asset_ids: [12] } }),
       'media-ids',
     )
     expectUnmappable(
@@ -248,7 +248,7 @@ describe('toWorkspaceCreateInput', () => {
         toWorkspaceCreateInput({
           prompt: '',
           service: 'generation',
-          reference_image_asset_ids: [7],
+          ...{ reference_image_asset_ids: [7] },
         }),
       'media-ids',
     )
@@ -478,7 +478,6 @@ describe('quote mapping', () => {
       toWorkspaceQuoteInput({
         prompt: 'a cat (never sent)',
         service: 'generation',
-        image_urls: ['https://cdn.example/a.png'],
         media_asset_ids: ['asset_aaa1'],
         params: { output_count: 3, output_resolution: '1k' },
       }),
@@ -800,11 +799,15 @@ describe('canvas workspace task transport', () => {
     const cases: Array<{ name: string; request: Parameters<typeof toWorkspaceCreateInput>[0] }> = [
       {
         name: 'image_urls',
-        request: { prompt: '', service: 'generation', image_urls: ['https://cdn.example/a.png'] },
+        request: {
+          prompt: '',
+          service: 'generation',
+          ...{ image_urls: ['https://cdn.example/a.png'] },
+        },
       },
       {
         name: 'numeric ids',
-        request: { prompt: '', service: 'generation', image_asset_ids: [12] },
+        request: { prompt: '', service: 'generation', ...{ image_asset_ids: [12] } },
       },
       {
         name: 'storage URL param',
@@ -1035,6 +1038,22 @@ describe('extractWorkspaceTaskImageResults', () => {
         },
       ]),
     ).toEqual([{ url: 'https://cdn.example/out.png', resultIndex: 1 }])
+    expect(
+      extractWorkspaceTaskImageResults(WORKSPACE_ID, [
+        {
+          kind: 'asset',
+          asset_id: 'asset_result1',
+          role: 'result',
+          result_index: 0,
+        },
+      ]),
+    ).toEqual([
+      {
+        workspaceId: WORKSPACE_ID,
+        assetId: 'asset_result1',
+        resultIndex: 0,
+      },
+    ])
   })
 
   it('drops storage-internal remote URLs', () => {

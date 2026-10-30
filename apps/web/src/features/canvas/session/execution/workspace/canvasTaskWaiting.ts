@@ -28,6 +28,38 @@ import {
 
 const STORAGE_OUTPUT_MARKERS = ['ws-uploads', 'uploads/ws', 'builtin-local', 'storage_key']
 
+function toAssetImageResult(
+  workspaceId: string,
+  ref: WorkspaceTaskOutputRef,
+): TaskImageResult | null {
+  const assetId = `${ref.asset_id ?? ''}`.trim()
+  if (!assetId) return null
+  return {
+    workspaceId,
+    assetId,
+    ...(Number.isInteger(ref.result_index) && ref.result_index >= 0
+      ? { resultIndex: ref.result_index }
+      : {}),
+    ...(typeof ref.width === 'number' && ref.width > 0 ? { width: ref.width } : {}),
+    ...(typeof ref.height === 'number' && ref.height > 0 ? { height: ref.height } : {}),
+    ...(ref.mime_type ? { mimeType: ref.mime_type } : {}),
+    ...(typeof ref.preview_ready === 'boolean' ? { isPreviewReady: ref.preview_ready } : {}),
+  }
+}
+
+function toRemoteImageResult(ref: WorkspaceTaskOutputRef): TaskImageResult | null {
+  const url = `${ref.url ?? ''}`.trim()
+  if (!url || STORAGE_OUTPUT_MARKERS.some((marker) => url.toLowerCase().includes(marker))) {
+    return null
+  }
+  return {
+    url,
+    ...(Number.isInteger(ref.result_index) && ref.result_index >= 0
+      ? { resultIndex: ref.result_index }
+      : {}),
+  }
+}
+
 function toWorkspaceImageResults(
   workspaceId: string,
   outputs: readonly WorkspaceTaskOutputRef[],
@@ -35,32 +67,11 @@ function toWorkspaceImageResults(
   const results: TaskImageResult[] = []
   for (const ref of outputs) {
     if (ref.kind === 'asset') {
-      const assetId = `${ref.asset_id ?? ''}`.trim()
-      if (!assetId) continue
-      // Explicit workspace binding: the task may settle under a workspace
-      // that differs from the current selection (registry path), so the
-      // delivery URL must not resolve the workspace implicitly.
-      results.push({
-        workspaceId,
-        assetId,
-        ...(Number.isInteger(ref.result_index) && ref.result_index >= 0
-          ? { resultIndex: ref.result_index }
-          : {}),
-      })
-      continue
-    }
-    if (ref.kind === 'remote') {
-      // v1 refs carry no width/height/mime: downstream resolves display
-      // size from the URL. Storage internals never become browser URLs.
-      const url = `${ref.url ?? ''}`.trim()
-      if (!url) continue
-      if (STORAGE_OUTPUT_MARKERS.some((marker) => url.toLowerCase().includes(marker))) continue
-      results.push({
-        url,
-        ...(Number.isInteger(ref.result_index) && ref.result_index >= 0
-          ? { resultIndex: ref.result_index }
-          : {}),
-      })
+      const result = toAssetImageResult(workspaceId, ref)
+      if (result) results.push(result)
+    } else if (ref.kind === 'remote') {
+      const result = toRemoteImageResult(ref)
+      if (result) results.push(result)
     }
   }
   return results
@@ -70,8 +81,8 @@ export function extractWorkspaceTaskImageResults(
   workspaceId: string,
   outputs: readonly WorkspaceTaskOutputRef[] | undefined,
 ): TaskImageResult[] {
-  // Only image-role facts may become image results.
-  const imageRefs = (outputs ?? []).filter((ref) => ref.role === 'image')
+  // Both 'image' and 'result' role facts carry image results (backend returns WorkspaceProviderResultRole="result").
+  const imageRefs = (outputs ?? []).filter((ref) => ref.role === 'image' || ref.role === 'result')
   return toWorkspaceImageResults(workspaceId, imageRefs)
 }
 

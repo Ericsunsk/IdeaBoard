@@ -253,7 +253,8 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 		return nil, nil, err
 	}
 	db := s.dbWithContext(ctx)
-	if _, err := db.queries(); err != nil {
+	q, err := db.queries()
+	if err != nil {
 		return nil, nil, err
 	}
 	trimmedWorkspace := strings.TrimSpace(workspaceID)
@@ -263,54 +264,58 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 	if facts.Width < 0 || facts.Height < 0 || facts.Width > 32768 || facts.Height > 32768 {
 		return nil, nil, NewFieldValidationError("dimensions")
 	}
+
+	row, err := getSessionRow(ctx, q, trimmedWorkspace, uploadID)
+	if err != nil {
+		return nil, nil, err
+	}
+	live, effectErr := applyLazySessionEffects(ctx, q, trimmedWorkspace, row, time.Now().UTC())
+	if errors.Is(effectErr, ErrExpired) {
+		return nil, nil, ErrExpired
+	}
+	if effectErr != nil {
+		return nil, nil, effectErr
+	}
+	row = live
+	if SessionStatus(row.Status) != StatusPending && SessionStatus(row.Status) != StatusTransferring {
+		return nil, nil, ErrStateConflict
+	}
+	session := sessionFromRow(trimmedWorkspace, row)
+	if mismatch := matchCompletionFacts(session, facts); mismatch != nil {
+		if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
+			PublicID:          row.PublicID,
+			WorkspacePublicID: trimmedWorkspace,
+		}); failErr != nil && !database.IsNotFound(failErr) {
+			return nil, nil, failErr
+		}
+		return nil, nil, mismatch
+	}
+
+	minted := strings.TrimSpace(asset.PublicID)
+	if !contract.IsAssetID(minted) {
+		minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	slot := session.StorageKey
+	if strings.TrimSpace(slot) == "" {
+		slot = SlotKey(trimmedWorkspace, session.ID, session.Filename)
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, trimmedWorkspace)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, nil, ErrNotFound
+		}
+		return nil, nil, err
+	}
+
 	var completed *Session
 	var created *Asset
-	err := db.withTx(func(q *dbsqlc.Queries) error {
-		row, err := getSessionRow(ctx, q, trimmedWorkspace, uploadID)
-		if err != nil {
-			return err
-		}
-		live, effectErr := applyLazySessionEffects(ctx, q, trimmedWorkspace, row, time.Now().UTC())
-		if errors.Is(effectErr, ErrExpired) {
-			return ErrExpired
-		}
-		if effectErr != nil {
-			return effectErr
-		}
-		row = live
-		if SessionStatus(row.Status) != StatusPending && SessionStatus(row.Status) != StatusTransferring {
-			return ErrStateConflict
-		}
-		session := sessionFromRow(trimmedWorkspace, row)
-		if mismatch := matchCompletionFacts(session, facts); mismatch != nil {
-			if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
-				PublicID:          row.PublicID,
-				WorkspacePublicID: trimmedWorkspace,
-			}); failErr != nil && !database.IsNotFound(failErr) {
-				return failErr
-			}
-			return mismatch
-		}
-		minted := strings.TrimSpace(asset.PublicID)
-		if !contract.IsAssetID(minted) {
-			minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
-			if err != nil {
-				return err
-			}
-		}
-		slot := session.StorageKey
-		if strings.TrimSpace(slot) == "" {
-			slot = SlotKey(trimmedWorkspace, session.ID, session.Filename)
-		}
-		workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, trimmedWorkspace)
-		if err != nil {
-			if errors.Is(err, errWorkspaceNotFound) {
-				return ErrNotFound
-			}
-			return err
-		}
+	var createAssetFailed bool
+	txErr := db.withTx(func(txQ *dbsqlc.Queries) error {
 		for attempt := 0; attempt < mintAttempts; attempt++ {
-			inserted, err := q.CreateMediaAsset(ctx, dbsqlc.CreateMediaAssetParams{
+			inserted, err := txQ.CreateMediaAsset(ctx, dbsqlc.CreateMediaAssetParams{
 				PublicID:        minted,
 				WorkspaceID:     workspaceInternalID,
 				UploadSessionID: row.InternalID,
@@ -333,12 +338,7 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 				continue
 			}
 			if err != nil {
-				if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
-					PublicID:          row.PublicID,
-					WorkspacePublicID: trimmedWorkspace,
-				}); failErr != nil && !database.IsNotFound(failErr) {
-					return failErr
-				}
+				createAssetFailed = true
 				return fmt.Errorf("workspacemedia: create media asset: %w", err)
 			}
 			created = assetFromRow(trimmedWorkspace, inserted)
@@ -347,7 +347,7 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 		if created == nil {
 			return errors.New("workspacemedia: asset public id mint collision, retry the request")
 		}
-		done, err := q.CompleteUploadSession(ctx, dbsqlc.CompleteUploadSessionParams{
+		done, err := txQ.CompleteUploadSession(ctx, dbsqlc.CompleteUploadSessionParams{
 			StorageKey:        pgtype.Text{String: slot, Valid: true},
 			PublicID:          row.PublicID,
 			WorkspacePublicID: trimmedWorkspace,
@@ -362,8 +362,16 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 		completed.AssetID = created.ID
 		return nil
 	})
-	if err != nil {
-		return nil, nil, err
+	if txErr != nil {
+		if createAssetFailed {
+			if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
+				PublicID:          row.PublicID,
+				WorkspacePublicID: trimmedWorkspace,
+			}); failErr != nil && !database.IsNotFound(failErr) {
+				return nil, nil, errors.Join(txErr, failErr)
+			}
+		}
+		return nil, nil, txErr
 	}
 	return completed, created, nil
 }

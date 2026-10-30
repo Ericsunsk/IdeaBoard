@@ -43,6 +43,7 @@ import type {
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UploadSessionEnvelope,
+  UploadWorkspaceMediaDirectBody,
 } from '../model'
 
 import { publicMutator } from '../../../publicMutator'
@@ -639,6 +640,109 @@ export function useListWorkspaceMediaAssets<
   return query
 }
 
+export const getUploadWorkspaceMediaDirectUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/media-assets/direct`
+}
+
+/**
+ * Single-request image upload using the upload session protocol internally. Accepts multipart/form-data with a binary file and optional board_id. Returns the created media asset envelope. No Idempotency-Key header is required for direct multipart upload.
+ * @summary Direct upload of a workspace media asset (single request)
+ */
+export const uploadWorkspaceMediaDirect = async (
+  workspaceId: string,
+  uploadWorkspaceMediaDirectBody: UploadWorkspaceMediaDirectBody,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<MediaAssetEnvelope> => {
+  const formData = new FormData()
+  formData.append(`file`, uploadWorkspaceMediaDirectBody.file)
+  if (uploadWorkspaceMediaDirectBody.board_id !== undefined) {
+    formData.append(`board_id`, uploadWorkspaceMediaDirectBody.board_id)
+  }
+
+  return publicMutator<MediaAssetEnvelope>(getUploadWorkspaceMediaDirectUrl(workspaceId), {
+    ...options,
+    method: 'POST',
+    body: formData,
+  })
+}
+
+export const getUploadWorkspaceMediaDirectMutationKey = () =>
+  ['uploadWorkspaceMediaDirect'] as const
+
+export const getUploadWorkspaceMediaDirectMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>,
+    TError,
+    UploadWorkspaceMediaDirectMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>,
+  TError,
+  UploadWorkspaceMediaDirectMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUploadWorkspaceMediaDirectMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>,
+    UploadWorkspaceMediaDirectMutationVariables
+  > = (props) => {
+    const { workspaceId, data } = props ?? {}
+
+    return uploadWorkspaceMediaDirect(workspaceId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UploadWorkspaceMediaDirectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>
+>
+export type UploadWorkspaceMediaDirectMutationBody = UploadWorkspaceMediaDirectBody
+export type UploadWorkspaceMediaDirectMutationError =
+  BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse
+export type UploadWorkspaceMediaDirectMutationVariables = {
+  workspaceId: string
+  data: UploadWorkspaceMediaDirectBody
+}
+
+/**
+ * @summary Direct upload of a workspace media asset (single request)
+ */
+export const useUploadWorkspaceMediaDirect = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>,
+      TError,
+      UploadWorkspaceMediaDirectMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof uploadWorkspaceMediaDirect>>,
+  TError,
+  UploadWorkspaceMediaDirectMutationVariables,
+  TContext
+> => {
+  return useMutation(getUploadWorkspaceMediaDirectMutationOptions(options), queryClient)
+}
 export const getBatchGetWorkspaceMediaAssetsUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/media-assets/batch`
 }

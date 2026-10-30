@@ -98,6 +98,7 @@ func (h *contractV1Handler) registerMediaRoutes(group *gin.RouterGroup) {
 	group.POST("/workspaces/:workspace_id/uploads/:upload_id/complete", h.completeUploadSession)
 	group.GET("/workspaces/:workspace_id/media-assets", h.listMediaAssets)
 	group.POST("/workspaces/:workspace_id/media-assets/batch", h.batchGetMediaAssets)
+	group.POST("/workspaces/:workspace_id/media-assets/direct", h.uploadWorkspaceMediaDirect)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id", h.getMediaAsset)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/content", h.contentMediaAsset)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", h.derivativeMediaAsset)
@@ -919,6 +920,82 @@ func (h *contractV1Handler) batchGetMediaAssets(c *gin.Context) {
 			items = append(items, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
 		}
 		contract.RenderSuccess(c, v1BatchMediaAssetsDTO{Items: items})
+	})
+}
+
+func (h *contractV1Handler) uploadWorkspaceMediaDirect(c *gin.Context) {
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspacePublicID := wctx.Workspace.PublicID
+
+		if h.deps.MediaObjects == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable50)
+			c.Abort()
+			return
+		}
+
+		fileHeader, err := c.FormFile("file")
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest6)
+			c.Abort()
+			return
+		}
+
+		boardID := strings.TrimSpace(c.PostForm("board_id"))
+		if boardID != "" {
+			if _, _, ok := h.authorizeBoardByID(c, wctx.Workspace, boardID, wctx.Role, identityPrincipal.UserID(), boards.CapWrite); !ok {
+				return
+			}
+		}
+
+		if fileHeader.Size < 1 || fileHeader.Size > workspacemedia.MaxUploadSizeBytes {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("size_bytes"))
+			return
+		}
+
+		src, err := fileHeader.Open()
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest6)
+			c.Abort()
+			return
+		}
+		defer src.Close()
+
+		data, err := io.ReadAll(io.LimitReader(src, workspacemedia.MaxUploadSizeBytes+1))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest6)
+			c.Abort()
+			return
+		}
+		if len(data) == 0 || int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("size_bytes"))
+			return
+		}
+
+		ctx := c.Request.Context()
+		asset, err := workspacemedia.IngestImage(ctx, h.deps.Media, h.deps.MediaObjects, workspacemedia.IngestImageParams{
+			WorkspaceID:         workspacePublicID,
+			OwnerUserID:         identityPrincipal.UserID(),
+			FilenameStem:        fileHeader.Filename,
+			Data:                data,
+			TargetBoardPublicID: boardID,
+		})
+		if err != nil {
+			var validationErr *workspacemedia.ValidationError
+			if errors.As(err, &validationErr) {
+				renderUploadValidationError(c, validationErr)
+				return
+			}
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable50)
+			c.Abort()
+			return
+		}
+
+		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetReady,
+			events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
+			events.V1MediaAssetReadyData{AssetID: asset.ID})
+
+		contract.RenderCreated(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
 	})
 }
 

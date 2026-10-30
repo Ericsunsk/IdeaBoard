@@ -40,7 +40,6 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
     attachPendingTaskIds: vi.fn(),
     removePendingResults: vi.fn(),
   }
-  const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(async () => undefined)
   const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
     taskId: 'task-1',
   }))
@@ -49,7 +48,7 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
     result: { url: `https://example.com/${resultIndex}.png`, ratio: 1 },
   }))
   const observe = vi.fn<PendingImageWorkflowTaskTransport['observe']>(async () => ({ resolve }))
-  const transport = { assertReady, submit, observe }
+  const transport = { submit, observe }
   const cancelTasks = vi.fn()
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
@@ -72,7 +71,6 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
     sourceNodeId: 'image-0',
     outputCount: taskIds.length,
     taskRequest: {} as never,
-    readinessRequest: {} as never,
     fallbackRatio: 1,
   }
   return {
@@ -98,33 +96,6 @@ afterEach(() => {
 })
 
 describe('pendingImageWorkflowRunner', () => {
-  it.each(['ready', 'retryable failure'] as const)(
-    'does not reserve or submit after disposal while readiness returns %s',
-    async (outcome) => {
-      const harness = createHarness()
-      let finishReadiness!: () => void
-      harness.transport.assertReady.mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            finishReadiness = () =>
-              outcome === 'ready'
-                ? resolve()
-                : reject(new CanvasBillingPreflightError('network', 'Network error'))
-          }),
-      )
-      const execution = harness.runner.execute(harness.intent)
-      harness.runner.dispose()
-      finishReadiness()
-      await execution
-      expect(harness.transport.assertReady).toHaveBeenCalledOnce()
-      expect(harness.pendingResults.reservePendingResults).not.toHaveBeenCalled()
-      expect(harness.transport.submit).not.toHaveBeenCalled()
-      expect(harness.onError).not.toHaveBeenCalled()
-      expect(harness.onWarning).not.toHaveBeenCalled()
-      expect(harness.onSuccess).not.toHaveBeenCalled()
-    },
-  )
-
   it('does not retry or delete pending nodes when an in-flight submit fails after disposal', async () => {
     const harness = createHarness()
     let rejectSubmit!: (error: unknown) => void
@@ -179,10 +150,9 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.onSuccess).not.toHaveBeenCalled()
   })
 
-  it('executes one shared prepared intent through stable transport adapters', async () => {
+  it('executes one shared prepared intent through stable transport adapters optimistically', async () => {
     const harness = createHarness(['task-1', 'task-1'])
     await harness.runner.execute(harness.intent)
-    expect(harness.transport.assertReady).toHaveBeenCalledWith(harness.intent.readinessRequest)
     expect(harness.transport.submit).toHaveBeenCalledWith(harness.intent.taskRequest, 'action-1')
     expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledWith([
       { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },
@@ -448,13 +418,6 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.onWarning).toHaveBeenCalledWith('Image generation failed')
   })
 
-  it('does not reserve when the injected readiness transport rejects', async () => {
-    const harness = createHarness()
-    harness.transport.assertReady.mockRejectedValueOnce(new Error('余额不足'))
-    await harness.runner.execute(harness.intent)
-    expect(harness.pendingResults.reservePendingResults).not.toHaveBeenCalled()
-  })
-
   it('retries transient submit with one action id and preserves pending recovery handles', async () => {
     const harness = createHarness()
     harness.transport.submit
@@ -528,36 +491,6 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.cancelTasks).toHaveBeenCalledWith([])
   })
 
-  it('retries quote assertion once on transient pricing failures', async () => {
-    const harness = createHarness()
-    harness.transport.assertReady
-      .mockRejectedValueOnce(
-        new CanvasBillingPreflightError(
-          'pricing-unavailable',
-          'Pricing is temporarily unavailable. Please try again shortly.',
-        ),
-      )
-      .mockResolvedValueOnce(undefined)
-    await harness.runner.execute(harness.intent)
-    expect(harness.transport.assertReady).toHaveBeenCalledTimes(2)
-    expect(harness.transport.submit).toHaveBeenCalledTimes(1)
-    expect(harness.onSuccess).toHaveBeenCalledOnce()
-  })
-
-  it('does not retry quote assertion on deterministic empty-pool failures', async () => {
-    const harness = createHarness()
-    harness.transport.assertReady.mockRejectedValueOnce(
-      new CanvasBillingPreflightError(
-        'resolution-unavailable',
-        'This resolution is unavailable right now.',
-      ),
-    )
-    await harness.runner.execute(harness.intent)
-    expect(harness.transport.assertReady).toHaveBeenCalledTimes(1)
-    expect(harness.transport.submit).not.toHaveBeenCalled()
-    expect(harness.onWarning).toHaveBeenCalledWith('This resolution is unavailable right now.')
-  })
-
   it('retries submit once on transient pricing failures with the shared budget', async () => {
     const harness = createHarness()
     harness.transport.submit
@@ -614,7 +547,6 @@ describe('pendingImageWorkflowRunner', () => {
         }),
       })
     const transport = {
-      assertReady: vi.fn(async () => undefined),
       submit: vi.fn(async () => ({ taskId: 'task-1' })),
       observe,
     }
@@ -639,7 +571,6 @@ describe('pendingImageWorkflowRunner', () => {
       sourceNodeId: 'image-0',
       outputCount: 1,
       taskRequest: {} as never,
-      readinessRequest: {} as never,
       fallbackRatio: 1,
     })
     // 前台超时不断 lease：先报进行中，后台续跑成功后报成功且落子

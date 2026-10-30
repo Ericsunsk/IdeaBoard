@@ -1273,3 +1273,45 @@ func TestV1BillingCheckoutKeysDoNotConflictAcrossAccounts(t *testing.T) {
 		previousSession = session
 	}
 }
+
+func TestV1WorkspaceBootstrap(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "bootstrap-test", 11)
+	accountID := fx.mustAccount(t, ctx, ws)
+	fx.seedWallet(accountID, 1250, 50)
+	engine := fx.engine()
+
+	status, _, res := doV1(t, engine, v1Call{
+		method: http.MethodGet,
+		path:   "/api/v1/workspaces/" + ws.PublicID + "/bootstrap",
+		userID: 11,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("bootstrap status = %d (%v)", status, res)
+	}
+	data, _ := v1Data(t, res).(map[string]any)
+	if data == nil {
+		t.Fatalf("bootstrap data is nil: %v", res)
+	}
+
+	workspace, _ := data["workspace"].(map[string]any)
+	if workspace == nil || workspace["id"] != ws.PublicID {
+		t.Fatalf("bootstrap workspace = %v, want id %s", workspace, ws.PublicID)
+	}
+
+	billingAccount, _ := data["billing_account"].(map[string]any)
+	if billingAccount == nil || billingAccount["workspace_id"] != ws.PublicID {
+		t.Fatalf("bootstrap billing_account = %v", billingAccount)
+	}
+
+	wallet, _ := data["wallet"].(map[string]any)
+	if wallet == nil || wallet["available_credits"] != float64(1250) {
+		t.Fatalf("bootstrap wallet = %v, want available 1250", wallet)
+	}
+
+	branding, _ := data["branding"].(map[string]any)
+	if branding == nil {
+		t.Fatalf("bootstrap branding is nil: %v", data)
+	}
+}

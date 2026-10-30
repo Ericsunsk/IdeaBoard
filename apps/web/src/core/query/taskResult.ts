@@ -6,6 +6,7 @@ type TaskAssetImageResult = {
   height?: number
   mimeType?: string
   resultIndex?: number
+  isPreviewReady?: boolean
 }
 
 // Remote refs remain transport facts; Canvas materializes managed assets only.
@@ -20,6 +21,7 @@ type TaskImageResultInput = {
   height?: unknown
   mimeType?: unknown
   resultIndex?: unknown
+  isPreviewReady?: unknown
 }
 
 function toPositiveNumber(value: unknown): number | undefined {
@@ -38,6 +40,7 @@ export function normalizeTaskImageResult(
   const height = toPositiveNumber(result.height)
   const mimeType = typeof result.mimeType === 'string' ? result.mimeType.trim() : ''
   const resultIndex = Number(result.resultIndex)
+  const isPreviewReady = result.isPreviewReady === true ? true : undefined
   return {
     workspaceId,
     assetId,
@@ -45,6 +48,7 @@ export function normalizeTaskImageResult(
     ...(height ? { height } : {}),
     ...(mimeType ? { mimeType } : {}),
     ...(Number.isInteger(resultIndex) && resultIndex >= 0 ? { resultIndex } : {}),
+    ...(isPreviewReady ? { isPreviewReady } : {}),
   }
 }
 

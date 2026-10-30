@@ -1,17 +1,5 @@
-// Canvas task request DTO (W2 stream 1, workspace v1 transport).
-//
-// Feature-owned view of the canvas submission/readiness contract. These
-// types were previously re-exported from the legacy `shared/api/task`
-// transport (`/api/user/tasks/*`, deleted backend-side); they now live with
-// the canvas execution contract that is their only consumer.
-//
-// `media_asset_ids` carries opaque `asset_...` workspace media references
-// for the v1 `inputs.media_asset_ids` union member. Legacy URL/numeric
-// inputs (`image_urls`, `image_asset_ids`, `reference_image_asset_ids`,
-// `mask_image_url`) stay on the DTO so builders keep compiling the full
-// request, but the workspace adapter refuses to send them (v1 rejects raw
-// media URLs and has no numeric-id mapping): unmappable inputs fail closed
-// with `CanvasWorkspaceTaskUnmappableError` instead of a cryptic 422.
+// Feature-owned Canvas submission/readiness DTO. Media inputs use opaque
+// workspace AssetIDs through media_asset_ids and params.mask_asset_id.
 /** @externalContract Canvas task request parameters. */
 export type CanvasTaskParams = {
   use_mask?: boolean
@@ -36,10 +24,6 @@ export type CanvasTaskRequestData = {
   prompt: string
   service?: string
   client_action_id?: string
-  priority?: number
-  image_urls?: string[]
-  image_asset_ids?: number[]
-  reference_image_asset_ids?: number[]
   /** Opaque `asset_...` ids; the only media refs the v1 transport sends. */
   media_asset_ids?: string[]
   /**

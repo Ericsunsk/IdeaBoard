@@ -28,7 +28,6 @@ func newObservabilityTestRouter(checker stubReadyChecker, useChecker bool) *gin.
 	deps := Dependencies{
 		CORSMiddleware: func(c *gin.Context) { c.Next() },
 		RateLimit:      stubRateLimitSettingsProvider{},
-		Branding:       stubBrandingSettingsProvider{},
 	}
 	if useChecker {
 		deps.ReadyChecker = checker

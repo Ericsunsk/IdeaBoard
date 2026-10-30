@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/boards/realtime"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -66,7 +68,7 @@ func newV1BoardsTestEngineWithDisplay(store tenancy.Store, boardsStore boards.Wo
 		c.Next()
 	})
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
-	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardsStore, MemberDisplay: display})
+	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardsStore, MemberDisplay: display, RealtimeTicketSecret: strings.Repeat("test", 8)})
 	return router
 }
 
@@ -197,8 +199,8 @@ func TestV1BoardsLifecycle(t *testing.T) {
 	// Read + rename + archive + restore on the fixture board.
 	detailPath := f.boardPath("")
 	status, headers, readPayload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: detailPath, userID: f.owner})
-	if status != 200 || headers.Get(contract.ETagHeader) != "1" {
-		t.Fatalf("read = %d %v etag=%q, want 200 with ETag 1", status, readPayload, headers.Get(contract.ETagHeader))
+	if status != 200 || !strings.HasPrefix(headers.Get(contract.ETagHeader), `"board-meta-`) {
+		t.Fatalf("read = %d %v etag=%q, want 200 with metadata ETag", status, readPayload, headers.Get(contract.ETagHeader))
 	}
 	status, _ = boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.owner, "", `{"data":{"name":"Atlas Prime"}}`)
 	if status != 200 {
@@ -778,5 +780,135 @@ func TestV1BoardsCatalogPaginationValidation(t *testing.T) {
 		} else if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodePaginationCursorInvalid) {
 			t.Fatalf("offset=%d status=%d payload=%v", offset, status, payload)
 		}
+	}
+}
+
+func TestV1BoardsPreconditionNotModified(t *testing.T) {
+	f := newV1BoardsFixture(t)
+
+	initialStatus, initialHeaders, _ := doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet, path: f.boardPath(""), userID: f.viewer,
+	}, "test-etag-")
+	metaETag := initialHeaders.Get(contract.ETagHeader)
+	if initialStatus != http.StatusOK || metaETag == "" {
+		t.Fatalf("initial metadata read = %d, etag=%q", initialStatus, metaETag)
+	}
+	// 1. Get board with matching If-None-Match returns 304 Not Modified and empty body.
+	status, headers, body := doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet,
+		path:   f.boardPath(""),
+		userID: f.viewer,
+		headers: map[string]string{
+			contract.IfNoneMatchHeader: metaETag,
+		},
+	}, "test-etag-")
+	if status != http.StatusNotModified {
+		t.Fatalf("get board status = %d, want 304 Not Modified; body=%s", status, body)
+	}
+	if headers.Get(contract.ETagHeader) != metaETag {
+		t.Fatalf("get board ETag = %q, want %q", headers.Get(contract.ETagHeader), metaETag)
+	}
+	if body != "" {
+		t.Fatalf("get board body must be empty on 304, got %q", body)
+	}
+
+	// 2. Get board document with matching If-None-Match returns 304 Not Modified and empty body.
+	status, headers, body = doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet,
+		path:   f.boardPath("/document"),
+		userID: f.viewer,
+		headers: map[string]string{
+			contract.IfNoneMatchHeader: "1",
+		},
+	}, "test-etag-")
+	if status != http.StatusNotModified {
+		t.Fatalf("get board document status = %d, want 304 Not Modified; body=%s", status, body)
+	}
+	if headers.Get(contract.ETagHeader) != "1" {
+		t.Fatalf("get board document ETag = %q, want 1", headers.Get(contract.ETagHeader))
+	}
+	if body != "" {
+		t.Fatalf("get board document body must be empty on 304, got %q", body)
+	}
+
+	// 3. Stale If-None-Match returns 200 OK with full payload.
+	status, headers, body = doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet,
+		path:   f.boardPath("/document"),
+		userID: f.viewer,
+		headers: map[string]string{
+			contract.IfNoneMatchHeader: "0",
+		},
+	}, "test-etag-")
+	if status != http.StatusOK {
+		t.Fatalf("get board document with stale ETag status = %d, want 200", status)
+	}
+	if headers.Get(contract.ETagHeader) != "1" {
+		t.Fatalf("ETag = %q, want 1", headers.Get(contract.ETagHeader))
+	}
+	if body == "" {
+		t.Fatal("expected non-empty body for 200 OK")
+	}
+}
+
+func TestV1GetBoardBundle(t *testing.T) {
+	f := newV1BoardsFixture(t)
+	bundlePath := f.boardPath("/bundle")
+
+	// 1. Initial bundle read returns 200 OK with meta, document, and realtime ticket.
+	status, headers, body := doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet,
+		path:   bundlePath,
+		userID: f.viewer,
+	}, "test-bundle-")
+	if status != http.StatusOK {
+		t.Fatalf("get board bundle status = %d, want 200; body=%s", status, body)
+	}
+	if headers.Get(contract.ETagHeader) != "" || headers.Get("Cache-Control") != "no-store" {
+		t.Fatalf("bundle must not cache credentials: headers=%v", headers)
+	}
+	var res map[string]any
+	if err := json.Unmarshal([]byte(body), &res); err != nil {
+		t.Fatalf("failed to decode bundle json: %v", err)
+	}
+	data, _ := res["data"].(map[string]any)
+	if data == nil {
+		t.Fatalf("bundle data is nil, raw=%s", body)
+	}
+	meta, _ := data["meta"].(map[string]any)
+	doc, _ := data["document"].(map[string]any)
+	if meta == nil || doc == nil {
+		t.Fatalf("bundle missing meta or document: meta=%v, doc=%v", meta, doc)
+	}
+	if meta["id"] != f.boardID {
+		t.Fatalf("bundle meta id = %v, want %v", meta["id"], f.boardID)
+	}
+
+	// 2. Even a wildcard conditional read returns the current short-lived ticket.
+	status, headers, body = doV1RoundTrip(t, f.engine, v1Call{
+		method: http.MethodGet,
+		path:   bundlePath,
+		userID: f.viewer,
+		headers: map[string]string{
+			contract.IfNoneMatchHeader: "*",
+		},
+	}, "test-bundle-")
+	if status != http.StatusOK {
+		t.Fatalf("get board bundle status = %d, want 200; body=%s", status, body)
+	}
+	if headers.Get(contract.ETagHeader) != "" || headers.Get("Cache-Control") != "no-store" {
+		t.Fatalf("bundle must not cache credentials: headers=%v", headers)
+	}
+	var refreshed struct {
+		Data v1BoardBundleDTO `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &refreshed); err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.Data.Realtime.Ticket == "" || refreshed.Data.Realtime.ExpiresAt == "" {
+		t.Fatalf("bundle must contain refreshed ticket: %s", body)
+	}
+	if _, err := realtime.Verify(strings.Repeat("test", 8), refreshed.Data.Realtime.Ticket, time.Now().Add(time.Second)); err != nil {
+		t.Fatalf("refreshed bundle ticket is invalid: %v", err)
 	}
 }

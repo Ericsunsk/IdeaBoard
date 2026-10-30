@@ -158,6 +158,7 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 	verified := workspacetasks.OutputRef{
 		Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(ref.AssetID),
 		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
+		Width: ref.Width, Height: ref.Height, MIMEType: ref.MIMEType,
 	}
 	if err := workspacetasks.ValidateOutputRef(verified); err != nil {
 		return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset3, err)

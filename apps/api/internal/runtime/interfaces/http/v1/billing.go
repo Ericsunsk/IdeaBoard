@@ -52,6 +52,7 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
@@ -229,6 +230,7 @@ type ContractV1BillingDeps struct {
 	Snapshot billingoverview.Snapshot
 	// Invitations atomically creates handover notifications with the invite.
 	Invitations *invitations.Service
+	Branding    settings.BrandingSettingProvider
 }
 
 func (d *ContractV1BillingDeps) normalize() {
@@ -246,6 +248,7 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group := r.Group(runtimehttp.ContractV1GroupPath)
 	group.Use(runtimehttp.PublicContractChain()...)
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
+	group.GET("/workspaces/:workspace_id/bootstrap", handler.getWorkspaceBootstrap)
 	group.GET("/workspaces/:workspace_id/billing-account", handler.getBillingAccount)
 	group.GET("/workspaces/:workspace_id/billing-account/members", handler.listBillingAccountMembers)
 	group.POST("/workspaces/:workspace_id/billing-account/members", handler.addBillingAccountMember)
@@ -372,6 +375,60 @@ type v1BillingAccountDTO struct {
 	Shared                bool   `json:"shared,omitempty"`
 	CreatedAt             string `json:"created_at,omitempty"`
 	UpdatedAt             string `json:"updated_at,omitempty"`
+}
+
+type v1WorkspaceBootstrapDTO struct {
+	Workspace      v1WorkspaceDTO             `json:"workspace"`
+	BillingAccount v1BillingAccountDTO        `json:"billing_account"`
+	Wallet         v1BillingCreditsBalanceDTO `json:"wallet"`
+	Branding       settings.BrandingSetting   `json:"branding"`
+}
+
+func (h *contractV1BillingHandler) getWorkspaceBootstrap(c *gin.Context) {
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		ctx := c.Request.Context()
+		if h.deps.BillingAccounts == nil || h.deps.Wallets == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+			c.Abort()
+			return
+		}
+		account, resolved := h.billingAccountForWorkspace(c, workspace)
+		if !resolved {
+			return
+		}
+		_, scope, ok := h.consumptionReadScope(c, wctx, account)
+		if !ok {
+			return
+		}
+		canManageQuotas, err := h.canManageMemberQuotas(ctx, workspace, account.InternalID, wctx.Principal.UserID())
+		if err != nil {
+			renderBillingAccountError(c, err)
+			return
+		}
+		billingAccountDTO := toBillingAccountDTO(workspace, account, scope, canManageQuotas)
+
+		wallet, err := h.deps.Wallets.GetWallet(ctx, account.InternalID)
+		if err != nil {
+			billingRenderWalletGate(c, err)
+			return
+		}
+		balanceDTO := billingToBalanceDTO(account.PublicID, workspace.PublicID, wallet)
+
+		var brandingDTO settings.BrandingSetting
+		if h.deps.Branding != nil {
+			if b, bErr := h.deps.Branding.GetBranding(ctx); bErr == nil {
+				brandingDTO = b
+			}
+		}
+
+		contract.RenderSuccess(c, v1WorkspaceBootstrapDTO{
+			Workspace:      toWorkspaceDTO(workspace),
+			BillingAccount: billingAccountDTO,
+			Wallet:         balanceDTO,
+			Branding:       brandingDTO,
+		})
+	})
 }
 
 func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {

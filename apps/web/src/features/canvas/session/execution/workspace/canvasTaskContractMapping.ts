@@ -320,15 +320,18 @@ function toWorkspaceResolution(params: CanvasTaskRequestData['params']): string 
 export function toWorkspaceCreateInput(request: CanvasTaskRequestData): CreateWorkspaceTaskInput {
   const service = assertService(request.service)
   const prompt = toWorkspacePrompt(service, request.prompt)
-  if (nonEmptyStrings(request.image_urls).length > 0) {
+  if ('image_urls' in request && nonEmptyStrings(request.image_urls).length > 0) {
     throw new CanvasWorkspaceTaskUnmappableError(
       'media-urls',
       'Canvas task image URLs have no v1 mapping: inputs accept asset_... references only. Resubmit from an asset-backed node so media_asset_ids is populated.',
     )
   }
   if (
-    (Array.isArray(request.image_asset_ids) && request.image_asset_ids.length > 0) ||
-    (Array.isArray(request.reference_image_asset_ids) &&
+    ('image_asset_ids' in request &&
+      Array.isArray(request.image_asset_ids) &&
+      request.image_asset_ids.length > 0) ||
+    ('reference_image_asset_ids' in request &&
+      Array.isArray(request.reference_image_asset_ids) &&
       request.reference_image_asset_ids.length > 0)
   ) {
     throw new CanvasWorkspaceTaskUnmappableError(
@@ -341,8 +344,7 @@ export function toWorkspaceCreateInput(request: CanvasTaskRequestData): CreateWo
   const quantity = toWorkspaceQuantity(request.params)
   const resolution = toWorkspaceResolution(request.params)
   const boardId = toWorkspaceBoardId(request.board_id)
-  // NOTE: legacy `priority` (interactive hint) has no v1 field and is
-  // dropped; `client_action_id` becomes the header-only Idempotency-Key.
+  // `client_action_id` becomes the header-only Idempotency-Key.
   return {
     service,
     ...(mediaAssetIds.length > 0 ? { media_asset_ids: mediaAssetIds } : {}),

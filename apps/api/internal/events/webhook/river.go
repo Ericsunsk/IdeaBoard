@@ -154,3 +154,75 @@ func webhookJitteredDelay(base time.Duration, jitter float64) time.Duration {
 	}
 	return delay
 }
+
+// WebhookReconcileJobKind is the River job kind for periodic webhook reconciliation.
+const WebhookReconcileJobKind = "webhook_reconcile"
+
+// WebhookReconcileArgs represents the River job args for periodic webhook reconciliation.
+type WebhookReconcileArgs struct{}
+
+// Kind implements river.JobArgs.
+func (WebhookReconcileArgs) Kind() string { return WebhookReconcileJobKind }
+
+// WebhookReconcileWorker sweeps pending webhook deliveries periodically.
+type WebhookReconcileWorker struct {
+	river.WorkerDefaults[WebhookReconcileArgs]
+	store *WebhookStore
+}
+
+var _ river.Worker[WebhookReconcileArgs] = (*WebhookReconcileWorker)(nil)
+
+// NewWebhookReconcileWorker builds the reconciliation worker over the shared store.
+func NewWebhookReconcileWorker(store *WebhookStore) *WebhookReconcileWorker {
+	return &WebhookReconcileWorker{store: store}
+}
+
+// Timeout pins the per-attempt budget for the reconciliation sweep.
+func (*WebhookReconcileWorker) Timeout(*river.Job[WebhookReconcileArgs]) time.Duration {
+	return riverpolicy.RiverJobTimeoutTaskSettlementSweep
+}
+
+// Work executes one periodic pending webhook reconciliation pass against the store.
+func (w *WebhookReconcileWorker) Work(ctx context.Context, job *river.Job[WebhookReconcileArgs]) error {
+	if w == nil || w.store == nil {
+		return fmt.Errorf("events: webhook reconcile worker unavailable")
+	}
+	return w.store.ReconcilePending(ctx)
+}
+
+// webhookReconcilePeriod is the interval between periodic reconciliation sweeps.
+const webhookReconcilePeriod = 2 * time.Minute
+
+// webhookReconcileSchedule defines the periodic schedule interval.
+type webhookReconcileSchedule struct{}
+
+func (webhookReconcileSchedule) Next(current time.Time) time.Time {
+	return current.Add(webhookReconcilePeriod)
+}
+
+func webhookReconcileInsert() (river.JobArgs, *river.InsertOpts) {
+	return WebhookReconcileArgs{}, WebhookReconcileInsertOpts()
+}
+
+// WebhookReconcileInsertOpts builds River insert options for the reconciliation periodic job.
+func WebhookReconcileInsertOpts() *river.InsertOpts {
+	return &river.InsertOpts{
+		Queue:       riverpolicy.RiverQueueTaskSettlementSweep,
+		MaxAttempts: riverpolicy.RiverMaxAttemptsTaskSettlementSweep,
+		Priority:    3,
+	}
+}
+
+// WebhookReconciliationPeriodicJobs returns the periodic sweep jobs that re-enqueue
+// durable pending webhook deliveries left behind by network drops or process crashes.
+// RunOnStart is false because startup already performs an explicit synchronous reconciliation.
+func WebhookReconciliationPeriodicJobs() []*river.PeriodicJob {
+	return []*river.PeriodicJob{river.NewPeriodicJob(
+		webhookReconcileSchedule{},
+		webhookReconcileInsert,
+		&river.PeriodicJobOpts{
+			ID:         "webhook-reconciliation",
+			RunOnStart: false,
+		},
+	)}
+}

@@ -1,5 +1,4 @@
 import type { CanvasTaskRequestData, CanvasTaskParams } from './canvasTaskRequest'
-import { canonicalizeRuntimeUploadRef } from '../../../../core/config/runtimeUrls'
 import { SERVICE } from '../../../../core/contracts/imageServices'
 
 export const EXECUTION_SERVICE = {
@@ -59,22 +58,9 @@ interface BuildExecutionTaskRequestOptions {
   // Optional task inputs: explicit undefined is equivalent to absent (every
   // consumer guards with truthiness/length checks before setting DTO keys).
   service?: ExecutionService | undefined
-  imageUrls?: string[] | undefined
-  imageAssetIds?: number[] | undefined
-  referenceImageAssetIds?: number[] | undefined
   /** Opaque `asset_...` ids; the only media refs the v1 transport sends. */
   mediaAssetIds?: string[] | undefined
   params?: CanvasTaskParams | undefined
-}
-
-const CANVAS_INTERACTIVE_TASK_PRIORITY = 1
-const MEDIA_STRING_PARAM_KEYS = new Set(['mask_image_url'])
-
-function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
-  if (MEDIA_STRING_PARAM_KEYS.has(key) && typeof value === 'string') {
-    return canonicalizeRuntimeUploadRef(value)
-  }
-  return value
 }
 
 export function buildExecutionTaskRequest(
@@ -82,30 +68,13 @@ export function buildExecutionTaskRequest(
 ): CanvasTaskRequestData {
   const request: CanvasTaskRequestData = {
     prompt: options.prompt,
-    priority: CANVAS_INTERACTIVE_TASK_PRIORITY,
   }
 
   if (options.service) {
     request.service = options.service
   }
-  if (options.imageUrls && options.imageUrls.length > 0) {
-    request.image_urls = options.imageUrls.map(canonicalizeRuntimeUploadRef)
-  }
-  if (options.imageAssetIds && options.imageAssetIds.length > 0) {
-    request.image_asset_ids = options.imageAssetIds
-  }
-
-  const nextParams = Object.fromEntries(
-    Object.entries(options.params ?? {}).map(([key, value]) => [
-      key,
-      canonicalizeTaskMediaParam(key, value),
-    ]),
-  ) as CanvasTaskParams
-  if (Object.keys(nextParams).length > 0) {
-    request.params = nextParams
-  }
-  if (options.referenceImageAssetIds && options.referenceImageAssetIds.length > 0) {
-    request.reference_image_asset_ids = options.referenceImageAssetIds
+  if (options.params && Object.keys(options.params).length > 0) {
+    request.params = { ...options.params }
   }
   const opaqueIds = (options.mediaAssetIds ?? []).map((id) => `${id ?? ''}`.trim()).filter(Boolean)
   if (opaqueIds.length > 0) {

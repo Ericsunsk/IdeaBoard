@@ -74,14 +74,14 @@ test('anonymous fixtures restrict origin, method, and endpoint without touching 
   assert.equal(session.reply?.status, 200)
   assert.equal(session.reply?.body, 'null')
   assert.equal((await dispatch('/api/v1/user')).reply?.status, 401)
-  const search = await dispatch('/api/search?q=smoke&limit=24')
+  const search = await dispatch('/api/v1/search?q=smoke&limit=24')
   assert.deepEqual(JSON.parse(search.reply?.body as string), {
     data: { query: 'smoke', results: [], has_more: false },
   })
   for (const [path, method, origin] of [
-    ['/api/settings/branding', 'POST', 'http://127.0.0.1:5173'],
+    ['/api/v1/settings/branding', 'POST', 'http://127.0.0.1:5173'],
     ['/api/unexpected', 'GET', 'http://127.0.0.1:5173'],
-    ['/api/settings/branding', 'GET', 'https://external.example'],
+    ['/api/v1/settings/branding', 'GET', 'https://external.example'],
   ]) {
     const result = await dispatch(path!, method!, origin!)
     assert.equal(result.aborted, true)

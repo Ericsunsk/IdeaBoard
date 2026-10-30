@@ -338,6 +338,16 @@ const fixtureCases: BoundaryFixtureCase[] = [
     ],
   },
   {
+    name: 'prohibits cross-feature deep imports into notification session',
+    expectedRule: 'no-cross-feature-deep-imports',
+    files: [
+      {
+        filePath: 'src/features/workspace/boundary-notification-deep.fixture.ts',
+        content: `import { syncInviteAcceptanceQueries } from '{target:src/features/notification/session/useNotifications}'; console.log(syncInviteAcceptanceQueries);`,
+      },
+    ],
+  },
+  {
     name: 'prohibits tool core modules from importing session zone modules',
     expectedRule: 'canvas-tool-core-no-zone-imports',
     files: [

@@ -33,6 +33,8 @@ import type {
   ErrorEnvelope,
   NotFoundResponse,
   PaginatedWorkspaceSearchResults,
+  PublicSearchEnvelope,
+  SearchInspirationParams,
   SearchWorkspaceParams,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
@@ -42,6 +44,95 @@ import type {
 import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
+
+export const getSearchInspirationUrl = (params?: SearchInspirationParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0 ? `/search?${stringifiedParams}` : `/search`
+}
+
+/**
+ * Public inspiration search across enabled image providers (Unsplash, Pexels). Supports keyword queries, cursor-based pagination, and limit control. Anonymous-capable by design; no authentication required.
+ * @summary Public web image search across providers (no auth)
+ */
+export const searchInspiration = async (
+  params?: SearchInspirationParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<PublicSearchEnvelope> => {
+  return publicMutator<PublicSearchEnvelope>(getSearchInspirationUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getSearchInspirationQueryKey = (
+  params?: MaybeRefOrGetter<SearchInspirationParams>,
+) => {
+  return ['search', ...(params ? [params] : [])] as const
+}
+
+export const getSearchInspirationQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchInspiration>>,
+  TError = BadRequestResponse | ErrorEnvelope,
+>(
+  params?: MaybeRefOrGetter<SearchInspirationParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof searchInspiration>>, TError, TData>>
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSearchInspirationQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchInspiration>>> = ({ signal }) =>
+    searchInspiration(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchInspiration>>,
+    TError,
+    TData
+  >
+}
+
+export type SearchInspirationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchInspiration>>
+>
+export type SearchInspirationQueryError = BadRequestResponse | ErrorEnvelope
+
+/**
+ * @summary Public web image search across providers (no auth)
+ */
+
+export function useSearchInspiration<
+  TData = Awaited<ReturnType<typeof searchInspiration>>,
+  TError = BadRequestResponse | ErrorEnvelope,
+>(
+  params?: MaybeRefOrGetter<SearchInspirationParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof searchInspiration>>, TError, TData>>
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSearchInspirationQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
 
 export const getSearchWorkspaceUrl = (workspaceId: string, params: SearchWorkspaceParams) => {
   const normalizedParams = new URLSearchParams()

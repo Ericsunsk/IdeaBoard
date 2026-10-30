@@ -4,6 +4,8 @@ package v1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -33,6 +35,7 @@ func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
 	group.PATCH("/workspaces/:workspace_id/boards/:board_id", h.renameBoard)
 	group.POST("/workspaces/:workspace_id/boards/:board_id/archive", h.archiveBoard)
 	group.POST("/workspaces/:workspace_id/boards/:board_id/restore", h.restoreBoard)
+	group.GET("/workspaces/:workspace_id/boards/:board_id/bundle", h.getBoardBundle)
 	group.GET("/workspaces/:workspace_id/boards/:board_id/document", h.getBoardDocument)
 	group.PUT("/workspaces/:workspace_id/boards/:board_id/document", h.replaceBoardDocument)
 	group.GET("/workspaces/:workspace_id/boards/:board_id/revisions", h.listBoardRevisions)
@@ -520,7 +523,19 @@ func (h *contractV1Handler) getBoard(c *gin.Context) {
 		if !ok {
 			return
 		}
-		contract.SetETag(c, boards.FormatV1ETag(board.Revision))
+		// Metadata, caller capabilities and display facts can change without a
+		// document revision. Validate the full representation after authorization.
+		payload, err := json.Marshal(dto)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		sum := sha256.Sum256(payload)
+		currentETag := `"board-meta-` + hex.EncodeToString(sum[:]) + `"`
+		if contract.HandlePreconditionNotModified(c, currentETag) {
+			return
+		}
+		contract.SetETag(c, currentETag)
 		contract.RenderSuccess(c, dto)
 	})
 }
@@ -684,6 +699,42 @@ func toBoardDocumentDTO(board *boards.V1Board) v1BoardDocumentDTO {
 	return dto
 }
 
+type v1BoardBundleDTO struct {
+	Meta     v1BoardDTO          `json:"meta"`
+	Document v1BoardDocumentDTO  `json:"document"`
+	Realtime v1RealtimeTicketDTO `json:"realtime"`
+}
+
+func (h *contractV1Handler) getBoardBundle(c *gin.Context) {
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapRead)
+		if !ok {
+			return
+		}
+		metaDTO, ok := h.toBoardDTOFull(c, board, identityPrincipal.UserID(), role)
+		if !ok {
+			return
+		}
+		docDTO := toBoardDocumentDTO(board)
+
+		var ticketDTO v1RealtimeTicketDTO
+		if board.ArchivedAt == nil {
+			ticketDTO, _ = h.boardRealtimeTicket(board, role, identityPrincipal.PublicID())
+		}
+
+		// Every bundle read mints a short-lived credential; always send it.
+		c.Header("Cache-Control", "no-store")
+		contract.RenderSuccess(c, v1BoardBundleDTO{
+			Meta:     metaDTO,
+			Document: docDTO,
+			Realtime: ticketDTO,
+		})
+	})
+}
+
 func (h *contractV1Handler) getBoardDocument(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
@@ -693,7 +744,11 @@ func (h *contractV1Handler) getBoardDocument(c *gin.Context) {
 		if !ok {
 			return
 		}
-		contract.SetETag(c, boards.FormatV1ETag(board.Revision))
+		currentETag := boards.FormatV1ETag(board.Revision)
+		if contract.HandlePreconditionNotModified(c, currentETag) {
+			return
+		}
+		contract.SetETag(c, currentETag)
 		contract.RenderSuccess(c, toBoardDocumentDTO(board))
 	})
 }

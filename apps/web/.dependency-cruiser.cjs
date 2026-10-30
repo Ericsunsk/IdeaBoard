@@ -181,6 +181,20 @@ module.exports = {
       },
     },
     {
+      name: 'no-cross-feature-deep-imports',
+      severity: 'error',
+      comment:
+        'Features and app layers must consume notification through its public entrypoint; every module behind the barrel is private. (Issue #834)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/notification(?:/|$)',
+      },
+      to: {
+        path: '^src/features/notification/',
+        pathNot: '^src/features/notification/index\\.ts$',
+      },
+    },
+    {
       name: 'canvas-tool-core-no-zone-imports',
       severity: 'error',
       comment:

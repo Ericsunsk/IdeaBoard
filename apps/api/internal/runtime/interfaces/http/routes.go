@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	iofs "io/fs"
 	"net/http"
 	"time"
@@ -16,18 +15,15 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	"ideaboard/api/internal/runtime/ports"
-	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Dependencies struct {
-	PublicSearchHandler *searchhttp.SearchHandler
-	CORSMiddleware      gin.HandlerFunc
-	RateLimit           settings.RateLimitSettingProvider
-	Branding            settings.BrandingSettingProvider
-	PaymentWebhook      *paymenthttp.WebhookHandler
-	Internal            InternalRouteDeps
+	CORSMiddleware gin.HandlerFunc
+	RateLimit      settings.RateLimitSettingProvider
+	PaymentWebhook *paymenthttp.WebhookHandler
+	Internal       InternalRouteDeps
 	// MediaPreviews serves the kernel public preview route
 	// (/api/media/previews/:token/:tier). Split from ContractV1Deps
 	// during the plane split: the kernel owns this public route while
@@ -70,15 +66,13 @@ const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                 = "/api/health"
-	RoutePublicSettingsBranding = "/api/settings/branding"
-	RoutePublicSearch           = "/api/search"
-	RoutePaymentStripeWebhook   = "/api/webhooks/stripe"
+	RouteHealth               = "/api/health"
+	RoutePaymentStripeWebhook = "/api/webhooks/stripe"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
-	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler, deps.ReadyChecker)
+	registerPublicRoutes(r, deps.ReadyChecker)
 	registerPublicMediaRoutes(r, deps.MediaPreviews)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
@@ -104,7 +98,7 @@ type readyResponse struct {
 	Component string `json:"component,omitempty"`
 }
 
-func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchhttp.SearchHandler, readyChecker ports.HealthChecker) {
+func registerPublicRoutes(r *gin.Engine, readyChecker ports.HealthChecker) {
 	// RouteHealth stays shallow: process liveness for Docker/Compose and the
 	// existing healthcheck binary. Orchestrators must use /api/readyz.
 	r.GET(RouteHealth, func(c *gin.Context) {
@@ -114,10 +108,6 @@ func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvid
 		response.SuccessDTO(c, healthResponse{Status: "ok"})
 	})
 	r.GET("/api/readyz", readyHandler(readyChecker))
-	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(branding))
-	if searchHandler != nil {
-		r.GET(RoutePublicSearch, searchHandler.Search)
-	}
 }
 
 // readyHandler reports dependency readiness (PostgreSQL+River via the runtime
@@ -136,23 +126,6 @@ func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
 			return
 		}
 		response.SuccessDTO(c, readyResponse{Status: "ok", Ready: true, Component: status.Name})
-	}
-}
-
-func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if provider == nil {
-			response.InternalError(c, http.StatusInternalServerError, MsgPublicBrandingSettingsHandler, errors.New("branding settings provider is not initialized"))
-			return
-		}
-		branding, err := provider.GetBranding(c.Request.Context())
-		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, MsgServiceUnavailable22, err)
-			return
-		}
-		// The service already returns the display form (stored logo keys
-		// project to the public logo route); the boundary trusts it.
-		response.SuccessDTO(c, branding)
 	}
 }
 

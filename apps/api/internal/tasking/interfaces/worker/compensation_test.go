@@ -25,7 +25,7 @@ import (
 // compensateCountingRenderer wraps a production renderer and counts
 // CompensateRenderedOutputs calls: the worker must funnel settlement
 // compensation through the Compensator seam (never a detached ArchiveAsset
-// beside it), and converged drops must not call it at all.
+// beside it).
 type compensateCountingRenderer struct {
 	taskruntime.WorkspaceTaskRenderer
 	calls int
@@ -208,10 +208,10 @@ func TestWorkerSettlementFailureCompensatesRenderedAssets(t *testing.T) {
 	}
 }
 
-// TestWorkerConvergedDropSkipsCompensation proves the guard direction: a
-// converged task (already completed by the winner) drops without
-// archiving, so assets a completed task references are never touched.
-func TestWorkerConvergedDropSkipsCompensation(t *testing.T) {
+// TestWorkerConvergedDropCompensatesOutputs proves that when a task converges
+// (e.g. cancelled by user) during completion, the uncommitted rendered outputs
+// are compensated and archived to prevent orphan asset leakage.
+func TestWorkerConvergedDropCompensatesOutputs(t *testing.T) {
 	env := newWorkerTestEnv()
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
@@ -238,8 +238,8 @@ func TestWorkerConvergedDropSkipsCompensation(t *testing.T) {
 	if err := worker.Work(context.Background(), workerJobFor(created)); err != nil {
 		t.Fatalf("Work: %v", err)
 	}
-	if compensating.calls != 0 {
-		t.Fatalf("compensate calls = %d, want 0 (converged drop must not touch the Compensator seam)", compensating.calls)
+	if compensating.calls != 1 {
+		t.Fatalf("compensate calls = %d, want 1 (converged drop must compensate uncommitted outputs)", compensating.calls)
 	}
 	if settler.failCalls != 0 {
 		t.Fatalf("fail calls = %d, want 0 (converged drop)", settler.failCalls)
@@ -251,8 +251,8 @@ func TestWorkerConvergedDropSkipsCompensation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAsset: %v", err)
 	}
-	if stored.IsArchived() {
-		t.Fatal("converged drop must not archive rendered assets")
+	if !stored.IsArchived() {
+		t.Fatal("converged drop must archive rendered assets")
 	}
 }
 

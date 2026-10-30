@@ -22,7 +22,6 @@ afterEach(() => {
 })
 
 vi.mock('./canvasTaskSubmissionAdapter', () => ({
-  assertTaskRequestReady: vi.fn(async () => undefined),
   submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })),
 }))
 

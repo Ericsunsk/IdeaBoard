@@ -28,7 +28,7 @@ describe('fetchSiteBranding fallback', () => {
     })
     // Supplementary public read: silent 401s degrade locally, never reload.
     expect(vi.mocked(api.request)).toHaveBeenCalledWith(
-      '/settings/branding',
+      '/v1/settings/branding',
       expect.objectContaining({ authFailure: 'silent' }),
     )
   })

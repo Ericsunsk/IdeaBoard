@@ -126,6 +126,12 @@ func TestIngestImageRejectsBytesBeforeReservation(t *testing.T) {
 			if err == nil || asset != nil || sessions.session != nil || objects.key != "" {
 				t.Fatalf("invalid bytes reserved resources: asset=%v, err=%v", asset, err)
 			}
+			if tc.name == "invalid image" {
+				var validationErr *ValidationError
+				if !errors.As(err, &validationErr) || validationErr.Fields["file"] == "" {
+					t.Fatalf("invalid image error = %v, want typed file validation", err)
+				}
+			}
 		})
 	}
 }

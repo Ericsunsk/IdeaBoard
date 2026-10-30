@@ -103,7 +103,7 @@ info:
     best-effort invalidation hints converging through gap + HTTP
     revalidation. Durable outbox persistence lands with #809.
   x-event-transports: [sse, webhook]
-  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled]
+  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled, notification.created, notification.updated]
 servers:
   - url: /api/v1
 paths:
@@ -356,7 +356,7 @@ components:
           description: Opaque event identifier, also used for SSE Last-Event-ID replay.
         type:
           type: string
-          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled]
+          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled, notification.created, notification.updated]
           description: Stable event type with independent schema versioning.
         version:
           type: integer
@@ -395,8 +395,8 @@ components:
       properties:
         type:
           type: string
-          enum: [task, board, media_asset, checkout_session]
-          description: checkout_session is reserved for the #809 Stripe-convergence mapping and is never emitted today.
+          enum: [task, board, media_asset, checkout_session, invite]
+          description: checkout_session is reserved for the #809 Stripe-convergence mapping and is never emitted today. invite carries a member-invite identity (wsi_, osi_, or bti_).
         id:
           type: string
           description: Opaque resource identifier (task_*, board_*, asset_*).
@@ -429,6 +429,31 @@ components:
         outputs_uri:
           type: string
           description: API URI for task outputs, never a raw storage URL.
+        outputs:
+          type: array
+          description: Self-contained task outputs with media metadata and preview readiness.
+          items:
+            $ref: '#/components/schemas/TaskCompletedOutput'
+    TaskCompletedOutput:
+      type: object
+      required: [preview_ready]
+      additionalProperties: false
+      properties:
+        asset_id:
+          type: string
+          pattern: '^asset_[A-Za-z0-9_-]+$'
+        role:
+          type: string
+        url:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        mime_type:
+          type: string
+        preview_ready:
+          type: boolean
     TaskFailedData:
       type: object
       required: [task_id, error_code]
@@ -510,6 +535,48 @@ components:
         hold_transaction_id:
           type: string
           description: Ledger hold reference only; amounts never appear in events.
+    NotificationCreatedData:
+      type: object
+      required: [id, user_id, type]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Opaque notification identifier.
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9_-]+$'
+          description: Recipient user identifier.
+        type:
+          type: string
+          description: Semantic notification type.
+        title:
+          type: string
+          description: Brief summary of the notification.
+        content:
+          type: string
+          description: Notification body or summary content.
+    NotificationUpdatedData:
+      type: object
+      required: [id, user_id, type]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Opaque notification identifier.
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9_-]+$'
+          description: Recipient user identifier.
+        type:
+          type: string
+          description: Semantic notification type.
+        title:
+          type: string
+          description: Brief summary of the notification.
+        content:
+          type: string
+          description: Notification body or summary content.
     WebhookEventType:
       type: string
       enum: [billing.settled]

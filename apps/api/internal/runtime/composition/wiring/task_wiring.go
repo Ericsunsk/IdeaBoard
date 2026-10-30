@@ -420,13 +420,14 @@ func NewAppTaskRuntime(
 	// is no archive/restore lifecycle and no background purge.
 	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
 	boardAccessOutboxPeriodicJobs := outboxworker.BoardAccessPeriodicJobs()
+	webhookPeriodicJobs := eventwebhook.WebhookReconciliationPeriodicJobs()
 	// ADR-0021: an http-only process enqueues but never consumes. Workers
 	// stay unregistered and periodic schedules stay home on the worker
 	// process, so exactly one scheduler exists per deployment (local `all`
 	// keeps the pre-split behavior). The enqueue-only client below still
 	// serves the submit transaction (SetClient) without fetching anything.
 	runWorkers := cfg.Mode.RunsWorkers()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs))
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs)+len(webhookPeriodicJobs))
 	if runWorkers {
 		periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 		periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
@@ -436,6 +437,7 @@ func NewAppTaskRuntime(
 		periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
 		periodicJobs = append(periodicJobs, boardAccessOutboxPeriodicJobs...)
 		periodicJobs = append(periodicJobs, identityPeriodicJobs...)
+		periodicJobs = append(periodicJobs, webhookPeriodicJobs...)
 	}
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
@@ -458,6 +460,7 @@ func NewAppTaskRuntime(
 			river.AddWorker(workers, workspaceWorker)
 			// #833: the webhook delivery consumer rides the same client.
 			river.AddWorker(workers, eventwebhook.NewWebhookDeliverWorker(webhookStore))
+			river.AddWorker(workers, eventwebhook.NewWebhookReconcileWorker(webhookStore))
 			// Final-timeout settlement sweep: converges abandoned Credit Holds
 			// through the worker's own settler bridge.
 			river.AddWorker(workers, settlementSweepWorker)
@@ -777,6 +780,7 @@ func workerWorkspaceEventData(typ string, event workspacetasks.TaskEvent) any {
 			TaskID: event.TaskID,
 			OutputsURI: "/api/v1/workspaces/" + strings.TrimSpace(event.WorkspaceID) +
 				"/tasks/" + strings.TrimSpace(event.TaskID) + "/outputs",
+			Outputs: event.Outputs,
 		}
 	case events.EventV1TaskFailed:
 		// TaskEvent intentionally carries no provider error text. Keep the

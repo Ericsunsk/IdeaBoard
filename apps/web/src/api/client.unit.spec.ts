@@ -36,4 +36,33 @@ describe('createApiError', () => {
       msg: '',
     })
   })
+
+  it('maps response body to error.data for contract errors without top-level data property', () => {
+    const contractPayload = {
+      error: {
+        code: 'validation_failed',
+        message: 'Name is required',
+        details: { fields: { name: 'required' } },
+      },
+    }
+    const error = createApiError(contractPayload, 422)
+    expect(error.data).toEqual(contractPayload)
+    expect(error.code).toBe('validation_failed')
+    expect(error.details).toEqual({ fields: { name: 'required' } })
+  })
+
+  it('preserves top-level data property for legacy payloads when present', () => {
+    const legacyPayload = {
+      code: 'custom_error',
+      msg: 'Something failed',
+      data: { retriesLeft: 2 },
+    }
+    const error = createApiError(legacyPayload, 400)
+    expect(error.data).toEqual({ retriesLeft: 2 })
+  })
+
+  it('keeps error.data undefined when payload is absent or non-object', () => {
+    expect(createApiError(undefined, 500).data).toBeUndefined()
+    expect(createApiError('internal server error string', 500).data).toBeUndefined()
+  })
 })

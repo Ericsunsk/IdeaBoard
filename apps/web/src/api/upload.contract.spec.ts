@@ -1,33 +1,15 @@
 import { describe, expect, it, test, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../test/msw'
-import { isBoardPublicIdShape, UPLOAD_OPERATION_TIMEOUT_MS, uploadApi } from './upload'
+import {
+  isBoardPublicIdShape,
+  UPLOAD_OPERATION_TIMEOUT_MS,
+  uploadApi,
+  workspaceUploadApi,
+} from './upload'
 
 const WORKSPACE_ID = 'ws_board1'
-const UPLOAD_ID = 'upload_upload42'
 const ASSET_ID = 'asset_upload42'
 const CHECKSUM = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-
-function sessionFixture(overrides: Record<string, unknown> = {}) {
-  return {
-    id: UPLOAD_ID,
-    workspace_id: WORKSPACE_ID,
-    status: 'pending',
-    filename: 'image.png',
-    mime_type: 'image/png',
-    size_bytes: 5,
-    checksum_sha256: CHECKSUM,
-    media_kind: 'image',
-    upload_target: {
-      kind: 'same-origin-slot',
-      slot: UPLOAD_ID,
-      expires_at: '2026-09-23T01:00:00Z',
-    },
-    created_at: '2026-09-23T00:00:00Z',
-    updated_at: '2026-09-23T00:00:00Z',
-    expires_at: '2026-09-23T00:30:00Z',
-    ...overrides,
-  }
-}
 
 function assetFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -49,19 +31,8 @@ function assetFixture(overrides: Record<string, unknown> = {}) {
 
 function registerSuccessfulUploadHandlers() {
   return useMswHandlers(
-    http.post('/api/v1/workspaces/:workspaceId/uploads', () =>
-      HttpResponse.json({ data: sessionFixture() }),
-    ),
-    http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
-      HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
-    ),
-    http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
-      HttpResponse.json({
-        data: {
-          upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
-          asset: assetFixture(),
-        },
-      }),
+    http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', () =>
+      HttpResponse.json({ data: assetFixture() }),
     ),
   )
 }
@@ -156,7 +127,7 @@ describe('uploadApi', () => {
 
   it('surfaces canonical workspace upload failures from the HTTP response body', async () => {
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', () => {
         return HttpResponse.json(
           {
             error: { code: 'upload_too_large', message: 'Upload too large', request_id: 'req-413' },
@@ -173,7 +144,7 @@ describe('uploadApi', () => {
 
   it('rejects successful upload envelopes without domain data', async () => {
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', () => {
         return HttpResponse.json({ meta: { request_id: 'req-empty' } })
       }),
     )
@@ -185,14 +156,8 @@ describe('uploadApi', () => {
 
   it('rejects workspace uploads that were not registered as media assets', async () => {
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', () =>
-        HttpResponse.json({ data: sessionFixture() }),
-      ),
-      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
-        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
-      ),
-      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
-        HttpResponse.json({ data: { upload: sessionFixture({ status: 'completed' }) } }),
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', () =>
+        HttpResponse.json({ data: null }),
       ),
     )
 
@@ -203,7 +168,7 @@ describe('uploadApi', () => {
 
   it('preserves structured workspace transport errors without exposing unsafe legacy fields', async () => {
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', () => {
         return HttpResponse.json(
           {
             error: {
@@ -242,54 +207,49 @@ describe('uploadApi', () => {
 describe('upload board binding (#936)', () => {
   test('sends board_id when the board has a durable identity', async () => {
     const file = new File(['image'], 'image.png', { type: 'image/png' })
-    let createBody = ''
+    const received: { formData?: FormData } = {}
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', async ({ request }) => {
-        createBody = await request.text()
-        return HttpResponse.json({ data: sessionFixture() })
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', async ({ request }) => {
+        received.formData = await request.formData()
+        return HttpResponse.json({ data: assetFixture() })
       }),
-      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
-        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
-      ),
-      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
-        HttpResponse.json({
-          data: {
-            upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
-            asset: assetFixture(),
-          },
-        }),
-      ),
     )
 
     await uploadApi.upload(file, WORKSPACE_ID, { boardId: 'board_abc123456789' })
-    expect(JSON.parse(createBody).data.board_id).toBe('board_abc123456789')
+    expect(received.formData?.get('board_id')).toBe('board_abc123456789')
   })
 
   test('omits board_id for unsaved boards (owner-only, no workspace window)', async () => {
     const file = new File(['image'], 'image.png', { type: 'image/png' })
-    let createBody = ''
+    const received: { formData?: FormData } = {}
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/uploads', async ({ request }) => {
-        createBody = await request.text()
-        return HttpResponse.json({ data: sessionFixture() })
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', async ({ request }) => {
+        received.formData = await request.formData()
+        return HttpResponse.json({ data: assetFixture() })
       }),
-      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
-        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
-      ),
-      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
-        HttpResponse.json({
-          data: {
-            upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
-            asset: assetFixture(),
-          },
-        }),
-      ),
     )
 
     await uploadApi.upload(file, WORKSPACE_ID, { boardId: 'local-unsaved-board' })
-    expect('board_id' in JSON.parse(createBody).data).toBe(false)
+    expect(received.formData?.has('board_id')).toBe(false)
     await uploadApi.upload(file, WORKSPACE_ID)
-    expect('board_id' in JSON.parse(createBody).data).toBe(false)
+    expect(received.formData?.has('board_id')).toBe(false)
+  })
+
+  test('workspaceUploadApi.uploadDirect uploads directly with board_id', async () => {
+    const file = new File(['image'], 'image.png', { type: 'image/png' })
+    const received: { formData?: FormData } = {}
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/media-assets/direct', async ({ request }) => {
+        received.formData = await request.formData()
+        return HttpResponse.json({ data: assetFixture() })
+      }),
+    )
+
+    const asset = await workspaceUploadApi.uploadDirect(WORKSPACE_ID, file, {
+      boardId: 'board_abc123456789',
+    })
+    expect(asset.id).toBe(ASSET_ID)
+    expect(received.formData?.get('board_id')).toBe('board_abc123456789')
   })
 })
 

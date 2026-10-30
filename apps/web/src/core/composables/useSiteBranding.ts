@@ -1,8 +1,12 @@
-import { useQuery, type QueryClient } from '@tanstack/vue-query'
+import type { QueryClient } from '@tanstack/vue-query'
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
-import { api } from '../../api/client'
-import { withSignal } from '../utils/request'
+import {
+  getPublicBrandingSetting,
+  useGetPublicBrandingSetting,
+  getGetPublicBrandingSettingQueryKey,
+} from '../../api/generated-query/public/user/user'
+import type { PublicBrandingSetting } from '../../api/generated-query/public/model'
 import {
   createContractDataSelector,
   resolveContractData,
@@ -10,14 +14,11 @@ import {
 } from '../../api/contractKernel'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
-export type BrandingSetting = {
-  project_name: string
-  logo_url: string
-}
+export type BrandingSetting = PublicBrandingSetting
 
 export type ApiResponseBrandingSetting = ContractSuccessEnvelope<BrandingSetting>
 
-export const SITE_BRANDING_QUERY_KEY = ['settings', 'branding'] as const
+export const SITE_BRANDING_QUERY_KEY = getGetPublicBrandingSettingQueryKey()
 
 export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
   project_name: 'IdeaBoard',
@@ -37,10 +38,7 @@ export type SiteBrandingOptions = {
 export async function fetchSiteBranding(fallback: string): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
     await resolveContractData<BrandingSetting>(
-      // Supplementary public read: a 401 (e.g. expired session cookie on a
-      // public page) must degrade locally, never reload to login.
-      api.request<ApiResponseBrandingSetting>('/settings/branding', {
-        method: 'GET',
+      getPublicBrandingSetting({
         authFailure: 'silent',
       }),
       fallback,
@@ -48,31 +46,19 @@ export async function fetchSiteBranding(fallback: string): Promise<BrandingSetti
   )
 }
 
-async function fetchSiteBrandingEnvelope(
-  signal?: AbortSignal,
-): Promise<ApiResponseBrandingSetting> {
-  return api.request<ApiResponseBrandingSetting>('/settings/branding', {
-    method: 'GET',
-    authFailure: 'silent',
-    ...withSignal(signal),
-  })
-}
-
 export function useSiteBranding(options: SiteBrandingOptions) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
   const selectSiteBranding = createContractDataSelector<BrandingSetting>(options.fallback)
-  const brandingQuery = useQuery<
-    ApiResponseBrandingSetting,
-    Error,
-    BrandingSetting,
-    readonly ['settings', 'branding']
-  >({
-    queryKey: SITE_BRANDING_QUERY_KEY,
-    queryFn: ({ signal }) => fetchSiteBrandingEnvelope(signal),
-    enabled: isEnabled,
-    select: selectSiteBranding,
+  const brandingQuery = useGetPublicBrandingSetting<BrandingSetting>({
+    query: {
+      enabled: isEnabled,
+      select: selectSiteBranding,
+    },
+    request: {
+      authFailure: 'silent',
+    },
   })
   const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value))
   const projectName = computed(() => branding.value.project_name)

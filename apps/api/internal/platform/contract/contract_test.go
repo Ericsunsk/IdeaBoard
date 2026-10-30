@@ -678,3 +678,74 @@ func TestErrorCodeRegistryConsistency(t *testing.T) {
 		}
 	}
 }
+
+func TestHandlePreconditionNotModified(t *testing.T) {
+	t.Run("empty current ETag returns false", func(t *testing.T) {
+		c, rec := newContractTestContext()
+		c.Request.Header.Set("If-None-Match", "rev-1")
+		if HandlePreconditionNotModified(c, "") {
+			t.Fatal("expected false for empty current ETag")
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("code = %d, want default 200", rec.Code)
+		}
+	})
+
+	t.Run("no client If-None-Match returns false", func(t *testing.T) {
+		c, rec := newContractTestContext()
+		if HandlePreconditionNotModified(c, "rev-1") {
+			t.Fatal("expected false when If-None-Match is absent")
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("code = %d, want default 200", rec.Code)
+		}
+	})
+
+	t.Run("non-matching If-None-Match returns false", func(t *testing.T) {
+		c, _ := newContractTestContext()
+		c.Request.Header.Set("If-None-Match", "rev-old")
+		if HandlePreconditionNotModified(c, "rev-new") {
+			t.Fatal("expected false when ETag does not match")
+		}
+	})
+
+	t.Run("matching If-None-Match returns 304 Not Modified", func(t *testing.T) {
+		c, rec := newContractTestContext()
+		c.Request.Header.Set("If-None-Match", "rev-1")
+		if !HandlePreconditionNotModified(c, "rev-1") {
+			t.Fatal("expected true when ETag matches")
+		}
+		if !c.IsAborted() {
+			t.Fatal("expected context to be aborted")
+		}
+		if rec.Code != http.StatusNotModified {
+			t.Fatalf("code = %d, want 304", rec.Code)
+		}
+		if rec.Header().Get("ETag") != "rev-1" {
+			t.Fatalf("ETag = %q, want rev-1", rec.Header().Get("ETag"))
+		}
+		if rec.Body.Len() != 0 {
+			t.Fatalf("expected empty body for 304, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("wildcard If-None-Match returns 304 Not Modified", func(t *testing.T) {
+		c, rec := newContractTestContext()
+		c.Request.Header.Set("If-None-Match", "*")
+		if !HandlePreconditionNotModified(c, "rev-any") {
+			t.Fatal("expected true when If-None-Match is wildcard *")
+		}
+		if !c.IsAborted() {
+			t.Fatal("expected context to be aborted")
+		}
+		if rec.Code != http.StatusNotModified {
+			t.Fatalf("code = %d, want 304", rec.Code)
+		}
+		if rec.Header().Get("ETag") != "rev-any" {
+			t.Fatalf("ETag = %q, want rev-any", rec.Header().Get("ETag"))
+		}
+		if rec.Body.Len() != 0 {
+			t.Fatalf("expected empty body for 304, got %q", rec.Body.String())
+		}
+	})
+}

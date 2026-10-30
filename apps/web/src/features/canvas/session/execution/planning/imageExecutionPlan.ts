@@ -2,7 +2,6 @@ import {
   getCanvasNodeImageInputLimit,
   normalizePromptAspectRatio,
   resolveImageNodeFrameSize,
-  resolveImageNodeLatestOutput,
   type FusionBlendPoint,
   type FusionNodeItem,
   type ImageNodeItem,
@@ -96,7 +95,6 @@ export type FusionExecutionPlan = {
   outputCount: number
   aspectRatio: PromptAspectRatio
   inputImages: FusionExecutionInputImage[]
-  imageUrls: string[]
   blendPoint: FusionBlendPoint
   stageWidth: number
   outputResolution?: OutputResolution | undefined
@@ -162,17 +160,10 @@ function normalizeExecutionRatio(value: unknown): number {
 
 function toImageExecutionInput(
   anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio' | 'assetId'>,
-  imageNode: Pick<ImageNodeItem, 'sourceMediaAssetId' | 'outputImages'>,
 ): ImageExecutionInput {
-  // Submission still addresses numeric board asset IDs (backend int64
-  // contract); delivery uses the string asset identity from the MediaRef.
-  const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const rawNumeric = latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId
-  const numericId = Number(rawNumeric)
   return {
     url: anchor.url.trim(),
     ratio: normalizeExecutionRatio(anchor.ratio),
-    ...(Number.isInteger(numericId) && numericId > 0 ? { mediaAssetId: numericId } : {}),
     ...(anchor.assetId ? { assetId: anchor.assetId } : {}),
   }
 }
@@ -227,7 +218,7 @@ function resolveImageExecutionImage(
   const anchor = resolveImageNodeLayoutAnchor(node, imageNode, options)
   if (!anchor) return null
   return {
-    input: toImageExecutionInput(anchor, imageNode),
+    input: toImageExecutionInput(anchor),
     resultAnchor: toImageResultAnchor(anchor),
   }
 }
@@ -298,7 +289,7 @@ export function prepareFusionExecutionPlan(
       url: plan.source.url,
       ratio: targetRatio,
     },
-    inputWeights: outputSize.weights.slice(0, plan.imageUrls.length),
+    inputWeights: outputSize.weights.slice(0, plan.inputImages.length),
     sizeSource: outputSize.sourceSize ?? outputSize.targetSize,
     targetSize: outputSize.targetSize,
     targetRatio,
@@ -413,7 +404,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const normalizedReferences = referenceImages.map((image) => ({
       url: `${image.url ?? ''}`.trim(),
       ratio: normalizeExecutionRatio(image.ratio),
-      ...(image.mediaAssetId ? { mediaAssetId: image.mediaAssetId } : {}),
       ...(image.assetId ? { assetId: image.assetId } : {}),
     }))
     if (normalizedReferences.some((image) => !image.url))
@@ -471,8 +461,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       .map((item) => ({ ...item, url: item.url.trim() }))
       .filter((item) => item.url)
       .slice(0, fusionInputLimit)
-    const imageUrls = fusionInputs.map((item) => item.url)
-    if (imageUrls.length < 2) failPlanning(i18n.global.t('canvas.execution.fusionInputsInvalid'))
+    if (fusionInputs.length < 2) failPlanning(i18n.global.t('canvas.execution.fusionInputsInvalid'))
 
     const normalizedPrompt = `${prompt ?? ''}`.trim()
     const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
@@ -497,7 +486,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizedAspectRatio,
       inputImages: fusionInputs,
-      imageUrls,
       blendPoint: snapshot.blendPoint,
       stageWidth: snapshot.width,
       outputResolution: resolveNodeOutputResolution(graph, nodeId),

@@ -104,12 +104,6 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       attachment,
       outputCount: plan.outputCount,
       taskRequest,
-      // 口径统一 (#P1-1): readiness 直接使用完整 taskRequest。quote
-      // 传输本就只取 service/quantity/resolution/board 做价格预检，媒体
-      // 与 prompt 不上网；用完整请求可使 quote 阶段的媒体预检与 submit
-      // 同规则（不通过即 not-ready，不再闪现 pending 节点），且计费
-      // quantity/resolution 与实际提交完全一致。
-      readinessRequest: taskRequest,
       fallbackRatio: source.ratio,
     })
   }
@@ -130,7 +124,6 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      readinessRequest: taskRequest,
       fallbackRatio: plan.targetRatio,
     })
   }
@@ -142,7 +135,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     const workspaceId = requireCanvasWorkspaceId()
     const source = await resolveExecutionSource(plan.source)
     // v1 inpaint links the mask by asset id: the painted data-URL travels
-    // the upload-session flow first, then submits with mask_asset_id.
+    // the direct-upload flow first, then submits with mask_asset_id.
     const [maskAssetId, imageSize] = await Promise.all([
       prepareInpaintMaskAsset(plan.rawMaskDataUrl, workspaceId),
       readImageNaturalSize(source.url),
@@ -159,7 +152,6 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      readinessRequest: taskRequest,
       fallbackRatio: source.ratio,
     })
   }
@@ -180,7 +172,6 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     const resolvedPlan = {
       ...plan,
       inputImages: resolvedInputs,
-      imageUrls: resolvedInputs.map((input) => input.url),
       source: await resolveExecutionSource(plan.source),
     }
     const imageSizes = await Promise.all(
@@ -195,7 +186,6 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       outputCount: preparedPlan.outputCount,
       resultOptions: preparedPlan.resultOptions,
       taskRequest,
-      readinessRequest: taskRequest,
       fallbackRatio: preparedPlan.targetRatio,
     })
   }

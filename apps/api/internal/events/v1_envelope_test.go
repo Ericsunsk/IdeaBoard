@@ -59,6 +59,43 @@ func TestMintV1EnvelopeAssignsEvtIDAndVersion(t *testing.T) {
 	}
 }
 
+func TestMintV1EnvelopeTaskCompletedWithSelfContainedOutputs(t *testing.T) {
+	envelope, err := MintV1Envelope(EventV1TaskCompleted, "ws_abc123", testActor(),
+		V1Resource{Type: V1ResourceTask, ID: "task_abc123"},
+		V1TaskCompletedData{
+			TaskID:     "task_abc123",
+			OutputsURI: "/api/v1/workspaces/ws_abc123/tasks/task_abc123/outputs",
+			Outputs: []V1TaskCompletedOutput{
+				{
+					AssetID:      "asset_res123",
+					Role:         "result",
+					URL:          "/api/v1/workspaces/ws_abc123/media-assets/asset_res123/content",
+					Width:        1024,
+					Height:       768,
+					MIMEType:     "image/png",
+					PreviewReady: true,
+				},
+			},
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateV1Envelope(envelope); err != nil {
+		t.Fatalf("minted envelope with outputs invalid: %v", err)
+	}
+	var decoded V1TaskCompletedData
+	if err := json.Unmarshal(envelope.Data, &decoded); err != nil {
+		t.Fatalf("decode data: %v", err)
+	}
+	if len(decoded.Outputs) != 1 {
+		t.Fatalf("outputs len = %d, want 1", len(decoded.Outputs))
+	}
+	out := decoded.Outputs[0]
+	if out.AssetID != "asset_res123" || out.Width != 1024 || out.Height != 768 || out.MIMEType != "image/png" || !out.PreviewReady {
+		t.Fatalf("decoded output mismatch: %+v", out)
+	}
+}
+
 func TestMintV1EnvelopeRejectsUnknownType(t *testing.T) {
 	if _, err := MintV1Envelope("task.exploded", "ws_x", testActor(),
 		V1Resource{Type: V1ResourceTask, ID: "task_x"}, map[string]any{"task_id": "task_x"}); err == nil {

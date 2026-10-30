@@ -27,6 +27,7 @@ import { assertRequestedOutputCount } from '../../../../../core/contracts/genera
 import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { PromptAspectRatio } from '../../../../board/ports/canvas'
 import { i18n } from '../../../../../core/i18n'
+import { CanvasWorkspaceTaskUnmappableError } from '../workspace/canvasTaskContractMapping'
 import {
   IMAGE_OUTPAINT_ACTION,
   IMAGE_UPSCALE_ACTION,
@@ -37,50 +38,26 @@ import {
   type ImageExecutionAction,
 } from '../../../core/execution/imageActionExecution.ts'
 
-function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
-  if (source.mediaAssetId) return ''
-  const url = `${source.url ?? ''}`.trim()
-  if (!url) throw new Error(i18n.global.t('canvas.execution.imageMissingUrl'))
-  return url
-}
-
-function imageAssetIds(sources: ImageExecutionInput[]): number[] {
-  return sources
-    .map((source) => source.mediaAssetId)
-    .filter((id): id is number => id !== undefined && Number.isInteger(id) && id > 0)
-}
-
-/** Opaque `asset_...` refs: the only media inputs the v1 transport sends. */
-function opaqueAssetIds(sources: Array<{ assetId?: string | undefined }>): string[] {
-  return [...new Set(sources.map((source) => `${source.assetId ?? ''}`.trim()).filter(Boolean))]
-}
-
-function opaqueAssetId(source: { assetId?: string | undefined }): string | null {
+function requireImageAssetId(source: { assetId?: string | undefined }): string {
   const id = `${source.assetId ?? ''}`.trim()
-  return id ? id : null
+  if (!id) {
+    throw new CanvasWorkspaceTaskUnmappableError(
+      'media-ids',
+      'Canvas execution requires an asset-backed image so media_asset_ids is populated.',
+    )
+  }
+  return id
 }
 
 type ImageInpaintTaskRequestInput = {
   prompt: string
-  originalImageUrl: string
-  /** Legacy mask URL; omitted once `maskAssetId` carries the v1 reference. */
-  maskImageUrl?: string | undefined
   imageSize: ExecutionImageSize | null
-  originalImageAssetId?: number | undefined
-  /** Opaque `asset_...` ref; the only media input the v1 transport sends. */
-  originalImageMediaAssetId?: string | undefined
-  /**
-   * Opaque `asset_...` inpaint mask minted by the workspace upload-session
-   * flow. When present the builder emits `params.mask_asset_id` (the v1
-   * durable mask path) and drops the legacy `mask_image_url`.
-   */
-  maskAssetId?: string | undefined
+  originalImageAssetId: string
+  maskAssetId: string
 }
 
 export type FusionTaskRequestInput = {
   prompt: string
-  imageUrls: string[]
-  imageAssetIds?: number[] | undefined
   /** Opaque `asset_...` refs; the only media inputs the v1 transport sends. */
   mediaAssetIds?: string[] | undefined
   inputWeights: number[]
@@ -176,9 +153,6 @@ export function buildImageActionReadinessRequest(
 export function buildGenerationTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
-  imageUrls?: string[] | undefined
-  imageAssetIds?: number[] | undefined
-  referenceImageAssetIds?: number[] | undefined
   /** Opaque `asset_...` refs; the only media inputs the v1 transport sends. */
   mediaAssetIds?: string[] | undefined
   outputCount: number
@@ -189,9 +163,6 @@ export function buildGenerationTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: `${input.prompt ?? ''}`.trim(),
     service: EXECUTION_META[EXECUTION_SERVICE.generation].service,
-    imageUrls: input.imageUrls,
-    imageAssetIds: input.imageAssetIds,
-    referenceImageAssetIds: input.referenceImageAssetIds,
     mediaAssetIds: input.mediaAssetIds,
     params: {
       output_count: outputCount,
@@ -210,7 +181,6 @@ export function buildDirectActionTaskRequest(input: {
   strength?: number | undefined
   outputResolution?: OutputResolution | undefined
 }): CanvasTaskRequestData {
-  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(input.action)
   const sizeParams = buildExecutionSizeParams(input.imageSize)
   const strengthConfig = execution.strength
@@ -218,23 +188,12 @@ export function buildDirectActionTaskRequest(input: {
     { outputCount: input.outputCount, outputResolution: input.outputResolution },
     execution.service,
   )
-  // Prefer the opaque asset ref: covered sources omit URL/numeric inputs so
-  // the v1 adapter sends media_asset_ids only. Uncovered sources keep the
-  // legacy shape and fail closed in the adapter with a precise reason.
-  const opaqueId = opaqueAssetId(input.source)
-  const imageUrls = opaqueId ? undefined : input.source.mediaAssetId ? undefined : [sourceUrl]
-  const imageAssetIds = opaqueId
-    ? undefined
-    : input.source.mediaAssetId
-      ? [input.source.mediaAssetId]
-      : undefined
+  const assetId = requireImageAssetId(input.source)
   if (strengthConfig?.paramPath === 'variation.strength') {
     return buildExecutionTaskRequest({
       prompt: input.prompt.trim(),
       service: execution.service,
-      imageUrls,
-      imageAssetIds,
-      mediaAssetIds: opaqueId ? [opaqueId] : undefined,
+      mediaAssetIds: [assetId],
       params: {
         ...outputParams,
         ...sizeParams,
@@ -250,9 +209,7 @@ export function buildDirectActionTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
     service: execution.service,
-    imageUrls,
-    imageAssetIds,
-    mediaAssetIds: opaqueId ? [opaqueId] : undefined,
+    mediaAssetIds: [assetId],
     params: {
       ...outputParams,
       ...sizeParams,
@@ -263,24 +220,18 @@ export function buildDirectActionTaskRequest(input: {
 export function buildImageInpaintTaskRequest(
   input: ImageInpaintTaskRequestInput,
 ): CanvasTaskRequestData {
-  const originalOpaqueId = opaqueAssetId({ assetId: input.originalImageMediaAssetId })
-  const maskAssetId = `${input.maskAssetId ?? ''}`.trim()
+  const originalAssetId = requireImageAssetId({ assetId: input.originalImageAssetId })
+  const maskAssetId = requireImageAssetId({ assetId: input.maskAssetId })
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
     service: EXECUTION_PARTIAL_EDIT_META.service,
-    mediaAssetIds: originalOpaqueId ? [originalOpaqueId] : undefined,
+    mediaAssetIds: [originalAssetId],
     params: {
       output_count: 1,
       output_resolution: '1k',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
-      // v1 durable mask path wins when the mask has been uploaded to a
-      // workspace asset; otherwise the legacy URL rides along and fails
-      // closed in the workspace adapter with upload guidance.
-      ...(maskAssetId ? { mask_asset_id: maskAssetId } : { mask_image_url: input.maskImageUrl }),
+      mask_asset_id: maskAssetId,
       use_mask: true,
-      ...(input.originalImageAssetId
-        ? { original_image_asset_id: input.originalImageAssetId }
-        : {}),
     },
   })
 }
@@ -292,7 +243,6 @@ export function buildOutpaintTaskRequest(input: {
   originalImageRect: OutpaintRect
   prompt?: string
 }): CanvasTaskRequestData {
-  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
   if (!input.imageSize)
@@ -302,17 +252,11 @@ export function buildOutpaintTaskRequest(input: {
     input.frameRect,
     input.originalImageRect,
   )
-  const opaqueId = opaqueAssetId(input.source)
+  const assetId = requireImageAssetId(input.source)
   return buildExecutionTaskRequest({
     prompt,
     service: execution.service,
-    imageUrls: opaqueId ? undefined : input.source.mediaAssetId ? undefined : [sourceUrl],
-    imageAssetIds: opaqueId
-      ? undefined
-      : input.source.mediaAssetId
-        ? [input.source.mediaAssetId]
-        : undefined,
-    mediaAssetIds: opaqueId ? [opaqueId] : undefined,
+    mediaAssetIds: [assetId],
     params: {
       output_count: 1,
       output_resolution: '1k',
@@ -336,19 +280,12 @@ export function buildUpscaleTaskRequest(input: {
   strength?: number | undefined
   outputResolution?: OutputResolution | undefined
 }): CanvasTaskRequestData {
-  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
-  const opaqueId = opaqueAssetId(input.source)
+  const assetId = requireImageAssetId(input.source)
   return buildExecutionTaskRequest({
     prompt: '',
     service: execution.service,
-    imageUrls: opaqueId ? undefined : input.source.mediaAssetId ? undefined : [sourceUrl],
-    imageAssetIds: opaqueId
-      ? undefined
-      : input.source.mediaAssetId
-        ? [input.source.mediaAssetId]
-        : undefined,
-    mediaAssetIds: opaqueId ? [opaqueId] : undefined,
+    mediaAssetIds: [assetId],
     params: {
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       upscale: {
@@ -364,8 +301,6 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): CanvasTas
   return buildExecutionTaskRequest({
     prompt: input.prompt,
     service: EXECUTION_FUSION_META.service,
-    imageUrls: input.imageUrls,
-    imageAssetIds: input.imageAssetIds,
     mediaAssetIds: input.mediaAssetIds,
     params: {
       ...(outputCount ? { output_count: outputCount } : {}),
@@ -422,27 +357,18 @@ export function buildImageExecutionTaskRequest(
         originalImageRect: plan.originalImageRect,
         prompt: plan.prompt,
       })
-    case 'generation': {
-      const uncoveredRefs = plan.referenceImages.filter((image) => !opaqueAssetId(image))
+    case 'generation':
       return buildGenerationTaskRequest({
         prompt: plan.prompt,
         aspectRatio: plan.aspectRatio,
-        imageUrls: uncoveredRefs.length > 0 ? uncoveredRefs.map((image) => image.url) : undefined,
-        referenceImageAssetIds: imageAssetIds(uncoveredRefs),
-        mediaAssetIds: opaqueAssetIds(plan.referenceImages),
+        mediaAssetIds: plan.referenceImages.map(requireImageAssetId),
         outputCount: plan.outputCount,
         outputResolution: plan.outputResolution,
       })
-    }
-    case 'fusion': {
-      const opaqueIds = opaqueAssetIds(plan.inputImages)
-      const isFullyCovered =
-        plan.inputImages.length > 0 && opaqueIds.length === plan.inputImages.length
+    case 'fusion':
       return buildFusionTaskRequest({
         prompt: plan.taskPrompt,
-        imageUrls: isFullyCovered ? [] : plan.imageUrls,
-        imageAssetIds: isFullyCovered ? undefined : imageAssetIds(plan.inputImages),
-        mediaAssetIds: opaqueIds,
+        mediaAssetIds: plan.inputImages.map(requireImageAssetId),
         inputWeights: plan.inputWeights,
         outputCount: plan.outputCount,
         sizeSource: plan.sizeSource,
@@ -450,23 +376,18 @@ export function buildImageExecutionTaskRequest(
         aspectRatio: plan.aspectRatio,
         outputResolution: plan.outputResolution,
       })
-    }
   }
 }
 
 export function buildPreparedImageInpaintTaskRequest(input: {
   plan: ImageInpaintExecutionPlan
-  maskImageUrl?: string | undefined
-  maskAssetId?: string | undefined
+  maskAssetId: string
   imageSize: ExecutionImageSize | null
 }): CanvasTaskRequestData {
   return buildImageInpaintTaskRequest({
     prompt: input.plan.prompt,
-    originalImageUrl: input.plan.source.url,
-    maskImageUrl: input.maskImageUrl,
     maskAssetId: input.maskAssetId,
     imageSize: input.imageSize,
-    originalImageAssetId: input.plan.source.mediaAssetId,
-    originalImageMediaAssetId: input.plan.source.assetId,
+    originalImageAssetId: requireImageAssetId(input.plan.source),
   })
 }

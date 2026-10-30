@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
+	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -237,6 +238,7 @@ func renderTaskError(c *gin.Context, err error) {
 	case errors.Is(err, workspacetasks.ErrMediaArchived):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMediaArchived), contract.CodeMediaArchived, runtimehttp.MsgMediaArchived)
 	default:
+		slog.Error("renderTaskError: unhandled task error", "err", err)
 		contract.RenderError(c, contract.StatusOf(contract.CodeServiceUnavailable), contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable25)
 	}
 	c.Abort()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	creditsdomain "ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	quotadomain "ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/platform/contract"
@@ -209,6 +210,9 @@ type OutputRef struct {
 	ChecksumSHA256 string `json:"checksum_sha256,omitempty"`
 	Role           string `json:"role,omitempty"`
 	ResultIndex    int    `json:"result_index"`
+	Width          int32  `json:"width,omitempty"`
+	Height         int32  `json:"height,omitempty"`
+	MIMEType       string `json:"mime_type,omitempty"`
 }
 
 const (
@@ -283,11 +287,42 @@ func (t *WorkspaceTask) IsTerminal() bool {
 // TaskEvent is one staged status event. Events emit ONLY after commit
 // (for #807 task.* fanout); staging never publishes inside the txn.
 type TaskEvent struct {
-	EventID     string    `json:"event_id,omitempty"`
-	TaskID      string    `json:"task_id"`
-	WorkspaceID string    `json:"workspace_id"`
-	Status      Status    `json:"status"`
-	OccurredAt  time.Time `json:"occurred_at"`
+	EventID     string                         `json:"event_id,omitempty"`
+	TaskID      string                         `json:"task_id"`
+	WorkspaceID string                         `json:"workspace_id"`
+	Status      Status                         `json:"status"`
+	OccurredAt  time.Time                      `json:"occurred_at"`
+	Outputs     []events.V1TaskCompletedOutput `json:"outputs,omitempty"`
+}
+
+// BuildTaskCompletedOutputs constructs self-contained output facts for task.completed events.
+func BuildTaskCompletedOutputs(workspaceID string, outputs []OutputRef) []events.V1TaskCompletedOutput {
+	if len(outputs) == 0 {
+		return nil
+	}
+	res := make([]events.V1TaskCompletedOutput, 0, len(outputs))
+	workspaceID = strings.TrimSpace(workspaceID)
+	for _, ref := range outputs {
+		role := strings.TrimSpace(ref.Role)
+		if role == "" {
+			role = "result"
+		}
+		url := strings.TrimSpace(ref.URL)
+		assetID := strings.TrimSpace(ref.AssetID)
+		if assetID != "" && url == "" {
+			url = "/api/v1/workspaces/" + workspaceID + "/media-assets/" + assetID + "/content"
+		}
+		res = append(res, events.V1TaskCompletedOutput{
+			AssetID:      assetID,
+			Role:         role,
+			URL:          url,
+			Width:        ref.Width,
+			Height:       ref.Height,
+			MIMEType:     strings.TrimSpace(ref.MIMEType),
+			PreviewReady: true,
+		})
+	}
+	return res
 }
 
 // CreateParams carries validated task creation input. Repository methods
@@ -320,6 +355,9 @@ type AssetInfo struct {
 	WorkspaceID string
 	Status      string
 	Archived    bool
+	Width       int32
+	Height      int32
+	MIMEType    string
 }
 
 // AssetReader checks byte-verified readiness. Production adapts the

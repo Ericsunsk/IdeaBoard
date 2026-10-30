@@ -104,6 +104,27 @@ function mockReadDocument(state: MockWorkspaceBoardApiState, boardId: string): P
   return Promise.resolve({ data: document })
 }
 
+function mockReadBundle(state: MockWorkspaceBoardApiState, boardId: string): Promise<unknown> {
+  const board = state.boardsResponse.data.find((item) => item.id === boardId)
+  if (!board) {
+    return Promise.reject({ status: 404, code: 'board_not_found', msg: '看板不存在' })
+  }
+  const document = state.documentById[boardId]
+  if (!document) {
+    return Promise.reject({ status: 404, code: 'board_not_found', msg: '看板不存在' })
+  }
+  return Promise.resolve({
+    data: {
+      meta: board,
+      document,
+      realtime: {
+        ticket: `mock_ticket_${boardId}`,
+        expires_at: new Date(Date.now() + 3600000).toISOString(),
+      },
+    },
+  })
+}
+
 function mockReplaceDocument(
   state: MockWorkspaceBoardApiState,
   url: string,
@@ -218,6 +239,11 @@ const BOARD_ROUTE_TABLE: Array<{
     pattern: BOARD_COLLECTION_PATTERN,
     methods: ['POST'],
     run: (state, _url, config, match) => mockCreateBoard(state, match[1] ?? '', config),
+  },
+  {
+    pattern: /^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/bundle$/,
+    methods: ['GET'],
+    run: (state, _url, _config, match) => mockReadBundle(state, match[1] ?? ''),
   },
   {
     pattern: /^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/document$/,

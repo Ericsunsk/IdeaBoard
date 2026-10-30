@@ -4,6 +4,7 @@ import {
   createWorkspaceUpload as createWorkspaceUploadTransport,
   getWorkspaceUpload as getWorkspaceUploadTransport,
   stageWorkspaceUploadBytes as stageWorkspaceUploadBytesTransport,
+  uploadWorkspaceMediaDirect as uploadWorkspaceMediaDirectTransport,
 } from './generated-query/public/workspace-media/workspace-media'
 import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/user/user'
 import type { CompleteUploadRequest, CreateUploadRequest } from './generated-query/public/model'
@@ -11,7 +12,6 @@ import { buildContractRequestHeaders, newRequestId, requireContractData } from '
 import { withSignal } from '../core/utils/request'
 import { assertOpaqueId, isOpaqueIdWithPrefix } from '../core/utils/opaqueIds'
 import { isRecord } from '../core/utils/guards'
-import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../core/i18n'
 
 export const UPLOAD_OPERATION_TIMEOUT_MS = 5 * 60 * 1000
@@ -45,43 +45,14 @@ export const uploadApi = {
   upload: async (
     file: File,
     workspaceId: string,
-    options?: { boardId?: string | undefined },
+    options?: { boardId?: string | undefined; signal?: AbortSignal | null | undefined },
   ): Promise<UploadImageMetadata> => {
     const workspace = workspaceId.trim()
     if (!workspace) throw new Error(i18n.global.t('common.errors.uploadFailed'))
-    const bytes = await file.arrayBuffer()
-    const subtle = globalThis.crypto?.subtle
-    if (!subtle) throw new Error(i18n.global.t('common.errors.uploadFailed'))
-    const digest = await subtle.digest('SHA-256', bytes)
-    const checksumSha256 = [...new Uint8Array(digest)]
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('')
-    const mimeType = file.type || 'application/octet-stream'
-    const session = await workspaceUploadApi.createSession(
-      workspace,
-      {
-        filename: file.name,
-        mimeType,
-        sizeBytes: file.size,
-        checksumSha256,
-        mediaKind: 'image',
-        // #936: bind Canvas uploads to their board when the board has a
-        // durable identity; unsaved boards stay unbound (owner-only).
-        ...(options?.boardId != null ? { boardId: options.boardId } : {}),
-      },
-      { idempotencyKey: workspaceUploadIdempotencyKey('create') },
-    )
-    await workspaceUploadApi.stageBytes(workspace, session.id, file, {
-      contentType: mimeType,
-      idempotencyKey: workspaceUploadIdempotencyKey('bytes'),
+    const asset = await workspaceUploadApi.uploadDirect(workspace, file, {
+      boardId: options?.boardId,
+      signal: options?.signal,
     })
-    const completed = await workspaceUploadApi.completeSession(
-      workspace,
-      session.id,
-      { checksumSha256, sizeBytes: file.size, mimeType, mediaKind: 'image' },
-      { idempotencyKey: workspaceUploadIdempotencyKey('complete') },
-    )
-    const asset = completed.asset
     if (!asset.id?.trim()) throw new Error(i18n.global.t('common.errors.uploadProcessingFailed'))
     return {
       url: asset.contentUrl,
@@ -358,6 +329,32 @@ function workspaceRequestHeaders(options: WorkspaceRequestOptions): Record<strin
 }
 
 export const workspaceUploadApi = {
+  uploadDirect: async (
+    workspaceId: string,
+    file: Blob | File,
+    options: WorkspaceRequestOptions & {
+      boardId?: string | undefined
+    } = {},
+  ): Promise<WorkspaceMediaAsset> => {
+    const envelope = await uploadWorkspaceMediaDirectTransport(
+      assertWorkspaceId(workspaceId),
+      {
+        file,
+        ...(isBoardPublicIdShape(options.boardId) ? { board_id: options.boardId.trim() } : {}),
+      },
+      {
+        headers: workspaceRequestHeaders(options),
+        ...withSignal(options.signal),
+      },
+    )
+    return toWorkspaceMediaAsset(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('common.errors.uploadFailed'),
+      ),
+    )
+  },
+
   createSession: async (
     workspaceId: string,
     input: WorkspaceUploadCreateInput,

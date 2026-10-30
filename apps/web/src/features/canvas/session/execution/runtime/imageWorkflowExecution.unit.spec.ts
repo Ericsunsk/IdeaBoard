@@ -21,7 +21,6 @@ vi.mock('../../../../../core/media/imageDimensions', () => ({
   readImageNaturalSize: vi.fn(async () => ({ width: 1200, height: 800 })),
 }))
 vi.mock('../media/inpaintMask', () => ({
-  prepareInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
   prepareInpaintMaskAsset: vi.fn(async () => 'asset_mask1'),
 }))
 vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
@@ -33,7 +32,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
 })
 vi.mock('../../../../../api/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
-    async (assetId: number) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
+    async (assetId: string) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),
 }))
 
@@ -44,7 +43,7 @@ function imageActionPlan() {
     kind: 'image-action',
     activationId: 'a',
     sourceNodeId: 'image-1',
-    source: { url: 'https://example.com/a.png', ratio: 1 },
+    source: { url: 'https://example.com/a.png', ratio: 1, assetId: 'asset_source42' },
     action: 'cutout',
     prompt: '',
     outputCount: 1,
@@ -162,7 +161,6 @@ describe('useImageWorkflowExecution', () => {
 
   it('materializes through Graph Session projection and marks the board dirty for autosave', async () => {
     const harness = createPublicHarness({
-      assertReady: async () => undefined,
       submit: async () => ({ taskId: 'task-1' }),
       observe: async () => ({
         resolve: async () => ({
@@ -181,7 +179,6 @@ describe('useImageWorkflowExecution', () => {
 
   it('cancels a real reserved pending node when submit is cancelled', async () => {
     const harness = createPublicHarness({
-      assertReady: async () => undefined,
       submit: async () => {
         throw new TaskCancelledError()
       },
@@ -196,7 +193,6 @@ describe('useImageWorkflowExecution', () => {
   it('does not remove a superseding pending node when an old submit resolves late', async () => {
     let resolveSubmit!: (value: { taskId: string }) => void
     const harness = createPublicHarness({
-      assertReady: async () => undefined,
       submit: async () =>
         await new Promise((resolve) => {
           resolveSubmit = resolve
@@ -223,58 +219,32 @@ describe('useImageWorkflowExecution', () => {
   })
 
   it('passes a prepared image action to the real Runner transport without per-run callbacks', async () => {
-    const core = createPendingImageExecutionCore()
-    const graphSession = CanvasGraphSession.hydrate('board-a', createEmptyBoardSnapshot())
-    core.attachBoard(
-      BoardGraphSession.create('board-a', {
-        graphSession,
-      }),
-    )
-    const assertReady = vi.fn(async () => {
-      throw new Error('not ready')
+    const submit = vi.fn(async () => {
+      throw new Error('submit failed')
     })
-    const execution = useImageWorkflowExecution({
-      nodes: ref([]),
-      edges: ref([]),
-      readCanvasGraphStore: () => graphSession.store,
-      rendererMetrics,
-      boardBaseSnapshot: ref(createEmptyBoardSnapshot()),
-      executionWorkspace: {
-        state: { executionCore: core, isNodeRunning: () => false },
-        commands: {
-          runGeneration: vi.fn(),
-          hydratePendingImageLeases: vi.fn(),
-          reattachPendingImageResults: vi.fn(),
-        },
-      },
-      cancelTasks: vi.fn(),
-      onSuccess: vi.fn(),
-      onWarning: vi.fn(),
-      taskTransport: { assertReady, submit: vi.fn(), observe: vi.fn() },
+    const harness = createPublicHarness({
+      submit,
+      observe: vi.fn(),
     })
-    await execution.executeImageWorkflow({
+    await harness.execution.executeImageWorkflow({
       kind: 'image-action',
       activationId: 'a',
       sourceNodeId: 'image-1',
-      source: { url: 'https://example.com/a.png', ratio: 1 },
+      source: { url: 'https://example.com/a.png', ratio: 1, assetId: 'asset_source42' },
       action: 'cutout',
       prompt: '',
       outputCount: 1,
       resultOptions: {},
     } as never)
-    expect(assertReady).toHaveBeenCalledOnce()
-    expect(core.snapshot().executions).toEqual([])
+    expect(submit).toHaveBeenCalledOnce()
+    expect(harness.core.snapshot().executions).toEqual([])
   })
 
-  it('uses the complete outpaint request for readiness and submission', async () => {
-    const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
-      async () => undefined,
-    )
+  it('uses the complete outpaint request for submission', async () => {
     const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
       taskId: 'task-extend',
     }))
     const harness = createPublicHarness({
-      assertReady,
       submit,
       observe: async () => ({
         resolve: async () => ({
@@ -288,7 +258,7 @@ describe('useImageWorkflowExecution', () => {
       kind: 'outpaint',
       activationId: 'extend',
       sourceNodeId: 'image-1',
-      source: { url: 'https://example.com/a.png', ratio: 1 },
+      source: { url: 'https://example.com/a.png', ratio: 1, assetId: 'asset_source42' },
       prompt: 'extend the horizon',
       outputCount: 1,
       frameRect: { left: -40, top: -10, width: 160, height: 140 },
@@ -298,10 +268,10 @@ describe('useImageWorkflowExecution', () => {
       resultOptions: {},
     } as never)
 
-    const readinessRequest = assertReady.mock.calls[0]?.[0]
-    expect(readinessRequest).toMatchObject({
+    const submittedRequest = submit.mock.calls[0]?.[0]
+    expect(submittedRequest).toMatchObject({
       service: 'outpaint',
-      image_urls: ['https://example.com/a.png'],
+      media_asset_ids: ['asset_source42'],
       params: {
         output_count: 1,
         original_image_width: 1200,
@@ -314,18 +284,13 @@ describe('useImageWorkflowExecution', () => {
         },
       },
     })
-    expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
   })
 
-  it('uses the complete sized inpaint request for readiness and submission', async () => {
-    const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
-      async () => undefined,
-    )
+  it('uses the complete sized inpaint request for submission', async () => {
     const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
       taskId: 'task-inpaint',
     }))
     const harness = createPublicHarness({
-      assertReady,
       submit,
       observe: async () => ({
         resolve: async () => ({
@@ -339,20 +304,20 @@ describe('useImageWorkflowExecution', () => {
       kind: 'inpaint',
       activationId: 'inpaint',
       sourceNodeId: 'image-1',
-      source: { url: 'https://example.com/a.png', ratio: 1, mediaAssetId: 42 },
+      source: { url: 'https://example.com/a.png', ratio: 1, assetId: 'asset_source42' },
       prompt: 'remove the object',
       rawMaskDataUrl: 'data:image/png;base64,mask',
       outputCount: 1,
       resultOptions: {},
     } as never)
 
-    const readinessRequest = assertReady.mock.calls[0]?.[0]
-    expect(readinessRequest).toMatchObject({
+    const submittedRequest = submit.mock.calls[0]?.[0]
+    expect(submittedRequest).toMatchObject({
       service: 'inpaint',
       prompt: 'remove the object',
+      media_asset_ids: ['asset_source42'],
       params: {
         output_count: 1,
-        original_image_asset_id: 42,
         mask_asset_id: 'asset_mask1',
         original_image_width: 1200,
         original_image_height: 800,
@@ -360,9 +325,8 @@ describe('useImageWorkflowExecution', () => {
         custom_height: 800,
       },
     })
-    expect(readinessRequest?.params).not.toHaveProperty('mask_image_url')
-    expect(readinessRequest?.params).not.toHaveProperty('reference_image_urls')
-    expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
+    expect(submittedRequest?.params).not.toHaveProperty('mask_image_url')
+    expect(submittedRequest?.params).not.toHaveProperty('reference_image_urls')
   })
 
   it('delegates prompt execution and pending reattach to the shared Core workspace seam', async () => {
@@ -391,7 +355,7 @@ describe('useImageWorkflowExecution', () => {
       cancelTasks: vi.fn(),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
-      taskTransport: { assertReady: vi.fn(), submit: vi.fn(), observe: vi.fn() },
+      taskTransport: { submit: vi.fn(), observe: vi.fn() },
     })
     const plan = {
       kind: 'generation',

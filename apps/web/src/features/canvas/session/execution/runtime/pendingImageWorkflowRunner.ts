@@ -46,7 +46,6 @@ import {
 type PendingImageResultOptions = ImageExecutionResultOptions
 
 export type PendingImageWorkflowTaskTransport = Readonly<{
-  assertReady: (request: CanvasTaskRequestData) => Promise<void>
   submit: (request: CanvasTaskRequestData, clientActionId: string) => Promise<{ taskId: string }>
   observe: TaskImageObserver
 }>
@@ -58,7 +57,6 @@ type PendingImageWorkflowIntent = {
   outputCount: number
   resultOptions?: PendingImageResultOptions
   taskRequest: CanvasTaskRequestData
-  readinessRequest?: CanvasTaskRequestData
   fallbackRatio: number
 }
 
@@ -88,8 +86,8 @@ export type PendingImageWorkflowRunnerOptions = {
 }
 
 /**
- * quote/submit 共用重试预算 (#P1-4): assert 与 submit 各最多 2 次
- * 尝试（初始 + 单次重试），仅可重试错误（network / 503 定价瞬态 /
+ * 提交重试预算 (#P1-4): submit 最多 2 次尝试（初始 + 单次重试），
+ * 仅可重试错误（network / 503 定价瞬态 /
  * 原始 503-429）进入重试；确定性失败（空池、余额、校验 422）不重试。
  * 用户手动重提不受影响（无状态锁）。
  *
@@ -478,38 +476,10 @@ export function createPendingImageWorkflowRunner(
     }
   }
 
-  /**
-   * quote 断言共用重试预算 (#P1-4): 最多 2 次尝试，仅可重试错误进入
-   * 重试；not-ready（余额/校验/Board 门控）与确定性失败直接抛出。
-   */
-  async function assertTaskReadyWithRetry(intent: PendingImageWorkflowIntent): Promise<void> {
-    for (let attempt = 0; ; attempt += 1) {
-      if (!isExecutionCurrent(intent)) {
-        throw new TaskCancelledError('Canvas execution is no longer active')
-      }
-      try {
-        await options.taskTransport.assertReady(intent.readinessRequest ?? intent.taskRequest)
-        return
-      } catch (error) {
-        if (
-          isExecutionCurrent(intent) &&
-          attempt + 1 < SHARED_TASK_REQUEST_ATTEMPTS &&
-          isRetryableCanvasTaskRequestError(error)
-        ) {
-          continue
-        }
-        throw error
-      }
-    }
-  }
-
   async function execute(intent: PendingImageWorkflowIntent): Promise<void> {
     if (!isExecutionCurrent(intent)) return
     let leases: PendingImageExecutionLease[] = []
     try {
-      await assertTaskReadyWithRetry(intent)
-      if (!isExecutionCurrent(intent)) return
-
       const acquired = acquireExecutionLeases(intent)
       if (!acquired) return
       leases = acquired.leases

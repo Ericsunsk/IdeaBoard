@@ -365,6 +365,29 @@ func TestMediaServiceZeroDimsNull(t *testing.T) {
 	}
 }
 
+// TestMediaServiceCompleteMismatchFailsSession proves fact mismatch
+// marks the upload session failed in PostgreSQL instead of rolling it back.
+func TestMediaServiceCompleteMismatchFailsSession(t *testing.T) {
+	env := openMediaTestEnv(t)
+	ctx := context.Background()
+
+	session := mustCreateDBSession(t, ctx, env.svc, env.wsA, env.owner)
+	facts := dbCompleteFacts()
+	facts.SizeBytes = 2048
+	_, _, err := env.svc.CompleteSession(ctx, env.wsA, session.ID, facts, CreateAssetParams{})
+	var validationErr *ValidationError
+	if !isValidationErrorAs(err, &validationErr) || validationErr.Fields["size_bytes"] == "" {
+		t.Fatalf("mismatch err = %v, want size_bytes field error", err)
+	}
+	got, err := env.svc.GetSession(ctx, env.wsA, session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != StatusFailed {
+		t.Fatalf("mismatched session status = %q, want failed", got.Status)
+	}
+}
+
 // TestMediaServiceLazyExpiry proves lazy expiry: backdating created_at
 // past the TTL makes the next read expire the session (410-class).
 func TestMediaServiceLazyExpiry(t *testing.T) {

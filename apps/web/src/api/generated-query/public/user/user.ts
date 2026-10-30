@@ -38,6 +38,7 @@ import type {
   OrganizationInviteAckEnvelope,
   OrganizationMemberEnvelope,
   OrganizationMemberInviteList,
+  PublicBrandingSettingEnvelope,
   SupportChannelsSettingEnvelope,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
@@ -114,6 +115,83 @@ export function useGetSupportChannels<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetSupportChannelsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetPublicBrandingSettingUrl = () => {
+  return `/settings/branding`
+}
+
+/**
+ * Returns the public site branding settings (project name and logo URL). Public endpoint; no authentication required.
+ * @summary Read the public site branding setting (no auth)
+ */
+export const getPublicBrandingSetting = async (
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<PublicBrandingSettingEnvelope> => {
+  return publicMutator<PublicBrandingSettingEnvelope>(getGetPublicBrandingSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetPublicBrandingSettingQueryKey = () => {
+  return ['settings', 'branding'] as const
+}
+
+export const getGetPublicBrandingSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicBrandingSetting>>,
+  TError = ErrorEnvelope,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getPublicBrandingSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof publicMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetPublicBrandingSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicBrandingSetting>>> = ({
+    signal,
+  }) => getPublicBrandingSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicBrandingSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetPublicBrandingSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicBrandingSetting>>
+>
+export type GetPublicBrandingSettingQueryError = ErrorEnvelope
+
+/**
+ * @summary Read the public site branding setting (no auth)
+ */
+
+export function useGetPublicBrandingSetting<
+  TData = Awaited<ReturnType<typeof getPublicBrandingSetting>>,
+  TError = ErrorEnvelope,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getPublicBrandingSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetPublicBrandingSettingQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

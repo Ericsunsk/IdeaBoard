@@ -19,5 +19,5 @@ export type CreateWorkspaceRequestData = {
    */
   name: string
   /** Omitted for a Personal workspace (the caller's Personal account); an organization_id creates an Organization workspace on the shared org pool. Fixed at creation. */
-  organization_id?: OrganizationId | unknown
+  organization_id?: OrganizationId | null
 }

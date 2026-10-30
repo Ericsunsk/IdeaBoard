@@ -1,6 +1,7 @@
 import {
   archiveWorkspaceBoard,
   BoardWorkspaceUnavailableError,
+  fetchWorkspaceBoardBundle,
   fetchWorkspaceBoardMeta,
   renameWorkspaceBoard,
   requireBoardWorkspaceId,
@@ -82,6 +83,7 @@ export type HydrateBoardsFromServerOptions = {
 type ResolvedHydrateBoardsFromServerOptions = {
   shouldPreserveLocalNewer: boolean
   rollbackBoardIds: Set<string>
+  targetBoardIds?: Set<string>
 }
 
 function toLocalAccessFacts(board: WorkspaceBoardMeta): Partial<BoardMeta> {
@@ -218,8 +220,16 @@ function applyRemoteBoardsToLocal(
     }
   })
   if (!options.shouldPreserveLocalNewer) {
-    replaceBoards(metas, { publish: false })
-    replaceBoardStateMap(stateMap)
+    const unrelatedMetas = options.targetBoardIds
+      ? listBoards().filter((meta) => !options.targetBoardIds!.has(meta.id))
+      : []
+    const unrelatedStates: Record<string, BoardState> = {}
+    unrelatedMetas.forEach((meta) => {
+      const state = getBoardState(meta.id)
+      if (state) unrelatedStates[meta.id] = state
+    })
+    replaceBoards([...metas, ...unrelatedMetas], { publish: false })
+    replaceBoardStateMap({ ...unrelatedStates, ...stateMap })
     Object.entries(stateMap).forEach(([id, state]) => rememberBoardServerContent(id, state))
     publishCatalogChange()
     return
@@ -228,7 +238,10 @@ function applyRemoteBoardsToLocal(
   const mergedMetas = new Map<string, BoardMeta>()
   const localMetas = listBoards()
   const localMetaMap = new Map(localMetas.map((meta) => [meta.id, meta]))
-  const shouldPreserveLocal = (boardId: string) => !options.rollbackBoardIds.has(boardId)
+  const isOutsideTarget = (boardId: string) =>
+    options.targetBoardIds !== undefined && !options.targetBoardIds.has(boardId)
+  const shouldPreserveLocal = (boardId: string) =>
+    isOutsideTarget(boardId) || !options.rollbackBoardIds.has(boardId)
 
   metas.forEach((remoteMeta) => {
     const localMeta = localMetaMap.get(remoteMeta.id)
@@ -257,7 +270,8 @@ function applyRemoteBoardsToLocal(
     mergedMetas.set(remoteMeta.id, mergedMeta)
   })
 
-  // Local-only boards (absent from the full remote list, which is a
+  // Targeted hydration never changes boards outside its requested IDs.
+  // For a full catalog, local-only boards (absent from the remote list, which is a
   // complete cursor walk so absence means deleted/archived elsewhere):
   // the walk is complete-or-throw (truncation and page failures reject the
   // whole hydrate instead of returning a partial list), so absence here is
@@ -270,7 +284,7 @@ function applyRemoteBoardsToLocal(
   // Rollback markers still drop first via shouldPreserveLocal above.
   localMetas.forEach((localMeta) => {
     if (mergedMetas.has(localMeta.id) || !shouldPreserveLocal(localMeta.id)) return
-    if (localMeta.revision !== undefined) return
+    if (!isOutsideTarget(localMeta.id) && localMeta.revision !== undefined) return
     mergedMetas.set(localMeta.id, localMeta)
   })
 
@@ -335,6 +349,42 @@ function resolveHydrateOptions(
   }
 }
 
+function boardBundleOptions(workspaceId: string, boardId: string) {
+  return {
+    queryKey: boardQueryKeys.bundle(workspaceId, boardId),
+    queryFn: ({ signal }: { signal?: AbortSignal }) =>
+      fetchWorkspaceBoardBundle(workspaceId, boardId, { signal }),
+  }
+}
+
+async function hydrateSingleBoardBundle(
+  workspaceId: string,
+  targetBoardId: string,
+  scope: CompleteBoardScope,
+  shouldForce: boolean,
+): Promise<Array<{ meta: WorkspaceBoardMeta; state: BoardState | null }>> {
+  const cachedDoc = queryClient.getQueryData<WorkspaceBoardDocument>(
+    boardQueryKeys.document(workspaceId, targetBoardId),
+  )
+  const cachedList = queryClient.getQueryData<WorkspaceBoardMeta[]>(
+    boardQueryKeys.list(workspaceId),
+  )
+  const listMeta = cachedList?.find((m) => m.id === targetBoardId)
+  const localMeta = getBoardById(targetBoardId)
+  const knownRevision = Math.max(listMeta?.revision ?? 0, localMeta?.revision ?? 0)
+  const isBehind = cachedDoc !== undefined && cachedDoc.revision < knownRevision
+
+  const bundle = await queryClient.fetchQuery({
+    ...boardBundleOptions(workspaceId, targetBoardId),
+    ...(shouldForce || isBehind ? { staleTime: 0 } : {}),
+  })
+  if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
+  writeBoardListMeta(workspaceId, bundle.meta)
+  queryClient.setQueryData(boardQueryKeys.document(workspaceId, targetBoardId), bundle.document)
+  const state = toLocalState(targetBoardId, bundle.document)
+  return [{ meta: { ...bundle.meta, revision: bundle.document.revision }, state }]
+}
+
 async function listRemoteBoards(
   workspaceId: string,
   scope: CompleteBoardScope,
@@ -348,13 +398,37 @@ async function listRemoteBoards(
   // The list walk is complete-or-throw and bound to the captured scope: a
   // truncated walk or a mid-walk User/Workspace switch rejects, so the
   // merge below only ever observes a confirmed complete catalog.
-  const metas = await queryClient.fetchQuery({
-    ...boardListOptions(workspaceId),
-    ...(shouldForce ? { staleTime: 0 } : {}),
-  })
-  if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
   const onlyIds = onlyBoardIds?.map((id) => id.trim()).filter((id) => id !== '')
   const onlySet = onlyIds && onlyIds.length > 0 ? new Set(onlyIds) : null
+
+  // Fast-path: single target board hydration fetches bundle (meta + document + realtime ticket) in 1 RTT
+  if (onlySet && onlyIds && onlyIds.length === 1 && shouldIncludeDocuments && onlyIds[0]) {
+    return hydrateSingleBoardBundle(workspaceId, onlyIds[0], scope, shouldForce)
+  }
+
+  let metas: WorkspaceBoardMeta[]
+  if (onlySet && onlyIds) {
+    const cachedList = queryClient.getQueryData<WorkspaceBoardMeta[]>(
+      boardQueryKeys.list(workspaceId),
+    )
+    if (cachedList && !shouldForce) {
+      metas = cachedList.filter((m) => onlySet.has(m.id))
+    } else {
+      metas = await Promise.all(
+        onlyIds.map(async (boardId) => {
+          const meta = await fetchWorkspaceBoardMeta(workspaceId, boardId)
+          writeBoardListMeta(workspaceId, meta)
+          return meta
+        }),
+      )
+    }
+  } else {
+    metas = await queryClient.fetchQuery({
+      ...boardListOptions(workspaceId),
+      ...(shouldForce ? { staleTime: 0 } : {}),
+    })
+  }
+  if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
   return Promise.all(
     metas.map(async (meta) => {
       if (onlySet && !onlySet.has(meta.id)) return { meta, state: null }
@@ -470,8 +544,10 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
     if (!isBoardScopeCurrent(scope)) {
       throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
     }
+    const targetBoardIds = normalizeRollbackBoardIds(options.onlyBoardIds ?? [])
     applyRemoteBoardsToLocal(remoteBoards, {
       ...resolvedOptions,
+      ...(targetBoardIds.size > 0 ? { targetBoardIds } : {}),
       // A catalog-only reload replaces only the requested rollback document;
       // unrelated cached/local documents remain a draft overlay.
       shouldPreserveLocalNewer:

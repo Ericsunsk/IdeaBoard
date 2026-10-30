@@ -125,5 +125,8 @@ func (a *TaskAssetAdapter) GetAsset(ctx context.Context, workspaceID, assetID st
 		WorkspaceID: asset.WorkspaceID,
 		Status:      asset.Status,
 		Archived:    false,
+		Width:       asset.Width,
+		Height:      asset.Height,
+		MIMEType:    asset.MIMEType,
 	}, nil
 }

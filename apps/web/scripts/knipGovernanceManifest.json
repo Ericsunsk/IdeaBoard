@@ -4178,18 +4178,6 @@
           "docs/frontend-seam-inventory.md: src/features/account/index.ts#RewardRedemptionDependencies"
         ]
       },
-      "RewardRedemptionHistoryItem": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/index.ts#RewardRedemptionHistoryItem"
-        ]
-      },
-      "RewardRedemptionHistoryPage": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/index.ts#RewardRedemptionHistoryPage"
-        ]
-      },
       "RewardRedemptionItem": {
         "kind": "canonical-public",
         "evidence": [
@@ -4903,14 +4891,6 @@
       "RewardRedemption": {
         "kind": "canonical-origin",
         "evidence": ["src/features/account/index.ts#RewardRedemption"]
-      },
-      "RewardRedemptionHistoryItem": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/account/index.ts#RewardRedemptionHistoryItem"]
-      },
-      "RewardRedemptionHistoryPage": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/account/index.ts#RewardRedemptionHistoryPage"]
       },
       "RewardRedemptionItem": {
         "kind": "canonical-origin",
@@ -15358,14 +15338,6 @@
       "sha256": "17747e46fa97247a221b3cdab5128b40f93f07780d3981b56998d9f8a440ad36",
       "exports": ["ControlBillingOwnerScopeParameter"]
     },
-    "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
-      "sha256": "4a0cac2ce6b3e37e9929535a00a092ae87467d4b20d5cb1dfcf5c1fbf6c15da9",
-      "exports": ["ControlBrandingLogoUpload"]
-    },
-    "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
-      "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
-      "exports": ["ControlBrandingLogoUploadEnvelope"]
-    },
     "src/api/generated-query/control/model/controlBrandLogoOverride.ts": {
       "sha256": "6549b8b122a6240844d2ef153624605c740832df867719e92542b610ac469e09",
       "exports": ["ControlBrandLogoOverride"]
@@ -15377,6 +15349,14 @@
     "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts": {
       "sha256": "7ca1dd5444ecebcd679b4d7de227dba781da7e1fdf9083633cf9c6072001e860",
       "exports": ["ControlBrandLogoOverrideScope"]
+    },
+    "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
+      "sha256": "4a0cac2ce6b3e37e9929535a00a092ae87467d4b20d5cb1dfcf5c1fbf6c15da9",
+      "exports": ["ControlBrandingLogoUpload"]
+    },
+    "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
+      "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
+      "exports": ["ControlBrandingLogoUploadEnvelope"]
     },
     "src/api/generated-query/control/model/controlCatalogEnvelope.ts": {
       "sha256": "9c76b7de33005665354275b20de4ca7535547866325b98681ca01847c2a3a534",
@@ -15943,7 +15923,7 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "c405535f4a4798d4c7ab958aa73016355b5ef0608f64aab659562afcf2ad0d1f",
+      "sha256": "275b2469d784816fb301ce3f3b78c8717abe9ff5d6fc1e888e39788bf3bfcf09",
       "exports": [
         "ArchiveBoardMutationError",
         "ArchiveBoardMutationResult",
@@ -15960,6 +15940,8 @@
         "GetBoardQueryResult",
         "GetBoardRevisionQueryError",
         "GetBoardRevisionQueryResult",
+        "GetWorkspaceBoardBundleQueryError",
+        "GetWorkspaceBoardBundleQueryResult",
         "IssueBoardRealtimeTicketMutationError",
         "IssueBoardRealtimeTicketMutationResult",
         "IssueBoardRealtimeTicketMutationVariables",
@@ -16006,6 +15988,9 @@
         "getGetBoardRevisionQueryOptions",
         "getGetBoardRevisionUrl",
         "getGetBoardUrl",
+        "getGetWorkspaceBoardBundleQueryKey",
+        "getGetWorkspaceBoardBundleQueryOptions",
+        "getGetWorkspaceBoardBundleUrl",
         "getIssueBoardRealtimeTicketMutationKey",
         "getIssueBoardRealtimeTicketMutationOptions",
         "getIssueBoardRealtimeTicketUrl",
@@ -16027,6 +16012,7 @@
         "getUpdateBoardMutationKey",
         "getUpdateBoardMutationOptions",
         "getUpdateBoardUrl",
+        "getWorkspaceBoardBundle",
         "issueBoardRealtimeTicket",
         "listBoardRevisions",
         "listBoards",
@@ -16040,6 +16026,7 @@
         "useGetBoardAccess",
         "useGetBoardDocument",
         "useGetBoardRevision",
+        "useGetWorkspaceBoardBundle",
         "useIssueBoardRealtimeTicket",
         "useListBoardRevisions",
         "useListBoards",
@@ -16156,6 +16143,14 @@
     "src/api/generated-query/public/model/boardAccessState.ts": {
       "sha256": "4b76d3e2fc1e58e8d9076c2fed9b6882e01f811a134deaf38d9aeb73de7f33e7",
       "exports": ["BoardAccessState"]
+    },
+    "src/api/generated-query/public/model/boardBundle.ts": {
+      "sha256": "e01cdb63795d51d84147c4f5471872640fd4edeb1f8ef7458ecd2f9fe2d3837d",
+      "exports": ["BoardBundle"]
+    },
+    "src/api/generated-query/public/model/boardBundleEnvelope.ts": {
+      "sha256": "7f3e27e0b31b11017c0cf698df9e3a2414a424f40be81f209c52cf3e05e91b1a",
+      "exports": ["BoardBundleEnvelope"]
     },
     "src/api/generated-query/public/model/boardCapabilities.ts": {
       "sha256": "e3f6c11881ed1b49d997a712b2c7ca5bd6a6d928d8811431d60df7c702cc4275",
@@ -16338,7 +16333,7 @@
       "exports": ["CreateWorkspaceRequest"]
     },
     "src/api/generated-query/public/model/createWorkspaceRequestData.ts": {
-      "sha256": "86c72c53f902f519e2444ad2248fd20cae2db75cfed30108e0172ff56278f806",
+      "sha256": "527d31dbd6100a128ae179388653df89d159862a2a4dab591b0d7f31dfffc0c3",
       "exports": ["CreateWorkspaceRequestData"]
     },
     "src/api/generated-query/public/model/createWorkspaceTaskRequest.ts": {
@@ -16462,7 +16457,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "256fca3e7bc1856f0d3cca7c38ec9a01ff0890a36215ec85131fb7175a2f2dbc",
+      "sha256": "a28bc9d331fa33a4fe9e324cd5d65587448b1bb67b1bda8ca7784fcd9bbcbc9a",
       "exports": []
     },
     "src/api/generated-query/public/model/initiateBillingTransferRequest.ts": {
@@ -16573,13 +16568,13 @@
       "sha256": "99c8332e3546b40f93ba82920fde3f51b4d7eac929a2cf13255de43d81237469",
       "exports": ["ListWorkspaceRewardRedemptionsParams"]
     },
-    "src/api/generated-query/public/model/listWorkspacesParams.ts": {
-      "sha256": "8c834b661c1d01ab7339d167f133911c8dce58f6717866621f04d9d220c98aec",
-      "exports": ["ListWorkspacesParams"]
-    },
     "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
       "sha256": "9f98b3560780a06017e0f7a8978ca9021529a8e709e9fb1c55de7aabf247d09e",
       "exports": ["ListWorkspaceTasksParams"]
+    },
+    "src/api/generated-query/public/model/listWorkspacesParams.ts": {
+      "sha256": "8c834b661c1d01ab7339d167f133911c8dce58f6717866621f04d9d220c98aec",
+      "exports": ["ListWorkspacesParams"]
     },
     "src/api/generated-query/public/model/lookupOrganizationMemberByEmailParams.ts": {
       "sha256": "5e5ee7d3828d1b5490b26ae7fe0f33ce98c4fb282d3e11903f94a3070404bc35",
@@ -16817,10 +16812,6 @@
       "sha256": "b623e263c7e742229443c991054278d5b392ed2bdfe7f8ac8d802cadf44d2424",
       "exports": ["PaginatedWorkspaceRewardRedemptions"]
     },
-    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
-      "sha256": "11107918c30d283a099781f7f64750ad4b8729bca52896b085f15b46eea651d0",
-      "exports": ["PaginatedWorkspaces"]
-    },
     "src/api/generated-query/public/model/paginatedWorkspaceSearchResults.ts": {
       "sha256": "ff75045f7a15b2f11417c3b3852c902723522bf06d4dafd44289bcdce66aaef4",
       "exports": ["PaginatedWorkspaceSearchResults"]
@@ -16828,6 +16819,10 @@
     "src/api/generated-query/public/model/paginatedWorkspaceTasks.ts": {
       "sha256": "a6035429da0584102e531a7ef169e43a7adcf9f37ca412beb84b3d75ae1319eb",
       "exports": ["PaginatedWorkspaceTasks"]
+    },
+    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
+      "sha256": "11107918c30d283a099781f7f64750ad4b8729bca52896b085f15b46eea651d0",
+      "exports": ["PaginatedWorkspaces"]
     },
     "src/api/generated-query/public/model/paginationMeta.ts": {
       "sha256": "149a281a793714a2495b18fe01be7fcc37d66992c98b4a05cb53e09bef730a4e",
@@ -16840,6 +16835,26 @@
     "src/api/generated-query/public/model/preconditionRequiredResponse.ts": {
       "sha256": "8c7d3d391ed79ac687f3a955332bb3c526867c89e042a9ce5f915fbd02dc7fa9",
       "exports": ["PreconditionRequiredResponse"]
+    },
+    "src/api/generated-query/public/model/publicBrandingSetting.ts": {
+      "sha256": "d0b72ca804f95b6bdc187b23acddc5618af971272bbe6fa4b4fe7fc98f1331a8",
+      "exports": ["PublicBrandingSetting"]
+    },
+    "src/api/generated-query/public/model/publicBrandingSettingEnvelope.ts": {
+      "sha256": "034f871ae202e9ee52ad53af0cf106ea08d46b04f2261cb2f31ab02ee4b62afd",
+      "exports": ["PublicBrandingSettingEnvelope"]
+    },
+    "src/api/generated-query/public/model/publicSearchEnvelope.ts": {
+      "sha256": "9552ac33963354431492b163bceaefdf94ae7c8242860b561a8030c9a180c7e1",
+      "exports": ["PublicSearchEnvelope"]
+    },
+    "src/api/generated-query/public/model/publicSearchResponse.ts": {
+      "sha256": "d8f895745012dc8e90443cfcdccb713f8f7c2a9df08fb2272085d80a2b912cdc",
+      "exports": ["PublicSearchResponse"]
+    },
+    "src/api/generated-query/public/model/publicSearchResult.ts": {
+      "sha256": "c91a8dd2e5be47dc0213a9684d1f278795ed8b45481cb7c4417b510935ae1b28",
+      "exports": ["PublicSearchResult"]
     },
     "src/api/generated-query/public/model/quoteWorkspaceTaskRequest.ts": {
       "sha256": "a65401d028588cfa6545fc382da071404b3899eb0e852e5391b249e3756f5370",
@@ -16956,6 +16971,10 @@
     "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts": {
       "sha256": "68935138506e878235de3d1609c47c73f0a4081c78da9bb1487bb13f2158b07f",
       "exports": ["SaveMediaLibraryAssetDataSource"]
+    },
+    "src/api/generated-query/public/model/searchInspirationParams.ts": {
+      "sha256": "4c31f87dc49b50e18db6b53a8cc49186cfca81f1415ebc296e5c64c4774c6b13",
+      "exports": ["SearchInspirationParams"]
     },
     "src/api/generated-query/public/model/searchWorkspaceParams.ts": {
       "sha256": "0e4ef43fab9dc74ea64cf293b17d3d7b6ccb1776e489804ab8f56df1fda4af2e",
@@ -17157,6 +17176,10 @@
       "sha256": "6dc7b1941f4694152ce1c1855f3bbb54112671577679fc335f8326a09fe04d27",
       "exports": ["UploadTargetKind"]
     },
+    "src/api/generated-query/public/model/uploadWorkspaceMediaDirectBody.ts": {
+      "sha256": "a179c6453926dad7f213d3073aaf7ef4728ad53799be2100757becef8d445dae",
+      "exports": ["UploadWorkspaceMediaDirectBody"]
+    },
     "src/api/generated-query/public/model/user.ts": {
       "sha256": "9df7ff66783d340ffb98201d61aceca1aebedfa832ae7238b1c9b3d626509481",
       "exports": ["User"]
@@ -17178,7 +17201,7 @@
       "exports": ["VisionQueryId"]
     },
     "src/api/generated-query/public/model/workspace.ts": {
-      "sha256": "6ec97f7e3ca73efbdcbc77814235d4c051ea84df9eaa9e316b688550c4077688",
+      "sha256": "5bfb55d4e30090e352d7bd05391147fc8453dedb925d7e06521b7c982a3170f0",
       "exports": ["Workspace"]
     },
     "src/api/generated-query/public/model/workspaceAccess.ts": {
@@ -17216,6 +17239,14 @@
     "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts": {
       "sha256": "4ac63b07af04c6657d6f16216c45b3da04a63d7abb67a18db737048e89171178",
       "exports": ["WorkspaceBillingQuoteEnvelope"]
+    },
+    "src/api/generated-query/public/model/workspaceBootstrap.ts": {
+      "sha256": "36bd0586eb41aaa77a0c18a3e4c29f030cff3a5495cc30a44afaa3e8a5619b36",
+      "exports": ["WorkspaceBootstrap"]
+    },
+    "src/api/generated-query/public/model/workspaceBootstrapEnvelope.ts": {
+      "sha256": "ddb0aa09624dfa2959245bd1034108de978f907f3a5e49bb7676a6253d9837dd",
+      "exports": ["WorkspaceBootstrapEnvelope"]
     },
     "src/api/generated-query/public/model/workspaceCheckoutSession.ts": {
       "sha256": "ad1d8560a35c3c5ba976809ba2763c799c62b0eaf2e482595f233dcfcccdde29",
@@ -17565,7 +17596,7 @@
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
-      "sha256": "57bbe7ca3e916b4e77c4cf492896bd2635e12370b916fe69022ae6d94ecf6af4",
+      "sha256": "c63e113b5b9fcf34fdce0ce2b6ff2cf98f6cc86f371cf7f8005d261c9ead9082",
       "exports": [
         "AcceptUserOrganizationInviteMutationError",
         "AcceptUserOrganizationInviteMutationResult",
@@ -17581,6 +17612,8 @@
         "DeclineUserWorkspaceInviteMutationVariables",
         "GetPublicBrandingLogoQueryError",
         "GetPublicBrandingLogoQueryResult",
+        "GetPublicBrandingSettingQueryError",
+        "GetPublicBrandingSettingQueryResult",
         "GetPublicUserAvatarQueryError",
         "GetPublicUserAvatarQueryResult",
         "GetSupportChannelsQueryError",
@@ -17618,6 +17651,9 @@
         "getGetPublicBrandingLogoQueryKey",
         "getGetPublicBrandingLogoQueryOptions",
         "getGetPublicBrandingLogoUrl",
+        "getGetPublicBrandingSettingQueryKey",
+        "getGetPublicBrandingSettingQueryOptions",
+        "getGetPublicBrandingSettingUrl",
         "getGetPublicUserAvatarQueryKey",
         "getGetPublicUserAvatarQueryOptions",
         "getGetPublicUserAvatarUrl",
@@ -17634,6 +17670,7 @@
         "getListUserWorkspaceInvitesQueryOptions",
         "getListUserWorkspaceInvitesUrl",
         "getPublicBrandingLogo",
+        "getPublicBrandingSetting",
         "getPublicUserAvatar",
         "getSupportChannels",
         "getUpdateUserMutationKey",
@@ -17652,6 +17689,7 @@
         "useDeclineUserOrganizationInvite",
         "useDeclineUserWorkspaceInvite",
         "useGetPublicBrandingLogo",
+        "useGetPublicBrandingSetting",
         "useGetPublicUserAvatar",
         "useGetSupportChannels",
         "useGetUser",
@@ -17961,7 +17999,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-media/workspace-media.ts": {
-      "sha256": "c7e9536a804d44a2458233a080dd99a930493c3a2dbf6c1e8804ced69dd4f2db",
+      "sha256": "7098bcce25974381423f3496c40803121085ab8a6ea562003cc1e14918c60266",
       "exports": [
         "ArchiveWorkspaceMediaAssetMutationError",
         "ArchiveWorkspaceMediaAssetMutationResult",
@@ -17992,6 +18030,10 @@
         "StageWorkspaceUploadBytesMutationError",
         "StageWorkspaceUploadBytesMutationResult",
         "StageWorkspaceUploadBytesMutationVariables",
+        "UploadWorkspaceMediaDirectMutationBody",
+        "UploadWorkspaceMediaDirectMutationError",
+        "UploadWorkspaceMediaDirectMutationResult",
+        "UploadWorkspaceMediaDirectMutationVariables",
         "archiveWorkspaceMediaAsset",
         "batchGetWorkspaceMediaAssets",
         "completeWorkspaceUpload",
@@ -18028,10 +18070,14 @@
         "getStageWorkspaceUploadBytesMutationKey",
         "getStageWorkspaceUploadBytesMutationOptions",
         "getStageWorkspaceUploadBytesUrl",
+        "getUploadWorkspaceMediaDirectMutationKey",
+        "getUploadWorkspaceMediaDirectMutationOptions",
+        "getUploadWorkspaceMediaDirectUrl",
         "getWorkspaceMediaAsset",
         "getWorkspaceUpload",
         "listWorkspaceMediaAssets",
         "stageWorkspaceUploadBytes",
+        "uploadWorkspaceMediaDirect",
         "useArchiveWorkspaceMediaAsset",
         "useBatchGetWorkspaceMediaAssets",
         "useCompleteWorkspaceUpload",
@@ -18041,7 +18087,8 @@
         "useGetWorkspaceMediaAsset",
         "useGetWorkspaceUpload",
         "useListWorkspaceMediaAssets",
-        "useStageWorkspaceUploadBytes"
+        "useStageWorkspaceUploadBytes",
+        "useUploadWorkspaceMediaDirect"
       ]
     },
     "src/api/generated-query/public/workspace-members/workspace-members.ts": {
@@ -18158,23 +18205,30 @@
       ]
     },
     "src/api/generated-query/public/workspace-search/workspace-search.ts": {
-      "sha256": "cf53e6bc4d78a26f3a624cd4eb30c0fd04fd10ae84ac08b8d7f03d3f88c23004",
+      "sha256": "43a01193645d5a08533afa8307b96a34cf3ca061a9ef9e799d07944001910d17",
       "exports": [
         "CreateWorkspaceVisionQueryMutationBody",
         "CreateWorkspaceVisionQueryMutationError",
         "CreateWorkspaceVisionQueryMutationResult",
         "CreateWorkspaceVisionQueryMutationVariables",
+        "SearchInspirationQueryError",
+        "SearchInspirationQueryResult",
         "SearchWorkspaceQueryError",
         "SearchWorkspaceQueryResult",
         "createWorkspaceVisionQuery",
         "getCreateWorkspaceVisionQueryMutationKey",
         "getCreateWorkspaceVisionQueryMutationOptions",
         "getCreateWorkspaceVisionQueryUrl",
+        "getSearchInspirationQueryKey",
+        "getSearchInspirationQueryOptions",
+        "getSearchInspirationUrl",
         "getSearchWorkspaceQueryKey",
         "getSearchWorkspaceQueryOptions",
         "getSearchWorkspaceUrl",
+        "searchInspiration",
         "searchWorkspace",
         "useCreateWorkspaceVisionQuery",
+        "useSearchInspiration",
         "useSearchWorkspace"
       ]
     },
@@ -18232,7 +18286,7 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "10a07eb236894df2b673d9b5c6d02fdd093ccbf7adb5caf82d9bcf408e43aa1f",
+      "sha256": "b7508e5a4e7cb28e5082abc36066449e2e08777923b71dc696a4597d12d98282",
       "exports": [
         "CreateWorkspaceMutationBody",
         "CreateWorkspaceMutationError",
@@ -18241,6 +18295,8 @@
         "DeleteWorkspaceMutationError",
         "DeleteWorkspaceMutationResult",
         "DeleteWorkspaceMutationVariables",
+        "GetWorkspaceBootstrapQueryError",
+        "GetWorkspaceBootstrapQueryResult",
         "GetWorkspaceQueryError",
         "GetWorkspaceQueryResult",
         "ListWorkspacesQueryError",
@@ -18257,6 +18313,9 @@
         "getDeleteWorkspaceMutationKey",
         "getDeleteWorkspaceMutationOptions",
         "getDeleteWorkspaceUrl",
+        "getGetWorkspaceBootstrapQueryKey",
+        "getGetWorkspaceBootstrapQueryOptions",
+        "getGetWorkspaceBootstrapUrl",
         "getGetWorkspaceQueryKey",
         "getGetWorkspaceQueryOptions",
         "getGetWorkspaceUrl",
@@ -18267,11 +18326,13 @@
         "getUpdateWorkspaceMutationOptions",
         "getUpdateWorkspaceUrl",
         "getWorkspace",
+        "getWorkspaceBootstrap",
         "listWorkspaces",
         "updateWorkspace",
         "useCreateWorkspace",
         "useDeleteWorkspace",
         "useGetWorkspace",
+        "useGetWorkspaceBootstrap",
         "useListWorkspaces",
         "useUpdateWorkspace"
       ]
