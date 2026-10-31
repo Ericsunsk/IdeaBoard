@@ -16,12 +16,11 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/boards"
-	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
@@ -113,7 +112,6 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 	env := openWorkspaceIntegrationEnv(t)
 	ctx := context.Background()
 	boardStore := boards.NewPostgresWorkspaceBoardStore(env.pool, workspacemedia.ValidateDocumentAssets)
-	authorizer := &boardtaskaccess.Authorizer{Store: boardStore}
 
 	service, _, _ := newWorkerIntegrationService(env)
 	_ = service
@@ -125,7 +123,7 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		Assets:        assets,
 		Resolver:      allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
-		Acceptance:    &workerTestAcceptance{boards: authorizer, assets: assets},
+		Acceptance:    env.acceptance,
 	})
 
 	boardID, err := boards.NewV1BoardPublicID()

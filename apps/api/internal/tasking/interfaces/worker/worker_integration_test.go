@@ -25,8 +25,8 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/media/workspacemedia"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
@@ -43,7 +43,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*taskapp.Service
 		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
-		Acceptance:    &workerTestAcceptance{assets: assets},
+		Acceptance:    env.acceptance,
 	})
 	return service, holder, queue
 }

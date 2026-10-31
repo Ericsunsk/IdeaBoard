@@ -19,10 +19,10 @@ import (
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
-	tasks "ideaboard/api/internal/tasking/domain"
-	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
 
@@ -469,14 +469,15 @@ CREATE INDEX idx_board_access_event_outbox_delivered
 `
 
 type workspaceIntegrationEnv struct {
-	pool  *pgxpool.Pool
-	lib   *librarypostgres.Service
-	media *workspacemedia.Service
-	tasks *taskpostgres.Store
-	wsA   string
-	wsB   string
-	userA int64
-	userB int64
+	pool       *pgxpool.Pool
+	acceptance *workspacemedia.TaskSubmissionAuthorizer
+	lib        *librarypostgres.Service
+	media      *workspacemedia.Service
+	tasks      *taskpostgres.Store
+	wsA        string
+	wsB        string
+	userA      int64
+	userB      int64
 }
 
 const workspaceIntegrationChecksum = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
@@ -515,10 +516,59 @@ func openWorkspaceIntegrationEnv(t *testing.T) *workspaceIntegrationEnv {
 		t.Fatal(err)
 	}
 	boardStore := boards.NewPostgresWorkspaceBoardStore(pool, workspacemedia.ValidateDocumentAssets)
+	taskBoards := &boardtaskaccess.Authorizer{Store: boardStore}
 	return &workspaceIntegrationEnv{
-		pool: pool, lib: librarypostgres.NewService(pool, &workspacemedia.LibraryPublicationAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}}),
-		media: workspacemedia.NewService(pool), tasks: taskpostgres.NewStore(pool),
+		pool:       pool,
+		acceptance: &workspacemedia.TaskSubmissionAuthorizer{Boards: boardStore, TaskBoards: taskBoards},
+		lib:        librarypostgres.NewService(pool, &workspacemedia.LibraryPublicationAuthorizer{Boards: boardStore, TaskBoards: taskBoards}),
+		media:      workspacemedia.NewService(pool), tasks: taskpostgres.NewStore(pool),
 		wsA: wsA, wsB: wsB, userA: userA, userB: userB,
+	}
+}
+
+// A single pool connection makes an escaped acceptance read fail promptly
+// instead of silently borrowing a second connection outside settlement.
+func TestWorkerAcceptanceUsesSettlementTransaction(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	if got := env.pool.Config().MaxConns; got != 1 {
+		t.Fatalf("pool connections = %d, want 1 to expose reads outside settlement", got)
+	}
+	ctx := context.Background()
+	asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "tx-input.png")
+	boardStore := boards.NewPostgresWorkspaceBoardStore(env.pool, workspacemedia.ValidateDocumentAssets)
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := boardStore.CreateBoard(ctx, env.wsA, env.userA, "Acceptance transaction", boardID); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		input tasks.CreateInput
+	}{
+		{name: "board", input: tasks.CreateInput{BoardID: boardID}},
+		{name: "input asset", input: tasks.CreateInput{MediaAssetIDs: []string{asset.ID}}},
+		{name: "mask asset", input: tasks.CreateInput{Params: map[string]any{"mask_asset_id": asset.ID}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			tx, err := env.pool.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback(context.Background())
+			input := tc.input
+			input.WorkspaceID, input.OwnerUserID, input.WorkspaceRole = env.wsA, env.userA, "owner"
+			binding, err := env.acceptance.AuthorizeSubmission(ctx, tx, input)
+			if err != nil {
+				t.Fatalf("acceptance must reuse the only connection held by settlement: %v", err)
+			}
+			if binding.BoardID != input.BoardID {
+				t.Fatalf("binding = %+v, want board %q", binding, input.BoardID)
+			}
+		})
 	}
 }
 
@@ -875,7 +925,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: quoter, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
-		Acceptance:    &workerTestAcceptance{assets: assets},
+		Acceptance:    env.acceptance,
 	})
 
 	created, err := service.Create(ctx, tasks.CreateInput{
