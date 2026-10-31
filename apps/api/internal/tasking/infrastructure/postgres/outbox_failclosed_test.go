@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -19,18 +19,18 @@ func TestInsertTaskOutboxNilFailsClosed(t *testing.T) {
 	// Bypass NewStore (which always wires the outbox) to simulate a
 	// mis-wired settlement Store.
 	bare := &Store{}
-	task := &workspacetasks.WorkspaceTask{
+	task := &tasks.WorkspaceTask{
 		ID: "task_outbox_nil", WorkspaceID: "ws_outbox_nil",
-		Status: workspacetasks.StatusCompleted,
+		Status: tasks.StatusCompleted,
 	}
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := bare.insertTaskOutboxTx(ctx, tx, task, workspacetasks.StatusCompleted, "task.completed", nil); err == nil {
+	if err := bare.insertTaskOutboxTx(ctx, tx, task, tasks.StatusCompleted, "task.completed", nil); err == nil {
 		t.Fatal("insertTaskOutboxTx(nil outbox) succeeded, want fail-closed error")
-	} else if !errors.Is(err, workspacetasks.ErrSettlementUnavailable) {
+	} else if !errors.Is(err, tasks.ErrSettlementUnavailable) {
 		t.Fatalf("insertTaskOutboxTx err = %v, want ErrSettlementUnavailable", err)
 	}
 	_ = tx.Rollback(ctx)

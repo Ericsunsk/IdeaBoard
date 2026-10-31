@@ -6,7 +6,7 @@ import { collectTouchProfileViolations } from '../../scripts/checkTouchTargetCon
 const theme = `${readFileSync(new URL('../theme/theme.css', import.meta.url), 'utf8')}\n${readFileSync(new URL('../theme/tokens/primitives.css', import.meta.url), 'utf8')}`
 const targets = readFileSync(new URL('../theme/atoms/touch-target.css', import.meta.url), 'utf8')
 const controls = readFileSync(
-  new URL('../features/admin/shared/core/uiClasses.ts', import.meta.url),
+  new URL('../features/admin/shared/ui/styling/uiClasses.ts', import.meta.url),
   'utf8',
 )
 
@@ -117,5 +117,10 @@ describe('touch profile routing contract', () => {
     expect(collectTouchProfileViolations(theme, changed, controls).join('\n')).toContain(
       'without an overlapping pseudo-element',
     )
+  })
+
+  it('pins the coarse profile to the 44px literal', () => {
+    expect(theme).toContain('--primitive-size-44: 44px')
+    expect(theme).toMatch(/--spacing-touch-target-coarse:\s*var\(--primitive-size-44\)/)
   })
 })

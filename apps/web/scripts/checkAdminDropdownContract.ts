@@ -233,13 +233,13 @@ for (const rel of Object.keys(LISTBOX_IMPLEMENTATIONS)) {
 /* 3. Geometry must come from the shared skin, not be re-inlined         */
 /* ------------------------------------------------------------------ */
 
-const skinFile = join(ADMIN_SHARED, 'core/adminSelectSkin.ts')
+const skinFile = join(ADMIN_SHARED, 'ui/styling/adminSelectSkin.ts')
 const skin = readFileSync(skinFile, 'utf8')
 
 const skinConsumers = [...listVueFiles(ADMIN_ROOT), skinFile]
 for (const file of skinConsumers) {
   const rel = relOf(file)
-  if (rel.endsWith('core/adminSelectSkin.ts')) continue
+  if (rel.endsWith('ui/styling/adminSelectSkin.ts')) continue
   const source = readFileSync(file, 'utf8')
   if (!/from ['"].*adminSelectSkin/.test(source)) continue
 
@@ -268,7 +268,7 @@ const requiredSkinPieces = [
 for (const piece of requiredSkinPieces) {
   if (!skin.includes(piece)) {
     violations.push(
-      `core/adminSelectSkin.ts: missing \`${piece}\`. Every dropdown trigger must expose a visible focus indicator.`,
+      `ui/styling/adminSelectSkin.ts: missing \`${piece}\`. Every dropdown trigger must expose a visible focus indicator.`,
     )
   }
 }

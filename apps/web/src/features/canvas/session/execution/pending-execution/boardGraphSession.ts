@@ -1,5 +1,6 @@
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../../board/ports/canvas'
-import { CanvasGraphSession, type CanvasGraphStore } from '../../../core/graph'
+import type { CanvasGraphStore } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import type { BoardAttachment, BoardSessionIdentity } from '../board-attachment'
 import type { MediaRef } from '../../../../../core/media/mediaRef'
 

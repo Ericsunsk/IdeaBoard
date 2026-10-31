@@ -275,7 +275,7 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'node action button',
-    rel: 'features/canvas/ui/nodes/primitives/NodeActionButton.vue',
+    rel: 'features/canvas/ui/nodes/primitives/tools/NodeActionButton.vue',
     pattern: /\bmin-h-7\b/,
     fix: 'carry `hit-target-32-inline` so node chrome keeps its compact height',
   },
@@ -290,7 +290,7 @@ const RULES: Rule[] = [
     // Was `opt-in` on `!size-7`; the compact icon button is now `!size-8`.
     kind: 'required',
     label: 'compact admin icon button',
-    rel: 'features/admin/shared/core/uiClasses.ts',
+    rel: 'features/admin/shared/ui/styling/uiClasses.ts',
     // Pinned to the compact-button token, not a bare `!size-8` occurrence, so the
     // rule still says something if a *different* token in this large module
     // happens to be 8x8.
@@ -452,7 +452,7 @@ function main(): void {
     ...collectTouchProfileViolations(
       themeEntry,
       readFileSync(join(SRC_ROOT, 'theme/atoms/touch-target.css'), 'utf8'),
-      readFileSync(join(SRC_ROOT, 'features/admin/shared/core/uiClasses.ts'), 'utf8'),
+      readFileSync(join(SRC_ROOT, 'features/admin/shared/ui/styling/uiClasses.ts'), 'utf8'),
     ),
   )
 

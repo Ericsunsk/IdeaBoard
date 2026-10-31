@@ -199,8 +199,10 @@ Rules:
   walks the full role × surface matrix, compositing alpha values the way the
   browser does.
 
-Enforcement: `src/features/admin/shared/core/textRampContrast.contract.spec.ts`.
-A token edit that drops any role below its floor, collapses two rungs, breaks an
+Enforcement: `src/features/admin/shared/core/textRampContrast.contract.spec.ts`
+(role × surface matrix, binding headroom, and ramp separation), alongside
+`src/test/tokenEngine.browser.spec.ts` (live paint) and `scripts/checkTokenGraph.ts`
+(`lint:token-graph`). A token edit that drops any role below its floor, collapses two rungs, breaks an
 alias, or desynchronizes `adminThemeTokenFallbacks` from `theme/theme.css` fails the
 web test lane.
 

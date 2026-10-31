@@ -10,7 +10,7 @@ import type {
 } from '../../../../board'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
 import type { MediaRef } from '../../../../../core/media/mediaRef'

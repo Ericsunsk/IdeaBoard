@@ -32,7 +32,6 @@ import (
 
 	"ideaboard/api/internal/platform/telemetry"
 	tasks "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow/paramkeys"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -40,7 +39,7 @@ import (
 
 // generate runs the provider seam. A nil provider fails closed with a clear
 // message (tasks converge to failed, never strand).
-func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks.WorkspaceTask, retryLayer string, attemptNumber int32) ([]workspacetasks.OutputRef, error) {
+func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *tasks.WorkspaceTask, retryLayer string, attemptNumber int32) ([]tasks.OutputRef, error) {
 	if attemptNumber <= 0 {
 		attemptNumber = int32(task.RetryCount + 1)
 	}
@@ -56,12 +55,12 @@ func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks
 		return nil, err
 	}
 	for _, ref := range outputs {
-		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
+		if err := tasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgGenerate2, err)
 		}
 	}
-	if len(outputs) > workspacetasks.MaxOutputsPerTask {
-		return nil, fmt.Errorf(errorrender.MsgGenerate3, workspacetasks.MaxOutputsPerTask)
+	if len(outputs) > tasks.MaxOutputsPerTask {
+		return nil, fmt.Errorf(errorrender.MsgGenerate3, tasks.MaxOutputsPerTask)
 	}
 	return outputs, nil
 }
@@ -72,8 +71,8 @@ func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks
 func (w *WorkspaceTaskWorker) completeExecution(
 	ctx context.Context,
 	send *workspaceSend,
-	claimed *workspacetasks.WorkspaceTask,
-	outputs []workspacetasks.OutputRef,
+	claimed *tasks.WorkspaceTask,
+	outputs []tasks.OutputRef,
 	model string,
 ) error {
 	workspaceID, taskID := claimed.WorkspaceID, claimed.ID
@@ -92,7 +91,7 @@ func (w *WorkspaceTaskWorker) completeExecution(
 	send.finishCompleted(model)
 	completed, err := w.settler.Complete(ctx, workspaceID, taskID, outputs)
 	if err != nil {
-		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+		if errors.Is(err, tasks.ErrStateConflict) || errors.Is(err, tasks.ErrNotFound) {
 			slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
 			if len(outputs) > 0 {
 				w.compensateUnsettledOutputs(ctx, claimed, outputs)
@@ -139,7 +138,7 @@ const workspaceSettlementCleanupTimeout = 5 * time.Second
 // claim token, its durable attempt fact, and its Credit hold, so the state is
 // fully attributable and an operator can settle it. Returning nil here is
 // what caps one submission at ONE billed send.
-func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.WorkspaceTask, reason string) *workspacetasks.WorkspaceTask {
+func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *tasks.WorkspaceTask, reason string) *tasks.WorkspaceTask {
 	if task == nil {
 		return nil
 	}
@@ -161,16 +160,16 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 			}
 		}
 		tried = i
-		var failed *workspacetasks.WorkspaceTask
+		var failed *tasks.WorkspaceTask
 		if failed, err = w.settler.Fail(cleanupCtx, task.WorkspaceID, task.ID, reason); err == nil {
 			slog.Warn("workspace task terminally failed after an unsettled billed send",
 				"task_id", task.ID, "reason", reason, "attempts", tried)
-			if failed != nil && failed.Status == workspacetasks.StatusFailed {
+			if failed != nil && failed.Status == tasks.StatusFailed {
 				return failed
 			}
 			return nil
 		}
-		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+		if errors.Is(err, tasks.ErrStateConflict) || errors.Is(err, tasks.ErrNotFound) {
 			slog.Info("workspace task converged while settling an unsettled send; dropping",
 				"task_id", task.ID, "err", err)
 			return nil
@@ -191,14 +190,14 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 // task or when completion converged with unsettled rendered outputs.
 // The renderer restricts cleanup to this execution's ingestion receipts.
 // Unknown outcomes keep assets live instead of risking a committed reference.
-func (w *WorkspaceTaskWorker) compensateUnsettledOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) {
+func (w *WorkspaceTaskWorker) compensateUnsettledOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) {
 	if w.renderer == nil {
 		return
 	}
 	compensateTask := task
-	if compensateTask != nil && compensateTask.Status != workspacetasks.StatusFailed {
+	if compensateTask != nil && compensateTask.Status != tasks.StatusFailed {
 		cloned := *compensateTask
-		cloned.Status = workspacetasks.StatusFailed
+		cloned.Status = tasks.StatusFailed
 		compensateTask = &cloned
 	}
 	if err := w.renderer.CompensateRenderedOutputs(ctx, compensateTask, outputs); err != nil {
@@ -210,7 +209,7 @@ func (w *WorkspaceTaskWorker) compensateUnsettledOutputs(ctx context.Context, ta
 // saveCompletedTask saves managed references after commit. The Task is
 // already complete: failures are warn-logged and swallowed so a completed
 // task never requeues through River.
-func (w *WorkspaceTaskWorker) saveCompletedTask(ctx context.Context, completed *workspacetasks.WorkspaceTask) {
+func (w *WorkspaceTaskWorker) saveCompletedTask(ctx context.Context, completed *tasks.WorkspaceTask) {
 	if w.librarySaver == nil || completed == nil {
 		return
 	}
@@ -258,7 +257,7 @@ func NewWorkspaceGatewayProvider(caller WorkspaceGatewayCaller) WorkspaceTaskPro
 // snapshot-derived target the worker stamped onto the transient task
 // copy before calling: the bridge never resolves a model itself and
 // never consults the live pool or admin mapping.
-func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	if p == nil || p.caller == nil {
 		return nil, errors.New(errorrender.MsgGenerate4)
 	}
@@ -284,7 +283,7 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspace
 // workspaceBridgeTaskPayload synthesizes the gateway payload from the
 // durable canonical plan. The executor still owns dialect shaping and
 // materialization; an absent or invalid canonical plan fails closed.
-func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.TaskPayload, error) {
+func workspaceBridgeTaskPayload(task *tasks.WorkspaceTask) (*tasks.TaskPayload, error) {
 	if task == nil || strings.TrimSpace(task.ID) == "" {
 		return nil, errors.New(errorrender.MsgWorkspaceBridgeTaskPayload)
 	}
@@ -328,18 +327,18 @@ func workspaceBridgePrompt(typed *tasks.WorkflowTaskParams) string {
 }
 
 // mapWorkspaceProviderOutputs accepts only asset outputs ingested by the executor.
-func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]workspacetasks.OutputRef, error) {
-	refs := make([]workspacetasks.OutputRef, 0, len(outputs))
+func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]tasks.OutputRef, error) {
+	refs := make([]tasks.OutputRef, 0, len(outputs))
 	for _, out := range outputs {
 		if strings.TrimSpace(out.AssetID) == "" {
 			return nil, errors.New(errorrender.MsgMapWorkspaceProviderOutputs)
 		}
-		ref := workspacetasks.OutputRef{
-			Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(out.AssetID),
+		ref := tasks.OutputRef{
+			Kind: tasks.OutputKindAsset, AssetID: strings.TrimSpace(out.AssetID),
 			Role: strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
 			Width: int32(out.Width), Height: int32(out.Height), MIMEType: strings.TrimSpace(out.MIMEType),
 		}
-		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
+		if err := tasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgMapWorkspaceProviderOutputs2, err)
 		}
 		refs = append(refs, ref)

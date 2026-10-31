@@ -3,7 +3,7 @@ import { effectScope } from 'vue'
 import { createBoardSessionRepository } from '../../../canvas/session/board-session'
 import { queryClient } from '../../../../core/query/queryClient'
 import { clearStoredAuth } from '../../../../core/utils/auth'
-import { resetWorkspaceEventStreamsForTests } from '../../../../api/workspaceEventStream'
+import { resetWorkspaceEventStreamsForTests } from '@/api/realtime/workspaceEventStream'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import {
   createMockWorkspaceBoardApiRequest,
@@ -27,7 +27,7 @@ import { createBoardRepository, type BoardRepository } from './repository'
 const WORKSPACE_ID = 'ws_query123'
 const OTHER_WORKSPACE_ID = 'ws_other999'
 const mocks = vi.hoisted(() => ({ request: vi.fn() }))
-vi.mock('../../../../api/client', () => ({ api: { request: mocks.request } }))
+vi.mock('@/api/http/client', () => ({ api: { request: mocks.request } }))
 
 class MockEventSource {
   static instances: MockEventSource[] = []

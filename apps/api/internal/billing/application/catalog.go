@@ -17,7 +17,7 @@ import (
 // is the single transaction-aware quote entry: callers pass the
 // transaction they hold (nil when they hold none) and the store decides
 // borrow vs. pool internally, so the submission single-transaction
-// boundary (see tasking/workspacetasks) keeps its snapshot without
+// boundary (see tasking/application/workspacetasks) keeps its snapshot without
 // callers remembering "am I in a tx".
 type CatalogStore interface {
 	ListCatalogFacts(context.Context) ([]billing.CatalogItem, error)

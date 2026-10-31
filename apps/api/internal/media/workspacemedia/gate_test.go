@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 )
 
 // GateAsset is the single media readiness gate: every media-side check
@@ -22,13 +22,13 @@ func TestGateAssetMatrix(t *testing.T) {
 	if err := GateAsset(ready); err != nil {
 		t.Fatalf("ready err = %v, want nil", err)
 	}
-	if err := GateAsset(nil); !errors.Is(err, workspacetasks.ErrMediaNotFound) {
+	if err := GateAsset(nil); !errors.Is(err, taskdomain.ErrMediaNotFound) {
 		t.Fatalf("nil err = %v, want media_not_found", err)
 	}
-	if err := GateAsset(archived); !errors.Is(err, workspacetasks.ErrMediaArchived) {
+	if err := GateAsset(archived); !errors.Is(err, taskdomain.ErrMediaArchived) {
 		t.Fatalf("archived err = %v, want media_archived", err)
 	}
-	if err := GateAsset(pending); !errors.Is(err, workspacetasks.ErrMediaNotReady) {
+	if err := GateAsset(pending); !errors.Is(err, taskdomain.ErrMediaNotReady) {
 		t.Fatalf("pending err = %v, want media_not_ready", err)
 	}
 }

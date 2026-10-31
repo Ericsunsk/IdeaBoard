@@ -10,7 +10,7 @@
 // Tasking keeps ownership of the enqueue/runtime store seam
 // (internal/tasking/infrastructure/queue.RiverQueue and the workspace
 // enqueuer); provider-level requeue semantics stay with
-// internal/tasking/workspacetasks (MaxProviderRequeues). This package never
+// internal/tasking/domain (MaxProviderRequeues). This package never
 // becomes a generic queue framework: no client wrapper, no enqueue helper,
 // only typed policy facts.
 package riverpolicy

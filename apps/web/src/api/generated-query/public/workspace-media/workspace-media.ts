@@ -46,7 +46,7 @@ import type {
   UploadWorkspaceMediaDirectBody,
 } from '../model'
 
-import { publicMutator } from '../../../publicMutator'
+import { publicMutator } from '../../../http/publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 

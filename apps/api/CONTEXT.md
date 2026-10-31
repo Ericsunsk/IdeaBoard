@@ -55,7 +55,7 @@ Code under `apps/api` is organized as runtime/platform/business contexts. This f
 | Upload Session            | Coordination of one image upload through transfer, completion, failure, or expiry; not the resulting Media Asset.                              |
 | Media Asset               | A managed image identity within a Workspace, with validated original-image facts and an independent lifecycle.                                 |
 
-Qualify overloaded terms with their context: Auth Session, Upload Session, Checkout Session, Board Session; Library Asset or Media Asset; Workspace Billing Account or Credit Account. Use `Service` for the product capability, not a Provider Model or a running server process.
+Qualify overloaded terms with their context: Auth Session, Upload Session, Checkout Session, Board Session; Library Asset or Media Asset; consumption Workspace or Credit Account. Use `Service` for the product capability, not a Provider Model or a running server process. Funds vocabulary follows [GLOSSARY.md](../../GLOSSARY.md): a Workspace records the consumption position and is never a funds identity.
 
 Workflow uses `feature` in its registry and Feature Prompt names; the shared product capability is the same Service, not a second catalog. Generation as a context owns routing for all image Services; the `generation` Service is one capability within that set.
 

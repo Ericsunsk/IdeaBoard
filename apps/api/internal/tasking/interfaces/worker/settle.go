@@ -42,7 +42,9 @@ import (
 
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/riverpolicy"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/riverqueue/river"
 )
@@ -63,7 +65,7 @@ func (w *WorkspaceTaskWorker) executeModelFallback(
 	tracker *workspaceSendTracker,
 	first *workspaceSend,
 	snap routing.RoutingSnapshot,
-	claimed *workspacetasks.WorkspaceTask,
+	claimed *tasks.WorkspaceTask,
 	model string,
 	firstErr error,
 ) (error, bool) {
@@ -106,18 +108,18 @@ func (w *WorkspaceTaskWorker) executeModelFallback(
 func (w *WorkspaceTaskWorker) convergeSendFailure(
 	ctx context.Context,
 	send *workspaceSend,
-	claimed *workspacetasks.WorkspaceTask,
+	claimed *tasks.WorkspaceTask,
 	failure routing.AttemptFailure,
 	genErr error,
 	fallbackUsed bool,
 ) error {
 	workspaceID, taskID := claimed.WorkspaceID, claimed.ID
 	retryable := failure.Retryable()
-	if workspacetasks.ShouldRetry(claimed.RetryCount, retryable) {
+	if tasks.ShouldRetry(claimed.RetryCount, retryable) {
 		stage, category := workspaceFailureStageCategory(failure)
 		send.finishRequeued(stage, category, workspaceFailureMessage(genErr))
 		if _, err := w.settler.Retry(ctx, workspaceID, taskID, retryable); err != nil {
-			if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+			if errors.Is(err, tasks.ErrStateConflict) || errors.Is(err, tasks.ErrNotFound) {
 				slog.Info("workspace task converged during retry; dropping", "task_id", taskID, "err", err)
 				return nil
 			}
@@ -135,9 +137,9 @@ func (w *WorkspaceTaskWorker) convergeSendFailure(
 
 // failTerminal converges one deterministic failure. Converged rows (a cancel
 // landing mid-flight) drop the job instead of erroring.
-func (w *WorkspaceTaskWorker) failTerminal(ctx context.Context, task *workspacetasks.WorkspaceTask, reason string) error {
+func (w *WorkspaceTaskWorker) failTerminal(ctx context.Context, task *tasks.WorkspaceTask, reason string) error {
 	if _, err := w.settler.Fail(ctx, task.WorkspaceID, task.ID, reason); err != nil {
-		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+		if errors.Is(err, tasks.ErrStateConflict) || errors.Is(err, tasks.ErrNotFound) {
 			slog.Info("workspace task converged before failure writeback; dropping", "task_id", task.ID, "err", err)
 			return nil
 		}
@@ -164,7 +166,7 @@ func workspaceFailureMessage(err error) string {
 // --- stalled-settlement sweep (from task_settlement_sweep.go): scan-driven final convergence ---
 
 // taskSettlementSweepPeriod is how often the sweep runs. The staleness
-// threshold (workspacetasks.StalledSettlementThreshold, 24h) decides WHEN a
+// threshold (taskapp.StalledSettlementThreshold, 24h) decides WHEN a
 // task becomes a candidate; this only decides how long after that an operator
 // waits. 15 minutes keeps the post-threshold window negligible while running a
 // single indexed, LIMIT-bounded query per period.
@@ -177,7 +179,7 @@ func (taskSettlementSweepArgs) Kind() string { return "task_settlement_sweep" }
 // TaskSettlementSweepStore is the read-only discovery seam the sweep needs.
 // *taskpostgres.Store satisfies it; the sweep never writes through it.
 type TaskSettlementSweepStore interface {
-	workspacetasks.StalledSettlementScanner
+	taskports.StalledSettlementScanner
 }
 
 // TaskSettlementSweepSettler is the terminal seam the sweep converges through.
@@ -186,7 +188,7 @@ type TaskSettlementSweepStore interface {
 // a swept task publishes its task.failed event through the same post-commit
 // path as any other failure.
 type TaskSettlementSweepSettler interface {
-	workspacetasks.StalledSettlementFailer
+	taskports.StalledSettlementFailer
 }
 
 // TaskSettlementSweepWorker converges abandoned Credit Holds.
@@ -225,13 +227,13 @@ func (*TaskSettlementSweepWorker) MaxAttempts(*river.Job[taskSettlementSweepArgs
 // abandoned hold locked.
 func (w *TaskSettlementSweepWorker) Work(ctx context.Context, _ *river.Job[taskSettlementSweepArgs]) error {
 	if w == nil || w.store == nil || w.settler == nil {
-		return workspacetasks.ErrSettlementUnavailable
+		return tasks.ErrSettlementUnavailable
 	}
-	report, err := workspacetasks.ConvergeStalledSettlements(ctx, workspacetasks.StalledConvergenceDeps{
+	report, err := taskapp.ConvergeStalledSettlements(ctx, taskapp.StalledConvergenceDeps{
 		Scanner:       w.store,
 		Failer:        w.settler,
-		StalledBefore: w.nowTime().Add(-workspacetasks.StalledSettlementThreshold),
-		Limit:         workspacetasks.StalledSettlementSweepBatch,
+		StalledBefore: w.nowTime().Add(-taskapp.StalledSettlementThreshold),
+		Limit:         taskapp.StalledSettlementSweepBatch,
 	})
 	for _, failure := range report.Failures {
 		// Logged at Error: this is the signal that a user's credits are still
@@ -245,7 +247,7 @@ func (w *TaskSettlementSweepWorker) Work(ctx context.Context, _ *river.Job[taskS
 		slog.Info("stalled task settlement sweep completed",
 			"scanned", report.Scanned, "converged", report.Converged,
 			"skipped", report.Skipped, "failures", len(report.Failures),
-			"stalled_after", workspacetasks.StalledSettlementThreshold)
+			"stalled_after", taskapp.StalledSettlementThreshold)
 	}
 	return err
 }

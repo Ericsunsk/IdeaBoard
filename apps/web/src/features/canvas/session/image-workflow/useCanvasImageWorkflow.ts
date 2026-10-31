@@ -3,7 +3,7 @@ import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type {
   ActiveNodePanel,
   ActiveNodePanelKind,
-} from '../../ui/screens/useFlowActiveNodePanels.ts'
+} from '../../ui/screens/controllers/useFlowActiveNodePanels.ts'
 import type { OutpaintDragAnchor } from '../../tools/outpaint/session/useImageOutpaintOverlay'
 import { useImageOutpaintOverlay } from '../../tools/outpaint/session/useImageOutpaintOverlay'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'

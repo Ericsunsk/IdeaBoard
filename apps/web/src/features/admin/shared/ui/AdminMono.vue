@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
-import { adminMonoClass } from '../core/cellClasses'
+import { adminMonoClass } from './styling/cellClasses'
 
 // 数字 / 金额 / 日期 / 单号单元格原子：只收口 font-mono，
 // 字号 / 颜色 / 粗细 / tabular / nowrap 由调用方 class 透传（零行为迁移）。

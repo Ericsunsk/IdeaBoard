@@ -4,9 +4,9 @@ import {
   buildContractRequestHeaders,
   newRequestId,
   requireContractData,
-} from '../../../../api/contractKernel'
-import { toSessionUser } from '../../../../api/userSession'
-import type { User } from '../../../../api/sessionUserType'
+} from '@/api/http/contractKernel'
+import { toSessionUser } from '@/api/http/userSession'
+import type { User } from '@/api/http/sessionUserType'
 import { i18n } from '../../../../core/i18n'
 import { withSignal } from '../../../../core/utils/request'
 

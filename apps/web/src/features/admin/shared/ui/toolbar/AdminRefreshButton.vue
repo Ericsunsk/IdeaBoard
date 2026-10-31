@@ -13,7 +13,7 @@
 
 <script setup lang="ts">
 import { Refresh } from '@iconoir/vue'
-import { adminToolbarButtonClass } from '../../core/uiClasses'
+import { adminToolbarButtonClass } from '../styling/uiClasses'
 
 const props = withDefaults(
   defineProps<{

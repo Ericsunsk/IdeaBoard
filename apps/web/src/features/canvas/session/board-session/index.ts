@@ -15,3 +15,4 @@ export {
 export { createBoardAutosavePolicy } from './autosavePolicy'
 export { readCurrentBoardIdRef } from './currentBoardId'
 export { createBoardSessionRepository, type BoardSessionRepository } from './repository'
+export { CanvasGraphSession } from './canvasGraphSession'

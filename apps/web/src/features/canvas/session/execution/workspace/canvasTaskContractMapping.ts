@@ -10,8 +10,8 @@
 // catalog and resolutions parse through the shared `parseOutputResolution`
 // catalog. There is no local service/resolution enum here.
 
-import { isOpaqueId, opaqueIdPrefix } from '../../../../../api/contractKernel'
-import type { CreateWorkspaceTaskInput } from '../../../../../api/workspaceTaskContract'
+import { isOpaqueId, opaqueIdPrefix } from '@/api/http/contractKernel'
+import type { CreateWorkspaceTaskInput } from '@/api/tasks/workspaceTaskContract'
 import { SERVICE_SLUGS, type Service } from '../../../../../core/contracts/imageServices'
 import {
   parseOutputResolution,

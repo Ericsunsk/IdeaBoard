@@ -12,13 +12,13 @@ import {
   isOpaqueId,
   newRequestId,
   opaqueIdPrefix,
-} from '../../../../api/contractKernel'
-import { workspaceBillingTransferIdempotencyKey } from '../../../../api/idempotencyKey'
+} from '@/api/http/contractKernel'
+import { workspaceBillingTransferIdempotencyKey } from '@/api/http/idempotencyKey'
 import { withSignal } from '../../../../core/utils/request'
 import { asTrimmedString, isRecord } from '../../../../core/utils/guards'
 import { i18n } from '../../../../core/i18n'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
-import type { AuthFailureMode } from '../../../../api/client'
+import type { AuthFailureMode } from '@/api/http/client'
 
 // Studio handover invitations (#948, invite-style ownership transfer).
 //

@@ -23,7 +23,9 @@ import (
 
 	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/platform/telemetry"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -49,7 +51,7 @@ type WorkspaceTaskEnqueuer struct {
 	maxAttempts int
 }
 
-var _ workspacetasks.TxEnqueuer = (*WorkspaceTaskEnqueuer)(nil)
+var _ taskports.TxEnqueuer = (*WorkspaceTaskEnqueuer)(nil)
 
 func NewWorkspaceTaskEnqueuer(client workspaceRiverClient, queue string, maxAttempts int) *WorkspaceTaskEnqueuer {
 	queue, maxAttempts = riverpolicy.WithDefaults(queue, maxAttempts)
@@ -72,24 +74,24 @@ func (e *WorkspaceTaskEnqueuer) SetClient(client workspaceRiverClient) {
 // EnqueueInTx inserts the River job through the settlement transaction
 // (client.InsertTx joins the ambient pgx.Tx): the river_job row commits
 // atomically with the task insert, retry flip, or not at all. It satisfies
-// workspacetasks.TxEnqueuer.
-func (e *WorkspaceTaskEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
+// taskports.TxEnqueuer.
+func (e *WorkspaceTaskEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *tasks.WorkspaceTask) error {
 	if e == nil {
-		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+		return fmt.Errorf("workspace task enqueuer is not configured: %w", tasks.ErrQuoteUnavailable)
 	}
 	if tx == nil {
-		return fmt.Errorf("workspace task enqueuer: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+		return fmt.Errorf("workspace task enqueuer: settlement transaction is nil: %w", tasks.ErrQuoteUnavailable)
 	}
 	e.mu.Lock()
 	client := e.client
 	e.mu.Unlock()
 	if client == nil {
-		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+		return fmt.Errorf("workspace task enqueuer is not configured: %w", tasks.ErrQuoteUnavailable)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" {
-		return fmt.Errorf("workspace task enqueuer: task identity required: %w", workspacetasks.ErrNotFound)
+		return fmt.Errorf("workspace task enqueuer: task identity required: %w", tasks.ErrNotFound)
 	}
-	_, err := client.InsertTx(ctx, tx, workspacetasks.WorkspaceTaskArgs{
+	_, err := client.InsertTx(ctx, tx, taskqueue.WorkspaceTaskArgs{
 		TaskID:         strings.TrimSpace(task.ID),
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
 		Service:        strings.TrimSpace(task.Service),

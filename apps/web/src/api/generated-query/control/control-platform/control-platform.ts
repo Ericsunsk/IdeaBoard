@@ -81,7 +81,7 @@ import type {
   UploadControlBrandingLogoBody,
 } from '../model'
 
-import { controlMutator } from '../../../controlMutator'
+import { controlMutator } from '../../../http/controlMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 

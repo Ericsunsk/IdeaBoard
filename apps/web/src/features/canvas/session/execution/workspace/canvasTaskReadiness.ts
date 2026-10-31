@@ -18,8 +18,8 @@
 // to submission. Transport validation errors propagate to the caller; only
 // billing and access gates become readiness results.
 
-import type { ApiClientError } from '../../../../../api/client'
-import { quoteWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
+import type { ApiClientError } from '@/api/http/client'
+import { quoteWorkspaceTask } from '@/api/tasks/workspaceTaskTransport'
 import type { Service } from '../../../../../core/contracts/imageServices'
 import { readinessErrorCopy } from '../../../../../core/errors/errorCatalog'
 import type {

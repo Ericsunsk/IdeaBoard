@@ -21,7 +21,9 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -546,16 +548,16 @@ func completeUploadForIntegration(t *testing.T, ctx context.Context, media *work
 	return asset
 }
 
-func newIntegrationTask(taskID, ws string, owner int64, assetIDs []string) *workspacetasks.WorkspaceTask {
-	token, err := workspacetasks.NewExecutionToken()
+func newIntegrationTask(taskID, ws string, owner int64, assetIDs []string) *tasks.WorkspaceTask {
+	token, err := tasks.NewExecutionToken()
 	if err != nil {
 		panic(err)
 	}
-	return &workspacetasks.WorkspaceTask{
+	return &tasks.WorkspaceTask{
 		ID: taskID, WorkspaceID: ws, OwnerUserID: owner,
 		Service: "render", MediaAssetIDs: assetIDs,
-		Status: workspacetasks.StatusPending, ExecutionToken: token,
-		BillingSnapshot: workspacetasks.BillingSnapshot{
+		Status: tasks.StatusPending, ExecutionToken: token,
+		BillingSnapshot: tasks.BillingSnapshot{
 			SKU: "ai-image:render", DisplayName: "Render",
 			PriceVersionID: 1, PriceVersion: 1, OutputResolution: "",
 			UnitCredits: 10, Quantity: 1, TotalCredits: 10,
@@ -579,8 +581,8 @@ func TestWorkspaceIntegrationTaskMedia(t *testing.T) {
 	if _, err := env.tasks.ClaimTask(ctx, env.wsA, taskID, created.ExecutionToken); err != nil {
 		t.Fatalf("ClaimTask: %v", err)
 	}
-	completed, err := env.tasks.CompleteTask(ctx, env.wsA, taskID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
+	completed, err := env.tasks.CompleteTask(ctx, env.wsA, taskID, []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 	})
 	if err != nil {
 		t.Fatalf("CompleteTask with asset output: %v", err)
@@ -659,8 +661,8 @@ func TestWorkspaceIntegrationTaskLibrary(t *testing.T) {
 	}
 	remoteURL := "https://images.unsplash.com/inttest-task-result"
 	remoteChecksum := strings.Repeat("d", 64)
-	if _, err := env.tasks.CompleteTask(ctx, env.wsA, taskID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindRemote, URL: remoteURL, ChecksumSHA256: remoteChecksum, ResultIndex: 0},
+	if _, err := env.tasks.CompleteTask(ctx, env.wsA, taskID, []tasks.OutputRef{
+		{Kind: tasks.OutputKindRemote, URL: remoteURL, ChecksumSHA256: remoteChecksum, ResultIndex: 0},
 	}); err != nil {
 		t.Fatalf("CompleteTask with remote output: %v", err)
 	}
@@ -707,7 +709,7 @@ func TestWorkspaceIntegrationIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := env.tasks.GetTask(ctx, env.wsB, taskID); !errors.Is(err, workspacetasks.ErrNotFound) {
+	if _, err := env.tasks.GetTask(ctx, env.wsB, taskID); !errors.Is(err, tasks.ErrNotFound) {
 		t.Fatalf("cross-workspace task get = %v, want not found", err)
 	}
 	if _, err := env.media.GetAsset(ctx, env.wsB, asset.ID); !errors.Is(err, workspacemedia.ErrNotFound) {
@@ -733,7 +735,7 @@ func TestWorkspaceIntegrationIsolation(t *testing.T) {
 // stub settlement seams for scenario 5 (mutex-guarded for -race).
 type integrationQuoter struct{ unit int64 }
 
-func (q *integrationQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q *integrationQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	if quantity <= 0 {
 		quantity = 1
 	}
@@ -741,7 +743,7 @@ func (q *integrationQuoter) Quote(ctx context.Context, kind, resolution string, 
 	if unit == 0 {
 		unit = 10
 	}
-	return workspacetasks.BillingSnapshot{
+	return tasks.BillingSnapshot{
 		SKU: "ai-image:" + kind, DisplayName: kind, PriceVersionID: 1, PriceVersion: 1,
 		OutputResolution: resolution, UnitCredits: unit, Quantity: quantity,
 		TotalCredits: unit * quantity, SettlementState: "quoted",
@@ -750,7 +752,7 @@ func (q *integrationQuoter) Quote(ctx context.Context, kind, resolution string, 
 
 // QuoteInTx serves the settlement-transaction seam: quoting has no durable
 // side effects, so no rollback hook is needed.
-func (q *integrationQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q *integrationQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	return q.Quote(ctx, kind, resolution, quantity)
 }
 
@@ -823,7 +825,7 @@ type integrationQueue struct {
 	failNext error
 }
 
-func (q *integrationQueue) Enqueue(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+func (q *integrationQueue) Enqueue(ctx context.Context, task *tasks.WorkspaceTask) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.failNext != nil {
@@ -837,7 +839,7 @@ func (q *integrationQueue) Enqueue(ctx context.Context, task *workspacetasks.Wor
 
 // EnqueueInTx serves the settlement-transaction seam from the same queue
 // and registers its rollback undo.
-func (q *integrationQueue) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
+func (q *integrationQueue) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *tasks.WorkspaceTask) error {
 	if err := q.Enqueue(ctx, task); err != nil {
 		return err
 	}
@@ -869,14 +871,14 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	// tables (the billing projection is proven in
 	// workspacetasks/settle_test.go); the claim fence is in-memory for the
 	// same reason.
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := taskapp.NewService(taskapp.ServiceDeps{
 		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: quoter, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
 		Acceptance:    &workerTestAcceptance{assets: assets},
 	})
 
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", Quantity: 1, Resolution: "",
 	}, "settle-key-1")
@@ -884,7 +886,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 		t.Fatalf("settlement Create: %v", err)
 	}
 	stored, err := env.tasks.GetTask(ctx, env.wsA, created.ID)
-	if err != nil || stored.Status != workspacetasks.StatusPending {
+	if err != nil || stored.Status != tasks.StatusPending {
 		t.Fatalf("stored task = (%+v, %v), want pending row", stored, err)
 	}
 	queue.mu.Lock()
@@ -912,7 +914,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	queue.mu.Lock()
 	queue.failNext = errors.New("river unavailable")
 	queue.mu.Unlock()
-	failed, err := service.Create(ctx, workspacetasks.CreateInput{
+	failed, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", Quantity: 1, Resolution: "",
 	}, "settle-key-2")
@@ -947,21 +949,21 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 func TestWorkspaceTaskAdaptersFailClosed(t *testing.T) {
 	ctx := context.Background()
 	var quoter *taskadapters.WorkspaceTaskQuoter
-	if _, err := quoter.Quote(ctx, "render", "default", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := quoter.Quote(ctx, "render", "default", 1); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil quoter = %v, want quote unavailable", err)
 	}
 	var holder *taskadapters.WorkspaceTaskHolder
-	if _, err := holder.HoldInTx(ctx, nil, 1, 7, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := holder.HoldInTx(ctx, nil, 1, 7, 10, "k", "task_x"); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Hold = %v, want quote unavailable", err)
 	}
-	if _, err := holder.ReleaseInTx(ctx, nil, 1, 7, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := holder.ReleaseInTx(ctx, nil, 1, 7, "hold_x", 10, "task_x"); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Release = %v, want quote unavailable", err)
 	}
 	var queue *taskadapters.WorkspaceTaskEnqueuer
-	if err := queue.EnqueueInTx(ctx, nil, &workspacetasks.WorkspaceTask{ID: "task_x"}); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if err := queue.EnqueueInTx(ctx, nil, &tasks.WorkspaceTask{ID: "task_x"}); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil queue = %v, want quote unavailable", err)
 	}
-	if got := (workspacetasks.WorkspaceTaskArgs{}).Kind(); got != "workspace_task_execute" {
+	if got := (taskqueue.WorkspaceTaskArgs{}).Kind(); got != "workspace_task_execute" {
 		t.Fatalf("job kind = %q, want workspace_task_execute", got)
 	}
 }

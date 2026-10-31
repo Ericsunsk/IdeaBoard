@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { useUserStore } from '../../../auth'
-import { uploadApi } from '../../../../api/upload'
+import { uploadApi } from '@/api/media/upload'
 import {
   type AsyncActionFeedback,
   useAsyncAction,

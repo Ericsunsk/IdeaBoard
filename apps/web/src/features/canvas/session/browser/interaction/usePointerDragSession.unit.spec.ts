@@ -1,6 +1,6 @@
 import { effectScope } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { usePointerDragSession, type PointerDragSessionController } from './usePointerDragSession'
+import { usePointerDragSession, type PointerDragSessionContext, type PointerDragSessionController } from './usePointerDragSession'
 
 type DragPayload = {
   id: string
@@ -83,7 +83,8 @@ describe('usePointerDragSession', () => {
     expect(target.setPointerCapture).toHaveBeenCalledWith(7)
     expect(target.releasePointerCapture).toHaveBeenCalledWith(7)
     expect(controller.isDragging.value).toBe(false)
-    expect(onStart).toHaveBeenCalledWith({ event: startEvent, payload })
+    const expectedStart: PointerDragSessionContext<DragPayload> = { event: startEvent, payload }
+    expect(onStart).toHaveBeenCalledWith(expectedStart)
     expect(onMove).toHaveBeenCalledTimes(1)
     expect(onMove).toHaveBeenCalledWith({ event: moveEvent, payload })
     expect(onEnd).toHaveBeenCalledWith({ event: endEvent, payload })

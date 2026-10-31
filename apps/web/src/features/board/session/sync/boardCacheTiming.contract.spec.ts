@@ -24,7 +24,7 @@ function newIsolatedBoardQueryClient() {
 
 const WORKSPACE_ID = 'ws_test123'
 const mocks = vi.hoisted(() => ({ request: vi.fn() }))
-vi.mock('../../../../api/client', () => ({ api: { request: mocks.request } }))
+vi.mock('@/api/http/client', () => ({ api: { request: mocks.request } }))
 
 describe('board cache timing', () => {
   let client: ReturnType<typeof newIsolatedBoardQueryClient>

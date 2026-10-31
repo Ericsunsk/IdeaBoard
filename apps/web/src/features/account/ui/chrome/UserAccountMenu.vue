@@ -314,8 +314,8 @@ import type { SupportChannel } from '../../../../core/composables/useSupportChan
 import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
-import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
-import { isDefaultWorkspaceItem } from './workspaceMenu'
+import WorkspaceSettingsDialog from '@/features/workspace/ui/settings/WorkspaceSettingsDialog.vue'
+import { isDefaultWorkspaceItem } from '@/features/workspace/ui/dialogs/workspaceMenu'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,

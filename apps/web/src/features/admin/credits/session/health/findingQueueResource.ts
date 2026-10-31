@@ -3,7 +3,7 @@ import type {
   ListAdminCreditReconciliationFindingQueueParams,
 } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
-import { stripUndefined } from '@/api/stripUndefined'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import { PAGE_SIZES } from '@/core/config/pagination'
 
 export type AdminCreditFindingStatus = 'open' | 'resolved'

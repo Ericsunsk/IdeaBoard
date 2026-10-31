@@ -30,7 +30,7 @@ const tokenOwners = [
 ]
 const chrome = 'src/theme/atoms/page-chrome.css'
 const round = 'src/theme/atoms/round-control.css'
-const bridge = 'src/features/admin/shared/core/adminThemeTokens.ts'
+const bridge = 'src/features/admin/shared/ui/styling/adminThemeTokens.ts'
 
 const requiredTokens = [
   '--color-scrollbar-thumb',
@@ -140,7 +140,7 @@ const chromeConsumers = [
   'features/workspace/shell/components/WorkspaceNavigation.vue',
   'features/search/ui/pages/SearchPage.vue',
   'features/search/ui/components/SearchBatchActionDock.vue',
-  'features/board/ui/gallery/skin.ts',
+  'features/board/ui/gallery/styling/skin.ts',
   'features/canvas/ui/chrome/components/CanvasChrome.vue',
   'features/canvas/ui/chrome/components/CanvasChromeBoardHeader.vue',
   'features/canvas/ui/chrome/CanvasMiniMap.vue',
@@ -175,7 +175,7 @@ export function loadRetirementSources(root = webRoot): RetirementSources {
     ...featureSkins,
     ...lightboxes,
     ...formFields,
-    'src/features/board/ui/gallery/BoardsPage.vue',
+    'src/features/board/ui/gallery/views/BoardsPage.vue',
   ]
   return Object.fromEntries(
     files.map((file) => [file, fs.readFileSync(path.join(root, file), 'utf8')]),
@@ -673,7 +673,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
         )
     }
   }
-  const boards = 'src/features/board/ui/gallery/BoardsPage.vue'
+  const boards = 'src/features/board/ui/gallery/views/BoardsPage.vue'
   if (
     elements(sources[boards] ?? '').some((el) =>
       el.props.some((prop) => prop.type === NodeTypes.DIRECTIVE && prop.name === 'model'),

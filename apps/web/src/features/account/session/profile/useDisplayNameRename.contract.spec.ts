@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { User } from '../../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import { makeSessionUser } from '../../../../test/factories'
 import { useDisplayNameRename, type DisplayNameRenameDependencies } from './useDisplayNameRename'
 

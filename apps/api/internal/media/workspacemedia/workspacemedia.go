@@ -43,7 +43,7 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 	"path"
 	"strings"
 	"time"
@@ -152,7 +152,7 @@ var (
 	// only in the task registry (workspacetasks) and the canonical media
 	// taxonomy (media/errors). errors.Is against either name matches the
 	// same fact.
-	ErrNotFound = workspacetasks.ErrNotFound
+	ErrNotFound = taskdomain.ErrNotFound
 	// ErrExpired reports a lazily-expired session (410 upload_expired).
 	ErrExpired = errors.New("workspacemedia: upload expired")
 	// ErrStateConflict reports a terminal-state mutation attempt
@@ -172,7 +172,7 @@ type FieldError struct {
 // Alias, not a copy (P0-4): the validation shape lives only in the task
 // registry (workspacetasks.ValidationError). Composite literals and
 // errors.As against either name target the same type.
-type ValidationError = workspacetasks.ValidationError
+type ValidationError = taskdomain.ValidationError
 
 // NewFieldValidationError builds a single-field 422 failure for callers
 // validating completion echoes outside ValidateCreateInput.

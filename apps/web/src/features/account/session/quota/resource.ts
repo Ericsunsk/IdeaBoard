@@ -5,7 +5,7 @@ import {
 } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { MemberQuota } from '../../../../api/generated-query/public/model'
 import { i18n } from '../../../../core/i18n'
-import { isOpaqueId, opaqueIdPrefix } from '../../../../api/contractKernel'
+import { isOpaqueId, opaqueIdPrefix } from '@/api/http/contractKernel'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
 
 // Member cross-workspace consumption quota boundary (issue #946).

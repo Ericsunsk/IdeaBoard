@@ -50,6 +50,8 @@ in Simplified Chinese in the frontend locales.
 | Remaining Credits | Capped limit minus used, clamped at zero; absent for unlimited.                                                                                                                           |
 | Quota Exhausted   | A request that would exceed the member's remaining quota (`ErrQuotaExhausted`, wire `member_quota_exhausted` 403). Distinct from insufficiency (402) and restriction (403).    |
 
+Canonical accounting (see `GLOSSARY.md` and Credits `CONTEXT.md`): Used/Remaining Credits are quota-window projections, never Wallet balances, and refunds correct windows only under the full names linked Refund / linked Purchase Refund.
+
 ## Public Seams
 
 - `Store.GetQuotaRow` / `Store.SetQuota` / `Store.ListQuotas` /

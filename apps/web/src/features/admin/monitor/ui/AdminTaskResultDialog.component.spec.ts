@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '@/test/render'
 import { expectDomOrder } from '@/test/domOrder'
-import { stripUndefined } from '@/api/stripUndefined'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from '../core/status'
 import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../resource'

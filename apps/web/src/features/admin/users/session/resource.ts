@@ -17,7 +17,7 @@ import type {
   ControlUser,
   ListControlUsersParams,
 } from '@/api/generated-query/control/model'
-import { stripUndefined } from '@/api/stripUndefined'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import { normalizePageSize, PAGE_SIZES } from '@/core/config/pagination'
 import { useAdminCursorCollection } from '../../shared'
 

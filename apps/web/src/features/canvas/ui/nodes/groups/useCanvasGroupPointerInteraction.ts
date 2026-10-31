@@ -8,7 +8,7 @@ import {
   type CanvasGroupFrame,
   type CanvasGroupResizeHandle,
   type CanvasPoint,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 import type { CanvasSelectionGroupAction } from '../../../session/graph-editing'
 import type { DismissTransientCanvasUi } from '../../../session/flow-adapter'
 

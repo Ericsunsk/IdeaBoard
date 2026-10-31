@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import ts from 'typescript'
 
@@ -121,7 +121,21 @@ type Violation = {
 
 const SPEC_SUFFIX_PATTERN = /\.(unit|contract|component|browser)\.spec$/
 const SPEC_FILE_PATTERN = /\.(unit|contract|component|browser)\.spec\.ts$/
-const KIND_REMAINDER_ALLOWLIST = new Set(['Contract', 'Ref', 'Upload', 'Persistence'])
+const KIND_REMAINDER_ALLOWLIST = new Set([
+  'Contract',
+  'Ref',
+  'Upload',
+  'Persistence',
+  // Narrow kind suffixes for the admin shared regroup renames: `ui/styling/uiClasses.ts`
+  // repeats ancestor `ui`, `ui/table/tableColumns.ts` repeats ancestor `table`.
+  // `Controller` covers the gallery-level controller (`ui/gallery/controllers/galleryController.ts`
+  // repeats ancestor `gallery`): the `controllers/` group holds sibling controller modules, so the
+  // gallery entry carries its subdomain plus the responsibility kind. Single-word helper-kind
+  // remainders only; anything else still flags.
+  'Classes',
+  'Columns',
+  'Controller',
+])
 // Plan section 20.6 responsibility suffixes (stable meanings), plus `Pane`
 // ratified as the Panel-equivalent tab-surface suffix in
 // docs/architecture/frontend-vocabulary.yml.
@@ -160,6 +174,8 @@ const legacyAllowances: Record<string, string> = {
     'admin: brand vocabulary repeats brand group dir by design',
   'features/admin/shared/ui/chart/chart.ts':
     'admin: chart primitive repeats chart group dir by design',
+  'features/board/ui/gallery/range/range.ts':
+    'gallery: range primitive repeats range group dir by design',
   'features/admin/users/session/sessionCommands.ts':
     'admin: session commands repeat session zone by design',
 }
@@ -269,6 +285,50 @@ function isToolSession(relativePath: string): boolean {
   return /^features\/[^/]+\/tools\/[^/]+\/session(?:\/|$)/.test(relativePath)
 }
 
+/**
+ * Canvas core graph domain keep: the canvasGraph* -> graph* rename left 16
+ * `graph*` modules repeating their `graph/` group dir by design (graphStore,
+ * graphMutation, ...). Pinned as an explicit file list, not a directory
+ * regex, so a future `graph/graph*.ts` stutter is still flagged.
+ * `groupGeometry.ts`, `libraryImportState.ts`, spec files and `index.ts` need
+ * no exemption: they do not repeat an ancestor stem.
+ */
+const CANVAS_CORE_GRAPH_STUTTER_KEEP = new Set([
+  'features/canvas/core/graph/graphClone.ts',
+  'features/canvas/core/graph/graphGeometry.ts',
+  'features/canvas/core/graph/graphHistoryProjection.ts',
+  'features/canvas/core/graph/graphMutation.ts',
+  'features/canvas/core/graph/graphMutationIntents.ts',
+  'features/canvas/core/graph/graphPatchAlgebra.ts',
+  'features/canvas/core/graph/graphRecordEquality.ts',
+  'features/canvas/core/graph/graphStore.ts',
+  'features/canvas/core/graph/graphStoreIds.ts',
+  'features/canvas/core/graph/graphStoreIndexes.ts',
+  'features/canvas/core/graph/graphStoreState.ts',
+  'features/canvas/core/graph/graphStoreTelemetry.ts',
+  'features/canvas/core/graph/graphStoreTypes.ts',
+  'features/canvas/core/graph/graphStoreWriter.ts',
+  'features/canvas/core/graph/graphTransactionPort.ts',
+  'features/canvas/core/graph/graphValueEquality.ts',
+])
+
+/** Canvas core graph domain modules use the graph domain prefix (e.g. graphStore, graphMutation). */
+function isCanvasCoreGraph(relativePath: string): boolean {
+  return CANVAS_CORE_GRAPH_STUTTER_KEEP.has(relativePath)
+}
+
+/**
+ * Stale self-check for the canvas graph keep: every entry must still exist on
+ * disk. A rename/delete leaves a dead entry with no violation to consume it
+ * (unlike `legacyAllowances`, which warns on unused paths), so missing files
+ * fail the check with a cleanup prompt.
+ */
+function collectCanvasKeepStale(
+  exists: (relativePath: string) => boolean = (relativePath) => existsSync(join(SRC_ROOT, relativePath)),
+): string[] {
+  return [...CANVAS_CORE_GRAPH_STUTTER_KEEP].filter((relativePath) => !exists(relativePath)).sort()
+}
+
 /** ADR-0013 control-colocated SFC: a `.vue` file directly under `ui/<control>/`. */
 function isControlColocatedSfc(relativePath: string, fileName: string): boolean {
   if (!fileName.endsWith('.vue')) return false
@@ -283,6 +343,7 @@ function checkAntiStutterStem(
 ): Violation | null {
   // ADR-0013: session-layer files are not judged for anti-stutter.
   if (isToolSession(relativePath)) return null
+  if (isCanvasCoreGraph(relativePath)) return null
   const ancestors = ancestorChain(relativePath)
   if (ancestors.length === 0) return null
   if (SPEC_SUFFIX_PATTERN.test(stem) || stem === 'index') return null
@@ -892,6 +953,62 @@ function runSelfTest(): void {
       )?.kind,
       'anti-stutter',
     ],
+    // --- gallery controller remainder (issue #692 follow-up) ---------------
+    // `galleryController.ts` repeats ancestor `gallery` plus the `Controller`
+    // responsibility kind; any other single-word remainder still flags.
+    [
+      'gallery-controller-remainder-allowed',
+      checkAntiStutterStem(
+        'features/board/ui/gallery/controllers/galleryController.ts',
+        'galleryController',
+        'anti-stutter',
+      ),
+      null,
+    ],
+    [
+      'gallery-other-remainder-still-flagged',
+      checkAntiStutterStem(
+        'features/board/ui/gallery/controllers/galleryHelper.ts',
+        'galleryHelper',
+        'anti-stutter',
+      )?.kind,
+      'anti-stutter',
+    ],
+    // --- Canvas core graph keep (explicit file list, not dir regex) ------
+    // Pinned renames pass; a future graph/graph*.ts stutter still flags.
+    [
+      'canvas-graph-keep-exempt',
+      checkAntiStutterStem(
+        'features/canvas/core/graph/graphStore.ts',
+        'graphStore',
+        'anti-stutter',
+      ),
+      null,
+    ],
+    [
+      'canvas-graph-future-stutter-still-flagged',
+      checkAntiStutterStem(
+        'features/canvas/core/graph/graphFoo.ts',
+        'graphFoo',
+        'anti-stutter',
+      )?.kind,
+      'anti-stutter',
+    ],
+    // --- Canvas graph keep staleness -----------------------------------
+    // Keep entries with no file on disk fail with a cleanup prompt (probe
+    // injected so the negative control never touches the worktree).
+    [
+      'canvas-keep-stale-clean',
+      collectCanvasKeepStale(() => true),
+      [],
+    ],
+    [
+      'canvas-keep-stale-detects-missing',
+      collectCanvasKeepStale(
+        (relativePath) => relativePath !== 'features/canvas/core/graph/graphStore.ts',
+      ),
+      ['features/canvas/core/graph/graphStore.ts'],
+    ],
     // --- ADR-0013 tool zones -----------------------------------------
     // session/ files are not judged for anti-stutter; control-colocated
     // SFCs may share their control directory's stem; everything else under
@@ -1480,6 +1597,13 @@ function main() {
   for (const stale of [...remainingAllowances.keys()].sort()) {
     console.warn(
       `[naming-allowance:stale] ${stale} no longer violates; remove it from legacyAllowances`,
+    )
+  }
+
+  for (const stale of collectCanvasKeepStale()) {
+    failed = true
+    console.error(
+      `[naming-keep:stale] ${stale} no longer exists; remove it from CANVAS_CORE_GRAPH_STUTTER_KEEP`,
     )
   }
 

@@ -8,7 +8,7 @@ import {
   subscribeWorkspaceEvent,
   WORKSPACE_EVENT_TYPES,
   type WorkspaceEventEnvelope,
-} from '../../../../api/workspaceEventStream'
+} from '@/api/realtime/workspaceEventStream'
 
 import { QueryClient, QueryObserver } from '@tanstack/vue-query'
 import { queryClient } from '../../../../core/query/queryClient'
@@ -34,7 +34,7 @@ function newIsolatedBoardQueryClient() {
 }
 
 const mocks = vi.hoisted(() => ({ request: vi.fn() }))
-vi.mock('../../../../api/client', () => ({ api: { request: mocks.request } }))
+vi.mock('@/api/http/client', () => ({ api: { request: mocks.request } }))
 
 const WORKSPACE_ID = 'ws_abc123'
 const OTHER_WORKSPACE_ID = 'ws_other999'

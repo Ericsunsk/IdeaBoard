@@ -19,7 +19,8 @@ import (
 
 	"ideaboard/api/internal/generation/routing"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -57,10 +58,10 @@ func workerTestSnapshot(t *testing.T, service string, eligible []string) routing
 // snapshot-writing pair, so the merged claim wrapper satisfies it unchanged.
 type workerSnapshotPinner interface {
 	DeleteTask(ctx context.Context, workspaceID, taskID string) error
-	CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error)
+	CreateTask(ctx context.Context, task *tasks.WorkspaceTask) (*tasks.WorkspaceTask, error)
 }
 
-func pinWorkerSnapshot(t *testing.T, store workerSnapshotPinner, task *workspacetasks.WorkspaceTask, snap routing.RoutingSnapshot) *workspacetasks.WorkspaceTask {
+func pinWorkerSnapshot(t *testing.T, store workerSnapshotPinner, task *tasks.WorkspaceTask, snap routing.RoutingSnapshot) *tasks.WorkspaceTask {
 	t.Helper()
 	raw, err := json.Marshal(snap)
 	if err != nil {
@@ -81,8 +82,8 @@ func pinWorkerSnapshot(t *testing.T, store workerSnapshotPinner, task *workspace
 
 // modelObservingProvider records the resolved model of every Generate
 // call and replays scripted results per model.
-func modelObservingProvider(seen *[]string, behave func(model string) ([]workspacetasks.OutputRef, error)) WorkspaceTaskProvider {
-	return WorkspaceTaskGenerateFunc(func(_ context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+func modelObservingProvider(seen *[]string, behave func(model string) ([]tasks.OutputRef, error)) WorkspaceTaskProvider {
+	return WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		*seen = append(*seen, strings.TrimSpace(task.ResolvedModel))
 		return behave(strings.TrimSpace(task.ResolvedModel))
 	})
@@ -113,7 +114,7 @@ func TestWorkspaceTaskWorkerExecutesPinnedSnapshotNotEnvelopeDecoy(t *testing.T)
 	}
 
 	var seen []string
-	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]tasks.OutputRef, error) {
 		return workerTestRemoteOutput(), nil
 	}), nil)
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
@@ -126,7 +127,7 @@ func TestWorkspaceTaskWorkerExecutesPinnedSnapshotNotEnvelopeDecoy(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 }
@@ -142,7 +143,7 @@ func TestWorkspaceTaskWorkerSnapshotTamperFailsClosed(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -156,7 +157,7 @@ func TestWorkspaceTaskWorkerSnapshotTamperFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.RetryCount != 0 {
@@ -188,7 +189,7 @@ func TestWorkspaceTaskWorkerSnapshotCorruptFailsClosed(t *testing.T) {
 	}
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -202,7 +203,7 @@ func TestWorkspaceTaskWorkerSnapshotCorruptFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed || got.RetryCount != 0 {
+	if got.Status != tasks.StatusFailed || got.RetryCount != 0 {
 		t.Fatalf("task = (%q, retry %d), want (failed, 0)", got.Status, got.RetryCount)
 	}
 }
@@ -217,7 +218,7 @@ func TestWorkspaceTaskWorkerMissingSnapshotFailsClosed(t *testing.T) {
 	}
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -231,7 +232,7 @@ func TestWorkspaceTaskWorkerMissingSnapshotFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed || got.RetryCount != 0 {
+	if got.Status != tasks.StatusFailed || got.RetryCount != 0 {
 		t.Fatalf("task = (%q, retry %d), want (failed, 0)", got.Status, got.RetryCount)
 	}
 	env.holder.mu.Lock()
@@ -256,7 +257,7 @@ func TestWorkspaceTaskWorkerModelFallbackOnce(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	var seen []string
-	worker := env.newWorker(modelObservingProvider(&seen, func(model string) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(modelObservingProvider(&seen, func(model string) ([]tasks.OutputRef, error) {
 		if model == snap.SelectedModel {
 			return nil, workerUpstreamError(503)
 		}
@@ -275,7 +276,7 @@ func TestWorkspaceTaskWorkerModelFallbackOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q (err %q), want completed", got.Status, got.ErrorMsg)
 	}
 	env.holder.mu.Lock()
@@ -291,10 +292,10 @@ func TestWorkspaceTaskWorkerModelFallbackOnce(t *testing.T) {
 	if len(starts) != 2 {
 		t.Fatalf("attempt starts = %d, want 2 (gateway + model_fallback)", len(starts))
 	}
-	if starts[0].RetryLayer != workspacetasks.AttemptRetryLayerGateway || starts[0].RequestedModel != snap.SelectedModel {
+	if starts[0].RetryLayer != tasks.AttemptRetryLayerGateway || starts[0].RequestedModel != snap.SelectedModel {
 		t.Fatalf("first start = %+v, want gateway/%s", starts[0], snap.SelectedModel)
 	}
-	if starts[1].RetryLayer != workspacetasks.AttemptRetryLayerModelFallback || starts[1].RequestedModel != snap.RetryCandidate {
+	if starts[1].RetryLayer != tasks.AttemptRetryLayerModelFallback || starts[1].RequestedModel != snap.RetryCandidate {
 		t.Fatalf("second start = %+v, want model_fallback/%s", starts[1], snap.RetryCandidate)
 	}
 	for _, start := range starts {
@@ -306,7 +307,7 @@ func TestWorkspaceTaskWorkerModelFallbackOnce(t *testing.T) {
 	if len(finishes) != 2 {
 		t.Fatalf("attempt finishes = %d, want 2", len(finishes))
 	}
-	if finishes[0].Status != workspacetasks.AttemptStatusFailed || finishes[1].Status != workspacetasks.AttemptStatusCompleted {
+	if finishes[0].Status != tasks.AttemptStatusFailed || finishes[1].Status != tasks.AttemptStatusCompleted {
 		t.Fatalf("finishes = %+v, want [failed completed]", finishes)
 	}
 	if finishes[1].ResolvedModel != snap.RetryCandidate {
@@ -326,7 +327,7 @@ func TestWorkspaceTaskWorkerFallbackSpendsOnceAcrossRetries(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	var seen []string
-	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]tasks.OutputRef, error) {
 		return nil, workerUpstreamError(503)
 	}), nil)
 
@@ -338,7 +339,7 @@ func TestWorkspaceTaskWorkerFallbackSpendsOnceAcrossRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if afterFirst.Status != workspacetasks.StatusPending || afterFirst.RetryCount != 1 {
+	if afterFirst.Status != tasks.StatusPending || afterFirst.RetryCount != 1 {
 		t.Fatalf("after first = (%q, retry %d), want (pending, 1)", afterFirst.Status, afterFirst.RetryCount)
 	}
 	// Execution 2: river redelivery runs the candidate directly (no
@@ -350,7 +351,7 @@ func TestWorkspaceTaskWorkerFallbackSpendsOnceAcrossRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if afterSecond.Status != workspacetasks.StatusPending || afterSecond.RetryCount != 2 {
+	if afterSecond.Status != tasks.StatusPending || afterSecond.RetryCount != 2 {
 		t.Fatalf("after second = (%q, retry %d), want (pending, 2)", afterSecond.Status, afterSecond.RetryCount)
 	}
 	// Execution 3: budget spent -> terminal.
@@ -361,7 +362,7 @@ func TestWorkspaceTaskWorkerFallbackSpendsOnceAcrossRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if done.Status != workspacetasks.StatusFailed {
+	if done.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed after budget exhaustion", done.Status)
 	}
 
@@ -388,10 +389,10 @@ func TestWorkspaceTaskWorkerFallbackSpendsOnceAcrossRetries(t *testing.T) {
 		layers = append(layers, start.RetryLayer)
 	}
 	want := []string{
-		workspacetasks.AttemptRetryLayerGateway,
-		workspacetasks.AttemptRetryLayerModelFallback,
-		workspacetasks.AttemptRetryLayerRiverTask,
-		workspacetasks.AttemptRetryLayerRiverTask,
+		tasks.AttemptRetryLayerGateway,
+		tasks.AttemptRetryLayerModelFallback,
+		tasks.AttemptRetryLayerRiverTask,
+		tasks.AttemptRetryLayerRiverTask,
 	}
 	if strings.Join(layers, ",") != strings.Join(want, ",") {
 		t.Fatalf("attempt layers = %q, want %q", layers, want)
@@ -420,7 +421,7 @@ func TestWorkspaceTaskWorkerRiverTaskLayer(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		if calls == 1 {
 			return nil, workerUpstreamError(503)
@@ -441,10 +442,10 @@ func TestWorkspaceTaskWorkerRiverTaskLayer(t *testing.T) {
 	if len(starts) != 2 {
 		t.Fatalf("attempt starts = %d, want 2", len(starts))
 	}
-	if starts[0].RetryLayer != workspacetasks.AttemptRetryLayerGateway {
+	if starts[0].RetryLayer != tasks.AttemptRetryLayerGateway {
 		t.Fatalf("first layer = %q, want gateway", starts[0].RetryLayer)
 	}
-	if starts[1].RetryLayer != workspacetasks.AttemptRetryLayerRiverTask {
+	if starts[1].RetryLayer != tasks.AttemptRetryLayerRiverTask {
 		t.Fatalf("second layer = %q, want river_task", starts[1].RetryLayer)
 	}
 }
@@ -472,7 +473,7 @@ func TestWorkspaceTaskWorkerDeterministicErrorsNeverFallback(t *testing.T) {
 			created = pinWorkerSnapshot(t, env.store, created, snap)
 
 			calls := 0
-			worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+			worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 				calls++
 				return nil, workerUpstreamError(tc.status)
 			}), nil)
@@ -486,7 +487,7 @@ func TestWorkspaceTaskWorkerDeterministicErrorsNeverFallback(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetTask: %v", err)
 			}
-			if got.Status != workspacetasks.StatusFailed || got.RetryCount != 0 {
+			if got.Status != tasks.StatusFailed || got.RetryCount != 0 {
 				t.Fatalf("task = (%q, retry %d), want (failed, 0)", got.Status, got.RetryCount)
 			}
 			env.holder.mu.Lock()
@@ -496,7 +497,7 @@ func TestWorkspaceTaskWorkerDeterministicErrorsNeverFallback(t *testing.T) {
 				t.Fatalf("released = %d, want 10 (full hold back on fail)", released)
 			}
 			starts := env.attempts.StartedAttempts(created.ID)
-			if len(starts) != 1 || starts[0].RetryLayer != workspacetasks.AttemptRetryLayerGateway {
+			if len(starts) != 1 || starts[0].RetryLayer != tasks.AttemptRetryLayerGateway {
 				t.Fatalf("attempt starts = %+v, want one gateway row", starts)
 			}
 		})
@@ -513,7 +514,7 @@ func TestWorkspaceTaskWorkerUnknownFailureNeverFallback(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		return nil, errors.New("mystery failure with no classifier marker")
 	}), nil)
@@ -527,7 +528,7 @@ func TestWorkspaceTaskWorkerUnknownFailureNeverFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed || got.RetryCount != 0 {
+	if got.Status != tasks.StatusFailed || got.RetryCount != 0 {
 		t.Fatalf("task = (%q, retry %d), want (failed, 0)", got.Status, got.RetryCount)
 	}
 }
@@ -542,7 +543,7 @@ func TestWorkspaceTaskWorkerCompletedRedeliveryChargesOnce(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		if calls == 1 {
 			return nil, workerUpstreamError(503)
@@ -557,7 +558,7 @@ func TestWorkspaceTaskWorkerCompletedRedeliveryChargesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if done.Status != workspacetasks.StatusCompleted {
+	if done.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", done.Status)
 	}
 	// Late redelivery of the same job drops dirty.
@@ -614,7 +615,7 @@ func TestWorkspaceRiverJobIDDefaultsWithoutJobRow(t *testing.T) {
 	if got := workspaceRiverJobID(nil); got != 0 {
 		t.Fatalf("nil job id = %d, want 0", got)
 	}
-	job := &river.Job[workspacetasks.WorkspaceTaskArgs]{}
+	job := &river.Job[taskqueue.WorkspaceTaskArgs]{}
 	if got := workspaceRiverJobID(job); got != 0 {
 		t.Fatalf("synthetic job id = %d, want 0", got)
 	}
@@ -629,7 +630,7 @@ func TestWorkspaceTaskWorkerSnapshotServiceMismatchFailsClosed(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "generation", []string{"openrouter/model-a"}))
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -643,7 +644,7 @@ func TestWorkspaceTaskWorkerSnapshotServiceMismatchFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed || got.RetryCount != 0 {
+	if got.Status != tasks.StatusFailed || got.RetryCount != 0 {
 		t.Fatalf("task = (%q, retry %d), want (failed, 0)", got.Status, got.RetryCount)
 	}
 }
@@ -686,7 +687,7 @@ func TestWorkspaceTaskWorkerIgnoresPostAcceptPoolEdits(t *testing.T) {
 	created := env.submitService(t, "generation", nil)
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 	var seen []string
-	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(modelObservingProvider(&seen, func(string) ([]tasks.OutputRef, error) {
 		return workerTestRemoteOutput(), nil
 	}), nil)
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
@@ -699,7 +700,7 @@ func TestWorkspaceTaskWorkerIgnoresPostAcceptPoolEdits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 }

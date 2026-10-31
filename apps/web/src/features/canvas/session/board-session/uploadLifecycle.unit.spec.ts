@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { uploadApi } from '../../../../api/upload'
+import { uploadApi } from '@/api/media/upload'
 import { makeBoardSnapshot } from '../../../board/ports/testing'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),

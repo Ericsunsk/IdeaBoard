@@ -28,7 +28,8 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
 )
@@ -51,7 +52,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	ctx := context.Background()
 	service, _, _ := newWorkerIntegrationService(env)
 
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("renderer-loop-%d", time.Now().UnixNano()))
@@ -69,8 +70,8 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
 	}
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			if task.Status != workspacetasks.StatusRunning {
+		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			if task.Status != tasks.StatusRunning {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
 			return materializingProvider(t, env.media, objects, png)(ctx, task)
@@ -88,7 +89,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorkspaceTaskWorker: %v", err)
 	}
-	if err := renderingWorker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+	if err := renderingWorker.Work(ctx, &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
@@ -99,10 +100,10 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if stored.Status != workspacetasks.StatusCompleted {
+	if stored.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", stored.Status)
 	}
-	if len(stored.OutputRefs) != 1 || stored.OutputRefs[0].Kind != workspacetasks.OutputKindAsset {
+	if len(stored.OutputRefs) != 1 || stored.OutputRefs[0].Kind != tasks.OutputKindAsset {
 		t.Fatalf("outputs = %+v, want the rendered asset ref", stored.OutputRefs)
 	}
 	renderedID := stored.OutputRefs[0].AssetID

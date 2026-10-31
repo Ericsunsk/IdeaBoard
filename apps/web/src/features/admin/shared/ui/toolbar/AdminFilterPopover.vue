@@ -42,8 +42,8 @@
 import { ref } from 'vue'
 import { Filter } from '@iconoir/vue'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
-import { adminFramedIconButtonClass } from '../../core/uiClasses'
-import { ADMIN_SELECT_SIDE_OFFSET, adminSelectPanelClass } from '../../core/adminSelectSkin'
+import { adminFramedIconButtonClass } from '../styling/uiClasses'
+import { ADMIN_SELECT_SIDE_OFFSET, adminSelectPanelClass } from '../styling/adminSelectSkin'
 
 withDefaults(
   defineProps<{

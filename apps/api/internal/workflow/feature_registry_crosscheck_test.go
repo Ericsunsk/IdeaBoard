@@ -11,6 +11,9 @@ import (
 // of silently changing durable facts.
 func TestLiveRegistryMatchesDurableSnapshotForCurrentSchema(t *testing.T) {
 	liveSlugs := registeredImageFeatureSlugs()
+	if !slices.Equal(liveSlugs, AIImageFeatureSlugs()) {
+		t.Fatalf("live Workflow registry %v differs from canonical feature slugs %v", liveSlugs, AIImageFeatureSlugs())
+	}
 	if len(liveSlugs) != len(imageFeatureExecutionDefinitions) {
 		t.Fatalf("live registry has %d slugs but %d definitions", len(liveSlugs), len(imageFeatureExecutionDefinitions))
 	}

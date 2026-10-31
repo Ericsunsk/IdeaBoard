@@ -36,7 +36,7 @@ function cssDependencyCompiler(source: string): string {
 }
 
 /** Annotation exists only in Knip's analysis input; source bytes remain untouched. */
-export function annotateKnipPublic(
+function annotateKnipPublic(
   source: string,
   file: string,
   manifest: KnipGovernanceManifest,
@@ -320,16 +320,16 @@ export function createGovernanceConfig(
           throw new Error(`Missing test Knip evidence: ${file}#${name}`)
         if (contract.kind === 'generator-support') {
           const allowed: Record<string, string[]> = {
-            'src/api/orvalMutator.ts': ['orvalMutator', 'ErrorType', 'BodyType'],
-            'src/api/publicMutator.ts': ['publicMutator'],
-            'src/api/controlMutator.ts': ['controlMutator'],
+            'src/api/http/orvalMutator.ts': ['orvalMutator', 'ErrorType', 'BodyType'],
+            'src/api/http/publicMutator.ts': ['publicMutator'],
+            'src/api/http/controlMutator.ts': ['controlMutator'],
           }
           if (!allowed[file]?.includes(name))
             throw new Error(`Unknown generator support contract: ${file}#${name}`)
-          if (file === 'src/api/orvalMutator.ts') {
+          if (file === 'src/api/http/orvalMutator.ts') {
             if (
-              !namedConsumer(root, 'src/api/publicMutator.ts', file, 'orvalMutator') ||
-              !namedConsumer(root, 'src/api/controlMutator.ts', file, 'orvalMutator')
+              !namedConsumer(root, 'src/api/http/publicMutator.ts', file, 'orvalMutator') ||
+              !namedConsumer(root, 'src/api/http/controlMutator.ts', file, 'orvalMutator')
             )
               throw new Error(
                 'Orval transport protocol no longer has its configured wrapper consumers.',

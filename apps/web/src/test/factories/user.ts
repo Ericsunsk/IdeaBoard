@@ -1,4 +1,4 @@
-import type { User } from '../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 
 export type TestUserOverrides = Partial<User> & {
   ordinal?: number

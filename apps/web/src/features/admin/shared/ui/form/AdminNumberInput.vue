@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { computed, ref, type HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
-import { adminInputChromeClass } from '../../core/uiClasses'
+import { adminInputChromeClass } from '../styling/uiClasses'
 
 const props = withDefaults(
   defineProps<{

@@ -10,7 +10,7 @@ import {
 import {
   NOTIFICATION_EVENT_TYPES,
   subscribeUserNotificationEvents,
-} from '@/api/workspaceEventStream'
+} from '@/api/realtime/workspaceEventStream'
 import type { ListUserNotificationsParams } from '@/api/generated-query/public/model'
 
 const NOTIFICATION_POLL_INTERVAL_MS = 30_000

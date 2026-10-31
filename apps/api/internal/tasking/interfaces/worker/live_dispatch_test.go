@@ -30,7 +30,9 @@ import (
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 )
 
 // liveDispatchGatewayServer serves one canned chat-completions image
@@ -77,14 +79,14 @@ type liveDispatchEnv struct {
 	store   *attemptClaimStore
 	holder  *workerTestHolder
 	queue   *workerTestQueue
-	service *workspacetasks.Service
+	service *taskapp.Service
 }
 
 func newLiveDispatchEnv() *liveDispatchEnv {
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	// Wrapped in the merged claim+attempt seam the worker constructor
 	// requires (production writes both in one statement).
-	store := newAttemptClaimStore(workspacetasks.NewInMemoryStoreForTests(), workspacetasks.NewInMemoryAttemptRecorderForTests())
+	store := newAttemptClaimStore(taskmemory.NewInMemoryStoreForTests(), taskmemory.NewInMemoryAttemptRecorderForTests())
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	assets := &workspacemedia.TaskAssetAdapter{Store: media}
@@ -95,7 +97,7 @@ func newLiveDispatchEnv() *liveDispatchEnv {
 	}
 }
 
-func (e *liveDispatchEnv) submit(t *testing.T, key string) *workspacetasks.WorkspaceTask {
+func (e *liveDispatchEnv) submit(t *testing.T, key string) *tasks.WorkspaceTask {
 	t.Helper()
 	canonical, err := taskservice.CompileWorkspaceParams("generation", "a fake test sunset", map[string]interface{}{
 		"output_count": 1,
@@ -103,7 +105,7 @@ func (e *liveDispatchEnv) submit(t *testing.T, key string) *workspacetasks.Works
 	if err != nil {
 		t.Fatalf("CompileWorkspaceParams: %v", err)
 	}
-	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
+	created, err := e.service.Create(context.Background(), tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "generation",
 		Params:          map[string]any{"output_count": 1},
 		Quantity:        1,
@@ -120,7 +122,7 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayC
 	t.Helper()
 	materializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: e.media, Objects: e.objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
+		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *tasks.WorkspaceTask, _ tasks.OutputRef) ([]byte, error) {
 			return nil, errors.New("fake: live generation results are inline, no download")
 		}),
 	})
@@ -167,7 +169,7 @@ func allowLiveDispatchLoopback(t *testing.T) {
 // #854), so tests that need a runnable task persist the pinned
 // snapshot explicitly before dispatch. The bridge consumes only the
 // snapshot selection, never a live lookup.
-func pinLiveDispatchSnapshot(t *testing.T, env *liveDispatchEnv, created *workspacetasks.WorkspaceTask, model string) *workspacetasks.WorkspaceTask {
+func pinLiveDispatchSnapshot(t *testing.T, env *liveDispatchEnv, created *tasks.WorkspaceTask, model string) *tasks.WorkspaceTask {
 	t.Helper()
 	return pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "generation", []string{model}))
 }
@@ -199,10 +201,10 @@ func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q (err %q), want completed", got.Status, got.ErrorMsg)
 	}
-	if len(got.OutputRefs) != 1 || got.OutputRefs[0].Kind != workspacetasks.OutputKindAsset {
+	if len(got.OutputRefs) != 1 || got.OutputRefs[0].Kind != tasks.OutputKindAsset {
 		t.Fatalf("outputs = %+v, want one ingested asset ref", got.OutputRefs)
 	}
 	png := fixturePNGBytes(t)
@@ -247,7 +249,7 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testin
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.RetryCount != 0 {
@@ -286,7 +288,7 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutRoutingSnapshot(t *testing.T
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.RetryCount != 0 {

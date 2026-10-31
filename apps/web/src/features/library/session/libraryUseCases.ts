@@ -2,7 +2,7 @@ import { type ExternalImageProvider } from '../../../core/contracts/externalImag
 // Workspace-scoped Library use cases and managed media reads.
 // Canvas owns pending-node readiness waits and explicit retries after failure.
 
-import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
+import { getWorkspaceMediaAssetMetadata } from '@/api/media/mediaAssetDelivery'
 import { withSignal } from '../../../core/utils/request'
 import { PAGE_SIZES } from '../../../core/config/pagination'
 import { resolveAssetUrl } from '../../../core/config/runtimeUrls'

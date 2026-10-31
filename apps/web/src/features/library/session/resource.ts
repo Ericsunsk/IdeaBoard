@@ -34,8 +34,8 @@ import {
   saveWorkspaceLibraryAsset as saveWorkspaceLibraryAssetTransport,
 } from '../../../api/generated-query/public/workspace-library/workspace-library'
 import type { SaveLibraryAssetRequest } from '../../../api/generated-query/public/model/saveLibraryAssetRequest'
-import { buildContractRequestHeaders, requireContractData } from '../../../api/contractKernel'
-import type { AuthFailureMode } from '../../../api/client'
+import { buildContractRequestHeaders, requireContractData } from '@/api/http/contractKernel'
+import type { AuthFailureMode } from '@/api/http/client'
 import { withSignal } from '../../../core/utils/request'
 import { createUniqueId } from '../../../core/utils/ids'
 import { i18n } from '../../../core/i18n'

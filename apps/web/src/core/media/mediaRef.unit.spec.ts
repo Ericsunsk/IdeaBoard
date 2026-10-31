@@ -3,7 +3,7 @@ import { buildMediaBrowserURL, isMediaRef, mediaRefEquals, type MediaRef } from 
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

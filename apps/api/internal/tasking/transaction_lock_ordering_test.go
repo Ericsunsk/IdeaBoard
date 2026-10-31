@@ -80,7 +80,7 @@ func baselineMigration(t *testing.T) (string, string) {
 }
 
 func TestTransactionLockOrdering(t *testing.T) {
-	settle := readOrderFile(t, filepath.Join("workspacetasks", "settle_tx.go"))
+	settle := readOrderFile(t, filepath.Join("application", "workspacetasks", "settle_tx.go"))
 	boardsDir := filepath.Join("..", "boards")
 	boardsParts := []string{"postgres_access.go", "postgres_store_board.go", "postgres_revision.go", "postgres_catalog.go"}
 	boardsPieces := make([]string, 0, len(boardsParts))

@@ -20,40 +20,40 @@ import (
 	"ideaboard/api/internal/platform/safehttp"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 // WorkspaceTaskRenderer verifies ingested asset refs and compensates execution-owned
 // assets only after a confirmed terminal failure. Unknown outcomes keep assets live.
 type WorkspaceTaskRenderer interface {
-	RenderOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) ([]workspacetasks.OutputRef, error)
-	CompensateRenderedOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) error
+	RenderOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) ([]tasks.OutputRef, error)
+	CompensateRenderedOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) error
 }
 
 // WorkspaceResultBytesFetcher downloads the bytes behind one remote output
 // ref. Implementations own allowlisting, timeouts, and size caps; tests
 // inject canned fixture bytes. The materializer requires a fetcher at construction.
 type WorkspaceResultBytesFetcher interface {
-	FetchResultBytes(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error)
+	FetchResultBytes(ctx context.Context, task *tasks.WorkspaceTask, ref tasks.OutputRef) ([]byte, error)
 }
 
 // WorkspaceResultBytesFetchFunc adapts a function to WorkspaceResultBytesFetcher.
-type WorkspaceResultBytesFetchFunc func(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error)
+type WorkspaceResultBytesFetchFunc func(ctx context.Context, task *tasks.WorkspaceTask, ref tasks.OutputRef) ([]byte, error)
 
 // FetchResultBytes implements WorkspaceResultBytesFetcher.
-func (f WorkspaceResultBytesFetchFunc) FetchResultBytes(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error) {
+func (f WorkspaceResultBytesFetchFunc) FetchResultBytes(ctx context.Context, task *tasks.WorkspaceTask, ref tasks.OutputRef) ([]byte, error) {
 	return f(ctx, task, ref)
 }
 
 // WorkspaceTaskRendererDeps wires asset verification and reference-safe cleanup.
 type WorkspaceTaskRendererDeps struct {
 	Media  workspacemedia.WorkspaceMediaStore
-	Assets workspacetasks.AssetReader
+	Assets taskports.AssetReader
 }
 
 type workspaceTaskRenderer struct {
 	media  workspacemedia.WorkspaceMediaStore
-	assets workspacetasks.AssetReader
+	assets taskports.AssetReader
 }
 
 var _ WorkspaceTaskRenderer = (*workspaceTaskRenderer)(nil)
@@ -72,7 +72,7 @@ func NewWorkspaceTaskRenderer(deps WorkspaceTaskRendererDeps) (WorkspaceTaskRend
 // ingestion failures and confirmed terminal failures. It uses a bounded
 // detached context and refuses durable references; cleanup errors keep assets
 // live and never change settlement.
-func compensateIngestedResultAssets(ctx context.Context, media workspacemedia.WorkspaceMediaStore, task *workspacetasks.WorkspaceTask, assetIDs []string) {
+func compensateIngestedResultAssets(ctx context.Context, media workspacemedia.WorkspaceMediaStore, task *tasks.WorkspaceTask, assetIDs []string) {
 	if media == nil || task == nil || len(assetIDs) == 0 {
 		return
 	}
@@ -91,22 +91,22 @@ func compensateIngestedResultAssets(ctx context.Context, media workspacemedia.Wo
 }
 
 // RenderOutputs verifies settlement-ready assets without downloading or ingesting.
-func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) ([]workspacetasks.OutputRef, error) {
+func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) ([]tasks.OutputRef, error) {
 	if r == nil || r.media == nil || r.assets == nil {
 		return nil, errors.New(errorrender.MsgRenderOutputs)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
 		return nil, errors.New(errorrender.MsgRenderOutputs2)
 	}
-	if len(outputs) > workspacetasks.MaxOutputsPerTask {
-		return nil, fmt.Errorf(errorrender.MsgRenderOutputs3, workspacetasks.MaxOutputsPerTask)
+	if len(outputs) > tasks.MaxOutputsPerTask {
+		return nil, fmt.Errorf(errorrender.MsgRenderOutputs3, tasks.MaxOutputsPerTask)
 	}
-	rendered := make([]workspacetasks.OutputRef, 0, len(outputs))
+	rendered := make([]tasks.OutputRef, 0, len(outputs))
 	for _, ref := range outputs {
-		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
+		if err := tasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgRenderOutputs4, err)
 		}
-		if ref.Kind != workspacetasks.OutputKindAsset {
+		if ref.Kind != tasks.OutputKindAsset {
 			return nil, errors.New("workspace task renderer requires ingested asset outputs")
 		}
 		verified, err := r.passthroughAsset(ctx, task, ref)
@@ -120,14 +120,14 @@ func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspa
 
 // CompensateRenderedOutputs uses attempt-local ingestion receipts, never the
 // presence of an asset-kind ref, as proof that this execution owns cleanup.
-func (r *workspaceTaskRenderer) CompensateRenderedOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) error {
+func (r *workspaceTaskRenderer) CompensateRenderedOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) error {
 	if r == nil || r.media == nil {
 		return errors.New(errorrender.MsgRenderOutputs)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
 		return errors.New(errorrender.MsgRenderOutputs2)
 	}
-	if task.Status != workspacetasks.StatusFailed {
+	if task.Status != tasks.StatusFailed {
 		return errors.New("result compensation requires a committed failed task")
 	}
 	scope, _ := ctx.Value(resultIngestionScopeKey{}).(*resultIngestionScope)
@@ -136,7 +136,7 @@ func (r *workspaceTaskRenderer) CompensateRenderedOutputs(ctx context.Context, t
 	}
 	assetIDs := make([]string, 0, len(outputs))
 	for _, ref := range outputs {
-		if ref.Kind == workspacetasks.OutputKindAsset && scope.owns(ref.AssetID) {
+		if ref.Kind == tasks.OutputKindAsset && scope.owns(ref.AssetID) {
 			assetIDs = append(assetIDs, ref.AssetID)
 		}
 	}
@@ -146,28 +146,28 @@ func (r *workspaceTaskRenderer) CompensateRenderedOutputs(ctx context.Context, t
 
 // passthroughAsset verifies an asset-kind ref resolves in-workspace
 // (ready, unarchived) and normalizes it for settlement.
-func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) (workspacetasks.OutputRef, error) {
+func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *tasks.WorkspaceTask, ref tasks.OutputRef) (tasks.OutputRef, error) {
 	if _, err := r.assets.GetAsset(ctx, task.WorkspaceID, ref.AssetID); err != nil {
 		switch {
-		case errors.Is(err, workspacetasks.ErrMediaArchived):
-			return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset, err)
+		case errors.Is(err, tasks.ErrMediaArchived):
+			return tasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset, err)
 		default:
-			return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset2, workspacetasks.ErrMediaNotFound)
+			return tasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset2, tasks.ErrMediaNotFound)
 		}
 	}
-	verified := workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(ref.AssetID),
+	verified := tasks.OutputRef{
+		Kind: tasks.OutputKindAsset, AssetID: strings.TrimSpace(ref.AssetID),
 		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
 		Width: ref.Width, Height: ref.Height, MIMEType: ref.MIMEType,
 	}
-	if err := workspacetasks.ValidateOutputRef(verified); err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset3, err)
+	if err := tasks.ValidateOutputRef(verified); err != nil {
+		return tasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset3, err)
 	}
 	return verified, nil
 }
 
 // persistWorkspaceTaskResultAsset applies Task provenance to managed image ingestion.
-func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.MediaObjects, task *workspacetasks.WorkspaceTask, data []byte, index int) (*workspacemedia.Asset, error) {
+func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.MediaObjects, task *tasks.WorkspaceTask, data []byte, index int) (*workspacemedia.Asset, error) {
 	if media == nil || objects == nil {
 		return nil, errors.New(errorrender.MsgIngestRemote)
 	}
@@ -206,7 +206,7 @@ type resultIngestionScope struct {
 }
 
 // WithResultIngestionScope starts the ownership scope after a successful claim.
-func WithResultIngestionScope(ctx context.Context, claimed *workspacetasks.WorkspaceTask) context.Context {
+func WithResultIngestionScope(ctx context.Context, claimed *tasks.WorkspaceTask) context.Context {
 	scope := &resultIngestionScope{assets: make(map[string]struct{})}
 	if claimed != nil {
 		scope.workspaceID = strings.TrimSpace(claimed.WorkspaceID)
@@ -217,7 +217,7 @@ func WithResultIngestionScope(ctx context.Context, claimed *workspacetasks.Works
 	return context.WithValue(ctx, resultIngestionScopeKey{}, scope)
 }
 
-func (s *resultIngestionScope) matches(task *workspacetasks.WorkspaceTask) bool {
+func (s *resultIngestionScope) matches(task *tasks.WorkspaceTask) bool {
 	return s != nil && task != nil && s.workspaceID != "" && s.taskID != "" && s.ownerUserID > 0 && s.executionToken != "" &&
 		s.workspaceID == strings.TrimSpace(task.WorkspaceID) && s.taskID == strings.TrimSpace(task.ID) &&
 		s.ownerUserID == task.OwnerUserID && s.executionToken == strings.TrimSpace(task.ExecutionToken)
@@ -296,7 +296,7 @@ func (m *workspaceProviderResultMaterializer) MaterializeRemoteResults(ctx conte
 	if scope == nil {
 		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: execution scope is missing")
 	}
-	task := &workspacetasks.WorkspaceTask{
+	task := &tasks.WorkspaceTask{
 		ID: strings.TrimSpace(taskID), WorkspaceID: scope.workspaceID,
 		OwnerUserID: userID, ExecutionToken: scope.executionToken,
 	}
@@ -338,7 +338,7 @@ func (m *workspaceProviderResultMaterializer) MaterializeRemoteResults(ctx conte
 // sourceBytes resolves one provider result URL to bytes. Inline data:
 // URLs decode without network (the common generation path); anything else
 // downloads through the allowlisted fetcher. Payloads never enter errors.
-func (m *workspaceProviderResultMaterializer) sourceBytes(ctx context.Context, task *workspacetasks.WorkspaceTask, raw string, allowHosts []string) ([]byte, error) {
+func (m *workspaceProviderResultMaterializer) sourceBytes(ctx context.Context, task *tasks.WorkspaceTask, raw string, allowHosts []string) ([]byte, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return nil, errors.New("workspace provider result is empty")
@@ -349,8 +349,8 @@ func (m *workspaceProviderResultMaterializer) sourceBytes(ctx context.Context, t
 		}
 		return data, nil
 	}
-	data, err := m.fetcher.FetchResultBytes(WithWorkspaceResultAllowHosts(ctx, allowHosts), task, workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindRemote, URL: trimmed,
+	data, err := m.fetcher.FetchResultBytes(WithWorkspaceResultAllowHosts(ctx, allowHosts), task, tasks.OutputRef{
+		Kind: tasks.OutputKindRemote, URL: trimmed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("workspace provider result download failed: %w", err)
@@ -400,7 +400,7 @@ func WorkspaceResultAllowHostsFromCtx(ctx context.Context) []string {
 	return append([]string(nil), hosts...)
 }
 
-func (WorkspaceTaskResultBytesFetcher) FetchResultBytes(ctx context.Context, _ *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error) {
+func (WorkspaceTaskResultBytesFetcher) FetchResultBytes(ctx context.Context, _ *tasks.WorkspaceTask, ref tasks.OutputRef) ([]byte, error) {
 	allowHosts := WorkspaceResultAllowHostsFromCtx(ctx)
 	if len(allowHosts) == 0 {
 		allowHosts = safehttp.AllowHosts(ctx)

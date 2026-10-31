@@ -7,7 +7,7 @@ import {
   testControlMailSetting,
   updateControlMailSetting,
 } from '@/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import type { MailConfigSummary, MailConfigUpdate } from './types'
 import { withControlCopy } from '../../../shared/index'
 

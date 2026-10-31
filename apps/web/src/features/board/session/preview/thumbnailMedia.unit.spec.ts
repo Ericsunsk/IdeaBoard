@@ -6,7 +6,7 @@ import {
   invalidateMediaAssetMetadata,
   resetWorkspaceMediaDeliveryOnIdentitySwitch,
   type MediaAssetDeliveryMetadata,
-} from '../../../../api/mediaAssetMetadata'
+} from '@/api/media/mediaAssetMetadata'
 import {
   isTerminalThumbnailMediaError,
   THUMBNAIL_MEDIA_MAX_ATTEMPTS,
@@ -19,7 +19,7 @@ const production = vi.hoisted(() => ({ read: vi.fn(), subscribe: vi.fn(() => () 
 vi.mock('../../../../api/generated-query/public/workspace-media/workspace-media', () => ({
   getWorkspaceMediaAsset: production.read,
 }))
-vi.mock('../../../../api/workspaceEventStream', () => ({
+vi.mock('@/api/realtime/workspaceEventStream', () => ({
   subscribeWorkspaceMediaInvalidation: production.subscribe,
 }))
 

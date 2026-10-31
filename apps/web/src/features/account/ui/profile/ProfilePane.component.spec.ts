@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { fireEvent } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import { makeSessionUser } from '../../../../test/factories'
-import type { User } from '../../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import ProfilePane from './ProfilePane.vue'
 
 const mockUser = ref<User>(makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' }))

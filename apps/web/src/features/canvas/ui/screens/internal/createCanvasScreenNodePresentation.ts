@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue'
 import type { NodeProps } from '@vue-flow/core'
-import { ACTIVE_NODE_PANEL_KIND, type useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
+import { ACTIVE_NODE_PANEL_KIND, type useFlowActiveNodePanels } from '../controllers/useFlowActiveNodePanels'
 import type { useImageStageRegistry } from '../../../session/flow-adapter'
 import {
   createFusionNodePresentationResolver,
@@ -8,7 +8,7 @@ import {
 } from '../../nodes'
 import type { CanvasWorkspaceRuntime } from '../../../session/workspace'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
-import { createCanvasNodePresentationIntentRouter } from '../createCanvasNodePresentationIntentRouter'
+import { createCanvasNodePresentationIntentRouter } from '../controllers/createCanvasNodePresentationIntentRouter'
 
 type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>
 type ImageStages = ReturnType<typeof useImageStageRegistry>

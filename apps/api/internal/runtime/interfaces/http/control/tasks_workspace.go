@@ -17,8 +17,9 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	taskapp "ideaboard/api/internal/tasking/application/task"
+	taskingsvc "ideaboard/api/internal/tasking/application/workspacetasks"
 	tasksdomain "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/google/uuid"
@@ -27,14 +28,14 @@ import (
 )
 
 // WorkspaceControlTaskStores is the minimal settlement seam the control
-// adapter needs: CancelAdminTask settles through workspacetasks.Service,
+// adapter needs: CancelAdminTask settles through taskingsvc.Service,
 // which reads via TaskRead and flips via TaskLifecycle (TaskBilling feeds
 // the optional atomic billing projection). The adapter never touches the
 // concrete postgres store.
 type WorkspaceControlTaskStores interface {
-	workspacetasks.TaskReadStore
-	workspacetasks.TaskSettlementStore
-	workspacetasks.TaskBillingStore
+	taskports.TaskReadStore
+	taskports.TaskSettlementStore
+	taskports.TaskBillingStore
 }
 
 // workspaceControlTaskAdapter is the ControlTaskAdmin implementation over
@@ -43,7 +44,7 @@ type workspaceControlTaskAdapter struct {
 	db     *pgxpool.Pool
 	q      *dbsqlc.Queries
 	store  WorkspaceControlTaskStores
-	holder workspacetasks.TxHolder
+	holder taskports.TxHolder
 	users  ControlCreditDirectory
 	// events is the neutral ControlTaskEventPort the adapter announces
 	// settled transitions through (see control/tasks_events.go for
@@ -56,7 +57,7 @@ type workspaceControlTaskAdapter struct {
 // NewWorkspaceControlTasks builds the control task read model. A nil db
 // keeps every method fail-closed (the handlers converge to 503), matching
 // the nil-dep convention of the other control seams.
-func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
+func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder taskports.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
 	if db == nil {
 		return &workspaceControlTaskAdapter{store: store, holder: holder, users: users, events: events}
 	}
@@ -69,14 +70,14 @@ var _ ControlTaskAdmin = (*workspaceControlTaskAdapter)(nil)
 // isControlTaskNotFound reports invisible tasks (unknown id, malformed
 // shape, or cross-workspace id).
 func isControlTaskNotFound(err error) bool {
-	return errors.Is(err, workspacetasks.ErrNotFound) ||
+	return errors.Is(err, tasksdomain.ErrNotFound) ||
 		errors.Is(err, tenancy.ErrNotFound) ||
 		database.IsNotFound(err)
 }
 
 // isControlTaskConflict reports terminal-state transitions.
 func isControlTaskConflict(err error) bool {
-	return errors.Is(err, workspacetasks.ErrStateConflict)
+	return errors.Is(err, tasksdomain.ErrStateConflict)
 }
 
 // controlTaskEnvelope is the tasks.workflow_input JSONB shape read back
@@ -146,17 +147,17 @@ func (a *workspaceControlTaskAdapter) resolveControlTaskIdentity(ctx context.Con
 func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string) (*taskapp.AdminMonitorDetail, error) {
 	q := a.queries()
 	if q == nil {
-		return nil, workspacetasks.ErrNotFound
+		return nil, tasksdomain.ErrNotFound
 	}
 	taskID = strings.TrimSpace(taskID)
 	row, err := q.GetControlTaskByPublicID(ctx, taskID)
 	if err != nil {
-		return nil, workspacetasks.ErrNotFound
+		return nil, tasksdomain.ErrNotFound
 	}
 	envelope := parseControlTaskEnvelope(row.WorkflowInput)
 	publicID, displayName := a.resolveControlTaskIdentity(ctx, row.SubmitterUserID)
 	completed := dbutil.TimePtr(row.CompletedAt)
-	if row.Status == string(workspacetasks.StatusCancelled) && completed == nil {
+	if row.Status == string(tasksdomain.StatusCancelled) && completed == nil {
 		completed = dbutil.TimePtr(row.CancelledAt)
 	}
 	detail := &taskapp.AdminMonitorDetail{
@@ -175,7 +176,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 		CompletedAt:     completed,
 		CancelReason:    envelope.CancelReason,
 	}
-	if row.Status == string(workspacetasks.StatusCancelled) {
+	if row.Status == string(tasksdomain.StatusCancelled) {
 		detail.CancelledAt = dbutil.TimePtr(row.CancelledAt)
 	}
 	if outputs, err := a.loadControlTaskOutputs(ctx, row.WorkspacePublicID, row.PublicID); err == nil {
@@ -216,7 +217,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksdomain.TaskListRequest) ([]taskapp.AdminMonitorListItem, tasksdomain.TaskListCounts, error) {
 	q := a.queries()
 	if q == nil {
-		return nil, tasksdomain.TaskListCounts{}, workspacetasks.ErrNotFound
+		return nil, tasksdomain.TaskListCounts{}, tasksdomain.ErrNotFound
 	}
 	if req == nil {
 		req = &tasksdomain.TaskListRequest{}
@@ -231,10 +232,10 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 	}
 	status := strings.ToLower(strings.TrimSpace(req.Status))
 	switch status {
-	case "", string(workspacetasks.StatusPending), string(workspacetasks.StatusRunning),
-		string(workspacetasks.StatusCompleted), string(workspacetasks.StatusFailed), string(workspacetasks.StatusCancelled):
+	case "", string(tasksdomain.StatusPending), string(tasksdomain.StatusRunning),
+		string(tasksdomain.StatusCompleted), string(tasksdomain.StatusFailed), string(tasksdomain.StatusCancelled):
 	default:
-		return nil, tasksdomain.TaskListCounts{}, workspacetasks.ErrNotFound
+		return nil, tasksdomain.TaskListCounts{}, tasksdomain.ErrNotFound
 	}
 	keyword := strings.TrimSpace(req.Keyword)
 	if len([]rune(keyword)) > 200 {
@@ -261,15 +262,15 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 	for _, countRow := range countRows {
 		counts.Total += countRow.Count
 		switch countRow.Status {
-		case string(workspacetasks.StatusPending):
+		case string(tasksdomain.StatusPending):
 			counts.PendingCount += countRow.Count
-		case string(workspacetasks.StatusRunning):
+		case string(tasksdomain.StatusRunning):
 			counts.RunningCount += countRow.Count
-		case string(workspacetasks.StatusCompleted):
+		case string(tasksdomain.StatusCompleted):
 			counts.CompletedCount += countRow.Count
-		case string(workspacetasks.StatusFailed):
+		case string(tasksdomain.StatusFailed):
 			counts.FailedCount += countRow.Count
-		case string(workspacetasks.StatusCancelled):
+		case string(tasksdomain.StatusCancelled):
 			counts.CancelledCount += countRow.Count
 		default:
 			counts.OtherCount += countRow.Count
@@ -284,7 +285,7 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 		envelope := parseControlTaskEnvelope(row.WorkflowInput)
 		publicID, displayName := a.resolveControlTaskIdentity(ctx, row.SubmitterUserID)
 		completed := dbutil.TimePtr(row.CompletedAt)
-		if row.Status == string(workspacetasks.StatusCancelled) && completed == nil {
+		if row.Status == string(tasksdomain.StatusCancelled) && completed == nil {
 			completed = dbutil.TimePtr(row.CancelledAt)
 		}
 		item := taskapp.AdminMonitorListItem{
@@ -390,13 +391,13 @@ func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context
 // CancelAdminTask settles the operator cancel and then announces the
 // resulting transition. The staged-event drain lives HERE, inside this
 // function, and not at the handler: this method builds its OWN
-// workspacetasks.Service (it must not share the worker's instance, whose
+// taskingsvc.Service (it must not share the worker's instance, whose
 // staged buffer is drained under the worker's mutex), so the staged
 // events are unreachable from anywhere else and this is the only place
 // they can be drained.
 //
 // WHY THE FLUSH IS AFTER THE SETTLEMENT CALL RETURNS
-// workspacetasks.Service STAGES a status event only on its post-commit
+// taskingsvc.Service STAGES a status event only on its post-commit
 // line, so a rolled-back settlement stages nothing and this flush
 // publishes nothing. That is the same contract the River worker settler
 // bridge relies on; it is why the drain can never announce a state a
@@ -414,15 +415,15 @@ func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context
 func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskID string, adminID int64) error {
 	q := a.queries()
 	if q == nil || a.store == nil {
-		return workspacetasks.ErrNotFound
+		return tasksdomain.ErrNotFound
 	}
 	taskID = strings.TrimSpace(taskID)
 	row, err := q.GetControlTaskByPublicID(ctx, taskID)
 	if err != nil {
-		return workspacetasks.ErrNotFound
+		return tasksdomain.ErrNotFound
 	}
 	const reason = "cancelled"
-	settler := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	settler := taskingsvc.NewService(taskingsvc.ServiceDeps{
 		TaskRead: a.store, TaskLifecycle: a.store,
 		TaskBilling: a.store, Holder: a.holder,
 	})
@@ -472,7 +473,7 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 // Announcement failures are warn-logged and never returned: the domain
 // fact is already committed, and failing the HTTP response here would
 // report a settlement failure for a settlement that actually landed.
-func (a *workspaceControlTaskAdapter) announceCancelTransitions(ctx context.Context, settler *workspacetasks.Service, workspaceID, reason string, adminID int64, settlementState, holdTransactionID string, settleErr error) {
+func (a *workspaceControlTaskAdapter) announceCancelTransitions(ctx context.Context, settler *taskingsvc.Service, workspaceID, reason string, adminID int64, settlementState, holdTransactionID string, settleErr error) {
 	if settler == nil {
 		return
 	}
@@ -527,7 +528,7 @@ type controlTaskOutputMeta struct {
 func (a *workspaceControlTaskAdapter) loadControlTaskOutputs(ctx context.Context, workspacePublicID, taskPublicID string) ([]tasksdomain.TaskOutput, error) {
 	q := a.queries()
 	if q == nil {
-		return nil, workspacetasks.ErrNotFound
+		return nil, tasksdomain.ErrNotFound
 	}
 	rows, err := q.ListWorkspaceTaskOutputs(ctx, dbsqlc.ListWorkspaceTaskOutputsParams{
 		PublicID:          taskPublicID,
@@ -553,10 +554,10 @@ func (a *workspaceControlTaskAdapter) loadControlTaskOutputs(ctx context.Context
 		}
 		switch strings.TrimSpace(row.OutputKind) {
 		case "media_asset":
-			output.OutputKind = workspacetasks.OutputKindAsset
+			output.OutputKind = tasksdomain.OutputKindAsset
 			output.AssetID = meta.AssetID
 		case "remote_url":
-			output.OutputKind = workspacetasks.OutputKindRemote
+			output.OutputKind = tasksdomain.OutputKindRemote
 			output.URL = row.RemoteUrl.String
 		default:
 			output.OutputKind = strings.TrimSpace(row.OutputKind)
@@ -570,7 +571,7 @@ func (a *workspaceControlTaskAdapter) loadControlTaskOutputs(ctx context.Context
 func (a *workspaceControlTaskAdapter) loadControlTaskBilling(ctx context.Context, taskPublicID string) (*tasksdomain.AdminBillingSnapshot, bool, error) {
 	q := a.queries()
 	if q == nil {
-		return nil, false, workspacetasks.ErrNotFound
+		return nil, false, tasksdomain.ErrNotFound
 	}
 	row, err := q.GetControlTaskBilling(ctx, taskPublicID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -605,7 +606,7 @@ func (a *workspaceControlTaskAdapter) loadControlTaskBilling(ctx context.Context
 
 func (a *workspaceControlTaskAdapter) loadControlTaskMetrics(ctx context.Context, taskPublicID string) (*tasksdomain.TaskExecutionMetrics, error) {
 	if a == nil || a.db == nil {
-		return nil, workspacetasks.ErrNotFound
+		return nil, tasksdomain.ErrNotFound
 	}
 	var metrics tasksdomain.TaskExecutionMetrics
 	err := a.db.QueryRow(ctx, `
@@ -629,7 +630,7 @@ LIMIT 1`, taskPublicID).Scan(
 
 func (a *workspaceControlTaskAdapter) loadControlTaskAttempts(ctx context.Context, taskPublicID string) ([]tasksdomain.AdminTaskAttempt, error) {
 	if a == nil || a.db == nil {
-		return nil, workspacetasks.ErrNotFound
+		return nil, tasksdomain.ErrNotFound
 	}
 	rows, err := a.db.Query(ctx, `
 SELECT attempt_no, status, failure_stage, failure_category, service, requested_model,
@@ -668,7 +669,7 @@ ORDER BY attempt_no ASC`, taskPublicID)
 			if attempt.TotalLatencyMS < 0 {
 				attempt.TotalLatencyMS = 0
 			}
-			if strings.TrimSpace(attempt.Status) == string(workspacetasks.StatusCancelled) {
+			if strings.TrimSpace(attempt.Status) == string(tasksdomain.StatusCancelled) {
 				completed := *attempt.CompletedAt
 				attempt.CancelledAt = &completed
 			}

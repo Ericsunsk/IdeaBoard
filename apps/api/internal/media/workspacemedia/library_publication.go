@@ -11,7 +11,8 @@ import (
 	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -19,7 +20,7 @@ import (
 // LibraryPublicationAuthorizer owns Media usage and explicit publication rights.
 type LibraryPublicationAuthorizer struct {
 	Boards     BoardAccess
-	TaskBoards workspacetasks.BoardAuthorizer
+	TaskBoards taskports.BoardAuthorizer
 }
 
 var _ libraryports.PublicationAuthorizer = (*LibraryPublicationAuthorizer)(nil)
@@ -59,10 +60,10 @@ func (a *LibraryPublicationAuthorizer) AuthorizeManual(ctx context.Context, tx p
 		for _, provenance := range provenances {
 			if boardID := strings.TrimSpace(provenance.BoardPublicID); boardID != "" {
 				if !a.isBoardCreator(ctx, workspaceID, boardID, input.OperatorUserID, role) {
-					return workspacetasks.ErrForbidden
+					return taskdomain.ErrForbidden
 				}
 			} else if provenance.SubmitterUserID != input.OperatorUserID {
-				return workspacetasks.ErrForbidden
+				return taskdomain.ErrForbidden
 			}
 		}
 		return nil
@@ -93,7 +94,7 @@ func (a *LibraryPublicationAuthorizer) AuthorizeManual(ctx context.Context, tx p
 			return nil
 		}
 	}
-	return workspacetasks.ErrForbidden
+	return taskdomain.ErrForbidden
 }
 
 func (a *LibraryPublicationAuthorizer) isBoardCreator(ctx context.Context, workspaceID, boardID string, userID int64, role string) bool {

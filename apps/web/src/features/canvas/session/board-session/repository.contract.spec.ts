@@ -13,7 +13,7 @@ import {
 import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
+import { resetMediaWorkspaceIdResolver } from '@/api/media/mediaAssetDelivery'
 import { queryClient } from '../../../../core/query/queryClient'
 import { createDeferred } from '../../../../test/deferred'
 import { useBoardSession } from './useBoardSession'
@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
   return { request }
 })
 
-vi.mock('../../../../api/client', () => ({
+vi.mock('@/api/http/client', () => ({
   api: {
     request: mocks.request,
   },

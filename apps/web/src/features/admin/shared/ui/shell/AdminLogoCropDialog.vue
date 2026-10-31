@@ -123,7 +123,7 @@ import 'vue-advanced-cropper/dist/style.css'
 import AdminButton from '../AdminButton.vue'
 import ActionButton from '@/core/components/ActionButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
-import { adminDialogTitleClass, adminTextButtonClass } from '../../core/uiClasses'
+import { adminDialogTitleClass, adminTextButtonClass } from '../styling/uiClasses'
 
 type CropperInstance = InstanceType<typeof Cropper>
 

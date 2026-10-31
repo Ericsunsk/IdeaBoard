@@ -1,6 +1,6 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { stripUndefined } from '@/api/stripUndefined'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import { PAGE_SIZES } from '@/core/config/pagination'
 import { keepPrevious } from '@/core/query/queryDefaults'
 import {

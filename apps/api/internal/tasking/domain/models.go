@@ -394,6 +394,8 @@ type TaskListCounts struct {
 // merged from internal/tasking/domain/priority.go (structural consolidation; symbols unchanged).
 const TaskPriorityDefault = 2
 
+type Status string
+
 // merged from internal/tasking/domain/status.go (structural consolidation; symbols unchanged).
 const (
 	StatusPending              = "pending"
@@ -406,8 +408,9 @@ const (
 
 const ResultStatusSuccess = "success"
 
-func IsTerminalStatus(status string) bool {
-	return status == StatusCompleted || status == StatusFailed || status == StatusCancelled || status == StatusCancelledWithResults
+func IsTerminalStatus[T ~string](status T) bool {
+	s := string(status)
+	return s == string(StatusCompleted) || s == string(StatusFailed) || s == string(StatusCancelled)
 }
 
 // merged from internal/tasking/domain/queue_payload.go (structural consolidation; symbols unchanged).

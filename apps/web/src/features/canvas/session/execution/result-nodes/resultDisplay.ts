@@ -6,7 +6,7 @@ import {
 import {
   getWorkspaceMediaAssetMetadata,
   resolveWorkspaceMediaAssetDerivativeURL,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 import { i18n } from '../../../../../core/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import type { MediaRef } from '../../../../../core/media/mediaRef'

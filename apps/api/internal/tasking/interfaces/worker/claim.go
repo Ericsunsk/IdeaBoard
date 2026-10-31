@@ -28,7 +28,8 @@ import (
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
 	tasks "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 // loadDispatchableTask loads one task for this job and drops dirty work:
@@ -37,20 +38,20 @@ import (
 // materialization gap replays the idempotent trigger to repair the link),
 // cancelled rows, and stale execution tokens (an old redelivery after a
 // retry rotated the token). A nil task with a nil error means drop.
-func (w *WorkspaceTaskWorker) loadDispatchableTask(ctx context.Context, args workspacetasks.WorkspaceTaskArgs) (*workspacetasks.WorkspaceTask, error) {
+func (w *WorkspaceTaskWorker) loadDispatchableTask(ctx context.Context, args taskqueue.WorkspaceTaskArgs) (*tasks.WorkspaceTask, error) {
 	taskID := strings.TrimSpace(args.TaskID)
 	workspaceID := strings.TrimSpace(args.WorkspaceID)
 
 	task, err := w.store.GetTask(ctx, workspaceID, taskID)
 	if err != nil {
-		if errors.Is(err, workspacetasks.ErrNotFound) {
+		if errors.Is(err, tasks.ErrNotFound) {
 			slog.Info("workspace task gone (rollback delete?); dropping job", "task_id", taskID)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("workspace task load: %w", err)
 	}
 	if task.IsTerminal() {
-		if task.Status == workspacetasks.StatusCompleted {
+		if task.Status == tasks.StatusCompleted {
 			// Complete commits before Library auto-save. A redelivery in
 			// this gap replays the idempotent trigger and repairs the link.
 			w.saveCompletedTask(ctx, task)
@@ -68,8 +69,8 @@ func (w *WorkspaceTaskWorker) loadDispatchableTask(ctx context.Context, args wor
 
 // validateInput enforces the discriminated input union before claiming, so
 // malformed tasks fail from pending without lease churn.
-func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *workspacetasks.WorkspaceTask) error {
-	if _, err := workspacetasks.ValidateCreate(task.Service, task.MediaAssetIDs, task.Params); err != nil {
+func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *tasks.WorkspaceTask) error {
+	if _, err := tasks.ValidateCreate(task.Service, task.MediaAssetIDs, task.Params); err != nil {
 		return fmt.Errorf(errorrender.MsgValidateInput, err)
 	}
 	return nil
@@ -78,7 +79,7 @@ func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *workspaceta
 // resolveMediaRefs checks every media_asset_ids entry read-only through the
 // TaskAssets adapter. Invisible/archived/non-ready assets fail the task
 // deterministically; the worker never mutates media.
-func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *tasks.WorkspaceTask) error {
 	if len(task.MediaAssetIDs) == 0 && task.Params == nil {
 		return nil
 	}
@@ -88,41 +89,41 @@ func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *worksp
 	for i, id := range task.MediaAssetIDs {
 		if _, err := w.assets.GetAsset(ctx, task.WorkspaceID, id); err != nil {
 			switch {
-			case errors.Is(err, workspacetasks.ErrMediaArchived):
+			case errors.Is(err, tasks.ErrMediaArchived):
 				return fmt.Errorf(errorrender.MsgResolveMediaRefs2, i, err)
-			case errors.Is(err, workspacetasks.ErrMediaNotReady):
+			case errors.Is(err, tasks.ErrMediaNotReady):
 				return fmt.Errorf(errorrender.MsgResolveMediaRefs3, i, err)
 			default:
-				return fmt.Errorf(errorrender.MsgResolveMediaRefs4, i, workspacetasks.ErrMediaNotFound)
+				return fmt.Errorf(errorrender.MsgResolveMediaRefs4, i, tasks.ErrMediaNotFound)
 			}
 		}
 	}
 	// The v1 mask reference (params.mask_asset_id) resolves through the
 	// same read-only gate so a mask that vanished between submit and
 	// dispatch fails deterministically instead of reaching the provider.
-	if maskID, ok := workspacetasks.MaskAssetIDFromParams(task.Params); ok {
+	if maskID, ok := tasks.MaskAssetIDFromParams(task.Params); ok {
 		if w.assets == nil {
 			return errors.New(errorrender.MsgResolveMediaRefs5)
 		}
 		if _, err := w.assets.GetAsset(ctx, task.WorkspaceID, maskID); err != nil {
 			switch {
-			case errors.Is(err, workspacetasks.ErrMediaArchived):
+			case errors.Is(err, tasks.ErrMediaArchived):
 				return fmt.Errorf(errorrender.MsgResolveMediaRefs6, err)
-			case errors.Is(err, workspacetasks.ErrMediaNotReady):
+			case errors.Is(err, tasks.ErrMediaNotReady):
 				return fmt.Errorf(errorrender.MsgResolveMediaRefs7, err)
 			default:
-				return fmt.Errorf(errorrender.MsgResolveMediaRefs8, workspacetasks.ErrMediaNotFound)
+				return fmt.Errorf(errorrender.MsgResolveMediaRefs8, tasks.ErrMediaNotFound)
 			}
 		}
 	}
 	return nil
 }
 
-func hasWorkspaceMaskParam(task *workspacetasks.WorkspaceTask) bool {
+func hasWorkspaceMaskParam(task *tasks.WorkspaceTask) bool {
 	if task == nil {
 		return false
 	}
-	_, ok := workspacetasks.MaskAssetIDFromParams(task.Params)
+	_, ok := tasks.MaskAssetIDFromParams(task.Params)
 	return ok
 }
 
@@ -145,11 +146,11 @@ func hasWorkspaceMaskParam(task *workspacetasks.WorkspaceTask) bool {
 // rows drop the job, anything else is transient and rides River backoff.
 func (w *WorkspaceTaskWorker) claim(
 	ctx context.Context,
-	args workspacetasks.WorkspaceTaskArgs,
-	task *workspacetasks.WorkspaceTask,
+	args taskqueue.WorkspaceTaskArgs,
+	task *tasks.WorkspaceTask,
 	tracker *workspaceSendTracker,
 	model, layer string,
-) (*workspacetasks.WorkspaceTask, *workspaceSend, error) {
+) (*tasks.WorkspaceTask, *workspaceSend, error) {
 	lease := strings.TrimSpace(args.ExecutionToken)
 	if lease == "" {
 		// Fail closed: Create/Retry always mint the lease, so an empty
@@ -157,7 +158,7 @@ func (w *WorkspaceTaskWorker) claim(
 		// would execute a second send the submit path never fenced.
 		return nil, nil, fmt.Errorf("workspace task job carries no execution token: %w", errEmptyLease)
 	}
-	claimed, started, err := w.claims.ClaimTaskWithAttempt(ctx, task.WorkspaceID, task.ID, lease, workspacetasks.AttemptStart{
+	claimed, started, err := w.claims.ClaimTaskWithAttempt(ctx, task.WorkspaceID, task.ID, lease, tasks.AttemptStart{
 		TaskID:         task.ID,
 		RiverJobID:     tracker.riverJobID,
 		Service:        tracker.service,
@@ -168,10 +169,10 @@ func (w *WorkspaceTaskWorker) claim(
 		StartedAt:      time.Now(),
 	})
 	if err != nil {
-		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+		if errors.Is(err, tasks.ErrStateConflict) || errors.Is(err, tasks.ErrNotFound) {
 			current, getErr := w.store.GetTask(ctx, task.WorkspaceID, task.ID)
 			if getErr != nil {
-				if errors.Is(getErr, workspacetasks.ErrNotFound) {
+				if errors.Is(getErr, tasks.ErrNotFound) {
 					return nil, nil, nil
 				}
 				return nil, nil, fmt.Errorf("workspace task reload after claim conflict: %w", getErr)
@@ -226,7 +227,7 @@ var errWorkspaceRoutingSnapshotCorrupt = errors.New(errorrender.MsgSnapshotCorru
 // adapter so existing failTerminal messages and errors.Is targets never
 // change. A snapshot pinned for another service is rejected the same as
 // a corrupt one: routing facts must belong to the task that carries them.
-func resolveExecutionSnapshot(task *workspacetasks.WorkspaceTask) (routing.RoutingSnapshot, error) {
+func resolveExecutionSnapshot(task *tasks.WorkspaceTask) (routing.RoutingSnapshot, error) {
 	if task == nil || len(task.RoutingSnapshot) == 0 {
 		return routing.RoutingSnapshot{}, errWorkspaceRoutingSnapshotMissing
 	}
@@ -290,7 +291,7 @@ func truncateWorkspaceError(msg string) string {
 // worker execution. All recorder failures degrade to warn-logs except
 // the fallback start, which gates the second send.
 type workspaceSendTracker struct {
-	recorder   workspacetasks.AttemptRecorder
+	recorder   taskports.AttemptRecorder
 	taskID     string
 	riverJobID int64
 	service    string
@@ -310,9 +311,9 @@ type workspaceSendTracker struct {
 // so the two together cover every non-initial send.
 func workspaceAttemptLayer(retryCount int32, jobAttempt int) string {
 	if retryCount > 0 || jobAttempt > 0 {
-		return workspacetasks.AttemptRetryLayerRiverTask
+		return tasks.AttemptRetryLayerRiverTask
 	}
-	return workspacetasks.AttemptRetryLayerGateway
+	return tasks.AttemptRetryLayerGateway
 }
 
 // workspaceSend is one started gateway send's open fact. A zero token
@@ -326,7 +327,7 @@ type workspaceSend struct {
 	layer     string
 }
 
-func newWorkspaceSendTracker(recorder workspacetasks.AttemptRecorder, taskID string, riverJobID int64, service string) *workspaceSendTracker {
+func newWorkspaceSendTracker(recorder taskports.AttemptRecorder, taskID string, riverJobID int64, service string) *workspaceSendTracker {
 	return &workspaceSendTracker{recorder: recorder, taskID: taskID, riverJobID: riverJobID, service: service}
 }
 
@@ -371,13 +372,13 @@ func (t *workspaceSendTracker) startSend(ctx context.Context, model, layer strin
 	if t == nil || t.recorder == nil {
 		return send
 	}
-	token, err := workspacetasks.NewExecutionToken()
+	token, err := tasks.NewExecutionToken()
 	if err != nil {
 		slog.Warn("workspace task attempt token mint failed; continuing without facts",
 			"task_id", t.taskID, "err", err)
 		return send
 	}
-	attemptNo, err := t.recorder.StartAttempt(ctx, workspacetasks.AttemptStart{
+	attemptNo, err := t.recorder.StartAttempt(ctx, tasks.AttemptStart{
 		TaskID:         t.taskID,
 		RiverJobID:     t.riverJobID,
 		ExecutionToken: token,
@@ -405,7 +406,7 @@ func (t *workspaceSendTracker) startFallbackSend(ctx context.Context, candidate 
 	if t == nil || t.recorder == nil {
 		return nil, false
 	}
-	send := t.startSend(ctx, candidate, workspacetasks.AttemptRetryLayerModelFallback)
+	send := t.startSend(ctx, candidate, tasks.AttemptRetryLayerModelFallback)
 	if send.token == "" {
 		return nil, false
 	}
@@ -413,15 +414,15 @@ func (t *workspaceSendTracker) startFallbackSend(ctx context.Context, candidate 
 }
 
 func (s *workspaceSend) finishCompleted(model string) {
-	s.finish(workspacetasks.AttemptStatusCompleted, "", "", "", strings.TrimSpace(model))
+	s.finish(tasks.AttemptStatusCompleted, "", "", "", strings.TrimSpace(model))
 }
 
 func (s *workspaceSend) finishFailed(stage, category, reason string) {
-	s.finish(workspacetasks.AttemptStatusFailed, stage, category, reason, s.model)
+	s.finish(tasks.AttemptStatusFailed, stage, category, reason, s.model)
 }
 
 func (s *workspaceSend) finishRequeued(stage, category, reason string) {
-	s.finish(workspacetasks.AttemptStatusRequeued, stage, category, reason, s.model)
+	s.finish(tasks.AttemptStatusRequeued, stage, category, reason, s.model)
 }
 
 func (s *workspaceSend) finish(status, stage, category, reason, resolvedModel string) {
@@ -433,7 +434,7 @@ func (s *workspaceSend) finish(status, stage, category, reason, resolvedModel st
 	// writeback too.
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	rows, err := s.tracker.recorder.FinishAttempt(cleanupCtx, workspacetasks.AttemptFinish{
+	rows, err := s.tracker.recorder.FinishAttempt(cleanupCtx, tasks.AttemptFinish{
 		ExecutionToken:  s.token,
 		TaskID:          s.tracker.taskID,
 		Status:          status,

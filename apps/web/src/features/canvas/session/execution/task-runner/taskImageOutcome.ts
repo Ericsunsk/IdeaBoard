@@ -2,7 +2,7 @@ import {
   normalizeTaskImageResults,
   type TaskImageResult,
 } from '../../../../../core/query/taskResult'
-import type { WaitWorkspaceTaskOptions } from '../../../../../api/workspaceTaskWaiter'
+import type { WaitWorkspaceTaskOptions } from '@/api/tasks/workspaceTaskWaiter'
 import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,

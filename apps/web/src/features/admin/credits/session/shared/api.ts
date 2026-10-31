@@ -40,8 +40,13 @@ import type {
   ListControlBillingAccountsParams,
   ListControlCreditLedgerParams,
 } from '@/api/generated-query/control/model'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
+import { createUniqueId } from '@/core/utils/ids'
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
+import {
+  validateAdminCreditCommand,
+  type AdminCreditCommandInput,
+} from '../../core/wallets/creditCommandContract'
 
 // Reconciliation views (issue #809). The legacy `admin-credits` generated
 // client is gone; the same domain service now serves the Control Plane
@@ -493,6 +498,50 @@ async function listReconciliationFindingQueue(
     toControlOptions(options),
   )
   return requireContractData<CreditReconciliationFindingPage>(envelope, '加载账本异常队列失败')
+}
+
+type AdminCreditCommandRequest =
+  ControlCreditCommandRequest | ControlCreditRefundRequest | ControlCreditCorrectionRequest
+
+export type BuiltAdminCreditCommand = {
+  body: AdminCreditCommandRequest
+  idempotencyKey: string
+}
+
+export function buildAdminCreditCommandRequest(
+  input: AdminCreditCommandInput,
+  idFactory: () => string = () => createUniqueId(),
+): BuiltAdminCreditCommand {
+  const validation = validateAdminCreditCommand(input)
+  if (!validation.valid || input.amountCredits == null) {
+    throw new Error(validation.targetError || validation.amountError || 'Idea操作参数无效')
+  }
+
+  const operationId = idFactory()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 96)
+  if (!operationId) throw new Error('无法生成Idea操作标识')
+  const body: AdminCreditCommandRequest = {
+    ...(input.billingAccountId?.trim()
+      ? { billing_account_id: input.billingAccountId.trim() }
+      : { user_id: (input.userPublicId ?? '').trim() }),
+    amount_credits: input.amountCredits,
+    business_reference_id: `control-ui:${input.kind}:${operationId}`,
+  }
+
+  if (input.kind === 'refund') {
+    ;(body as ControlCreditRefundRequest).charge_transaction_id =
+      input.chargeTransactionId as string
+  }
+  if (input.kind === 'correction') {
+    ;(body as ControlCreditCorrectionRequest).original_transaction_id =
+      input.originalTransactionId as string
+  }
+
+  return {
+    body,
+    idempotencyKey: `control-ui:${input.kind}:${operationId}`,
+  }
 }
 
 export const adminCreditsBillingApi = {

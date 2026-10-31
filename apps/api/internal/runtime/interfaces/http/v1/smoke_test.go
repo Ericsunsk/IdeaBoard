@@ -29,7 +29,8 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/workspacemedia"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/testsupport"
 
@@ -41,7 +42,7 @@ type phase4Fixture struct {
 	store  *tenancy.InMemoryStore
 	dir    *staticUserDirectory
 	ws     *tenancy.Workspace
-	tasks  *workspacetasks.InMemoryStore
+	tasks  *taskmemory.InMemoryStore
 	media  *workspacemedia.InMemoryWorkspaceMediaStore
 	lib    *librarymemory.InMemoryWorkspaceLibraryStore
 	queue  *fakeTaskQueue
@@ -52,7 +53,7 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
-	tasks := workspacetasks.NewInMemoryStoreForTests()
+	tasks := taskmemory.NewInMemoryStoreForTests()
 	txTasks := newV1TxTaskStore(tasks)
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	lib := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
@@ -96,27 +97,29 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
 		Library: ContractV1LibraryDeps{Store: lib},
-		Media:   media,
+		Media:   ContractV1MediaDeps{Media: media},
 		// MediaObjects stays nil in this fixture: binary reads fail closed
 		// with 503 while metadata keeps working. The production task worker
 		// has its own renderer; this HTTP fixture does not exercise it.
-		Tasks:         txTasks,
-		TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
-		TaskQuoter: quoter,
-		TaskHolder: holder,
-		TaskQueue:  queue,
-		// Production-shaped asset gate: the real adapter over the
-		// media store, so task input/output verification runs the
-		// same ready/archived/invisible mapping as production.
-		TaskAssets:          &workspacemedia.TaskAssetAdapter{Store: media},
-		TaskRouter:          allowTestPoolResolver(),
-		TaskSnapshotSaver:   v1TxSnapshotSaver(saved),
-		TaskBillingAccounts: v1FakeBillingAccounts{},
-		// #917: the preflight resolves the same fixture account submit
-		// holds and gates the same fixture funds.
-		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-		TaskQuoteWallets:         newV1FakeQuoteWallets(),
-		TaskAcceptance:           &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
+		Tasks: ContractV1TaskDeps{
+			Tasks:         txTasks,
+			TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
+			TaskQuoter: quoter,
+			TaskHolder: holder,
+			TaskQueue:  queue,
+			// Production-shaped asset gate: the real adapter over the
+			// media store, so task input/output verification runs the
+			// same ready/archived/invisible mapping as production.
+			TaskAssets:          &workspacemedia.TaskAssetAdapter{Store: media},
+			TaskRouter:          allowTestPoolResolver(),
+			TaskSnapshotSaver:   v1TxSnapshotSaver(saved),
+			TaskBillingAccounts: v1FakeBillingAccounts{},
+			// #917: the preflight resolves the same fixture account submit
+			// holds and gates the same fixture funds.
+			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+			TaskQuoteWallets:         newV1FakeQuoteWallets(),
+			TaskAcceptance:           &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
+		},
 	})
 	return &phase4Fixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, media: media, lib: lib, queue: queue}
 }
@@ -133,6 +136,11 @@ func phase4Call(t *testing.T, fx *phase4Fixture, method, path, body string, user
 
 const phase4Checksum = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
+// TODO(cleanup): TestPhase4SurfacesLive is a dedupe candidate — route
+// existence is pinned by TestPublicRouterOpenAPIParity +
+// TestContractInventory*, but cross-module composition
+// (upload -> asset -> task -> output) is unique to this test. Delete only
+// after the team confirms smoke coverage is no longer needed.
 // TestPhase4SurfacesLive proves every restored surface answers non-501
 // and composes: upload -> asset public_id -> task input -> task output.
 func TestPhase4SurfacesLive(t *testing.T) {
@@ -242,11 +250,15 @@ func TestPhase4SurfacesLive(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("archive asset = %d (%v), want 200", status, archiveBody)
 	}
-	if len(fx.queue.enqueued) != 1 || fx.queue.enqueued[0].ID != taskID {
-		t.Fatalf("enqueued = %+v, want the created task", fx.queue.enqueued)
+	if len(fx.queue.Enqueued) != 1 || fx.queue.Enqueued[0].ID != taskID {
+		t.Fatalf("enqueued = %+v, want the created task", fx.queue.Enqueued)
 	}
 }
 
+// TODO(cleanup): TestPhase4AccessMatrix is a dedupe candidate —
+// outsider-404/malformed-404/deleted-route-404 spot-checks overlap with
+// TestContractInventoryLegacySurfacesStayDeleted, but the member-403 and
+// 503-seam assertions are unique. Delete only after the team confirms.
 // TestPhase4AccessMatrix spot-checks the 404-vs-403 convergence across
 // all three modules plus the fail-closed 503 seams.
 func TestPhase4AccessMatrix(t *testing.T) {
@@ -356,9 +368,9 @@ func TestPhase4ConcurrencySanity(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			start := time.Now()
-			_, err := fx.tasks.CreateTask(ctx, &workspacetasks.WorkspaceTask{
+			_, err := fx.tasks.CreateTask(ctx, &taskdomain.WorkspaceTask{
 				ID: fmt.Sprintf("task_load%04d", i), WorkspaceID: ws, OwnerUserID: 1,
-				Service: "render", Status: workspacetasks.StatusPending,
+				Service: "render", Status: taskdomain.StatusPending,
 			})
 			record(time.Since(start))
 			if err != nil {

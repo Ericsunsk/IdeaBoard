@@ -9,7 +9,7 @@ import {
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../../../core/graph'
 import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import type { CanvasVueFlowConnectionAdapter } from '../../../session/flow-adapter'

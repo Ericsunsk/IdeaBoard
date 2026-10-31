@@ -20,7 +20,7 @@
 
 import type { QueryClient } from '@tanstack/vue-query'
 import { queryClient } from '../../../../core/query/queryClient'
-import { subscribeWorkspaceEvent } from '../../../../api/workspaceEventStream'
+import { subscribeWorkspaceEvent } from '@/api/realtime/workspaceEventStream'
 import { getBoardById } from '../catalog/boards'
 import { getBoardScope, subscribeBoardScopeChange } from '../catalog/scope'
 import type { WorkspaceBoardDocument, WorkspaceBoardMeta } from '../adapters/boardsResource'

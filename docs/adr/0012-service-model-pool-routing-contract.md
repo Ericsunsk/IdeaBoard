@@ -174,6 +174,28 @@ attempts keep reporting `normal_running` pressure until River redelivery
 converges them. Adding a reaper requires coordinated status, pressure-query,
 Admin, and frontend changes. Vision search stays outside the pool (rule 14).
 
+## Amendment (2026-11-11): provider/model split
+
+`ModelPoolEntry` 不再使用复合引用 `model`（`provider/model[@gateway-path]`）。
+新 shape 为 `ModelPoolEntry { provider, model, enabled,
+supported_resolutions }`：`provider` 是 registry slug（写边界小写化，未知
+slug 在执行时合成默认 `custom-<slug>` 命名空间，绝不消失）；`model` 是裸
+model 名（无 `@path`、无空白；裸名内部的嵌套斜杠如 openrouter 的
+`vendor/model` 予以保留）。Decision-2 的其余语义不变：一个 Model 仍可出现
+在多个 Service 的 pool 中；pool entry 仍无 priority/fallback/weight。
+
+持久层（`20261111000000_model_pool_provider_split.sql`，
+`schema/fragments/modelpool.sql`）：唯一键由
+`(service, model)` 变为 `(service, provider, model)`，并新增 3 个 CHECK —
+`provider` 长度 1–64、`provider NOT LIKE '%/%'/'%@%'/'% %'`、`model NOT LIKE
+'%@%'/'% %'`。Selection 算法与 snapshot pin 规则（Decision-9：不可变
+`RoutingSnapshot`、per-Service 单调 `pool_version`、worker 只消费快照）不变；
+排序用的 canonical catalog reference 相应变为 `provider/model`。
+
+迁移语义：destructive、不可逆、无 dual-write、无 backfill。Pre-launch
+pool 表无保留数据，dev 数据库重建；非空 pool 表必须先清空才能应用该
+migration。
+
 ## Status
 
 Accepted

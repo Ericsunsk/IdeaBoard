@@ -24,7 +24,7 @@ import type { TaskImageOutcomeWaiter } from '../task-runner/taskImageOutcome'
 import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
-import { resolveMediaAssetProcessingURL } from '../../../../../api/mediaAssetDelivery'
+import { resolveMediaAssetProcessingURL } from '@/api/media/mediaAssetDelivery'
 
 export type ImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 

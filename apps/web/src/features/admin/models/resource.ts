@@ -8,7 +8,7 @@ import {
   testControlAIGatewayConnection,
   updateControlAIGateway,
 } from '@/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import {
   buildControlMutationHeaders,
   createControlError,

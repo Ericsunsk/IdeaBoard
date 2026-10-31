@@ -116,7 +116,7 @@ describe('Boolean naming through the actual ESLint config', () => {
       const apiFetch = { retry: false, retry: true }
       console.log(apiFetch)
     `,
-      'src/api/client.ts',
+      'src/api/http/client.ts',
     )
     expect(messages).toHaveLength(1)
     expect(messages[0]?.message).toContain('|property:retry|2')

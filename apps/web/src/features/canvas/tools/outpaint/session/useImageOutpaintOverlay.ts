@@ -1,7 +1,7 @@
 import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { CanvasInteractionKey } from '../../../ui/screens/useFlowCanvasInteractionState.ts'
+import type { CanvasInteractionKey } from '../../../ui/screens/controllers/useFlowCanvasInteractionState.ts'
 import {
   containImageRect,
   createOutpaintRect,

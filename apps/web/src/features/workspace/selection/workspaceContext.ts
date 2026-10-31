@@ -24,12 +24,12 @@ import {
   removeLocalStorageItem,
   writeLocalStorageItem,
 } from '../../../core/utils/storage'
-import { isOpaqueId, opaqueIdPrefix } from '../../../api/contractKernel'
-import type { AuthFailureMode } from '../../../api/client'
+import { isOpaqueId, opaqueIdPrefix } from '@/api/http/contractKernel'
+import type { AuthFailureMode } from '@/api/http/client'
 import { getStoredUser } from '../../../core/utils/auth'
 import { stringParam } from '../../../core/router/queryParams'
 import { accountScoped } from '../../../core/query/queryDefaults'
-import { setMediaWorkspaceIdResolver } from '../../../api/mediaWorkspaceScope'
+import { setMediaWorkspaceIdResolver } from '@/api/media/mediaWorkspaceScope'
 
 export const WORKSPACE_URL_PARAM = 'workspace'
 export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'

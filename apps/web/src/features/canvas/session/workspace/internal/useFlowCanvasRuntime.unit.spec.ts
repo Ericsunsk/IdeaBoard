@@ -10,7 +10,8 @@ import {
   type BoardSnapshot,
   type CanvasGroup,
 } from '../../../../board'
-import { CanvasGraphSession, type CanvasGraphTransaction } from '../../../core/graph'
+import type { CanvasGraphTransaction } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'

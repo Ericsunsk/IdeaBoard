@@ -15,11 +15,11 @@ import type {
   WorkspacePurchaseOptions,
   WorkspaceRechargeHistoryItem,
 } from '../../../../api/generated-query/public/model'
-import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { buildContractRequestHeaders, newRequestId } from '@/api/http/contractKernel'
 import { withSignal } from '../../../../core/utils/request'
-import { workspaceBillingPendingOrderIdempotencyKey } from '../../../../api/idempotencyKey'
+import { workspaceBillingPendingOrderIdempotencyKey } from '@/api/http/idempotencyKey'
 import { i18n } from '../../../../core/i18n'
-import { subscribeWorkspaceEvent } from '../../../../api/workspaceEventStream'
+import { subscribeWorkspaceEvent } from '@/api/realtime/workspaceEventStream'
 import {
   readContractListBody,
   requireAccountWorkspaceId,

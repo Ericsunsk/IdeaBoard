@@ -97,7 +97,7 @@ describe('overlayMenuContract', () => {
     expect(libraryMenu).toContain('handleMenuKeyboardNavigation')
     expect(libraryMenu).toContain('createPopoverMotionTransition')
 
-    const nodePopover = read('features/canvas/ui/nodes/primitives/NodeToolPopover.vue')
+    const nodePopover = read('features/canvas/ui/nodes/primitives/tools/NodeToolPopover.vue')
     expect(nodePopover).toContain('createPopoverMotionTransition')
   })
 })

@@ -6,7 +6,7 @@ import type { MediaInputImage } from '../graph-editing'
 import { createPendingImageExecutionCore } from '../execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
+import { resetMediaWorkspaceIdResolver } from '@/api/media/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const plan = {

@@ -15,7 +15,7 @@ import {
 import type { MembershipRole } from '../../../api/generated-query/public/model/membershipRole'
 import type { WorkspaceMemberInvite } from '../../../api/generated-query/public/model/workspaceMemberInvite'
 import type { CreateWorkspaceMemberInviteRequestRole } from '../../../api/generated-query/public/model/createWorkspaceMemberInviteRequestRole'
-import { workspaceMemberIdempotencyKey } from '../../../api/idempotencyKey'
+import { workspaceMemberIdempotencyKey } from '@/api/http/idempotencyKey'
 import { userErrorCode } from '../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../core/query/queryDefaults'
 import { withSignal } from '../../../core/utils/request'

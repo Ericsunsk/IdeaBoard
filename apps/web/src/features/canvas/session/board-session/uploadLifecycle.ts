@@ -1,4 +1,4 @@
-import { uploadApi } from '../../../../api/upload'
+import { uploadApi } from '@/api/media/upload'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { i18n } from '../../../../core/i18n'
 import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board/ports/canvas'

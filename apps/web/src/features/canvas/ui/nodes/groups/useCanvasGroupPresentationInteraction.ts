@@ -6,7 +6,7 @@ import type {
   CanvasGroupFrame,
   CanvasGroupResizeHandle,
   CanvasPoint,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 import type { CanvasSelectionGroupAction } from '../../../session/graph-editing'
 import type { DismissTransientCanvasUi } from '../../../session/flow-adapter'
 import { useCanvasCustomLayerOverlay } from '../../overlays'

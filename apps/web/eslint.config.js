@@ -307,7 +307,7 @@ export default tseslint.config(
     files: [
       'src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts',
       'src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts',
-      'src/features/board/ui/gallery/BoardCard.vue',
+      'src/features/board/ui/gallery/cards/BoardCard.vue',
       'src/features/board/ui/share/ShareDialog.vue',
     ],
     // First-batch seam guard: these leaves receive workspace/auth via

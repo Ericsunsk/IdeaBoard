@@ -39,7 +39,7 @@ import {
   adminDashboardRootClass,
   adminTableCardClass,
   adminTableFooterClass,
-} from '../../core/uiClasses'
+} from '../styling/uiClasses'
 
 defineProps<{
   currentPage: number

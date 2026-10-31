@@ -8,7 +8,7 @@ import type { NotificationDTO } from '@/api/generated-query/public/model'
 import {
   NOTIFICATION_EVENT_TYPES,
   resetWorkspaceEventStreamsForTests,
-} from '@/api/workspaceEventStream'
+} from '@/api/realtime/workspaceEventStream'
 import { useNotifications } from './useNotifications'
 import type { NotificationCenterTab } from './readFilters'
 import NotificationPopover from '../ui/NotificationPopover.vue'

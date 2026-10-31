@@ -15,7 +15,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	billingapplication "ideaboard/api/internal/billing/application"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -101,7 +101,7 @@ func TestWorkspaceTaskQuoterPreservesPricingCause(t *testing.T) {
 		if !errors.Is(err, tc.want) {
 			t.Fatalf("Quote pricing failure (%v) = %v, want cause preserved", tc.storeErr, err)
 		}
-		if !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+		if !errors.Is(err, tasks.ErrQuoteUnavailable) {
 			t.Fatalf("Quote pricing failure (%v) = %v, want quote-unavailable identity", tc.storeErr, err)
 		}
 	}
@@ -113,7 +113,7 @@ func TestWorkspaceTaskQuoterTransientKeepsQuoteUnavailable(t *testing.T) {
 	if err == nil {
 		t.Fatal("Quote transient failure = nil, want error")
 	}
-	if !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("Quote transient failure = %v, want quote-unavailable identity", err)
 	}
 	if errors.Is(err, billing.ErrPricingUnavailable) || errors.Is(err, billing.ErrSKUNotFound) {
@@ -123,11 +123,11 @@ func TestWorkspaceTaskQuoterTransientKeepsQuoteUnavailable(t *testing.T) {
 
 func TestWorkspaceTaskQuoterFailsClosed(t *testing.T) {
 	var nilQuoter *WorkspaceTaskQuoter
-	if _, err := nilQuoter.Quote(context.Background(), "render", "1k", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := nilQuoter.Quote(context.Background(), "render", "1k", 1); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil quoter err = %v, want quote-unavailable", err)
 	}
 	unsupported := &WorkspaceTaskQuoter{Catalog: testTaskCatalog(10, nil)}
-	if _, err := unsupported.Quote(context.Background(), "nope", "1k", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := unsupported.Quote(context.Background(), "nope", "1k", 1); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("unsupported kind err = %v, want quote-unavailable", err)
 	}
 }

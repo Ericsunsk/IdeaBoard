@@ -14,7 +14,8 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
 )
@@ -96,16 +97,16 @@ func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*taskruntime.Worksp
 	return r
 }
 
-func rendererTestTask() *workspacetasks.WorkspaceTask {
-	return &workspacetasks.WorkspaceTask{
+func rendererTestTask() *tasks.WorkspaceTask {
+	return &tasks.WorkspaceTask{
 		ID: "task_render1", WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "render", Status: workspacetasks.StatusRunning, ExecutionToken: "execution_render1",
+		Service: "render", Status: tasks.StatusRunning, ExecutionToken: "execution_render1",
 	}
 }
 
-func rendererRemoteRef(sum string) workspacetasks.OutputRef {
-	return workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/fake-result.png",
+func rendererRemoteRef(sum string) tasks.OutputRef {
+	return tasks.OutputRef{
+		Kind: tasks.OutputKindRemote, URL: "https://cdn.example.com/fake-result.png",
 		ChecksumSHA256: sum, Role: "result", ResultIndex: 0,
 	}
 }
@@ -115,14 +116,14 @@ func materializingProvider(t *testing.T, media workspacemedia.WorkspaceMediaStor
 	t.Helper()
 	m, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: media, Objects: objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(context.Context, *workspacetasks.WorkspaceTask, workspacetasks.OutputRef) ([]byte, error) {
+		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(context.Context, *tasks.WorkspaceTask, tasks.OutputRef) ([]byte, error) {
 			return nil, errors.New("inline fixture must not download")
 		}),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	return func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		results, err := m.MaterializeRemoteResults(ctx, task.OwnerUserID, task.ID, []string{"data:image/png;base64," + base64.StdEncoding.EncodeToString(png)}, taskmedia.ResultMaterializeOptions{})
 		if err != nil {
 			return nil, err
@@ -131,7 +132,7 @@ func materializingProvider(t *testing.T, media workspacemedia.WorkspaceMediaStor
 	}
 }
 
-func (e *rendererTestEnv) materialize(t *testing.T, ctx context.Context, task *workspacetasks.WorkspaceTask) []workspacetasks.OutputRef {
+func (e *rendererTestEnv) materialize(t *testing.T, ctx context.Context, task *tasks.WorkspaceTask) []tasks.OutputRef {
 	t.Helper()
 	refs, err := materializingProvider(t, e.media, e.objects, e.pegged)(ctx, task)
 	if err != nil {
@@ -142,7 +143,7 @@ func (e *rendererTestEnv) materialize(t *testing.T, ctx context.Context, task *w
 
 func TestWorkspaceTaskRendererRejectsRemoteOutputs(t *testing.T) {
 	env := newRendererTestEnv(t)
-	if _, err := env.renderer(t, nil).RenderOutputs(context.Background(), rendererTestTask(), []workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)}); err == nil {
+	if _, err := env.renderer(t, nil).RenderOutputs(context.Background(), rendererTestTask(), []tasks.OutputRef{rendererRemoteRef(env.peggedSum)}); err == nil {
 		t.Fatal("remote output must fail before any ingestion")
 	}
 	if len(env.objects.objects) != 0 {
@@ -172,8 +173,8 @@ func TestWorkspaceTaskRendererAssetPassthrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompleteSession: %v", err)
 	}
-	refs, err := r.RenderOutputs(ctx, rendererTestTask(), []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
+	refs, err := r.RenderOutputs(ctx, rendererTestTask(), []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 	})
 	if err != nil {
 		t.Fatalf("passthrough: %v", err)
@@ -181,8 +182,8 @@ func TestWorkspaceTaskRendererAssetPassthrough(t *testing.T) {
 	if len(refs) != 1 || refs[0].AssetID != asset.ID {
 		t.Fatalf("refs = %+v, want the verified asset", refs)
 	}
-	if _, err := r.RenderOutputs(ctx, rendererTestTask(), []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"},
+	if _, err := r.RenderOutputs(ctx, rendererTestTask(), []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"},
 	}); err == nil {
 		t.Fatal("unknown asset = nil, want media-not-found failure")
 	}
@@ -214,12 +215,12 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	// Wrapped in the merged claim+attempt seam the worker constructor
 	// requires (production writes both in one statement).
-	store := newAttemptClaimStore(workspacetasks.NewInMemoryStoreForTests(), workspacetasks.NewInMemoryAttemptRecorderForTests())
+	store := newAttemptClaimStore(taskmemory.NewInMemoryStoreForTests(), taskmemory.NewInMemoryAttemptRecorderForTests())
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	assets := &workspacemedia.TaskAssetAdapter{Store: media}
 	service := newTxWorkerService(newTxWorkerStore(store), holder, queue, assets, nil)
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
 		Service: "render", Quantity: 1, Resolution: "",
 	}, "worker-render-key")
@@ -251,10 +252,10 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
-	if len(got.OutputRefs) != 1 || got.OutputRefs[0].Kind != workspacetasks.OutputKindAsset {
+	if len(got.OutputRefs) != 1 || got.OutputRefs[0].Kind != tasks.OutputKindAsset {
 		t.Fatalf("outputs = %+v, want the rendered asset ref", got.OutputRefs)
 	}
 	if _, err := media.GetAsset(ctx, "ws_test", got.OutputRefs[0].AssetID); err != nil {
@@ -280,8 +281,8 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			return []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"}}, nil
+		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			return []tasks.OutputRef{{Kind: tasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"}}, nil
 		}),
 		Renderer: renderer,
 	})
@@ -295,7 +296,7 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.RetryCount != 0 {

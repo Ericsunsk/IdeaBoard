@@ -20,26 +20,29 @@ import (
 	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
 )
 
 type stubWorkerBoards struct {
-	access *workspacetasks.BoardAccess
+	access *tasks.BoardAccess
 	err    error
 }
 
-func (f *stubWorkerBoards) ResolveBoardAccess(_ context.Context, _, _ string, _ int64, _ string) (*workspacetasks.BoardAccess, error) {
+func (f *stubWorkerBoards) ResolveBoardAccess(_ context.Context, _, _ string, _ int64, _ string) (*tasks.BoardAccess, error) {
 	return f.access, f.err
 }
 
 func TestWorkerCompletesBoardBoundTaskAfterRevoke(t *testing.T) {
 	ctx := context.Background()
-	memory := workspacetasks.NewInMemoryStoreForTests()
-	attempts := workspacetasks.NewInMemoryAttemptRecorderForTests()
+	memory := taskmemory.NewInMemoryStoreForTests()
+	attempts := taskmemory.NewInMemoryAttemptRecorderForTests()
 	store := newAttemptClaimStore(memory, attempts)
-	authorizer := &stubWorkerBoards{access: &workspacetasks.BoardAccess{
+	authorizer := &stubWorkerBoards{access: &tasks.BoardAccess{
 		BoardID: "board_worker_1", IsOwner: true,
 		CanRead: true, CanGenerate: true, CanWrite: true,
 		Archived: false, AccessVersion: 2,
@@ -48,7 +51,7 @@ func TestWorkerCompletesBoardBoundTaskAfterRevoke(t *testing.T) {
 		newWorkerTestHolder(), &workerTestQueue{},
 		&workerTestAssets{ready: map[string]bool{"asset_input_1": true}, archived: map[string]bool{}},
 		authorizer)
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
 		Service: "render", Quantity: 1, Resolution: "",
 		MediaAssetIDs: []string{"asset_input_1"},
@@ -59,13 +62,13 @@ func TestWorkerCompletesBoardBoundTaskAfterRevoke(t *testing.T) {
 	}
 	// Revoke AFTER acceptance: the grant disappears mid-execution.
 	authorizer.access = nil
-	authorizer.err = workspacetasks.ErrBoardNotFound
+	authorizer.err = tasks.ErrBoardNotFound
 	created = pinWorkerSnapshot(t, store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	recorder := &recordingWorkerLibrarySaver{}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: store, Settler: service,
 		Assets: &workerTestAssets{ready: map[string]bool{"asset_input_1": true}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			if len(task.MediaAssetIDs) != 1 || task.MediaAssetIDs[0] != "asset_input_1" {
 				t.Fatalf("provider inputs = %v, want the accepted inputs", task.MediaAssetIDs)
 			}
@@ -84,7 +87,7 @@ func TestWorkerCompletesBoardBoundTaskAfterRevoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed despite mid-execution revoke", got.Status)
 	}
 	if got.BoardID != "board_worker_1" || got.BoardAccessVersion != 2 {
@@ -116,7 +119,7 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 	_ = service
 	assets := &workspacemedia.TaskAssetAdapter{Store: env.media}
 	boundStore := newTxPGServiceStore(env.tasks)
-	boundService := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	boundService := taskapp.NewService(taskapp.ServiceDeps{
 		TaskRead: env.tasks, TaskLifecycle: boundStore, SubmissionClaims: boundStore, BillingAccounts: boundStore,
 		Quoter: &integrationQuoter{}, Holder: newIntegrationHolder(), Queue: &integrationQueue{},
 		Assets:        assets,
@@ -143,10 +146,10 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	runBoundTask := func(key, filename string) *workspacetasks.WorkspaceTask {
+	runBoundTask := func(key, filename string) *tasks.WorkspaceTask {
 		t.Helper()
 		asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, filename)
-		created, err := boundService.Create(ctx, workspacetasks.CreateInput{
+		created, err := boundService.Create(ctx, tasks.CreateInput{
 			WorkspaceID: env.wsA, OwnerUserID: env.userA,
 			Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "",
 			BoardID: boardID, WorkspaceRole: "owner",
@@ -158,9 +161,9 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 			Store: env.tasks, Settler: boundService,
 			Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
-			Provider: WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-				return []workspacetasks.OutputRef{
-					{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
+			Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+				return []tasks.OutputRef{
+					{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 				}, nil
 			}),
 			LibrarySaver: trigger,
@@ -169,7 +172,7 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+		if err := worker.Work(ctx, &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 			TaskID: created.ID, WorkspaceID: env.wsA,
 			Service: "render", ExecutionToken: created.ExecutionToken,
 		}}); err != nil {
@@ -179,7 +182,7 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if stored.Status != workspacetasks.StatusCompleted {
+		if stored.Status != tasks.StatusCompleted {
 			t.Fatalf("status = %q, want completed", stored.Status)
 		}
 		return stored

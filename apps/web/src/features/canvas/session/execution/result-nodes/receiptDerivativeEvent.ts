@@ -1,7 +1,7 @@
 // Workspace hints prompt authoritative metadata reads; polling remains the bounded fallback.
 
-import { getWorkspaceMediaAssetMetadata } from '../../../../../api/mediaAssetDelivery'
-import { subscribeWorkspaceMediaInvalidation } from '../../../../../api/workspaceEventStream'
+import { getWorkspaceMediaAssetMetadata } from '@/api/media/mediaAssetDelivery'
+import { subscribeWorkspaceMediaInvalidation } from '@/api/realtime/workspaceEventStream'
 import { awaitReceiptDerivativeReady, RECEIPT_DERIVATIVE_BUDGET_MS } from './resultDisplay'
 
 // Bypass cached pending metadata when confirming a receipt or a hint.

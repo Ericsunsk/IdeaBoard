@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"reflect"
@@ -63,20 +63,20 @@ func seedTaskWorkspace(t *testing.T, db *pgxpool.Pool) (workspacePublicID string
 	return workspacePublicID, userID
 }
 
-func newPendingTask(taskID, workspaceID string, ownerUserID int64) *workspacetasks.WorkspaceTask {
-	token, err := workspacetasks.NewExecutionToken()
+func newPendingTask(taskID, workspaceID string, ownerUserID int64) *taskdomain.WorkspaceTask {
+	token, err := taskdomain.NewExecutionToken()
 	if err != nil {
 		panic(err)
 	}
-	return &workspacetasks.WorkspaceTask{
+	return &taskdomain.WorkspaceTask{
 		ID:             taskID,
 		WorkspaceID:    workspaceID,
 		OwnerUserID:    ownerUserID,
 		Service:        "render",
 		Params:         map[string]any{"quality": "high"},
-		Status:         workspacetasks.StatusPending,
+		Status:         taskdomain.StatusPending,
 		ExecutionToken: token,
-		BillingSnapshot: workspacetasks.BillingSnapshot{
+		BillingSnapshot: taskdomain.BillingSnapshot{
 			SKU: "ai-image:render", DisplayName: "Render",
 			PriceVersionID: 1, PriceVersion: 1,
 			OutputResolution: "default", UnitCredits: 10, Quantity: 1, TotalCredits: 10,
@@ -99,7 +99,7 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTask failed: %v", err)
 	}
-	if created.ID != taskID || created.Status != workspacetasks.StatusPending {
+	if created.ID != taskID || created.Status != taskdomain.StatusPending {
 		t.Fatalf("created = %+v, want pending %s", created, taskID)
 	}
 	if created.Service != "render" {
@@ -116,7 +116,7 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClaimTask failed: %v", err)
 	}
-	if claimed.Status != workspacetasks.StatusRunning {
+	if claimed.Status != taskdomain.StatusRunning {
 		t.Fatalf("claimed status = %q, want running", claimed.Status)
 	}
 	if claimed.ExecutionToken != created.ExecutionToken {
@@ -128,18 +128,18 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 	if _, err := store.ClaimTask(ctx, workspaceID, taskID, created.ExecutionToken); err != nil {
 		t.Fatalf("same-token redelivery claim failed: %v", err)
 	}
-	if _, err := store.ClaimTask(ctx, workspaceID, taskID, "another-execution-token"); !errors.Is(err, workspacetasks.ErrStateConflict) {
+	if _, err := store.ClaimTask(ctx, workspaceID, taskID, "another-execution-token"); !errors.Is(err, taskdomain.ErrStateConflict) {
 		t.Fatalf("different-token claim err = %v, want state conflict", err)
 	}
 
 	checksum := strings.Repeat("c", 64)
-	completed, err := store.CompleteTask(ctx, workspaceID, taskID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/o.png", ChecksumSHA256: checksum, ResultIndex: 0},
+	completed, err := store.CompleteTask(ctx, workspaceID, taskID, []taskdomain.OutputRef{
+		{Kind: taskdomain.OutputKindRemote, URL: "https://cdn.example.com/o.png", ChecksumSHA256: checksum, ResultIndex: 0},
 	})
 	if err != nil {
 		t.Fatalf("CompleteTask failed: %v", err)
 	}
-	if completed.Status != workspacetasks.StatusCompleted || completed.CompletedAt == nil {
+	if completed.Status != taskdomain.StatusCompleted || completed.CompletedAt == nil {
 		t.Fatalf("completed = %+v, want completed with timestamp", completed)
 	}
 	if len(completed.OutputRefs) != 1 || completed.OutputRefs[0].URL != "https://cdn.example.com/o.png" {
@@ -147,14 +147,14 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 	}
 
 	// Terminal transitions fail closed.
-	if _, err := store.CompleteTask(ctx, workspaceID, taskID, nil); !errors.Is(err, workspacetasks.ErrStateConflict) {
+	if _, err := store.CompleteTask(ctx, workspaceID, taskID, nil); !errors.Is(err, taskdomain.ErrStateConflict) {
 		t.Fatalf("re-complete err = %v, want state conflict", err)
 	}
-	if _, err := store.FailTask(ctx, workspaceID, taskID, "boom"); !errors.Is(err, workspacetasks.ErrStateConflict) {
+	if _, err := store.FailTask(ctx, workspaceID, taskID, "boom"); !errors.Is(err, taskdomain.ErrStateConflict) {
 		t.Fatalf("fail-after-complete err = %v, want state conflict", err)
 	}
 	cancelled, already, err := store.CancelTask(ctx, workspaceID, taskID, ownerID, "late")
-	if err != nil || !already || cancelled.Status != workspacetasks.StatusCompleted {
+	if err != nil || !already || cancelled.Status != taskdomain.StatusCompleted {
 		t.Fatalf("cancel-after-complete = %+v %v %v, want idempotent replay", cancelled, already, err)
 	}
 }
@@ -173,14 +173,14 @@ func TestWorkspaceTaskCancelAndFail(t *testing.T) {
 	if err != nil || already {
 		t.Fatalf("cancel = %+v %v %v", cancelled, already, err)
 	}
-	if cancelled.Status != workspacetasks.StatusCancelled || cancelled.CompletedAt == nil {
+	if cancelled.Status != taskdomain.StatusCancelled || cancelled.CompletedAt == nil {
 		t.Fatalf("cancelled = %+v, want cancelled with timestamp", cancelled)
 	}
 	if cancelled.CancelReason != "no longer needed" {
 		t.Fatalf("cancel reason = %q, want round-trip", cancelled.CancelReason)
 	}
 	replay, already, err := store.CancelTask(ctx, workspaceID, taskID, ownerID, "again")
-	if err != nil || !already || replay.Status != workspacetasks.StatusCancelled {
+	if err != nil || !already || replay.Status != taskdomain.StatusCancelled {
 		t.Fatalf("cancel replay = %+v %v %v", replay, already, err)
 	}
 
@@ -192,7 +192,7 @@ func TestWorkspaceTaskCancelAndFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FailTask failed: %v", err)
 	}
-	if failed.Status != workspacetasks.StatusFailed || failed.ErrorMsg != "provider exploded" {
+	if failed.Status != taskdomain.StatusFailed || failed.ErrorMsg != "provider exploded" {
 		t.Fatalf("failed = %+v", failed)
 	}
 }
@@ -227,7 +227,7 @@ func TestResolveBillingAccountInTxRejectsClosedOrganization(t *testing.T) {
 	if _, err := db.Exec(ctx, `UPDATE organizations SET closed_at = now() WHERE internal_id = $1`, organization.InternalID); err != nil {
 		t.Fatalf("close organization: %v", err)
 	}
-	if accountID, err := resolve(); accountID != 0 || !errors.Is(err, workspacetasks.ErrNotFound) {
+	if accountID, err := resolve(); accountID != 0 || !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("closed organization account resolution = %d, %v; want not found", accountID, err)
 	}
 }
@@ -246,7 +246,7 @@ func TestWorkspaceTaskRetry(t *testing.T) {
 	if _, err := store.ClaimTask(ctx, workspaceID, taskID, created.ExecutionToken); err != nil {
 		t.Fatal(err)
 	}
-	newToken, err := workspacetasks.NewExecutionToken()
+	newToken, err := taskdomain.NewExecutionToken()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestWorkspaceTaskRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TransitionForRetry failed: %v", err)
 	}
-	if retried.Status != workspacetasks.StatusPending || retried.RetryCount != 1 {
+	if retried.Status != taskdomain.StatusPending || retried.RetryCount != 1 {
 		t.Fatalf("retried = %+v, want pending retry_count=1", retried)
 	}
 	if retried.ExecutionToken != newToken {
@@ -281,15 +281,15 @@ func TestWorkspaceTaskVisibilityAndPaging(t *testing.T) {
 	if err != nil || len(some) == 0 {
 		t.Fatalf("list = %d %v", len(some), err)
 	}
-	if _, err := store.GetTask(ctx, otherWS, some[0].ID); !errors.Is(err, workspacetasks.ErrNotFound) {
+	if _, err := store.GetTask(ctx, otherWS, some[0].ID); !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("cross-workspace get err = %v, want not found", err)
 	}
 	// Malformed shape is invisible.
-	if _, err := store.GetTask(ctx, workspaceID, "nope"); !errors.Is(err, workspacetasks.ErrNotFound) {
+	if _, err := store.GetTask(ctx, workspaceID, "nope"); !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("malformed get err = %v, want not found", err)
 	}
 	// Unknown workspace is invisible.
-	if _, err := store.GetTask(ctx, "ws_missing123", some[0].ID); !errors.Is(err, workspacetasks.ErrNotFound) {
+	if _, err := store.GetTask(ctx, "ws_missing123", some[0].ID); !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("unknown workspace get err = %v, want not found", err)
 	}
 
@@ -324,8 +324,8 @@ func TestWorkspaceTaskAssetOutputs(t *testing.T) {
 	if _, err := store.CreateTask(ctx, newPendingTask(taskID, workspaceID, ownerID)); err != nil {
 		t.Fatal(err)
 	}
-	updated, err := store.AddOutputs(ctx, workspaceID, taskID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: assetID, Role: "result", ResultIndex: 0},
+	updated, err := store.AddOutputs(ctx, workspaceID, taskID, []taskdomain.OutputRef{
+		{Kind: taskdomain.OutputKindAsset, AssetID: assetID, Role: "result", ResultIndex: 0},
 	})
 	if err != nil {
 		t.Fatalf("AddOutputs failed: %v", err)
@@ -334,9 +334,9 @@ func TestWorkspaceTaskAssetOutputs(t *testing.T) {
 		t.Fatalf("asset output did not round-trip: %+v", updated.OutputRefs)
 	}
 	// Unknown asset fails closed.
-	if _, err := store.AddOutputs(ctx, workspaceID, taskID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_missing123", ResultIndex: 1},
-	}); !errors.Is(err, workspacetasks.ErrMediaNotFound) {
+	if _, err := store.AddOutputs(ctx, workspaceID, taskID, []taskdomain.OutputRef{
+		{Kind: taskdomain.OutputKindAsset, AssetID: "asset_missing123", ResultIndex: 1},
+	}); !errors.Is(err, taskdomain.ErrMediaNotFound) {
 		t.Fatalf("missing asset err = %v, want media not found", err)
 	}
 }
@@ -375,7 +375,7 @@ func TestWorkspaceTaskValidation(t *testing.T) {
 
 	bad := newPendingTask("task_test"+randomHex(t, 6), workspaceID, ownerID)
 	bad.Service = "nope"
-	if _, err := store.CreateTask(ctx, bad); !workspacetasks.IsValidationError(err) {
+	if _, err := store.CreateTask(ctx, bad); !taskdomain.IsValidationError(err) {
 		t.Fatalf("unknown kind err = %v, want validation", err)
 	}
 	// Duplicate public id conflicts.
@@ -383,19 +383,19 @@ func TestWorkspaceTaskValidation(t *testing.T) {
 	if _, err := store.CreateTask(ctx, dup); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.CreateTask(ctx, dup); !errors.Is(err, workspacetasks.ErrStateConflict) {
+	if _, err := store.CreateTask(ctx, dup); !errors.Is(err, taskdomain.ErrStateConflict) {
 		t.Fatalf("duplicate err = %v, want state conflict", err)
 	}
 	if err := store.DeleteTask(ctx, workspaceID, dup.ID); err != nil {
 		t.Fatalf("DeleteTask failed: %v", err)
 	}
-	if _, err := store.GetTask(ctx, workspaceID, dup.ID); !errors.Is(err, workspacetasks.ErrNotFound) {
+	if _, err := store.GetTask(ctx, workspaceID, dup.ID); !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("get-after-delete err = %v, want not found", err)
 	}
 }
 
 func TestEnvelopeRoundTrip(t *testing.T) {
-	task := &workspacetasks.WorkspaceTask{
+	task := &taskdomain.WorkspaceTask{
 		MediaAssetIDs:   []string{"asset_abc"},
 		Params:          map[string]any{"prompt": "x"},
 		CanonicalParams: `{"schema_version":6,"service":"render"}`,
@@ -404,7 +404,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		ResolvedModel:  "openrouter/fake-image-model",
 		ExecutionToken: "exec_abc",
 		CancelReason:   "done",
-		BillingSnapshot: workspacetasks.BillingSnapshot{
+		BillingSnapshot: taskdomain.BillingSnapshot{
 			SKU: "ai-image:render", TotalCredits: 10, HoldTransactionID: "hold_1",
 		},
 	}
@@ -496,13 +496,13 @@ func TestClaimTaskWithAttemptCommitsLeaseAndFactAtomically(t *testing.T) {
 	}
 	lease := created.ExecutionToken
 
-	claimed, started, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, lease, workspacetasks.AttemptStart{
+	claimed, started, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, lease, taskdomain.AttemptStart{
 		RiverJobID:     41,
 		Service:        created.Service,
 		RequestedModel: "openrouter/model-a",
 		ResolvedModel:  "openrouter/model-a",
 		Provider:       "openrouter",
-		RetryLayer:     workspacetasks.AttemptRetryLayerGateway,
+		RetryLayer:     taskdomain.AttemptRetryLayerGateway,
 	})
 	if err != nil {
 		t.Fatalf("ClaimTaskWithAttempt failed: %v", err)
@@ -510,7 +510,7 @@ func TestClaimTaskWithAttemptCommitsLeaseAndFactAtomically(t *testing.T) {
 	if !started {
 		t.Fatal("started = false, want true for a fresh claim")
 	}
-	if claimed.Status != workspacetasks.StatusRunning {
+	if claimed.Status != taskdomain.StatusRunning {
 		t.Fatalf("claimed status = %q, want running", claimed.Status)
 	}
 
@@ -522,14 +522,14 @@ func TestClaimTaskWithAttemptCommitsLeaseAndFactAtomically(t *testing.T) {
 	if facts[0].ExecutionToken != lease {
 		t.Fatalf("attempt execution_token = %q, want the lease token %q", facts[0].ExecutionToken, lease)
 	}
-	if facts[0].AttemptNo != 1 || facts[0].RetryLayer != workspacetasks.AttemptRetryLayerGateway || facts[0].Status != "running" {
+	if facts[0].AttemptNo != 1 || facts[0].RetryLayer != taskdomain.AttemptRetryLayerGateway || facts[0].Status != "running" {
 		t.Fatalf("attempt fact = %+v, want attempt_no 1 / gateway / running", facts[0])
 	}
 
 	// The finish fence closes exactly the row the claim wrote.
-	rows, err := store.FinishAttempt(ctx, workspacetasks.AttemptFinish{
+	rows, err := store.FinishAttempt(ctx, taskdomain.AttemptFinish{
 		ExecutionToken: lease, TaskID: taskID,
-		Status:        workspacetasks.AttemptStatusCompleted,
+		Status:        taskdomain.AttemptStatusCompleted,
 		ResolvedModel: "openrouter/model-a",
 	})
 	if err != nil || rows != 1 {
@@ -557,7 +557,7 @@ func TestClaimTaskWithAttemptRollsBackLeaseWhenAttemptInsertFails(t *testing.T) 
 		t.Fatalf("CreateTask failed: %v", err)
 	}
 
-	if _, _, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, created.ExecutionToken, workspacetasks.AttemptStart{
+	if _, _, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, created.ExecutionToken, taskdomain.AttemptStart{
 		RiverJobID:     7,
 		Service:        created.Service,
 		RequestedModel: "openrouter/model-a",
@@ -569,7 +569,7 @@ func TestClaimTaskWithAttemptRollsBackLeaseWhenAttemptInsertFails(t *testing.T) 
 	}
 
 	status, lease := readTaskRow(t, db, taskID)
-	if status != string(workspacetasks.StatusPending) {
+	if status != string(taskdomain.StatusPending) {
 		t.Fatalf("task status = %q, want pending (the lease flip rolled back)", status)
 	}
 	if lease != "" {
@@ -581,13 +581,13 @@ func TestClaimTaskWithAttemptRollsBackLeaseWhenAttemptInsertFails(t *testing.T) 
 
 	// The claim is retryable, and the retry succeeds: the fence never left
 	// the task wedged.
-	if _, started, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, created.ExecutionToken, workspacetasks.AttemptStart{
+	if _, started, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, created.ExecutionToken, taskdomain.AttemptStart{
 		RiverJobID:     7,
 		Service:        created.Service,
 		RequestedModel: "openrouter/model-a",
 		ResolvedModel:  "openrouter/model-a",
 		Provider:       "openrouter",
-		RetryLayer:     workspacetasks.AttemptRetryLayerGateway,
+		RetryLayer:     taskdomain.AttemptRetryLayerGateway,
 	}); err != nil || !started {
 		t.Fatalf("retry claim = (%v, started=%v), want success", err, started)
 	}
@@ -613,10 +613,10 @@ func TestClaimTaskWithAttemptSameTokenResumesOneFact(t *testing.T) {
 		t.Fatalf("CreateTask failed: %v", err)
 	}
 	lease := created.ExecutionToken
-	start := workspacetasks.AttemptStart{
+	start := taskdomain.AttemptStart{
 		RiverJobID: 9, Service: created.Service,
 		RequestedModel: "openrouter/model-a", ResolvedModel: "openrouter/model-a",
-		Provider: "openrouter", RetryLayer: workspacetasks.AttemptRetryLayerGateway,
+		Provider: "openrouter", RetryLayer: taskdomain.AttemptRetryLayerGateway,
 	}
 	if _, started, err := store.ClaimTaskWithAttempt(ctx, workspaceID, taskID, lease, start); err != nil || !started {
 		t.Fatalf("first claim = (%v, started=%v)", err, started)
@@ -631,7 +631,7 @@ func TestClaimTaskWithAttemptSameTokenResumesOneFact(t *testing.T) {
 	if started {
 		t.Fatal("started = true, want false for a resume of an already-recorded lease")
 	}
-	if claimed.Status != workspacetasks.StatusRunning {
+	if claimed.Status != taskdomain.StatusRunning {
 		t.Fatalf("resumed status = %q, want running", claimed.Status)
 	}
 	if facts := readAttemptFacts(t, db, taskID); len(facts) != 1 {
@@ -671,7 +671,7 @@ func TestClaimRowToTaskPreservesEveryTaskColumn(t *testing.T) {
 
 // merged from envelope_board_test.go (store.go aggregation: ClaimTaskWithAttempt atomicity and marshalEnvelope/mapTaskRow board binding).
 func TestEnvelopeRoundTripsBoardBinding(t *testing.T) {
-	task := &workspacetasks.WorkspaceTask{
+	task := &taskdomain.WorkspaceTask{
 		ID: "task_board_env_1", WorkspaceID: "ws_abc", OwnerUserID: 7,
 		Service: "render", MediaAssetIDs: []string{"asset_input_1"},
 		Params:  map[string]any{"mask_asset_id": "asset_mask_1"},
@@ -694,7 +694,7 @@ func TestEnvelopeRoundTripsBoardBinding(t *testing.T) {
 	if len(loaded.MediaAssetIDs) != 1 || loaded.MediaAssetIDs[0] != "asset_input_1" {
 		t.Fatalf("media_asset_ids = %v, want the accepted inputs", loaded.MediaAssetIDs)
 	}
-	if maskID, ok := workspacetasks.MaskAssetIDFromParams(loaded.Params); !ok || maskID != "asset_mask_1" {
+	if maskID, ok := taskdomain.MaskAssetIDFromParams(loaded.Params); !ok || maskID != "asset_mask_1" {
 		t.Fatalf("mask = (%q, %v), want the accepted mask", maskID, ok)
 	}
 }

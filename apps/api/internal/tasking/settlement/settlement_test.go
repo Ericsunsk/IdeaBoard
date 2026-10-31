@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/tasking/settlement"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // TestStateVocabularyPinsWireWords locks the durable settlement words.
@@ -44,8 +44,8 @@ func TestTaskHoldKeyPinsDurableIdentity(t *testing.T) {
 			t.Fatalf("TaskHoldKey(%q,%q) = %q, want %q", tc.workspace, tc.key, got, tc.want)
 		}
 	}
-	if got := settlement.TaskHoldKey("ws_alpha", "key-1"); !strings.HasPrefix(got, "task-hold:"+workspacetasks.TaskSubmitOperation+":") {
-		t.Fatalf("TaskHoldKey namespace = %q, want durable claim operation %q", got, workspacetasks.TaskSubmitOperation)
+	if got := settlement.TaskHoldKey("ws_alpha", "key-1"); !strings.HasPrefix(got, "task-hold:"+tasks.TaskSubmitOperation+":") {
+		t.Fatalf("TaskHoldKey namespace = %q, want durable claim operation %q", got, tasks.TaskSubmitOperation)
 	}
 }
 

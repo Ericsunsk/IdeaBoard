@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { withSignal } from '@/core/utils/request'
 import { getControlMonitor } from '@/api/generated-query/control/control-platform/control-platform'
 import {
@@ -16,9 +16,9 @@ import type {
   PaginatedControlTasks,
 } from '@/api/generated-query/control/model'
 import type { ControlTaskEnvelope } from '@/api/generated-query/control/model/controlTaskEnvelope'
-import { buildControlMutationHeaders } from '../shared/core/controlMutation'
+import type { WorkspaceTaskStatus as TaskStatus } from '@/api/tasks/workspaceTaskContract'
+import { buildControlMutationHeaders } from '../shared/adapters/controlMutation'
 import { keepPrevious } from '@/core/query/queryDefaults'
-import type { TaskStatus } from '../shared/core/taskMetricTokens'
 
 // Monitor and task read models use Control API envelopes through this resource.
 // Pages consume normalized view models; the SSE monitor stream uses its raw protocol.

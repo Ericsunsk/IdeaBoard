@@ -265,55 +265,63 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 		return nil, nil, NewFieldValidationError("dimensions")
 	}
 
-	row, err := getSessionRow(ctx, q, trimmedWorkspace, uploadID)
-	if err != nil {
-		return nil, nil, err
-	}
-	live, effectErr := applyLazySessionEffects(ctx, q, trimmedWorkspace, row, time.Now().UTC())
-	if errors.Is(effectErr, ErrExpired) {
-		return nil, nil, ErrExpired
-	}
-	if effectErr != nil {
-		return nil, nil, effectErr
-	}
-	row = live
-	if SessionStatus(row.Status) != StatusPending && SessionStatus(row.Status) != StatusTransferring {
-		return nil, nil, ErrStateConflict
-	}
-	session := sessionFromRow(trimmedWorkspace, row)
-	if mismatch := matchCompletionFacts(session, facts); mismatch != nil {
-		if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
-			PublicID:          row.PublicID,
-			WorkspacePublicID: trimmedWorkspace,
-		}); failErr != nil && !database.IsNotFound(failErr) {
-			return nil, nil, failErr
-		}
-		return nil, nil, mismatch
-	}
-
-	minted := strings.TrimSpace(asset.PublicID)
-	if !contract.IsAssetID(minted) {
-		minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	slot := session.StorageKey
-	if strings.TrimSpace(slot) == "" {
-		slot = SlotKey(trimmedWorkspace, session.ID, session.Filename)
-	}
-	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, trimmedWorkspace)
-	if err != nil {
-		if errors.Is(err, errWorkspaceNotFound) {
-			return nil, nil, ErrNotFound
-		}
-		return nil, nil, err
-	}
-
 	var completed *Session
 	var created *Asset
 	var createAssetFailed bool
+	var terminalErr error
+	var sessionPublicID string
 	txErr := db.withTx(func(txQ *dbsqlc.Queries) error {
+		row, err := getSessionRow(ctx, txQ, trimmedWorkspace, uploadID)
+		if err != nil {
+			return err
+		}
+		sessionPublicID = row.PublicID
+		live, effectErr := applyLazySessionEffects(ctx, txQ, trimmedWorkspace, row, time.Now().UTC())
+		if errors.Is(effectErr, ErrExpired) {
+			// Persist lazy expiry before reporting the terminal error.
+			terminalErr = ErrExpired
+			return nil
+		}
+		if effectErr != nil {
+			return effectErr
+		}
+		row = live
+		if SessionStatus(row.Status) != StatusPending && SessionStatus(row.Status) != StatusTransferring {
+			return ErrStateConflict
+		}
+		session := sessionFromRow(trimmedWorkspace, row)
+		if mismatch := matchCompletionFacts(session, facts); mismatch != nil {
+			if _, failErr := txQ.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
+				PublicID:          row.PublicID,
+				WorkspacePublicID: trimmedWorkspace,
+			}); failErr != nil && !database.IsNotFound(failErr) {
+				return failErr
+			}
+			// Commit the fail above: returning mismatch here would
+			// roll the Fail back (Do rolls back on fn error).
+			terminalErr = mismatch
+			return nil
+		}
+
+		minted := strings.TrimSpace(asset.PublicID)
+		if !contract.IsAssetID(minted) {
+			minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
+			if err != nil {
+				return err
+			}
+		}
+		slot := session.StorageKey
+		if strings.TrimSpace(slot) == "" {
+			slot = SlotKey(trimmedWorkspace, session.ID, session.Filename)
+		}
+		workspaceInternalID, err := resolveWorkspaceInternal(ctx, txQ, trimmedWorkspace)
+		if err != nil {
+			if errors.Is(err, errWorkspaceNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+
 		for attempt := 0; attempt < mintAttempts; attempt++ {
 			inserted, err := txQ.CreateMediaAsset(ctx, dbsqlc.CreateMediaAssetParams{
 				PublicID:        minted,
@@ -364,14 +372,19 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 	})
 	if txErr != nil {
 		if createAssetFailed {
+			// The asset INSERT poisoned the tx (aborted), so its
+			// Fail must run after rollback on the pool queries.
 			if _, failErr := q.FailUploadSession(ctx, dbsqlc.FailUploadSessionParams{
-				PublicID:          row.PublicID,
+				PublicID:          sessionPublicID,
 				WorkspacePublicID: trimmedWorkspace,
 			}); failErr != nil && !database.IsNotFound(failErr) {
 				return nil, nil, errors.Join(txErr, failErr)
 			}
 		}
 		return nil, nil, txErr
+	}
+	if terminalErr != nil {
+		return nil, nil, terminalErr
 	}
 	return completed, created, nil
 }

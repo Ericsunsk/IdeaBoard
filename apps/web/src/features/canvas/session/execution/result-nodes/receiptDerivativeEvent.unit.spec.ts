@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getWorkspaceMediaAssetMetadata } from '../../../../../api/mediaAssetDelivery'
-import { subscribeWorkspaceMediaInvalidation } from '../../../../../api/workspaceEventStream'
+import { getWorkspaceMediaAssetMetadata } from '@/api/media/mediaAssetDelivery'
+import { subscribeWorkspaceMediaInvalidation } from '@/api/realtime/workspaceEventStream'
 import { waitForReceiptDerivativeReady } from './receiptDerivativeEvent'
 
-vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()
+vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/api/media/mediaAssetDelivery')>()
   return { ...original, getWorkspaceMediaAssetMetadata: vi.fn() }
 })
 
-vi.mock('../../../../../api/workspaceEventStream', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../../api/workspaceEventStream')>()
+vi.mock('@/api/realtime/workspaceEventStream', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/api/realtime/workspaceEventStream')>()
   return { ...original, subscribeWorkspaceMediaInvalidation: vi.fn() }
 })
 

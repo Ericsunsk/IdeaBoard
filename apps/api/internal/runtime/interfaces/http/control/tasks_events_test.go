@@ -11,8 +11,9 @@ import (
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	creditsports "ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/db/dbutil"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/tenancy"
 	"net/http"
 	"sync"
@@ -71,7 +72,7 @@ type controlTxHolder struct {
 	failRelease error
 }
 
-var _ workspacetasks.TxHolder = (*controlTxHolder)(nil)
+var _ taskports.TxHolder = (*controlTxHolder)(nil)
 
 func (h *controlTxHolder) releaseFailure() error {
 	h.mu.Lock()
@@ -268,7 +269,7 @@ func (e *controlCancelEnv) taskStatus(t *testing.T, taskID string) string {
 	return status
 }
 
-func (e *controlCancelEnv) adapter(holder workspacetasks.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
+func (e *controlCancelEnv) adapter(holder taskports.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
 	return NewWorkspaceControlTasks(e.pool, taskpostgres.NewStore(e.pool), holder, users, events)
 }
 
@@ -335,7 +336,7 @@ func TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce(t *testing.T) {
 		t.Fatalf("workspace envelopes = %d, want exactly 1: %+v", len(envelopes), envelopes)
 	}
 	published := statuses[0]
-	if published.Status != string(workspacetasks.StatusCancelled) {
+	if published.Status != string(tasks.StatusCancelled) {
 		t.Fatalf("status announcement = %q, want cancelled", published.Status)
 	}
 	if published.TaskID != taskID || published.WorkspaceID != env.workspace {
@@ -350,7 +351,7 @@ func TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce(t *testing.T) {
 	if published.OccurredAt.IsZero() {
 		t.Fatal("status announcement carried a zero occurred_at; it must be stamped after the commit")
 	}
-	if envelopes[0].TaskID != taskID || envelopes[0].Status != string(workspacetasks.StatusCancelled) {
+	if envelopes[0].TaskID != taskID || envelopes[0].Status != string(tasks.StatusCancelled) {
 		t.Fatalf("workspace envelope = %+v, want task.cancelled for %s", envelopes[0], taskID)
 	}
 }
@@ -553,7 +554,7 @@ func assertControlPortAnnouncedOnce(t *testing.T, env *controlCancelEnv, events 
 		t.Fatalf("workspace envelopes = %d, want exactly 1: %+v", len(envelopes), envelopes)
 	}
 	published := statuses[0]
-	if published.Status != string(workspacetasks.StatusCancelled) {
+	if published.Status != string(tasks.StatusCancelled) {
 		t.Fatalf("status announcement = %q, want cancelled", published.Status)
 	}
 	if published.TaskID != taskID || published.WorkspaceID != env.workspace {
@@ -568,7 +569,7 @@ func assertControlPortAnnouncedOnce(t *testing.T, env *controlCancelEnv, events 
 	if published.OccurredAt.IsZero() {
 		t.Fatal("announcement carried a zero occurred_at; it must be stamped post-commit")
 	}
-	if envelopes[0].TaskID != taskID || envelopes[0].Status != string(workspacetasks.StatusCancelled) {
+	if envelopes[0].TaskID != taskID || envelopes[0].Status != string(tasks.StatusCancelled) {
 		t.Fatalf("workspace envelope = %+v, want task.cancelled for %s", envelopes[0], taskID)
 	}
 }

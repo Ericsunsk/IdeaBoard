@@ -4,8 +4,8 @@ import {
   publishControlCatalogPrices,
   setControlCatalogAvailability,
 } from '@/api/generated-query/control/control-billing/control-billing'
-import { requireContractData } from '@/api/contractKernel'
-import { stripUndefined } from '@/api/stripUndefined'
+import { requireContractData } from '@/api/http/contractKernel'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,

@@ -36,7 +36,7 @@ import { renderWithUser, screen, waitFor } from './render'
 import { i18n } from '../core/i18n'
 import AdminSwitch from '../features/admin/shared/ui/form/AdminSwitch.vue'
 import { NodeActionButton } from '../features/canvas/ui/nodes/primitives'
-import { adminCompactIconButtonClass } from '../features/admin/shared/core/uiClasses'
+import { adminCompactIconButtonClass } from '../features/admin/shared/ui/styling/uiClasses'
 import '../app/style.css'
 import {
   CurveGraph,

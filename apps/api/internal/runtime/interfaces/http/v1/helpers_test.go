@@ -19,9 +19,164 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
+	"ideaboard/api/internal/media/workspacemedia"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
+	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
+	taskdomain "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/testdb"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
+
+var testInvitations = v1testsupport.TestInvitations
+
+type fakeTaskQuoter = v1testsupport.FakeTaskQuoter
+type fakeTaskQueue = v1testsupport.FakeTaskQueue
+type fakeTaskHolder = v1testsupport.FakeTaskHolder
+var newFakeTaskHolder = v1testsupport.NewFakeTaskHolder
+type v1TxTaskStore = v1testsupport.TxTaskStore
+var newV1TxTaskStore = v1testsupport.NewTxTaskStore
+var allowTestPoolResolver = v1testsupport.AllowTestPoolResolver
+var v1TxSnapshotSaver = v1testsupport.TxSnapshotSaver
+type v1FakeBillingAccounts = v1testsupport.FakeBillingAccounts
+type v1FakeQuoteWallets = v1testsupport.FakeQuoteWallets
+var newV1FakeQuoteWallets = v1testsupport.NewFakeQuoteWallets
+
+type v1TxSubmissionAcceptance struct {
+	boards taskports.BoardAuthorizer
+	assets taskports.AssetReader
+}
+
+func (f *v1TxSubmissionAcceptance) AuthorizeSubmission(ctx context.Context, tx pgx.Tx, input taskdomain.CreateInput) (taskdomain.TaskBoardBinding, error) {
+	t := &v1testsupport.TxSubmissionAcceptance{Boards: f.boards, Assets: f.assets}
+	return t.AuthorizeSubmission(ctx, tx, input)
+}
+
+func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps ContractV1Deps, withGlobalMiddleware ...bool) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(runtimehttp.ContractRequestIDMiddleware())
+	router.Use(func(c *gin.Context) {
+		raw := strings.TrimSpace(c.GetHeader(testsupport.HeaderTestUser))
+		if raw == "" {
+			c.Next()
+			return
+		}
+		userID, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || userID <= 0 {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		role := strings.TrimSpace(c.GetHeader(testsupport.HeaderTestRole))
+		if role == "" {
+			role = "user"
+		}
+		id := dir.ensure(userID)
+		identityPrincipal, err := principal.New(userID, id,
+			fmt.Sprintf("auth-%d", userID), fmt.Sprintf("test-user-%d", userID), role)
+		if err != nil || principal.Set(c, identityPrincipal) != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		c.Next()
+	})
+	if len(withGlobalMiddleware) > 0 && withGlobalMiddleware[0] {
+		runtimehttp.RegisterRoutes(router, runtimehttp.Dependencies{
+			CORSMiddleware: func(c *gin.Context) { c.Next() },
+		}, nil, runtimehttp.FrontendRouteOptions{})
+	}
+	deps.Store = store
+	deps.Users = dir
+	v1 := router.Group(runtimehttp.ContractV1GroupPath)
+	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, deps)
+	return router
+}
+
+type v1MediaAccessPGFixture struct {
+	engine *gin.Engine
+	ws     *tenancy.Workspace
+	ws2    *tenancy.Workspace
+	owner  int64
+	member int64
+	boards *boards.PostgresWorkspaceBoardStore
+	media  *workspacemedia.Service
+}
+
+func newV1MediaAccessPGFixture(t *testing.T) *v1MediaAccessPGFixture {
+	t.Helper()
+	db := testdb.Open(t)
+	ctx := context.Background()
+	tstore := tenancypg.NewStore(db, nil)
+	dir := newStaticUserDirectory()
+	const owner, member, other = 1, 10, 8
+	for _, id := range []int64{owner, member, other} {
+		dir.ensure(id)
+	}
+	ws, err := tstore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "media-access", OwnerUserID: owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v1testsupport.ConfigureWorkspaceDefaultQuota(t, db, ws)
+	if _, err := tstore.AddWorkspaceMember(ctx, ws.PublicID, member, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws2, err := tstore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "media-access-2", OwnerUserID: other})
+	if err != nil {
+		t.Fatal(err)
+	}
+	media := workspacemedia.NewService(db)
+	objects := v1testsupport.NewFakeMediaObjects()
+	boardsStore := boards.NewPostgresWorkspaceBoardStore(db, workspacemedia.ValidateDocumentAssets)
+	engine := newV1MediaTestEngine(tstore, dir, ContractV1Deps{
+		Media: ContractV1MediaDeps{
+			Media:         media,
+			MediaObjects:  objects,
+			MediaRenderer: imgproxy.NewRenderer(v1testsupport.TestImgproxyConfig(t), nil),
+		},
+		Boards: boardsStore,
+	})
+	return &v1MediaAccessPGFixture{engine: engine, ws: ws, ws2: ws2, owner: owner, member: member, boards: boardsStore, media: media}
+}
+
+func (f *v1MediaAccessPGFixture) uploadsPath() string {
+	return "/api/v1/workspaces/" + f.ws.PublicID + "/uploads"
+}
+
+func (f *v1MediaAccessPGFixture) assetsPath() string {
+	return "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets"
+}
+
+func pgAccessUpload(t *testing.T, f *v1MediaAccessPGFixture, creator int64, boardID string, key string) string {
+	t.Helper()
+	staged := v1testsupport.GapsPNGBytes(512)
+	checksum := v1testsupport.GapsChecksum(staged)
+	body := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":%d,"checksum_sha256":%q,"media_kind":"image"%s}}`,
+		len(staged), checksum, func() string {
+			if boardID == "" {
+				return ""
+			}
+			return fmt.Sprintf(`,"board_id":%q`, boardID)
+		}())
+	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(),
+		body: body, userID: creator, headers: map[string]string{"Idempotency-Key": key + "-create"}})
+	if status != http.StatusCreated {
+		t.Fatalf("create = %d %v, want 201", status, payload)
+	}
+	uploadID := v1testsupport.MediaUploadID(t, v1testsupport.Data(t, payload))
+	v1testsupport.GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", staged, creator, key+"-stage")
+	finish := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":%d,"width":100,"height":80}}`, checksum, len(staged))
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete",
+		body: finish, userID: creator, headers: map[string]string{"Idempotency-Key": key + "-complete"}})
+	if status != http.StatusOK {
+		t.Fatalf("complete = %d %v, want 200", status, payload)
+	}
+	return v1testsupport.MediaAssetID(t, v1testsupport.Data(t, payload))
+}
 
 // ---- merged from (base helpers_test.go) ----
 // staticUserDirectory is a deterministic runtimehttp.V1UserDirectory for tests: user N
@@ -1365,9 +1520,9 @@ func TestRequireV1IdempotencyKey(t *testing.T) {
 				c.Request.Header.Set(contract.IdempotencyKeyHeader, tt.header)
 			}
 
-			gotKey, gotOK := requireV1IdempotencyKey(c)
+			gotKey, gotOK := shared.RequireIdempotencyKey(c)
 			if gotKey != tt.wantKey || gotOK != tt.wantOK {
-				t.Fatalf("requireV1IdempotencyKey() = (%q, %t), want (%q, %t)", gotKey, gotOK, tt.wantKey, tt.wantOK)
+				t.Fatalf("shared.RequireIdempotencyKey() = (%q, %t), want (%q, %t)", gotKey, gotOK, tt.wantKey, tt.wantOK)
 			}
 			if recorder.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", recorder.Code, tt.wantStatus)

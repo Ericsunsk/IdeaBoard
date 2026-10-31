@@ -1,6 +1,6 @@
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { organizationCreationIdempotencyKey } from '../../../api/idempotencyKey'
+import { organizationCreationIdempotencyKey } from '@/api/http/idempotencyKey'
 import { useAppToast } from '../../../core/composables/useAppToast'
 
 type OrganizationItem = { publicId: string; name: string }

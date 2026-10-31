@@ -1,24 +1,19 @@
 import type { QueryClient } from '@tanstack/vue-query'
+import { useQuery } from '@tanstack/vue-query'
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 import {
-  getPublicBrandingSetting,
-  useGetPublicBrandingSetting,
-  getGetPublicBrandingSettingQueryKey,
-} from '../../api/generated-query/public/user/user'
-import type { PublicBrandingSetting } from '../../api/generated-query/public/model'
-import {
-  createContractDataSelector,
-  resolveContractData,
-  type ContractSuccessEnvelope,
-} from '../../api/contractKernel'
+  createSiteBrandingSelector,
+  fetchSiteBrandingEnvelope,
+  fetchSiteBrandingSetting,
+  SITE_BRANDING_QUERY_KEY,
+  type ApiResponseBrandingSetting,
+  type BrandingSetting,
+} from '@/api/siteBranding'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
-export type BrandingSetting = PublicBrandingSetting
-
-export type ApiResponseBrandingSetting = ContractSuccessEnvelope<BrandingSetting>
-
-export const SITE_BRANDING_QUERY_KEY = getGetPublicBrandingSettingQueryKey()
+export type { ApiResponseBrandingSetting, BrandingSetting }
+export { SITE_BRANDING_QUERY_KEY }
 
 export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
   project_name: 'IdeaBoard',
@@ -36,29 +31,18 @@ export type SiteBrandingOptions = {
 }
 
 export async function fetchSiteBranding(fallback: string): Promise<BrandingSetting> {
-  return normalizeSiteBrandingSetting(
-    await resolveContractData<BrandingSetting>(
-      getPublicBrandingSetting({
-        authFailure: 'silent',
-      }),
-      fallback,
-    ),
-  )
+  return normalizeSiteBrandingSetting(await fetchSiteBrandingSetting(fallback))
 }
 
 export function useSiteBranding(options: SiteBrandingOptions) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
-  const selectSiteBranding = createContractDataSelector<BrandingSetting>(options.fallback)
-  const brandingQuery = useGetPublicBrandingSetting<BrandingSetting>({
-    query: {
-      enabled: isEnabled,
-      select: selectSiteBranding,
-    },
-    request: {
-      authFailure: 'silent',
-    },
+  const brandingQuery = useQuery({
+    queryKey: SITE_BRANDING_QUERY_KEY,
+    queryFn: ({ signal }) => fetchSiteBrandingEnvelope(signal),
+    enabled: isEnabled,
+    select: createSiteBrandingSelector(options.fallback),
   })
   const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value))
   const projectName = computed(() => branding.value.project_name)

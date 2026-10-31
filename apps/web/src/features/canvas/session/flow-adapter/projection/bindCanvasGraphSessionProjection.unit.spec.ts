@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { CanvasGraphSession, stageCanvasGraphNodeDragIntent } from '../../../core/graph'
+import { stageCanvasGraphNodeDragIntent } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 
 describe('bindCanvasGraphSessionProjection', () => {

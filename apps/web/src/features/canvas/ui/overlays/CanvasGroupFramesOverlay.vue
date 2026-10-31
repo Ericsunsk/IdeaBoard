@@ -34,7 +34,7 @@ import { useI18n } from 'vue-i18n'
 import type {
   CanvasGroupFrame,
   CanvasGroupResizeHandle,
-} from '../../core/graph/canvasGroupGeometry.ts'
+} from '../../core/graph/groupGeometry.ts'
 
 const props = defineProps<{
   frames: CanvasGroupFrame[]

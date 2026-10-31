@@ -1,12 +1,11 @@
-export * from './canvasGraphStore'
+export * from './graphStore'
 export type {
   CanvasGraphCommitTelemetry,
   CanvasGraphDraftCounts,
   CanvasGraphHydrateCounts,
   CanvasGraphStoreTelemetry,
-} from './canvasGraphStoreTelemetry'
-export { noopCanvasGraphStoreTelemetry } from './canvasGraphStoreTelemetry'
-export * from './canvasGraphSession'
-export * from './canvasGraphGeometry'
-export * from './canvasGraphMutationIntents'
-export * from './canvasLibraryImportState'
+} from './graphStoreTelemetry'
+export { noopCanvasGraphStoreTelemetry } from './graphStoreTelemetry'
+export * from './graphGeometry'
+export * from './graphMutationIntents'
+export * from './libraryImportState'

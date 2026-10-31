@@ -11,10 +11,10 @@ import { describe, expect, it } from 'vitest'
  * - `contract`: API shape / policy fixtures, must not mock `generated-query`.
  * - `browser`: real-browser geometry only.
  *
- * Layout: gallery stays colocated flat (control-colocated); admin/shared
- * must split into `core/` / `session/` / `ui/` subgroups (no flat specs in
- * the shared root). Transitional exceptions carry reasons below; new
- * violations fail this lane.
+ * Layout: gallery organizes into SaaS subdomains (`cards/`, `views/`, `controllers/`,
+ * `range/`, `styling/`); admin/shared must split into `core/` / `session/` / `ui/`
+ * subgroups (no flat specs in either root). Transitional exceptions carry reasons below;
+ * new violations fail this lane.
  */
 
 const SRC_ROOT = join(import.meta.dirname, '..')
@@ -84,11 +84,15 @@ describe('spec suffix semantics (gallery/admin/shared)', () => {
     expect(flat).toEqual([])
   })
 
-  it('keeps gallery specs colocated flat (no nested spec subgroups)', () => {
-    const nested = listSpecFiles(GALLERY_ROOT).filter(
-      (file) => relative(GALLERY_ROOT, file).split('/').length > 1,
-    )
-    expect(nested.map(toSrcRelative)).toEqual([])
+  it('keeps gallery specs inside approved subdomains (no specs lingering in gallery root)', () => {
+    const flat = readdirSync(GALLERY_ROOT).filter((entry) => entry.endsWith('.spec.ts'))
+    expect(flat).toEqual([])
+    const allowedSubdomains = new Set(['cards', 'views', 'controllers', 'range', 'styling'])
+    const specs = listSpecFiles(GALLERY_ROOT)
+    for (const file of specs) {
+      const parts = relative(GALLERY_ROOT, file).split('/')
+      expect(allowedSubdomains.has(parts[0]!)).toBe(true)
+    }
   })
 
   it('restricts .vue imports in unit specs to the transitional allowlist', () => {

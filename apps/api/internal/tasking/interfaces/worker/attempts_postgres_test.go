@@ -9,22 +9,23 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 	env := openWorkspaceIntegrationEnv(t)
 	ctx := context.Background()
-	recorder := workspacetasks.AttemptRecorder(env.tasks)
+	recorder := taskports.AttemptRecorder(env.tasks)
 
-	start := workspacetasks.AttemptStart{
+	start := tasks.AttemptStart{
 		TaskID:         "task_pgattempt1",
 		ExecutionToken: "exec_pgattempt_gateway",
 		Service:        "render",
 		RequestedModel: "openrouter/model-a",
 		ResolvedModel:  "openrouter/model-a",
 		Provider:       "openrouter",
-		RetryLayer:     workspacetasks.AttemptRetryLayerGateway,
+		RetryLayer:     tasks.AttemptRetryLayerGateway,
 		StartedAt:      time.Now(),
 	}
 	attemptNo, err := recorder.StartAttempt(ctx, start)
@@ -38,14 +39,14 @@ func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 		t.Fatalf("hasFallback = %v/%v, want false/nil before any fallback", consumed, err)
 	}
 
-	fallbackNo, err := recorder.StartAttempt(ctx, workspacetasks.AttemptStart{
+	fallbackNo, err := recorder.StartAttempt(ctx, tasks.AttemptStart{
 		TaskID:         start.TaskID,
 		ExecutionToken: "exec_pgattempt_fallback",
 		Service:        "render",
 		RequestedModel: "openrouter/model-b",
 		ResolvedModel:  "openrouter/model-b",
 		Provider:       "openrouter",
-		RetryLayer:     workspacetasks.AttemptRetryLayerModelFallback,
+		RetryLayer:     tasks.AttemptRetryLayerModelFallback,
 		StartedAt:      time.Now(),
 	})
 	if err != nil {
@@ -63,10 +64,10 @@ func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 		t.Fatal("duplicate execution token started, want uniqueness error")
 	}
 
-	rows, err := recorder.FinishAttempt(ctx, workspacetasks.AttemptFinish{
+	rows, err := recorder.FinishAttempt(ctx, tasks.AttemptFinish{
 		ExecutionToken:  start.ExecutionToken,
 		TaskID:          start.TaskID,
-		Status:          workspacetasks.AttemptStatusFailed,
+		Status:          tasks.AttemptStatusFailed,
 		ResolvedModel:   start.ResolvedModel,
 		FailureStage:    "provider",
 		FailureCategory: "provider_error",
@@ -80,10 +81,10 @@ func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 		t.Fatalf("finished rows = %d, want 1", rows)
 	}
 	// Closing twice matches nothing: idempotent, never an error.
-	rows, err = recorder.FinishAttempt(ctx, workspacetasks.AttemptFinish{
+	rows, err = recorder.FinishAttempt(ctx, tasks.AttemptFinish{
 		ExecutionToken: start.ExecutionToken,
 		TaskID:         start.TaskID,
-		Status:         workspacetasks.AttemptStatusFailed,
+		Status:         tasks.AttemptStatusFailed,
 		FinishedAt:     time.Now(),
 	})
 	if err != nil {
@@ -93,10 +94,10 @@ func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 		t.Fatalf("second finish rows = %d, want 0", rows)
 	}
 	// Unknown tokens match nothing either.
-	rows, err = recorder.FinishAttempt(ctx, workspacetasks.AttemptFinish{
+	rows, err = recorder.FinishAttempt(ctx, tasks.AttemptFinish{
 		ExecutionToken: "exec_missing",
 		TaskID:         start.TaskID,
-		Status:         workspacetasks.AttemptStatusFailed,
+		Status:         tasks.AttemptStatusFailed,
 		FinishedAt:     time.Now(),
 	})
 	if err != nil {
@@ -106,13 +107,13 @@ func TestWorkspaceAttemptRecorderPostgres(t *testing.T) {
 		t.Fatalf("unknown finish rows = %d, want 0", rows)
 	}
 	// Invalid layers and statuses fail at the CHECK, never silently.
-	if _, err := recorder.StartAttempt(ctx, workspacetasks.AttemptStart{
+	if _, err := recorder.StartAttempt(ctx, tasks.AttemptStart{
 		TaskID: "task_pgattempt1", ExecutionToken: "exec_bad_layer",
 		RetryLayer: "anything", Service: "render",
 	}); err == nil {
 		t.Fatal("invalid retry_layer started, want CHECK error")
 	}
-	if _, err := recorder.FinishAttempt(ctx, workspacetasks.AttemptFinish{
+	if _, err := recorder.FinishAttempt(ctx, tasks.AttemptFinish{
 		ExecutionToken: "exec_pgattempt_fallback", TaskID: start.TaskID,
 		Status: "bogus", FinishedAt: time.Now(),
 	}); err == nil {

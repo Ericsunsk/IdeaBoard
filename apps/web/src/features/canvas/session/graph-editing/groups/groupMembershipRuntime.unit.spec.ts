@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { CanvasGraphSession, type CanvasGraphGroupId } from '../../../core/graph'
+import type { CanvasGraphGroupId } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { createGroupMembershipRuntime } from './groupMembershipRuntime'
-import type { CanvasGroupFrame } from '../../../core/graph/canvasGroupGeometry.ts'
+import type { CanvasGroupFrame } from '../../../core/graph/groupGeometry.ts'
 
 describe('groupMembershipRuntime', () => {
   function createHarness() {

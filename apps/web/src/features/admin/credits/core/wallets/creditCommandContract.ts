@@ -1,10 +1,4 @@
-import type {
-  ControlCreditCommandRequest,
-  ControlCreditCorrectionRequest,
-  ControlCreditRefundRequest,
-} from '@/api/generated-query/control/model'
 import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
-import { createUniqueId } from '@/core/utils/ids'
 
 export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund' | 'correction'
 
@@ -27,14 +21,6 @@ export type AdminCreditCommandInput = AdminCreditCommandDraft & {
   originalTransactionId?: string | undefined
   remainingRefundableCredits?: number | undefined
   originalAmountCredits?: number | undefined
-}
-
-type AdminCreditCommandRequest =
-  ControlCreditCommandRequest | ControlCreditRefundRequest | ControlCreditCorrectionRequest
-
-export type BuiltAdminCreditCommand = {
-  body: AdminCreditCommandRequest
-  idempotencyKey: string
 }
 
 export type CreditCommandValidation = {
@@ -120,40 +106,4 @@ export function isCorrectableTransaction(transaction: {
     transaction.command_type === 'deduction' ||
     transaction.command_type === 'refund'
   )
-}
-
-export function buildAdminCreditCommandRequest(
-  input: AdminCreditCommandInput,
-  idFactory: () => string = () => createUniqueId(),
-): BuiltAdminCreditCommand {
-  const validation = validateAdminCreditCommand(input)
-  if (!validation.valid || input.amountCredits == null) {
-    throw new Error(validation.targetError || validation.amountError || 'Idea操作参数无效')
-  }
-
-  const operationId = idFactory()
-    .replace(/[^a-zA-Z0-9_-]/g, '')
-    .slice(0, 96)
-  if (!operationId) throw new Error('无法生成Idea操作标识')
-  const body: AdminCreditCommandRequest = {
-    ...(input.billingAccountId?.trim()
-      ? { billing_account_id: input.billingAccountId.trim() }
-      : { user_id: (input.userPublicId ?? '').trim() }),
-    amount_credits: input.amountCredits,
-    business_reference_id: `control-ui:${input.kind}:${operationId}`,
-  }
-
-  if (input.kind === 'refund') {
-    ;(body as ControlCreditRefundRequest).charge_transaction_id =
-      input.chargeTransactionId as string
-  }
-  if (input.kind === 'correction') {
-    ;(body as ControlCreditCorrectionRequest).original_transaction_id =
-      input.originalTransactionId as string
-  }
-
-  return {
-    body,
-    idempotencyKey: `control-ui:${input.kind}:${operationId}`,
-  }
 }

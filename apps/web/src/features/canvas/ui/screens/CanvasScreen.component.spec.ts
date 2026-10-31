@@ -81,19 +81,19 @@ vi.mock('../../session/flow-adapter', async (importOriginal) => ({
   }),
 }))
 
-vi.mock('./useCanvasKeyboardShortcuts', () => ({
+vi.mock('./controllers/useCanvasKeyboardShortcuts', () => ({
   useCanvasKeyboardShortcuts: (options: KeyboardOptions) => {
     mocks.keyboardOptions = options
   },
 }))
 
-vi.mock('./useCanvasLeaveGuard', () => ({
+vi.mock('./controllers/useCanvasLeaveGuard', () => ({
   useCanvasLeaveGuard: (options: LeaveGuardOptions) => {
     mocks.leaveGuardOptions = options
   },
 }))
 
-vi.mock('./useFlowNodeDragInteractions', () => ({
+vi.mock('./controllers/useFlowNodeDragInteractions', () => ({
   useFlowNodeDragInteractions: (options?: {
     onDragBegin?: () => void
     onDragEnd?: () => void
@@ -111,7 +111,7 @@ vi.mock('./useFlowNodeDragInteractions', () => ({
   }),
 }))
 
-vi.mock('./useCanvasImageLightbox', () => ({
+vi.mock('./controllers/useCanvasImageLightbox', () => ({
   useCanvasImageLightbox: () => ({
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),

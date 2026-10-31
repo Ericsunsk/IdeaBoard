@@ -1,4 +1,4 @@
-import type { ApiClientError } from '../../../../../api/client'
+import type { ApiClientError } from '@/api/http/client'
 import { i18n } from '../../../../../core/i18n'
 
 export type CanvasBillingPreflightFailureKind =

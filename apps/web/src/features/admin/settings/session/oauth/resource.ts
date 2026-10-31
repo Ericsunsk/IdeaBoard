@@ -5,7 +5,7 @@ import {
 import type { ControlOAuthProviderSummary } from '@/api/generated-query/control/model/controlOAuthProviderSummary'
 import type { ControlOAuthProviderUpdateRequest } from '@/api/generated-query/control/model/controlOAuthProviderUpdateRequest'
 import type { OAuthProviderCode } from '@/core/auth/oauthProviders'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'

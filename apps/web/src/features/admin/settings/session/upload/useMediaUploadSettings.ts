@@ -5,7 +5,7 @@ import {
   getControlMediaUploadSetting,
   updateControlMediaUploadSetting,
 } from '@/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminMediaUploadSettingsFeedback } from '../useSettingsFeedback'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'

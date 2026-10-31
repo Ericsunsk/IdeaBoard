@@ -1,4 +1,4 @@
-import { resolveMediaAssetDerivativeURL } from '../../api/mediaAssetDelivery'
+import { resolveMediaAssetDerivativeURL } from '@/api/media/mediaAssetDelivery'
 
 /** Immutable browser-safe reference to a concrete Media derivative. */
 export type MediaRefDerivativeTier = 'thumb' | 'preview' | 'large-preview'

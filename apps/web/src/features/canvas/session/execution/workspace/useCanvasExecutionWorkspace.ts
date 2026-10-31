@@ -15,7 +15,7 @@ import type { PendingImageExecutionCore } from '../pending-execution/core'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
 import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'
 import { createTaskImageObserver } from '../task-runner/taskImageOutcome'
-import { resolveMediaAssetProcessingURL } from '../../../../../api/mediaAssetDelivery'
+import { resolveMediaAssetProcessingURL } from '@/api/media/mediaAssetDelivery'
 
 type CanvasExecutionWorkspaceState = {
   readonly executionCore: PendingImageExecutionCore

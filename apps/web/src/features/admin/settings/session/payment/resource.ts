@@ -3,7 +3,7 @@ import {
   updateControlStripeConfig,
 } from '@/api/generated-query/control/control-payments/control-payments'
 import type { ControlStripeConfigRequest } from '@/api/generated-query/control/model/controlStripeConfigRequest'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'

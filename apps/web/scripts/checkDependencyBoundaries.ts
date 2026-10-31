@@ -407,6 +407,36 @@ const fixtureCases: BoundaryFixtureCase[] = [
       },
     ],
   },
+  {
+    name: 'prohibits core modules from importing vue',
+    expectedRule: 'core-pure-domain-no-ui',
+    files: [
+      {
+        filePath: 'src/features/board/core/boundary-core-vue.fixture.ts',
+        content: `import { ref } from 'vue'; console.log(ref);`,
+      },
+    ],
+  },
+  {
+    name: 'prohibits core modules from importing ui zone modules',
+    expectedRule: 'core-pure-domain-no-ui',
+    files: [
+      {
+        filePath: 'src/features/board/core/boundary-core-ui.fixture.ts',
+        content: `import { boardUiTarget } from '{target:src/features/board/ui/boardUiTarget.vue}'; console.log(boardUiTarget);`,
+      },
+    ],
+  },
+  {
+    name: 'prohibits core modules from importing adapter modules',
+    expectedRule: 'core-pure-domain-no-ui',
+    files: [
+      {
+        filePath: 'src/features/board/core/boundary-core-adapter.fixture.ts',
+        content: `import { boardAdapterTarget } from '{target:src/features/board/adapters/boardAdapterTarget}'; console.log(boardAdapterTarget);`,
+      },
+    ],
+  },
 ]
 
 function runDepcruise(cwd: string, args: string[]) {

@@ -17,7 +17,7 @@ import type { BoardAccessState } from '../../../../api/generated-query/public/mo
 import type { BoardCapabilities } from '../../../../api/generated-query/public/model/boardCapabilities'
 import type { WorkspaceAccess } from '../../../../api/generated-query/public/model/workspaceAccess'
 import type { BoardDocument } from '../../../../api/generated-query/public/model/boardDocument'
-import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
+import { boardOperationIdempotencyKey } from '@/api/http/idempotencyKey'
 import { getBoardScope, isBoardScopeCurrent, type BoardScope } from '../catalog/scope'
 import { withSignal } from '../../../../core/utils/request'
 import { isOpaqueIdWithPrefix } from '../../../../core/utils/opaqueIds'

@@ -1,5 +1,5 @@
 import { ref, computed, reactive } from 'vue'
-import type { User } from '../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import { i18n } from '../../../core/i18n'
 import { authTransport } from './transport'
 import { readStoredSessionUser } from './sessionPersistence'

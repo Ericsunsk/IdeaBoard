@@ -29,7 +29,7 @@ while IFS= read -r changed_path; do
     scripts/ci-web-*) web=true; ops=true ;;
     apps/*/CONTEXT.md | apps/*/README.md | apps/*/DESIGN.md) continue ;;
     # Go parity checks read these Web contracts without importing them.
-    apps/web/src/core/contracts/imageServices.ts | apps/web/src/core/contracts/generationContract.ts | apps/web/src/features/canvas/core/execution/executionContract.ts | apps/web/src/features/admin/shared/core/serviceAdminMeta.ts | apps/web/src/api/workspaceEventStream.ts | apps/web/src/api/workspaceTaskContract.ts | apps/web/src/features/admin/shared/core/taskMetricTokens.ts) web=true; mark_api ;;
+    apps/web/src/core/contracts/imageServices.ts | apps/web/src/core/contracts/generationContract.ts | apps/web/src/features/canvas/core/execution/executionContract.ts | apps/web/src/features/admin/shared/core/serviceAdminMeta.ts | apps/web/src/api/realtime/workspaceEventStream.ts | apps/web/src/api/tasks/workspaceTaskContract.ts | apps/web/src/features/admin/shared/ui/styling/taskMetricTokens.ts) web=true; mark_api ;;
     apps/api/openapi.public.yaml | apps/api/openapi.control.yaml | apps/api/openapi.events.yaml) web=true; mark_api ;;
     apps/api/atlas.hcl | apps/api/internal/db/migrations/*.sql | apps/api/internal/db/migrations/atlas.sum | apps/api/internal/db/schema/*) mark_api_all; migration_integration=true ;;
     apps/api/cmd/migrator/* | apps/api/cmd/migrationhistory/* | apps/api/cmd/schemarelease/* | apps/api/internal/runtime/infrastructure/migration/* | apps/api/internal/runtime/composition/wiring/migration.go | apps/api/internal/db/migrationhistory/* | apps/api/internal/db/schemaassembly/* | apps/api/internal/db/schemacontract/* | apps/api/internal/db/schemarelease/*) mark_api_all; migration_integration=true ;;

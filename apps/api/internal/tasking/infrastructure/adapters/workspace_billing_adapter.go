@@ -21,7 +21,8 @@ import (
 
 	"ideaboard/api/internal/billing"
 	billingapplication "ideaboard/api/internal/billing/application"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
@@ -32,22 +33,22 @@ type WorkspaceTaskQuoter struct {
 	Catalog *billingapplication.BillableItemCatalog
 }
 
-var _ workspacetasks.Quoter = (*WorkspaceTaskQuoter)(nil)
+var _ taskports.Quoter = (*WorkspaceTaskQuoter)(nil)
 
-func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", tasks.ErrQuoteUnavailable)
 	}
 	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(service))
 	if !ok {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, tasks.ErrQuoteUnavailable)
 	}
 	if quantity <= 0 {
 		quantity = 1
 	}
 	outputResolution, err := billing.NormalizeOutputResolution(resolution)
 	if err != nil {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
 	quote, err := q.Catalog.Quote(ctx, nil, sku, outputResolution, quantity)
@@ -57,9 +58,9 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution str
 		// (ErrPricingUnavailable/ErrSKUNotFound) render 422 via the
 		// first branch of renderTaskError, while transient failures
 		// keep the 503 billing_quote_unavailable branch.
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w: %w", err, workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w: %w", err, tasks.ErrQuoteUnavailable)
 	}
-	return workspacetasks.BillingSnapshot{
+	return tasks.BillingSnapshot{
 		SKU:              string(quote.SKU),
 		DisplayName:      quote.DisplayName,
 		PriceVersionID:   quote.PriceVersionID,
@@ -75,24 +76,24 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution str
 
 // QuoteInTx mints the same snapshot through the settlement transaction so
 // the price read shares the repeatable-read snapshot with the Hold that
-// follows. It satisfies workspacetasks.Quoter.
-func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+// follows. It satisfies taskports.Quoter.
+func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", tasks.ErrQuoteUnavailable)
 	}
 	if tx == nil {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: settlement transaction is nil: %w", tasks.ErrQuoteUnavailable)
 	}
 	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(service))
 	if !ok {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, tasks.ErrQuoteUnavailable)
 	}
 	if quantity <= 0 {
 		quantity = 1
 	}
 	outputResolution, err := billing.NormalizeOutputResolution(resolution)
 	if err != nil {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
 	quote, err := q.Catalog.Quote(ctx, tx, sku, outputResolution, quantity)
@@ -100,9 +101,9 @@ func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service,
 		// Same multi-%w preservation as Quote: the price read shares
 		// the repeatable-read snapshot with the Hold that follows, and
 		// the pricing cause must survive to renderTaskError.
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w: %w", err, workspacetasks.ErrQuoteUnavailable)
+		return tasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w: %w", err, tasks.ErrQuoteUnavailable)
 	}
-	return workspacetasks.BillingSnapshot{
+	return tasks.BillingSnapshot{
 		SKU:              string(quote.SKU),
 		DisplayName:      quote.DisplayName,
 		PriceVersionID:   quote.PriceVersionID,

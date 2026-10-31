@@ -1,7 +1,7 @@
 package workspacemedia
 
 import (
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 )
 
 // GateAsset is the single media readiness gate (P0-4). Every media-side
@@ -17,13 +17,13 @@ import (
 // itself: it consumes only these sentinels through the AssetReader seam.
 func GateAsset(asset *Asset) error {
 	if asset == nil {
-		return workspacetasks.ErrMediaNotFound
+		return taskdomain.ErrMediaNotFound
 	}
 	if asset.IsArchived() {
-		return workspacetasks.ErrMediaArchived
+		return taskdomain.ErrMediaArchived
 	}
 	if asset.Status != AssetStatusReady {
-		return workspacetasks.ErrMediaNotReady
+		return taskdomain.ErrMediaNotReady
 	}
 	return nil
 }

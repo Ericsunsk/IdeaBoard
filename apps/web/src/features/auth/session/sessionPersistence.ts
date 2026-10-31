@@ -1,4 +1,4 @@
-import type { User } from '../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import { clearStoredAuth, getStoredUser, setStoredAuth } from '../../../core/utils/auth'
 
 export function readStoredSessionUser(): User | null {

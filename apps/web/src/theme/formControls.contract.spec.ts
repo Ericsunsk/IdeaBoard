@@ -33,7 +33,7 @@ describe('User form input contract', () => {
   // P5 retirement (computed-style/fef79256): the "gives the canvas prompt
   // textarea a visible focus ring" source-string assertion is replaced by
   // the computed-style browser contract
-  // (`features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts`),
+  // (`features/canvas/ui/nodes/primitives/composer/promptComposerRing.browser.spec.ts`),
   // which asserts the rendered textarea ring paint rides the live ring token.
 
   it('keeps the shared error chrome on the user danger tokens', () => {

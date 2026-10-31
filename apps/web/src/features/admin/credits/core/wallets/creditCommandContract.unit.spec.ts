@@ -1,28 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { buildAdminCreditCommandRequest, validateAdminCreditCommand } from './creditCommandContract'
+import {
+  isCorrectableTransaction,
+  isRefundableCharge,
+  validateAdminCreditCommand,
+} from './creditCommandContract'
 
 describe('Admin Credit command contract', () => {
   const publicId = 'usr_11111111111111111111111111111111'
-  it('builds auditable Grant and Deduction requests with independent idempotency identities', () => {
-    const grant = buildAdminCreditCommandRequest(
-      { kind: 'grant', userPublicId: publicId, amountCredits: 20 },
-      () => 'grant-operation',
-    )
-    const deduction = buildAdminCreditCommandRequest(
-      { kind: 'deduction', userPublicId: publicId, amountCredits: 3 },
-      () => 'deduct-operation',
-    )
-
-    expect(grant).toEqual({
-      body: {
-        user_id: publicId,
-        amount_credits: 20,
-        business_reference_id: 'control-ui:grant:grant-operation',
-      },
-      idempotencyKey: 'control-ui:grant:grant-operation',
-    })
-    expect(deduction.idempotencyKey).toBe('control-ui:deduction:deduct-operation')
-    expect(deduction.body).not.toHaveProperty('idempotency_key')
+  it('accepts valid Grant and Deduction inputs', () => {
+    expect(
+      validateAdminCreditCommand({ kind: 'grant', userPublicId: publicId, amountCredits: 20 }),
+    ).toMatchObject({ valid: true })
+    expect(
+      validateAdminCreditCommand({ kind: 'deduction', userPublicId: publicId, amountCredits: 3 }),
+    ).toMatchObject({ valid: true, amountError: '', targetError: '' })
   })
 
   it('allows Refund only from a Charge and rejects amounts above remaining refundable Credits', () => {
@@ -48,24 +39,15 @@ describe('Admin Credit command contract', () => {
     ).toMatchObject({ valid: false, amountError: '退款必须从原 Charge 流水发起' })
 
     expect(
-      buildAdminCreditCommandRequest(
-        {
-          kind: 'refund',
-          userPublicId: publicId,
-          amountCredits: 5,
+      validateAdminCreditCommand({
+        kind: 'refund',
+        userPublicId: publicId,
+        amountCredits: 5,
 
-          chargeTransactionId: 'charge-1',
-          remainingRefundableCredits: 5,
-        },
-        () => 'refund-operation',
-      ),
-    ).toMatchObject({
-      body: {
-        user_id: publicId,
-        charge_transaction_id: 'charge-1',
-      },
-      idempotencyKey: 'control-ui:refund:refund-operation',
-    })
+        chargeTransactionId: 'charge-1',
+        remainingRefundableCredits: 5,
+      }),
+    ).toMatchObject({ valid: true })
   })
 
   it('requires positive integer Credits', () => {
@@ -93,17 +75,8 @@ describe('Admin Credit command contract', () => {
     expect(ambiguous.valid).toBe(false)
     expect(ambiguous.targetError).toBe('请选择用户或资金账户中的其一作为操作目标')
     expect(
-      buildAdminCreditCommandRequest(
-        { kind: 'grant', billingAccountId: accountId, amountCredits: 5 },
-        () => 'account-grant-operation',
-      ),
-    ).toMatchObject({
-      body: {
-        billing_account_id: accountId,
-        amount_credits: 5,
-      },
-      idempotencyKey: 'control-ui:grant:account-grant-operation',
-    })
+      validateAdminCreditCommand({ kind: 'grant', billingAccountId: accountId, amountCredits: 5 }),
+    ).toMatchObject({ valid: true })
   })
 
   it('allows Correction only from an original transaction within its bound', () => {
@@ -127,22 +100,25 @@ describe('Admin Credit command contract', () => {
     expect(unlinked.amountError).toBe('修正必须从原交易流水发起')
 
     expect(
-      buildAdminCreditCommandRequest(
-        {
-          kind: 'correction',
-          userPublicId: publicId,
-          amountCredits: 5,
-          originalTransactionId: 'ctxn-1',
-          originalAmountCredits: 8,
-        },
-        () => 'correction-operation',
-      ),
-    ).toMatchObject({
-      body: {
-        user_id: publicId,
-        original_transaction_id: 'ctxn-1',
-      },
-      idempotencyKey: 'control-ui:correction:correction-operation',
-    })
+      validateAdminCreditCommand({
+        kind: 'correction',
+        userPublicId: publicId,
+        amountCredits: 5,
+        originalTransactionId: 'ctxn-1',
+        originalAmountCredits: 8,
+      }),
+    ).toMatchObject({ valid: true })
+  })
+
+  it('classifies refundable and correctable transactions without DTOs', () => {
+    expect(isRefundableCharge({ command_type: 'capture', charge: null })).toBe(false)
+    expect(
+      isRefundableCharge({
+        command_type: 'capture',
+        charge: { remaining_refundable_credits: 2 },
+      }),
+    ).toBe(true)
+    expect(isCorrectableTransaction({ command_type: 'grant', amount_credits: 1 })).toBe(true)
+    expect(isCorrectableTransaction({ command_type: 'capture', amount_credits: 1 })).toBe(false)
   })
 })

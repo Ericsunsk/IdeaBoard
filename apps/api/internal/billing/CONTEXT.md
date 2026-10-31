@@ -19,6 +19,8 @@ Billing is the platform-level product identity and Credit pricing context. Users
 | Quote                  | A server-calculated price for a particular SKU, Output Resolution, and quantity; it reserves no Credits.                                                    |
 | Admin Action           | One Admin write against Catalog/Price; carries authenticated actor, target, old/new, outcome and time, persisted as append-only audit                       |
 
+Canonical ownership (see `GLOSSARY.md`): PriceSnapshot and Quote belong to Billing, while Task Billing Snapshot is the Tasking-persisted frozen copy and never a Billing live fact.
+
 ## Public Seams
 
 - `BillableItemRegistry.Items()` is the read-only product pricing-identity seam; the current Workflow adapter uses `ai-image:<feature-slug>`, future products register their own namespace.

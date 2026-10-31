@@ -36,7 +36,10 @@ import (
 	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -63,7 +66,7 @@ func workerOnRollback(tx pgx.Tx, fn func()) {
 // settlement-transaction seams for database-free worker loop tests.
 type txWorkerStore struct {
 	*attemptClaimStore
-	fence  testscope.Claims[workspacetasks.SubmissionClaim]
+	fence  testscope.Claims[tasks.SubmissionClaim]
 	lastTx *workerFakeTx
 }
 
@@ -77,7 +80,7 @@ func (s *txWorkerStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope
 	return scope, nil
 }
 
-func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
+func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *tasks.WorkspaceTask) (*tasks.WorkspaceTask, error) {
 	created, err := s.CreateTask(ctx, task)
 	if err != nil {
 		return nil, err
@@ -89,11 +92,11 @@ func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *wor
 	return created, nil
 }
 
-func (s *txWorkerStore) GetTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error) {
+func (s *txWorkerStore) GetTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string) (*tasks.WorkspaceTask, error) {
 	return s.GetTask(ctx, workspaceID, taskID)
 }
 
-func (s *txWorkerStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *txWorkerStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	before, _ := s.GetTask(ctx, workspaceID, taskID)
 	completed, err := s.CompleteTask(ctx, workspaceID, taskID, outputs)
 	if err != nil {
@@ -103,7 +106,7 @@ func (s *txWorkerStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspa
 	return completed, nil
 }
 
-func (s *txWorkerStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+func (s *txWorkerStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*tasks.WorkspaceTask, error) {
 	before, _ := s.GetTask(ctx, workspaceID, taskID)
 	failed, err := s.FailTask(ctx, workspaceID, taskID, errorMsg)
 	if err != nil {
@@ -113,7 +116,7 @@ func (s *txWorkerStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID
 	return failed, nil
 }
 
-func (s *txWorkerStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
+func (s *txWorkerStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*tasks.WorkspaceTask, bool, error) {
 	before, _ := s.GetTask(ctx, workspaceID, taskID)
 	cancelled, already, err := s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
 	if err != nil || already {
@@ -128,7 +131,7 @@ func (s *txWorkerStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspace
 // leaking a flipped task. The mechanics live in testscope; this only
 // binds the store's restore helper. It is a no-op for foreign
 // transactions, which own their own rollback.
-func restoreWorkerTaskOnRollback(tx pgx.Tx, store *workspacetasks.InMemoryStore, workspaceID, taskID string, before *workspacetasks.WorkspaceTask) {
+func restoreWorkerTaskOnRollback(tx pgx.Tx, store *taskmemory.InMemoryStore, workspaceID, taskID string, before *tasks.WorkspaceTask) {
 	if store == nil || before == nil {
 		return
 	}
@@ -138,11 +141,11 @@ func restoreWorkerTaskOnRollback(tx pgx.Tx, store *workspacetasks.InMemoryStore,
 	})
 }
 
-func (s *txWorkerStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
+func (s *txWorkerStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*tasks.WorkspaceTask, error) {
 	return s.TransitionForRetry(ctx, workspaceID, taskID, newToken)
 }
 
-func (s *txWorkerStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
+func (s *txWorkerStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim tasks.SubmissionClaim) (*tasks.SubmissionClaim, bool, error) {
 	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
@@ -152,7 +155,7 @@ func (s *txWorkerStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim 
 // claim table).
 type txPGServiceStore struct {
 	*taskpostgres.Store
-	fence testscope.Claims[workspacetasks.SubmissionClaim]
+	fence testscope.Claims[tasks.SubmissionClaim]
 }
 
 func newTxPGServiceStore(store *taskpostgres.Store) *txPGServiceStore {
@@ -167,7 +170,7 @@ func (s *txPGServiceStore) BeginSettlementScope(ctx context.Context) (*dbutil.Sc
 	return dbutil.ScopeForTest(ctx, testscope.WrapShim(scope.Tx()), true), nil
 }
 
-func (s *txPGServiceStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
+func (s *txPGServiceStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim tasks.SubmissionClaim) (*tasks.SubmissionClaim, bool, error) {
 	return s.fence.Claim(tx, testscope.ClaimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey), claim)
 }
 
@@ -177,49 +180,49 @@ func (s *txPGServiceStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, cla
 // gate. A nil authorizer fails closed on bound submits, never an unbound
 // task.
 type workerTestAcceptance struct {
-	boards workspacetasks.BoardAuthorizer
-	assets workspacetasks.AssetReader
+	boards taskports.BoardAuthorizer
+	assets taskports.AssetReader
 }
 
-func (f *workerTestAcceptance) AuthorizeSubmission(ctx context.Context, _ pgx.Tx, input workspacetasks.CreateInput) (workspacetasks.TaskBoardBinding, error) {
+func (f *workerTestAcceptance) AuthorizeSubmission(ctx context.Context, _ pgx.Tx, input tasks.CreateInput) (tasks.TaskBoardBinding, error) {
 	if trimmed := strings.TrimSpace(input.BoardID); trimmed != "" {
 		if f.boards == nil {
-			return workspacetasks.TaskBoardBinding{}, workspacetasks.ErrSettlementUnavailable
+			return tasks.TaskBoardBinding{}, tasks.ErrSettlementUnavailable
 		}
 		access, err := f.boards.ResolveBoardAccess(ctx, strings.TrimSpace(input.WorkspaceID), trimmed, input.OwnerUserID, input.WorkspaceRole)
 		if err != nil {
-			return workspacetasks.TaskBoardBinding{}, err
+			return tasks.TaskBoardBinding{}, err
 		}
-		var facts workspacetasks.BoardTaskFacts
+		var facts tasks.BoardTaskFacts
 		if access != nil {
-			facts = workspacetasks.BoardTaskFacts{
+			facts = tasks.BoardTaskFacts{
 				CanRead: access.CanRead, CanGenerate: access.CanGenerate,
 				CanWrite: access.CanWrite, Archived: access.Archived,
 			}
 		}
-		switch workspacetasks.BoardPolicy.Check(facts, workspacetasks.BoardOpSubmit) {
-		case workspacetasks.BoardDecisionAllow:
-			return workspacetasks.TaskBoardBinding{BoardID: trimmed, AccessVersion: access.AccessVersion}, nil
-		case workspacetasks.BoardDecisionArchived:
-			return workspacetasks.TaskBoardBinding{}, workspacetasks.ErrBoardArchived
-		case workspacetasks.BoardDecisionForbidden:
-			return workspacetasks.TaskBoardBinding{}, workspacetasks.ErrForbidden
+		switch tasks.BoardPolicy.Check(facts, tasks.BoardOpSubmit) {
+		case tasks.BoardDecisionAllow:
+			return tasks.TaskBoardBinding{BoardID: trimmed, AccessVersion: access.AccessVersion}, nil
+		case tasks.BoardDecisionArchived:
+			return tasks.TaskBoardBinding{}, tasks.ErrBoardArchived
+		case tasks.BoardDecisionForbidden:
+			return tasks.TaskBoardBinding{}, tasks.ErrForbidden
 		default:
-			return workspacetasks.TaskBoardBinding{}, workspacetasks.ErrBoardNotFound
+			return tasks.TaskBoardBinding{}, tasks.ErrBoardNotFound
 		}
 	}
 	if f.assets != nil {
 		ids := append([]string(nil), input.MediaAssetIDs...)
-		if maskID, ok := workspacetasks.MaskAssetIDFromParams(input.Params); ok {
+		if maskID, ok := tasks.MaskAssetIDFromParams(input.Params); ok {
 			ids = append(ids, maskID)
 		}
 		for _, id := range ids {
 			if _, err := f.assets.GetAsset(ctx, strings.TrimSpace(input.WorkspaceID), id); err != nil {
-				return workspacetasks.TaskBoardBinding{}, err
+				return tasks.TaskBoardBinding{}, err
 			}
 		}
 	}
-	return workspacetasks.TaskBoardBinding{}, nil
+	return tasks.TaskBoardBinding{}, nil
 }
 
 // workerNoopSnapshotSaver satisfies the atomic pin requirement for suites
@@ -239,8 +242,8 @@ func (workerTestBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ 
 
 // newTxWorkerService wires one in-memory settlement through createInTx for
 // the database-free worker loop tests.
-func newTxWorkerService(txStore *txWorkerStore, holder *workerTestHolder, queue *workerTestQueue, assets workspacetasks.AssetReader, boards workspacetasks.BoardAuthorizer) *workspacetasks.Service {
-	return workspacetasks.NewService(workspacetasks.ServiceDeps{
+func newTxWorkerService(txStore *txWorkerStore, holder *workerTestHolder, queue *workerTestQueue, assets taskports.AssetReader, boards taskports.BoardAuthorizer) *taskapp.Service {
+	return taskapp.NewService(taskapp.ServiceDeps{
 		TaskRead: txStore, TaskLifecycle: txStore, SubmissionClaims: txStore,
 		Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),

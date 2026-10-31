@@ -12,7 +12,7 @@ import {
   removeLocalStorageItem,
   writeLocalStorageItem,
 } from '../../../core/utils/storage'
-import { isOpaqueId, opaqueIdPrefix } from '../../../api/contractKernel'
+import { isOpaqueId, opaqueIdPrefix } from '@/api/http/contractKernel'
 import type { OrganizationSummary } from '../selection/workspaceResource'
 
 const ORGANIZATION_SCOPE_STORAGE_KEY = 'ideaboard.organization.scope.v1'

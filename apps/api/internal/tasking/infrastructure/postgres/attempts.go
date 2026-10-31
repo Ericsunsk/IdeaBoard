@@ -18,11 +18,12 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 // Compile-time convergence with the worker-consumed seam.
-var _ workspacetasks.AttemptRecorder = (*Store)(nil)
+var _ taskports.AttemptRecorder = (*Store)(nil)
 
 // maxAttemptErrorBytes bounds the persisted attempt error fact; the
 // worker truncates before calling, this is defense in depth.
@@ -32,7 +33,7 @@ const maxAttemptErrorBytes = 500
 // attempt number (max+1 per task). A unique-violation race (two
 // claimers, impossible under the lease fence) surfaces as an error for
 // the caller to degrade on.
-func (s *Store) StartAttempt(ctx context.Context, start workspacetasks.AttemptStart) (int32, error) {
+func (s *Store) StartAttempt(ctx context.Context, start tasks.AttemptStart) (int32, error) {
 	if s == nil || s.db == nil {
 		return 0, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
@@ -78,7 +79,7 @@ RETURNING attempt_no`,
 // FinishAttempt closes one running attempt row under the execution-token
 // fence. Zero affected rows means the fact was never recorded or a lost
 // race: not an error, the caller logs and continues.
-func (s *Store) FinishAttempt(ctx context.Context, finish workspacetasks.AttemptFinish) (int64, error) {
+func (s *Store) FinishAttempt(ctx context.Context, finish tasks.AttemptFinish) (int64, error) {
 	if s == nil || s.db == nil {
 		return 0, fmt.Errorf("tasking postgres: %w", database.ErrPoolNotConfigured)
 	}
@@ -89,9 +90,9 @@ func (s *Store) FinishAttempt(ctx context.Context, finish workspacetasks.Attempt
 		return 0, fmt.Errorf("tasking postgres: attempt identity required")
 	}
 	switch status {
-	case workspacetasks.AttemptStatusCompleted,
-		workspacetasks.AttemptStatusFailed,
-		workspacetasks.AttemptStatusRequeued:
+	case tasks.AttemptStatusCompleted,
+		tasks.AttemptStatusFailed,
+		tasks.AttemptStatusRequeued:
 	default:
 		return 0, fmt.Errorf("tasking postgres: attempt status %q is not terminal", status)
 	}

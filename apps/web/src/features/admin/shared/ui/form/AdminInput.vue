@@ -64,7 +64,7 @@ import { useAttrs } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { adminInputChromeClass } from '../../core/uiClasses'
+import { adminInputChromeClass } from '../styling/uiClasses'
 
 const props = withDefaults(
   defineProps<{

@@ -8,7 +8,7 @@ import {
   handleSilentAuthFailure,
   setStoredAuth,
 } from './auth'
-import type { User } from '../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 
 const adminUser: User = {
   public_id: '00000000-0000-0000-0000-000000000001',

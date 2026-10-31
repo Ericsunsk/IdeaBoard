@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { createGroupResizeRuntime } from './groupResizeRuntime'
-import type { CanvasGroupFrame, CanvasRect } from '../../../core/graph/canvasGroupGeometry.ts'
+import type { CanvasGroupFrame, CanvasRect } from '../../../core/graph/groupGeometry.ts'
 
 describe('groupResizeRuntime', () => {
   function createHarness() {

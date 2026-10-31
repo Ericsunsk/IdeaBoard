@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => {
   return { request }
 })
 
-vi.mock('../../../../api/client', () => ({
+vi.mock('@/api/http/client', () => ({
   api: { request: mocks.request },
 }))
 

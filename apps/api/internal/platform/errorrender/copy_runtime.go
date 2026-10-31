@@ -7,7 +7,7 @@ package errorrender
 // collided with existing names and carry a RuntimeInterfacesHTTP prefix
 // per the ADR-0017 duplicate rule; the rest kept their kernel names.
 const (
-	MsgAbandonPendingOrder                            = "放弃充值"                                  // runtimehttp.MsgAbandonPendingOrder @ internal/runtime/interfaces/http/errors.go // AbandonPendingOrder @ v1/billing_gaps.go
+	MsgAbandonPendingOrder                            = "放弃充值"                                  // runtimehttp.MsgAbandonPendingOrder @ internal/runtime/interfaces/http/errors.go // AbandonPendingOrder @ v1/billing/gaps.go
 	MsgBadRequest                                     = "请求体读取失败"                               // runtimehttp.MsgBadRequest @ internal/runtime/interfaces/http/errors.go // CodeBadRequest
 	MsgBadRequest10                                   = "Idea数量必须是有效正整数"                        // runtimehttp.MsgBadRequest10 @ internal/runtime/interfaces/http/errors.go // CodeBadRequest
 	MsgBadRequest11                                   = "charge_transaction_id 为必填"             // runtimehttp.MsgBadRequest11 @ internal/runtime/interfaces/http/errors.go // CodeBadRequest
@@ -70,7 +70,7 @@ const (
 	MsgConflict5                                      = "同名文件夹已存在"                              // runtimehttp.MsgConflict5 @ internal/runtime/interfaces/http/errors.go // CodeConflict
 	MsgConflict6                                      = "系统文件夹不可操作"                             // runtimehttp.MsgConflict6 @ internal/runtime/interfaces/http/errors.go // CodeConflict
 	MsgConflict7                                      = "模型池已被更新，请刷新后重试"                        // runtimehttp.MsgConflict7 @ internal/runtime/interfaces/http/errors.go // CodeConflict
-	MsgContinuePendingOrder                           = "继续充值"                                  // runtimehttp.MsgContinuePendingOrder @ internal/runtime/interfaces/http/errors.go // ContinuePendingOrder @ v1/billing_gaps.go
+	MsgContinuePendingOrder                           = "继续充值"                                  // runtimehttp.MsgContinuePendingOrder @ internal/runtime/interfaces/http/errors.go // ContinuePendingOrder @ v1/billing/gaps.go
 	MsgContractNotImplemented                         = "控制面服务未实现"                              // runtimehttp.MsgContractNotImplemented @ internal/runtime/interfaces/http/errors.go // CodeContractNotImplemented
 	MsgControlNotFound                                = "计费功能不存在"                               // runtimehttp.MsgControlNotFound @ internal/runtime/interfaces/http/errors.go // CodeControlNotFound
 	MsgControlNotFound2                               = "Idea钱包不存在"                             // runtimehttp.MsgControlNotFound2 @ internal/runtime/interfaces/http/errors.go // CodeControlNotFound
@@ -84,10 +84,10 @@ const (
 	MsgControlNotFound10                              = "账户限制不存在"                               // runtimehttp.MsgControlNotFound10 @ internal/runtime/interfaces/http/errors.go // CodeControlNotFound
 	MsgControlProxyDefaultMessage                     = "控制面资源不存在"                              // runtimehttp.MsgControlProxyDefaultMessage @ internal/runtime/interfaces/http/errors.go // ControlProxyDefaultMessage @ control/proxy_envelope.go
 	MsgControlProxyDefaultMessage2                    = "操作冲突，请稍后重试"                            // runtimehttp.MsgControlProxyDefaultMessage2 @ internal/runtime/interfaces/http/errors.go // ControlProxyDefaultMessage @ control/proxy_envelope.go
-	MsgCreateBillingQuote                             = "计费功能标识非法"                              // runtimehttp.MsgCreateBillingQuote @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing_gaps.go
-	MsgCreateBillingQuote2                            = "输出规格非法"                                // runtimehttp.MsgCreateBillingQuote2 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing_gaps.go
-	MsgCreateBillingQuote3                            = "报价数量非法"                                // runtimehttp.MsgCreateBillingQuote3 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing_gaps.go
-	MsgCreateBillingQuote4                            = "报价超过允许上限"                              // runtimehttp.MsgCreateBillingQuote4 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing_gaps.go
+	MsgCreateBillingQuote                             = "计费功能标识非法"                              // runtimehttp.MsgCreateBillingQuote @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing/gaps.go
+	MsgCreateBillingQuote2                            = "输出规格非法"                                // runtimehttp.MsgCreateBillingQuote2 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing/gaps.go
+	MsgCreateBillingQuote3                            = "报价数量非法"                                // runtimehttp.MsgCreateBillingQuote3 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing/gaps.go
+	MsgCreateBillingQuote4                            = "报价超过允许上限"                              // runtimehttp.MsgCreateBillingQuote4 @ internal/runtime/interfaces/http/errors.go // CreateBillingQuote @ v1/billing/gaps.go
 	MsgCreateBoard                                    = "看板名称非法"                                // runtimehttp.MsgCreateBoard @ internal/runtime/interfaces/http/errors.go // CreateBoard @ v1/boards.go
 	MsgCreateCheckoutSession3                         = "充值参数非法"                                // runtimehttp.MsgCreateCheckoutSession3 @ internal/runtime/interfaces/http/errors.go // CreateCheckoutSession @ v1/billing.go
 	MsgCreateOrganization                             = "组织名称非法"                                // runtimehttp.MsgCreateOrganization @ internal/runtime/interfaces/http/errors.go // CreateOrganization @ v1/organizations.go
@@ -132,7 +132,7 @@ const (
 	MsgRateLimited2                                   = "操作过于频繁，请稍后重试"                          // runtimehttp.MsgRateLimited2 @ internal/runtime/interfaces/http/errors.go // CodeRateLimited
 	MsgReadyHandler                                   = "服务尚未就绪"                                // runtimehttp.MsgReadyHandler @ internal/runtime/interfaces/http/errors.go // ReadyHandler @ routes.go
 	MsgRecoveryMiddleware                             = "服务器内部错误"                               // runtimehttp.MsgRecoveryMiddleware @ internal/runtime/interfaces/http/errors.go // RecoveryMiddleware @ observability.go
-	MsgRedeemReward                                   = "兑换码不能为空"                               // runtimehttp.MsgRedeemReward @ internal/runtime/interfaces/http/errors.go // RedeemReward @ v1/billing_gaps.go
+	MsgRedeemReward                                   = "兑换码不能为空"                               // runtimehttp.MsgRedeemReward @ internal/runtime/interfaces/http/errors.go // RedeemReward @ v1/billing/gaps.go
 	MsgRenderBoardError                               = "不能邀请或移除所有者"                            // runtimehttp.MsgRenderBoardError @ internal/runtime/interfaces/http/errors.go // RenderBoardError @ v1/boards.go
 	MsgRenderBoardError2                              = "成员角色非法"                                // runtimehttp.MsgRenderBoardError2 @ internal/runtime/interfaces/http/errors.go // RenderBoardError @ v1/boards.go
 	MsgRenderLibraryError                             = "单次最多解析 20 条"                           // runtimehttp.MsgRenderLibraryError @ internal/runtime/interfaces/http/errors.go // RenderLibraryError @ v1/library.go
@@ -144,7 +144,7 @@ const (
 	MsgRenderSearchError3                             = "视觉搜索输入无效"                              // runtimehttp.MsgRenderSearchError3 @ internal/runtime/interfaces/http/errors.go // RenderSearchError @ v1/search.go
 	MsgRenderV1UsageError                             = "用量范围非法"                                // runtimehttp.MsgRenderV1UsageError @ internal/runtime/interfaces/http/errors.go // RenderV1UsageError @ v1/billing.go
 	MsgReplaceBoardDocument                           = "文档快照非法"                                // runtimehttp.MsgReplaceBoardDocument @ internal/runtime/interfaces/http/errors.go // ReplaceBoardDocument @ v1/boards.go
-	MsgRequireEmptyV1BillingActionBody                = "请求体非法"                                 // runtimehttp.MsgRequireEmptyV1BillingActionBody @ internal/runtime/interfaces/http/errors.go // RequireEmptyV1BillingActionBody @ v1/billing_gaps.go
+	MsgRequireEmptyV1BillingActionBody                = "请求体非法"                                 // runtimehttp.MsgRequireEmptyV1BillingActionBody @ internal/runtime/interfaces/http/errors.go // RequireEmptyV1BillingActionBody @ v1/billing/gaps.go
 	MsgRewardCodeUnavailable                          = "兑换码无效或已失效"                             // runtimehttp.MsgRewardCodeUnavailable @ internal/runtime/interfaces/http/errors.go // CodeRewardCodeUnavailable
 	MsgRewardWalletLocked                             = "当前账户无法兑换奖励"                            // runtimehttp.MsgRewardWalletLocked @ internal/runtime/interfaces/http/errors.go // CodeRewardWalletLocked
 	MsgRuntimeInterfacesHTTPConflict                  = "计费功能状态冲突"                              // runtimehttp.MsgConflict @ internal/runtime/interfaces/http/errors.go // CodeConflict

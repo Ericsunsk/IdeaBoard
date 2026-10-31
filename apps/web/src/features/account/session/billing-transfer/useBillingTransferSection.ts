@@ -1,7 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
-import { workspaceBillingTransferIdempotencyKey } from '../../../../api/idempotencyKey'
+import { workspaceBillingTransferIdempotencyKey } from '@/api/http/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../../core/query/queryDefaults'

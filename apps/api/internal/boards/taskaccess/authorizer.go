@@ -6,7 +6,8 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	domain "ideaboard/api/internal/tasking/domain"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 // Reader provides live Board capability facts to Tasking.
@@ -20,29 +21,29 @@ type Authorizer struct {
 	Store Reader
 }
 
-var _ workspacetasks.BoardAuthorizer = (*Authorizer)(nil)
+var _ taskports.BoardAuthorizer = (*Authorizer)(nil)
 
-// ResolveBoardAccess implements workspacetasks.BoardAuthorizer.
-func (a *Authorizer) ResolveBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (*workspacetasks.BoardAccess, error) {
+// ResolveBoardAccess implements taskports.BoardAuthorizer.
+func (a *Authorizer) ResolveBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (*domain.BoardAccess, error) {
 	if a == nil || a.Store == nil {
-		return nil, workspacetasks.ErrBoardNotFound
+		return nil, domain.ErrBoardNotFound
 	}
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	boardPublicID = strings.TrimSpace(boardPublicID)
 	if !contract.IsBoardID(boardPublicID) {
-		return nil, workspacetasks.ErrBoardNotFound
+		return nil, domain.ErrBoardNotFound
 	}
 	role, ok, err := a.Store.GetBoardRole(ctx, workspacePublicID, boardPublicID, userID, workspaceRole)
 	if err != nil || !ok {
-		return nil, workspacetasks.ErrBoardNotFound
+		return nil, domain.ErrBoardNotFound
 	}
 	board, err := a.Store.GetBoard(ctx, workspacePublicID, boardPublicID)
 	if err != nil {
-		return nil, workspacetasks.ErrBoardNotFound
+		return nil, domain.ErrBoardNotFound
 	}
 	archived := board.ArchivedAt != nil
 	caps := boards.CapabilitiesFor(role, true, archived)
-	return &workspacetasks.BoardAccess{
+	return &domain.BoardAccess{
 		BoardID: boardPublicID, IsOwner: role == boards.RoleOwner,
 		CanRead: caps.CanRead, CanGenerate: caps.CanGenerate, CanWrite: caps.CanWrite,
 		Archived: archived, AccessVersion: board.AccessVersion,

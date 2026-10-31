@@ -1,37 +1,4 @@
 {
-  "src/api/client.ts": [
-    "ApiClientError",
-    "ApiRequestConfig",
-    "AuthFailureMode",
-    "api",
-    "createApiError"
-  ],
-  "src/api/contractKernel.ts": [
-    "ContractErrorBody",
-    "ContractErrorEnvelope",
-    "ContractKernelError",
-    "ContractMeta",
-    "ContractParseErr",
-    "ContractParseOk",
-    "ContractSuccessEnvelope",
-    "OpaqueIdPrefix",
-    "RateLimitState",
-    "ReadableHeaders",
-    "buildConditionalHeaders",
-    "buildContractRequestHeaders",
-    "buildSseResumeHeaders",
-    "createContractDataSelector",
-    "getETag",
-    "getRequestId",
-    "isOpaqueId",
-    "newRequestId",
-    "opaqueIdPrefix",
-    "parseContractEnvelope",
-    "parseRateLimit",
-    "requireContractData",
-    "resolveContractData",
-    "withSseResumeParam"
-  ],
   "src/api/generated-query/control/control-billing/control-billing.ts": [
     "DeleteControlCatalogItemMutationError",
     "DeleteControlCatalogItemMutationResult",
@@ -1938,7 +1905,40 @@
     "useListWorkspaces",
     "useUpdateWorkspace"
   ],
-  "src/api/idempotencyKey.ts": [
+  "src/api/http/client.ts": [
+    "ApiClientError",
+    "ApiRequestConfig",
+    "AuthFailureMode",
+    "api",
+    "createApiError"
+  ],
+  "src/api/http/contractKernel.ts": [
+    "ContractErrorBody",
+    "ContractErrorEnvelope",
+    "ContractKernelError",
+    "ContractMeta",
+    "ContractParseErr",
+    "ContractParseOk",
+    "ContractSuccessEnvelope",
+    "OpaqueIdPrefix",
+    "RateLimitState",
+    "ReadableHeaders",
+    "buildConditionalHeaders",
+    "buildContractRequestHeaders",
+    "buildSseResumeHeaders",
+    "createContractDataSelector",
+    "getETag",
+    "getRequestId",
+    "isOpaqueId",
+    "newRequestId",
+    "opaqueIdPrefix",
+    "parseContractEnvelope",
+    "parseRateLimit",
+    "requireContractData",
+    "resolveContractData",
+    "withSseResumeParam"
+  ],
+  "src/api/http/idempotencyKey.ts": [
     "boardOperationIdempotencyKey",
     "controlCreditIdempotencyKey",
     "controlUserIdempotencyKey",
@@ -1958,7 +1958,10 @@
     "workspaceUploadIdempotencyKey",
     "workspaceVisionQueryIdempotencyKey"
   ],
-  "src/api/mediaAssetDelivery.ts": [
+  "src/api/http/sessionUserType.ts": ["User"],
+  "src/api/http/stripUndefined.ts": ["DefinedOnly", "stripUndefined"],
+  "src/api/http/userSession.ts": ["fetchCurrentUserInfo", "toSessionUser"],
+  "src/api/media/mediaAssetDelivery.ts": [
     "ApiResponseMediaAssetMetadata",
     "MediaAssetDeliveryMetadata",
     "MediaAssetDeliveryStatus",
@@ -1982,17 +1985,14 @@
     "resolveMediaAssetProcessingURL",
     "resolveWorkspaceMediaAssetDerivativeURL",
     "resolveWorkspaceMediaAssetOriginalURL",
-    "setMediaWorkspaceIdResolver",
-    "useMediaAssetDelivery"
+    "setMediaWorkspaceIdResolver"
   ],
-  "src/api/mediaWorkspaceScope.ts": [
+  "src/api/media/mediaWorkspaceScope.ts": [
     "readMediaWorkspaceId",
     "resetMediaWorkspaceIdResolver",
     "setMediaWorkspaceIdResolver"
   ],
-  "src/api/sessionUserType.ts": ["User"],
-  "src/api/stripUndefined.ts": ["DefinedOnly", "stripUndefined"],
-  "src/api/upload.ts": [
+  "src/api/media/upload.ts": [
     "UPLOAD_OPERATION_TIMEOUT_MS",
     "UploadAvatarMetadata",
     "UploadImageMetadata",
@@ -2017,8 +2017,7 @@
     "workspaceMediaAssetDerivativeSuffix",
     "workspaceUploadApi"
   ],
-  "src/api/userSession.ts": ["fetchCurrentUserInfo", "toSessionUser"],
-  "src/api/workspaceEventStream.ts": [
+  "src/api/realtime/workspaceEventStream.ts": [
     "NOTIFICATION_EVENT_TYPES",
     "SubscribeWorkspaceEventsOptions",
     "WORKSPACE_EVENT_TYPES",
@@ -2044,7 +2043,7 @@
     "workspaceEventsSuffix",
     "workspaceEventsUrl"
   ],
-  "src/api/workspaceTaskContract.ts": [
+  "src/api/tasks/workspaceTaskContract.ts": [
     "CreateWorkspaceTaskInput",
     "WORKSPACE_TASK_STATUSES",
     "WorkspaceTaskBillingSnapshot",
@@ -2061,7 +2060,7 @@
     "toWorkspaceTaskOutputs",
     "workspaceTaskLocation"
   ],
-  "src/api/workspaceTaskTransport.ts": [
+  "src/api/tasks/workspaceTaskTransport.ts": [
     "cancelWorkspaceTask",
     "createWorkspaceTask",
     "getWorkspaceTask",
@@ -2070,8 +2069,8 @@
     "listWorkspaceTasks",
     "quoteWorkspaceTask"
   ],
-  "src/api/workspaceTaskWaiter.ts": ["WaitWorkspaceTaskOptions", "waitWorkspaceTaskTerminal"],
-  "src/api/workspaceTasks.ts": [
+  "src/api/tasks/workspaceTaskWaiter.ts": ["WaitWorkspaceTaskOptions", "waitWorkspaceTaskTerminal"],
+  "src/api/tasks/workspaceTasks.ts": [
     "CreateWorkspaceTaskInput",
     "WaitWorkspaceTaskOptions",
     "WorkspaceTaskBillingSnapshot",
@@ -2795,15 +2794,70 @@
     "useAvatarUpload",
     "useBillingAccount",
     "useBillingRecords",
+    "useBillingTransferSection",
     "useCreditWallet",
     "useCreditsSync",
+    "useMemberQuotaSection",
     "usePasswordChange",
     "usePaymentsContext",
     "useProfileFeedback",
     "useRecharge",
     "useRewardHistory",
     "useRewardRedemption",
-    "useUsage"
+    "useUsage",
+    "useWorkspaceCreation"
+  ],
+  "src/features/account/session/accountWorkspace.ts": [
+    "WorkspaceMemberEntry",
+    "WorkspaceMemberFailureReason",
+    "WorkspaceMemberInvite",
+    "WorkspaceMemberRole",
+    "cancelWorkspaceMemberInvite",
+    "changeWorkspaceMemberRole",
+    "classifyWorkspaceMemberError",
+    "createWorkspaceMemberInvite",
+    "invalidateWorkspaceMemberQueries",
+    "removeWorkspaceMemberEntry",
+    "useAccountWorkspace",
+    "workspaceMemberInvitesQueryOptions",
+    "workspaceMembersQueryOptions",
+    "workspaceQueryKeys"
+  ],
+  "src/features/account/session/billing-account/resource.ts": [
+    "BillingAccountScope",
+    "billingAccountQueryKeys",
+    "fetchBillingAccount"
+  ],
+  "src/features/account/session/billing-transfer/resource.ts": [
+    "BillingManagerSummary",
+    "BillingTransferInviteSummary",
+    "BillingTransferRequestOptions",
+    "acceptTransferInvite",
+    "billingTransferQueryKeys",
+    "cancelTransferInvite",
+    "fetchBillingManagers",
+    "fetchTransferInvites",
+    "initiateTransferInvite",
+    "isTransferInviteLapsed",
+    "isTransferInviteLive",
+    "rejectTransferInvite"
+  ],
+  "src/features/account/session/quota/resource.ts": [
+    "MAX_MEMBER_QUOTA_LIMIT",
+    "MemberQuotaPeriod",
+    "MemberQuotaSummary",
+    "UpdateMemberQuotaInput",
+    "fetchMemberQuotaList",
+    "fetchSelfMemberQuota",
+    "isQuotaExhausted",
+    "memberQuotaQueryKeys",
+    "normalizeQuotaInput",
+    "parseMemberQuotaData",
+    "parseMemberQuotaList",
+    "parseQuotaPeriodValue",
+    "quotaPeriodLabelKey",
+    "updateMemberQuota",
+    "validateQuotaLimit"
   ],
   "src/features/account/session/workspace-settings/index.ts": [
     "memberDisplayName",
@@ -2847,38 +2901,24 @@
     "ADMIN_USERS_PATH",
     "isPathUnderRoute"
   ],
-  "src/features/admin/shared/core/cellClasses.ts": [
-    "adminInlineJumpClass",
-    "adminMonoClass",
-    "adminNumericCellClass",
-    "adminTableMutedValueClass",
-    "adminTruncateCellClass"
+  "src/features/admin/shared/adapters/controlMutation.ts": [
+    "ControlMutationOptions",
+    "buildControlMutationHeaders"
   ],
-  "src/features/admin/shared/core/cellPlaceholders.ts": [
-    "ADMIN_IDENTITY_EMPTY",
-    "ADMIN_NUMERIC_EMPTY",
-    "AdminEmptyKind",
-    "emptyPlaceholder"
+  "src/features/admin/shared/adapters/controlResource.ts": [
+    "LoadControlSettingOptions",
+    "loadControlSetting"
   ],
-  "src/features/admin/shared/core/controlCopy.ts": ["ControlErrorMessages", "withControlCopy"],
+  "src/features/admin/shared/core/controlCopy.ts": [
+    "ControlError",
+    "ControlErrorMessages",
+    "createControlError",
+    "withControlCopy"
+  ],
   "src/features/admin/shared/core/controlGuidance.ts": [
     "ADMIN_CONTROL_UNAVAILABLE_CODE",
     "AdminControlUnavailableError",
     "adminControlUnavailable"
-  ],
-  "src/features/admin/shared/core/controlMutation.ts": [
-    "ControlError",
-    "ControlErrorMessages",
-    "ControlMutationOptions",
-    "buildControlMutationHeaders",
-    "createControlError",
-    "mapControlError",
-    "readControlErrorCode",
-    "readControlRequestId"
-  ],
-  "src/features/admin/shared/core/controlResource.ts": [
-    "LoadControlSettingOptions",
-    "loadControlSetting"
   ],
   "src/features/admin/shared/core/reconcileStableRows.ts": ["reconcileStableRows"],
   "src/features/admin/shared/core/secretSchema.ts": ["secretField"],
@@ -2891,61 +2931,6 @@
     "getAdminServiceGroupMeta",
     "getAdminServiceMeta",
     "getAdminServiceOrder"
-  ],
-  "src/features/admin/shared/core/tableColumns.ts": [
-    "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
-    "ADMIN_TABLE_MORE_COLUMN_WIDTH"
-  ],
-  "src/features/admin/shared/core/taskMetricTokens.ts": [
-    "TaskMetricDefinition",
-    "TaskMetricKey",
-    "TaskMetricStatsSnapshot",
-    "TaskStatus",
-    "getTaskMetricByStatus",
-    "monitorChartSpecs",
-    "taskMetricDefinitions"
-  ],
-  "src/features/admin/shared/core/uiClasses.ts": [
-    "adminAnomalyPopoverClass",
-    "adminChartCanvasClass",
-    "adminChartGridClass",
-    "adminCompactIconButtonClass",
-    "adminDashboardRootClass",
-    "adminDialogChromeClass",
-    "adminDialogChromeCloseClass",
-    "adminDialogChromeContentClass",
-    "adminDialogChromeFooterClass",
-    "adminDialogChromeHeaderClass",
-    "adminDialogChromeHeaderSplitClass",
-    "adminDialogChromeTitleClass",
-    "adminDialogFooterActionsClass",
-    "adminDialogFormBodyClass",
-    "adminDialogHeaderClass",
-    "adminDialogHeaderContentClass",
-    "adminDialogHeaderSplitClass",
-    "adminDialogScrollableBodyClass",
-    "adminDialogTitleClass",
-    "adminEmptyStateClass",
-    "adminFramedIconButtonClass",
-    "adminInputChromeClass",
-    "adminLogoButtonClass",
-    "adminOverlayMaskClass",
-    "adminSummaryGridClass",
-    "adminSurfacePanelClass",
-    "adminSurfacePanelViewportClass",
-    "adminSurfaceRootViewportClass",
-    "adminSurfaceScrollContentClass",
-    "adminSurfaceToolbarClass",
-    "adminTableCardClass",
-    "adminTableClass",
-    "adminTableFooterClass",
-    "adminTableFrameClass",
-    "adminTableRowActionButtonClass",
-    "adminTableStyle",
-    "adminTextButtonClass",
-    "adminToolbarButtonClass",
-    "adminToolbarMetricClass",
-    "adminToolbarPageLabelClass"
   ],
   "src/features/admin/shared/index.ts": [
     "ADMIN_BRAND_CATEGORIES",
@@ -3145,11 +3130,8 @@
     "getTaskMetricByStatus",
     "hydrateAdminBrandLogoOverrides",
     "loadControlSetting",
-    "mapControlError",
     "monitorChartSpecs",
     "pickAdminTimeRangeOptions",
-    "readControlErrorCode",
-    "readControlRequestId",
     "reconcileStableRows",
     "replaceAdminBrandLogoOverrides",
     "resolveModelBrandLogo",
@@ -3283,6 +3265,70 @@
     "default"
   ],
   "src/features/admin/shared/ui/shell/AdminSummaryCard.vue": ["default"],
+  "src/features/admin/shared/ui/styling/cellClasses.ts": [
+    "adminInlineJumpClass",
+    "adminMonoClass",
+    "adminNumericCellClass",
+    "adminTableMutedValueClass",
+    "adminTruncateCellClass"
+  ],
+  "src/features/admin/shared/ui/styling/cellPlaceholders.ts": [
+    "ADMIN_IDENTITY_EMPTY",
+    "ADMIN_NUMERIC_EMPTY",
+    "AdminEmptyKind",
+    "emptyPlaceholder"
+  ],
+  "src/features/admin/shared/ui/styling/taskMetricTokens.ts": [
+    "TaskMetricDefinition",
+    "TaskMetricKey",
+    "TaskMetricStatsSnapshot",
+    "TaskStatus",
+    "getTaskMetricByStatus",
+    "monitorChartSpecs",
+    "taskMetricDefinitions"
+  ],
+  "src/features/admin/shared/ui/styling/uiClasses.ts": [
+    "adminAnomalyPopoverClass",
+    "adminChartCanvasClass",
+    "adminChartGridClass",
+    "adminCompactIconButtonClass",
+    "adminDashboardRootClass",
+    "adminDialogChromeClass",
+    "adminDialogChromeCloseClass",
+    "adminDialogChromeContentClass",
+    "adminDialogChromeFooterClass",
+    "adminDialogChromeHeaderClass",
+    "adminDialogChromeHeaderSplitClass",
+    "adminDialogChromeTitleClass",
+    "adminDialogFooterActionsClass",
+    "adminDialogFormBodyClass",
+    "adminDialogHeaderClass",
+    "adminDialogHeaderContentClass",
+    "adminDialogHeaderSplitClass",
+    "adminDialogScrollableBodyClass",
+    "adminDialogTitleClass",
+    "adminEmptyStateClass",
+    "adminFramedIconButtonClass",
+    "adminInputChromeClass",
+    "adminLogoButtonClass",
+    "adminOverlayMaskClass",
+    "adminSummaryGridClass",
+    "adminSurfacePanelClass",
+    "adminSurfacePanelViewportClass",
+    "adminSurfaceRootViewportClass",
+    "adminSurfaceScrollContentClass",
+    "adminSurfaceToolbarClass",
+    "adminTableCardClass",
+    "adminTableClass",
+    "adminTableFooterClass",
+    "adminTableFrameClass",
+    "adminTableRowActionButtonClass",
+    "adminTableStyle",
+    "adminTextButtonClass",
+    "adminToolbarButtonClass",
+    "adminToolbarMetricClass",
+    "adminToolbarPageLabelClass"
+  ],
   "src/features/admin/shared/ui/table/AdminTable.vue": [
     "AdminTableRowClickEvent",
     "AdminTableRowCollapseEvent",
@@ -3291,6 +3337,10 @@
     "default"
   ],
   "src/features/admin/shared/ui/table/AdminTablePanel.vue": ["default"],
+  "src/features/admin/shared/ui/table/tableColumns.ts": [
+    "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
+    "ADMIN_TABLE_MORE_COLUMN_WIDTH"
+  ],
   "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue": ["default"],
   "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue": [
     "AdminOptionFilterOption",
@@ -3668,9 +3718,9 @@
     "primeAuthenticatedWorkspace",
     "selectWorkspace"
   ],
-  "src/features/canvas/core/graph/canvasGraphStoreWriter.ts": ["resolveWritableCanvasGraphStore"],
-  "src/features/canvas/core/graph/canvasGraphValueEquality.ts": ["isSameJsonValue"],
-  "src/features/canvas/core/graph/canvasGroupGeometry.ts": [
+  "src/features/canvas/core/graph/graphStoreWriter.ts": ["resolveWritableCanvasGraphStore"],
+  "src/features/canvas/core/graph/graphValueEquality.ts": ["isSameJsonValue"],
+  "src/features/canvas/core/graph/groupGeometry.ts": [
     "CANVAS_GROUP_FRAME_PADDING_PX",
     "CanvasFlowNodeLike",
     "CanvasFlowViewportTransform",
@@ -3718,7 +3768,6 @@
     "CanvasGraphReadPort",
     "CanvasGraphRecordPatch",
     "CanvasGraphRemoveNodeOptions",
-    "CanvasGraphSession",
     "CanvasGraphStaleTransactionError",
     "CanvasGraphStore",
     "CanvasGraphStoreTelemetry",
@@ -3760,6 +3809,7 @@
     "BoardSession",
     "BoardSessionRepository",
     "BoardSyncCoordinator",
+    "CanvasGraphSession",
     "SaveStatus",
     "createBoardAutosavePolicy",
     "createBoardSessionRepository",
@@ -4113,17 +4163,17 @@
   ],
   "src/features/canvas/ui/pages/CanvasLandingPage.vue": ["default"],
   "src/features/canvas/ui/pages/CanvasPage.vue": ["default"],
-  "src/features/canvas/ui/screens/index.ts": ["CanvasScreen"],
-  "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts": [
+  "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts": [
     "ACTIVE_NODE_PANEL_KIND",
     "ActiveNodePanel",
     "ActiveNodePanelKind",
     "useFlowActiveNodePanels"
   ],
-  "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts": [
+  "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts": [
     "CanvasInteractionKey",
     "useFlowCanvasInteractionState"
   ],
+  "src/features/canvas/ui/screens/index.ts": ["CanvasScreen"],
   "src/features/legal/index.ts": [
     "AcceptableUsePage",
     "LEGAL_CONTACTS",
@@ -4351,6 +4401,8 @@
     "toWorkspaceSelectionStatus",
     "useWorkspaceSelection"
   ],
+  "src/features/workspace/ui/dialogs/workspaceMenu.ts": ["isDefaultWorkspaceItem"],
+  "src/features/workspace/ui/settings/WorkspaceSettingsDialog.vue": ["default"],
   "src/test/factories/index.ts": [
     "AdminCommandTargetOverrides",
     "AdminListItemOverrides",

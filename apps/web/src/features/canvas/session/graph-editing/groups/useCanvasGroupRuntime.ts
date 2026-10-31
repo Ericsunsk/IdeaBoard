@@ -22,7 +22,7 @@ import {
   type CanvasGroupFrame,
   type CanvasPoint,
   type CanvasRect,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 import { resolveFlowNodeCanvasRef } from '../../../session/flow-adapter'
 import { releaseCanvasGraphDeleteExecutions } from '../../../session/flow-adapter'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'

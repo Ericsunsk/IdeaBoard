@@ -17,7 +17,10 @@ import (
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -49,11 +52,11 @@ func (allowAllWorkerPoolStore) ListPoolInTx(_ context.Context, _ pgx.Tx, service
 	return allowAllWorkerPoolStore{}.ListPool(context.Background(), service)
 }
 
-func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	if quantity <= 0 {
 		quantity = 1
 	}
-	return workspacetasks.BillingSnapshot{
+	return tasks.BillingSnapshot{
 		SKU: "ai-image:" + kind, DisplayName: kind,
 		PriceVersionID: 1, PriceVersion: 1, OutputResolution: resolution,
 		UnitCredits: 10, Quantity: quantity, TotalCredits: 10 * quantity,
@@ -63,7 +66,7 @@ func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quan
 
 // QuoteInTx serves the settlement-transaction seam: quoting has no durable
 // side effects, so no rollback hook is needed.
-func (q workerTestQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q workerTestQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resolution string, quantity int64) (tasks.BillingSnapshot, error) {
 	return q.Quote(ctx, kind, resolution, quantity)
 }
 
@@ -137,10 +140,10 @@ func (h *workerTestHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, billingAcc
 // workerTestQueue records enqueues (mutex-guarded for -race).
 type workerTestQueue struct {
 	mu       sync.Mutex
-	enqueued []*workspacetasks.WorkspaceTask
+	enqueued []*tasks.WorkspaceTask
 }
 
-func (q *workerTestQueue) Enqueue(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+func (q *workerTestQueue) Enqueue(ctx context.Context, task *tasks.WorkspaceTask) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.enqueued = append(q.enqueued, task)
@@ -149,7 +152,7 @@ func (q *workerTestQueue) Enqueue(ctx context.Context, task *workspacetasks.Work
 
 // EnqueueInTx serves the settlement-transaction seam from the same queue
 // and registers its rollback undo.
-func (q *workerTestQueue) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
+func (q *workerTestQueue) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *tasks.WorkspaceTask) error {
 	if err := q.Enqueue(ctx, task); err != nil {
 		return err
 	}
@@ -179,14 +182,14 @@ type workerTestAssets struct {
 	archived map[string]bool
 }
 
-func (a *workerTestAssets) GetAsset(ctx context.Context, workspaceID, assetID string) (*workspacetasks.AssetInfo, error) {
+func (a *workerTestAssets) GetAsset(ctx context.Context, workspaceID, assetID string) (*tasks.AssetInfo, error) {
 	if a.archived[assetID] {
-		return nil, workspacetasks.ErrMediaArchived
+		return nil, tasks.ErrMediaArchived
 	}
 	if !a.ready[assetID] {
-		return nil, workspacetasks.ErrMediaNotFound
+		return nil, tasks.ErrMediaNotFound
 	}
-	return &workspacetasks.AssetInfo{ID: assetID, WorkspaceID: workspaceID, Status: "ready"}, nil
+	return &tasks.AssetInfo{ID: assetID, WorkspaceID: workspaceID, Status: "ready"}, nil
 }
 
 type workerTestEnv struct {
@@ -194,16 +197,16 @@ type workerTestEnv struct {
 	txStore  *txWorkerStore
 	holder   *workerTestHolder
 	queue    *workerTestQueue
-	service  *workspacetasks.Service
-	attempts *workspacetasks.InMemoryAttemptRecorder
+	service  *taskapp.Service
+	attempts *taskmemory.InMemoryAttemptRecorder
 }
 
 func newWorkerTestEnv() *workerTestEnv {
 	// The store is wrapped in the merged claim+attempt adapter: production
 	// fences the lease and opens the send fact in ONE statement, so unit
 	// paths must not keep the split claim-then-record shape alive.
-	memory := workspacetasks.NewInMemoryStoreForTests()
-	attempts := workspacetasks.NewInMemoryAttemptRecorderForTests()
+	memory := taskmemory.NewInMemoryStoreForTests()
+	attempts := taskmemory.NewInMemoryAttemptRecorderForTests()
 	store := newAttemptClaimStore(memory, attempts)
 	txStore := newTxWorkerStore(store)
 	holder := newWorkerTestHolder()
@@ -213,7 +216,7 @@ func newWorkerTestEnv() *workerTestEnv {
 	return &workerTestEnv{store: store, txStore: txStore, holder: holder, queue: queue, service: service, attempts: attempts}
 }
 
-func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspacetasks.AssetReader) *WorkspaceTaskWorker {
+func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets taskports.AssetReader) *WorkspaceTaskWorker {
 	if assets == nil {
 		assets = &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}}
 	}
@@ -227,13 +230,13 @@ func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspa
 	return worker
 }
 
-func (e *workerTestEnv) submit(t *testing.T, inputs []string) *workspacetasks.WorkspaceTask {
+func (e *workerTestEnv) submit(t *testing.T, inputs []string) *tasks.WorkspaceTask {
 	return e.submitService(t, "render", inputs)
 }
 
-func (e *workerTestEnv) submitService(t *testing.T, service string, inputs []string) *workspacetasks.WorkspaceTask {
+func (e *workerTestEnv) submitService(t *testing.T, service string, inputs []string) *tasks.WorkspaceTask {
 	t.Helper()
-	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
+	created, err := e.service.Create(context.Background(), tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
 		Service: service, MediaAssetIDs: inputs, Quantity: 1, Resolution: "",
 	}, "worker-key-"+t.Name())
@@ -243,8 +246,8 @@ func (e *workerTestEnv) submitService(t *testing.T, service string, inputs []str
 	return created
 }
 
-func workerJobFor(task *workspacetasks.WorkspaceTask) *river.Job[workspacetasks.WorkspaceTaskArgs] {
-	return &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+func workerJobFor(task *tasks.WorkspaceTask) *river.Job[taskqueue.WorkspaceTaskArgs] {
+	return &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: task.ID, WorkspaceID: task.WorkspaceID,
 		Service: task.Service, ExecutionToken: task.ExecutionToken,
 	}}
@@ -252,9 +255,9 @@ func workerJobFor(task *workspacetasks.WorkspaceTask) *river.Job[workspacetasks.
 
 var workerTestRemoteChecksum = strings.Repeat("a", 64)
 
-func workerTestRemoteOutput() []workspacetasks.OutputRef {
-	return []workspacetasks.OutputRef{{
-		Kind:           workspacetasks.OutputKindRemote,
+func workerTestRemoteOutput() []tasks.OutputRef {
+	return []tasks.OutputRef{{
+		Kind:           tasks.OutputKindRemote,
 		URL:            "https://cdn.example.com/worker-result.png",
 		ChecksumSHA256: workerTestRemoteChecksum, Role: "result", ResultIndex: 0,
 	}}
@@ -269,9 +272,9 @@ func TestWorkspaceTaskWorkerSuccessLoop(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
-		if task.Status != workspacetasks.StatusRunning {
+		if task.Status != tasks.StatusRunning {
 			t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 		}
 		return workerTestRemoteOutput(), nil
@@ -287,7 +290,7 @@ func TestWorkspaceTaskWorkerSuccessLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 	if len(got.OutputRefs) != 1 || got.OutputRefs[0].URL != "https://cdn.example.com/worker-result.png" {
@@ -312,7 +315,7 @@ func TestWorkspaceTaskWorkerDeterministicFailure(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(400, "bad prompt", 0)
 	}), nil)
 
@@ -323,7 +326,7 @@ func TestWorkspaceTaskWorkerDeterministicFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if strings.TrimSpace(got.ErrorMsg) == "" {
@@ -347,7 +350,7 @@ func TestWorkspaceTaskWorkerRetryableRequeues(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	attempts := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		attempts++
 		if attempts == 1 {
 			return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
@@ -362,7 +365,7 @@ func TestWorkspaceTaskWorkerRetryableRequeues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if afterRetry.Status != workspacetasks.StatusPending || afterRetry.RetryCount != 1 {
+	if afterRetry.Status != tasks.StatusPending || afterRetry.RetryCount != 1 {
 		t.Fatalf("after retry = (%q, retry %d), want (pending, 1)", afterRetry.Status, afterRetry.RetryCount)
 	}
 	if afterRetry.ExecutionToken == created.ExecutionToken {
@@ -379,7 +382,7 @@ func TestWorkspaceTaskWorkerRetryableRequeues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if done.Status != workspacetasks.StatusCompleted {
+	if done.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", done.Status)
 	}
 }
@@ -392,11 +395,11 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
 	}), nil)
 
-	for i := 0; i < workspacetasks.MaxProviderRequeues; i++ {
+	for i := 0; i < tasks.MaxProviderRequeues; i++ {
 		current, err := env.store.GetTask(ctx, "ws_test", created.ID)
 		if err != nil {
 			t.Fatalf("GetTask: %v", err)
@@ -411,8 +414,8 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if current.RetryCount != workspacetasks.MaxProviderRequeues {
-		t.Fatalf("retry_count = %d, want %d", current.RetryCount, workspacetasks.MaxProviderRequeues)
+	if current.RetryCount != tasks.MaxProviderRequeues {
+		t.Fatalf("retry_count = %d, want %d", current.RetryCount, tasks.MaxProviderRequeues)
 	}
 	if err := worker.Work(ctx, workerJobFor(current)); err != nil {
 		t.Fatalf("final Work: %v", err)
@@ -421,7 +424,7 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if done.Status != workspacetasks.StatusFailed {
+	if done.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed after budget exhaustion", done.Status)
 	}
 }
@@ -438,7 +441,7 @@ func TestWorkspaceTaskWorkerStaleTokenDropped(t *testing.T) {
 		t.Fatalf("Retry: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -453,7 +456,7 @@ func TestWorkspaceTaskWorkerStaleTokenDropped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusPending || got.RetryCount != 1 {
+	if got.Status != tasks.StatusPending || got.RetryCount != 1 {
 		t.Fatalf("task = (%q, retry %d), want untouched (pending, 1)", got.Status, got.RetryCount)
 	}
 }
@@ -467,7 +470,7 @@ func TestWorkspaceTaskWorkerTerminalDropped(t *testing.T) {
 		t.Fatalf("FailTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -487,7 +490,7 @@ func TestWorkspaceTaskWorkerCancelledDropped(t *testing.T) {
 		t.Fatalf("CancelTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -503,11 +506,11 @@ func TestWorkspaceTaskWorkerCancelledDropped(t *testing.T) {
 // job) drop without error.
 func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 	env := newWorkerTestEnv()
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		t.Fatal("provider must not run for an unknown task")
 		return nil, nil
 	}), nil)
-	if err := worker.Work(context.Background(), &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+	if err := worker.Work(context.Background(), &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: "task_missing", WorkspaceID: "ws_test",
 		Service: "render", ExecutionToken: "exec_missing",
 	}}); err != nil {
@@ -519,7 +522,7 @@ func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 func TestWorkspaceTaskWorkerMalformedJobDropped(t *testing.T) {
 	env := newWorkerTestEnv()
 	worker := env.newWorker(nil, nil)
-	if err := worker.Work(context.Background(), &river.Job[workspacetasks.WorkspaceTaskArgs]{}); err != nil {
+	if err := worker.Work(context.Background(), &river.Job[taskqueue.WorkspaceTaskArgs]{}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}
 }
@@ -528,19 +531,19 @@ func TestWorkspaceTaskWorkerMalformedJobDropped(t *testing.T) {
 func TestWorkspaceTaskWorkerInvalidInputFails(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
-	token, err := workspacetasks.NewExecutionToken()
+	token, err := tasks.NewExecutionToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-	seeded, err := env.store.CreateTask(ctx, &workspacetasks.WorkspaceTask{
+	seeded, err := env.store.CreateTask(ctx, &tasks.WorkspaceTask{
 		ID: "task_badkind", WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "not-a-kind", Status: workspacetasks.StatusPending, ExecutionToken: token,
+		Service: "not-a-kind", Status: tasks.StatusPending, ExecutionToken: token,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -554,7 +557,7 @@ func TestWorkspaceTaskWorkerInvalidInputFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.ExecutionToken != token {
@@ -566,7 +569,7 @@ func TestWorkspaceTaskWorkerInvalidInputFails(t *testing.T) {
 func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
-	created, err := env.service.Create(ctx, workspacetasks.CreateInput{
+	created, err := env.service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "render", Quantity: 1, Resolution: "",
 	}, "worker-media-key")
 	if err != nil {
@@ -578,12 +581,12 @@ func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 	if err := env.store.DeleteTask(ctx, "ws_test", created.ID); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
 	}
-	created.Status = workspacetasks.StatusPending
+	created.Status = tasks.StatusPending
 	if _, err := env.store.CreateTask(ctx, created); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -597,7 +600,7 @@ func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 }
@@ -616,7 +619,7 @@ func TestWorkspaceTaskWorkerNilProviderFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 }
@@ -632,7 +635,7 @@ func TestWorkspaceTaskWorkerClaimConflictRetries(t *testing.T) {
 		t.Fatalf("ClaimTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -656,7 +659,7 @@ func TestWorkspaceTaskWorkerRedeliveryReacquiresInterruptedLease(t *testing.T) {
 		t.Fatalf("initial ClaimTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -670,7 +673,7 @@ func TestWorkspaceTaskWorkerRedeliveryReacquiresInterruptedLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 }
@@ -707,7 +710,7 @@ func TestMapWorkspaceProviderOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
-	if len(refs) != 1 || refs[0].Kind != workspacetasks.OutputKindAsset || refs[0].AssetID != "asset_1234567890ab" {
+	if len(refs) != 1 || refs[0].Kind != tasks.OutputKindAsset || refs[0].AssetID != "asset_1234567890ab" {
 		t.Fatalf("refs = %+v, want the asset passthrough", refs)
 	}
 	for _, output := range []tasks.TaskOutput{
@@ -725,14 +728,14 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	if _, err := workspaceBridgeTaskPayload(nil); err == nil {
 		t.Fatal("nil task = nil, want error")
 	}
-	if _, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{}); err == nil {
+	if _, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{}); err == nil {
 		t.Fatal("empty id = nil, want error")
 	}
 	canonical, err := taskservice.CompileWorkspaceParams("generation", "a sunset", nil)
 	if err != nil {
 		t.Fatalf("compile canonical params: %v", err)
 	}
-	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	legacy, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{
 		ID: "task_x", WorkspaceID: "ws_test", OwnerUserID: 7, Service: "generation",
 		CanonicalParams: canonical,
 	})
@@ -761,7 +764,7 @@ func TestWorkerExecutionDeadlineLeavesSettlementBudget(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	var parent context.Context
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		parentDeadline, parentOK := parent.Deadline()
 		executionDeadline, executionOK := ctx.Deadline()
 		if !parentOK || !executionOK || parentDeadline.Sub(executionDeadline) < 10*time.Minute {
@@ -785,7 +788,7 @@ func TestWorkerExecutionDeadlineLeavesSettlementBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.Status != workspacetasks.StatusPending || task.RetryCount != 1 || task.ExecutionToken == created.ExecutionToken {
+	if task.Status != tasks.StatusPending || task.RetryCount != 1 || task.ExecutionToken == created.ExecutionToken {
 		t.Fatalf("timeout failed to requeue with fresh token: %+v", task)
 	}
 }

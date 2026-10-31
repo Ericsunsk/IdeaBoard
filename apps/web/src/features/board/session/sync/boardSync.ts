@@ -13,7 +13,7 @@ import {
   type WorkspaceBoardMeta,
 } from '../adapters/boardsResource'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
-import { stripUndefined } from '../../../../api/stripUndefined'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import {
   boardScopeKey,
   getBoardScope,

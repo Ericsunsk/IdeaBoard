@@ -1,5 +1,5 @@
 import { ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
-import { uploadApi } from '../../../api/upload'
+import { uploadApi } from '@/api/media/upload'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import { i18n } from '../../../core/i18n'
 import { createUniqueId } from '../../../core/utils/ids'

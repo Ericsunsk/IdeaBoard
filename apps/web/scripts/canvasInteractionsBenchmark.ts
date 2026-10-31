@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util'
 import {
   CanvasGraphStore,
   toCanvasGraphNodeId,
-} from '../src/features/canvas/core/graph/canvasGraphStore.ts'
+} from '../src/features/canvas/core/graph/graphStore.ts'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../src/features/board/ports/canvas.ts'
 
 import { boardSnapshotToFlow } from '../src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts'

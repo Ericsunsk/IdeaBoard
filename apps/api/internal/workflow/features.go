@@ -4,24 +4,22 @@ import (
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
 	"math"
-	"regexp"
 	"strings"
 
+	"ideaboard/api/internal/workflow/features"
 	"ideaboard/api/internal/workflow/paramkeys"
 )
 
-var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
-
 const (
-	FeatureSlugGeneration = "generation"
-	FeatureSlugInpaint    = "inpaint"
+	FeatureSlugGeneration = features.FeatureSlugGeneration
+	FeatureSlugInpaint    = features.FeatureSlugInpaint
 
-	FeatureSlugRender     = "render"
-	FeatureSlugVariations = "variations"
-	FeatureSlugCutout     = "cutout"
-	FeatureSlugFusion     = "fusion"
-	FeatureSlugUpscale    = "upscale"
-	FeatureSlugOutpaint   = "outpaint"
+	FeatureSlugRender     = features.FeatureSlugRender
+	FeatureSlugVariations = features.FeatureSlugVariations
+	FeatureSlugCutout     = features.FeatureSlugCutout
+	FeatureSlugFusion     = features.FeatureSlugFusion
+	FeatureSlugUpscale    = features.FeatureSlugUpscale
+	FeatureSlugOutpaint   = features.FeatureSlugOutpaint
 )
 
 // ReservedVisionSlug is permanently reserved for vision search
@@ -30,18 +28,13 @@ const (
 // storage isolates vision at ai_gateway_vision_model precisely because the API
 // reuses the bare string, and a workflow "vision" would reintroduce the
 // ai-image:vision / ai-search:vision overwrite. Locked by test.
-const ReservedVisionSlug = "vision"
-
-var supportedWorkflowFeatureSlugs = registeredImageFeatureSlugs()
-var aiImageWorkflowFeatures = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
+const ReservedVisionSlug = features.ReservedVisionSlug
 
 // AIImageFeatureSlugs is the canonical product registry for workflows that
 // invoke an external AI image provider. Local editor operations never enter
 // this registry and therefore cannot acquire Task Billing facts.
 func AIImageFeatureSlugs() []string {
-	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
-	copy(slugs, supportedWorkflowFeatureSlugs)
-	return slugs
+	return features.AIImageFeatureSlugs()
 }
 
 func IsAIImageFeature(raw string) bool {
@@ -50,29 +43,7 @@ func IsAIImageFeature(raw string) bool {
 }
 
 func ParseAIImageFeatureSlug(raw string) (string, bool) {
-	// Single canonical owner for feature-slug validation. New callers
-	// use this directly; ValidateWorkflow* is a thin alias below so
-	// ValidateCreate/handler never fork the set.
-	slug := normalizeWorkflowFeatureSlug(raw)
-	if slug == "" || !workflowFeatureSlugRe.MatchString(slug) {
-		return "", false
-	}
-	if _, ok := aiImageWorkflowFeatures[slug]; !ok {
-		return "", false
-	}
-	return slug, true
-}
-
-func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
-	result := make(map[string]struct{}, len(slugs))
-	for _, slug := range slugs {
-		result[slug] = struct{}{}
-	}
-	return result
-}
-
-func normalizeWorkflowFeatureSlug(raw string) string {
-	return strings.TrimSpace(raw)
+	return features.ParseAIImageFeatureSlug(raw)
 }
 
 func ValidateWorkflowFeatureSlug(raw string) (string, error) {

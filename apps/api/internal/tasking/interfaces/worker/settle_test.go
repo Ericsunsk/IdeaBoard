@@ -17,7 +17,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/riverpolicy"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
 
 	"github.com/riverqueue/river"
 )
@@ -28,12 +29,12 @@ type sweepScanCall struct {
 }
 
 type sweepFakeStore struct {
-	rows  []workspacetasks.StalledSettlement
+	rows  []tasks.StalledSettlement
 	err   error
 	calls []sweepScanCall
 }
 
-func (s *sweepFakeStore) ListStalledHeldSettlements(_ context.Context, stalledBefore time.Time, limit int) ([]workspacetasks.StalledSettlement, error) {
+func (s *sweepFakeStore) ListStalledHeldSettlements(_ context.Context, stalledBefore time.Time, limit int) ([]tasks.StalledSettlement, error) {
 	s.calls = append(s.calls, sweepScanCall{stalledBefore: stalledBefore, limit: limit})
 	return s.rows, s.err
 }
@@ -43,12 +44,12 @@ type sweepFakeSettler struct {
 	calls []string
 }
 
-func (f *sweepFakeSettler) Fail(_ context.Context, workspaceID, taskID, _ string) (*workspacetasks.WorkspaceTask, error) {
+func (f *sweepFakeSettler) Fail(_ context.Context, workspaceID, taskID, _ string) (*tasks.WorkspaceTask, error) {
 	f.calls = append(f.calls, workspaceID+"/"+taskID)
 	if err, ok := f.errs[taskID]; ok {
 		return nil, err
 	}
-	return &workspacetasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, Status: workspacetasks.StatusFailed}, nil
+	return &tasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, Status: tasks.StatusFailed}, nil
 }
 
 func newTestSweepWorker(store TaskSettlementSweepStore, settler TaskSettlementSweepSettler, now time.Time) *TaskSettlementSweepWorker {
@@ -82,7 +83,7 @@ func TestTaskSettlementSweepUsesCodeOwnedBudget(t *testing.T) {
 // a healthy long-running task is never a candidate.
 func TestTaskSettlementSweepScansAtTheLivenessThreshold(t *testing.T) {
 	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
-	store := &sweepFakeStore{rows: []workspacetasks.StalledSettlement{
+	store := &sweepFakeStore{rows: []tasks.StalledSettlement{
 		{WorkspaceID: "ws_1", TaskID: "task_1"},
 	}}
 	settler := &sweepFakeSettler{}
@@ -94,12 +95,12 @@ func TestTaskSettlementSweepScansAtTheLivenessThreshold(t *testing.T) {
 	if len(store.calls) != 1 {
 		t.Fatalf("scan calls = %d, want 1", len(store.calls))
 	}
-	wantCutoff := now.Add(-workspacetasks.StalledSettlementThreshold)
+	wantCutoff := now.Add(-taskapp.StalledSettlementThreshold)
 	if !store.calls[0].stalledBefore.Equal(wantCutoff) {
 		t.Fatalf("cutoff = %s, want %s", store.calls[0].stalledBefore, wantCutoff)
 	}
-	if store.calls[0].limit != workspacetasks.StalledSettlementSweepBatch {
-		t.Fatalf("limit = %d, want the kernel bound %d", store.calls[0].limit, workspacetasks.StalledSettlementSweepBatch)
+	if store.calls[0].limit != taskapp.StalledSettlementSweepBatch {
+		t.Fatalf("limit = %d, want the kernel bound %d", store.calls[0].limit, taskapp.StalledSettlementSweepBatch)
 	}
 	if len(settler.calls) != 1 || settler.calls[0] != "ws_1/task_1" {
 		t.Fatalf("Fail calls = %v, want the discovered pair", settler.calls)
@@ -112,7 +113,7 @@ func TestTaskSettlementSweepScansAtTheLivenessThreshold(t *testing.T) {
 // while failing the job would burn the attempt budget on a poisoned row.
 func TestTaskSettlementSweepIsolatesTaskFailures(t *testing.T) {
 	ledgerDown := errors.New("ledger unavailable")
-	store := &sweepFakeStore{rows: []workspacetasks.StalledSettlement{
+	store := &sweepFakeStore{rows: []tasks.StalledSettlement{
 		{WorkspaceID: "ws_1", TaskID: "task_bad"},
 		{WorkspaceID: "ws_1", TaskID: "task_good"},
 	}}
@@ -163,7 +164,7 @@ func TestTaskSettlementSweepPeriodicJobIsWired(t *testing.T) {
 	if got := (taskSettlementSweepSchedule{}).Next(start); !got.Equal(start.Add(taskSettlementSweepPeriod)) {
 		t.Fatalf("next run = %s, want +%s", got, taskSettlementSweepPeriod)
 	}
-	if taskSettlementSweepPeriod >= workspacetasks.StalledSettlementThreshold {
-		t.Fatalf("sweep period %s must stay far below the %s threshold", taskSettlementSweepPeriod, workspacetasks.StalledSettlementThreshold)
+	if taskSettlementSweepPeriod >= taskapp.StalledSettlementThreshold {
+		t.Fatalf("sweep period %s must stay far below the %s threshold", taskSettlementSweepPeriod, taskapp.StalledSettlementThreshold)
 	}
 }

@@ -17,7 +17,7 @@ import { i18n } from '../../../../core/i18n'
 import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,
-} from '../../ui/screens/useFlowActiveNodePanels.ts'
+} from '../../ui/screens/controllers/useFlowActiveNodePanels.ts'
 import type { RetouchMode } from '../../tools/retouch'
 
 type FusionPromptParamPatch = Extract<

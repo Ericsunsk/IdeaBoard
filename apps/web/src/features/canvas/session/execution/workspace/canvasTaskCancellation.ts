@@ -12,8 +12,8 @@ import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../c
 import {
   cancelWorkspaceTask,
   isWorkspaceTaskGoneError,
-} from '../../../../../api/workspaceTaskTransport'
-import { taskCancellationIdempotencyKey } from '../../../../../api/idempotencyKey'
+} from '@/api/tasks/workspaceTaskTransport'
+import { taskCancellationIdempotencyKey } from '@/api/http/idempotencyKey'
 import { i18n } from '../../../../../core/i18n'
 import { getWorkspaceSelectionStore as getDefaultWorkspaceSelectionStore } from '../../../../workspace'
 import { errorCode, errorStatus } from './canvasTaskContractMapping'

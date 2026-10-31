@@ -38,8 +38,8 @@
 // silent drop, never a cryptic 422). Missing workspace selection throws
 // `CanvasWorkspaceUnavailableError` with guidance.
 
-import { createWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
-import { workspaceTaskIdempotencyKey } from '../../../../../api/idempotencyKey'
+import { createWorkspaceTask } from '@/api/tasks/workspaceTaskTransport'
+import { workspaceTaskIdempotencyKey } from '@/api/http/idempotencyKey'
 import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'
 import { i18n } from '../../../../../core/i18n'
 import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'

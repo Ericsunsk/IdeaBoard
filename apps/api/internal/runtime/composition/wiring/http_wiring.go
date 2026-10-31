@@ -59,10 +59,11 @@ import (
 	searchports "ideaboard/api/internal/searchcatalog/ports"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
-	workspacetasks "ideaboard/api/internal/tasking/workspacetasks"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	tenancyevents "ideaboard/api/internal/tenancy/events"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/tenancy/invitations"
@@ -210,14 +211,15 @@ func NewAppRouter(
 			// emailReader join (users -> AuthUserIDs -> Auth emails) plus
 			// the avatar projection off the same rows; members without
 			// facts omit the fields, never fail the request.
-			MemberDisplay: memberDisplay,
-			MemberLookup:  memberLookup,
-			AvatarUID:     v1.NewV1AvatarDirectory(repos.userRepo),
-			UserProfile:   runtimehttp.NewV1UserProfileDirectory(repos.userRepo),
-			// Avatar bytes ride the storage abstraction (active
-			// profile): the same seam serves local today and R2 after
-			// the profile cutover.
-			AvatarObjects: services.storageService,
+			Members: v1.ContractV1MemberDeps{
+				MemberDisplay: memberDisplay,
+				MemberLookup:  memberLookup,
+			},
+			Avatar: v1.ContractV1AvatarDeps{
+				AvatarUID:     v1.NewV1AvatarDirectory(repos.userRepo),
+				AvatarObjects: services.storageService,
+			},
+			UserProfile: runtimehttp.NewV1UserProfileDirectory(repos.userRepo),
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boardStore,
@@ -236,11 +238,12 @@ func NewAppRouter(
 				ReadThrough: libraryReadThrough,
 				Sources:     librarySources,
 			},
-			Media: taskServices.workspaceTaskMedia,
-			// Binary reads ride the storage service.
-			MediaObjects:  services.storageService,
-			MediaRenderer: mediaRenderer,
-			MediaPreviews: mediaPreviews,
+			Media: v1.ContractV1MediaDeps{
+				Media:         taskServices.workspaceTaskMedia,
+				MediaObjects:  services.storageService,
+				MediaRenderer: mediaRenderer,
+				MediaPreviews: mediaPreviews,
+			},
 			// #821 (#809 Phase 4-04): workspace-scoped task postgres
 			// store + production settlement adapters. Task routes
 			// are live: Quote via the billing catalog, Hold/Capture/
@@ -254,38 +257,41 @@ func NewAppRouter(
 			// transaction-first (Quote->Hold->Insert->Enqueue and
 			// terminal Capture/Release each commit in ONE shared PG
 			// transaction via the required Tx interfaces).
-			Tasks:                taskServices.workspaceTaskStore,
-			TaskLifecycle:        taskServices.workspaceTaskStore,
-			TaskBilling:          taskServices.workspaceTaskStore,
-			TaskSubmissionClaims: taskServices.workspaceTaskStore,
-			TaskBillingAccounts:  taskServices.workspaceTaskStore,
-			TaskQuoter:           taskServices.workspaceTaskQuoter,
-			TaskHolder:           taskServices.workspaceTaskHolder,
-			TaskQueue:            taskServices.workspaceTaskQueue,
-			TaskAssets:           taskServices.workspaceTaskAssets,
-			// #917: the quote/readiness preflight resolves the same stable
-			// Billing Account submit holds (no owner-wallet fallback) and
-			// gates the same Wallet funds (402 insufficient vs 403
-			// restricted). The store below is the same tenancy seam the
-			// workspace billing reads use, so every surface names one payer.
-			TaskQuoteBillingAccounts: billingAccounts,
-			TaskQuoteWallets:         services.creditService,
-			// #946: the quote/readiness preflight reports the same
-			// member quota submit enforces (not-ready early).
-			TaskQuoteQuotas: memberquotas.NewStore(repos.db),
-			// #848: quote, submit, and readiness share one RoutingResolver
-			// over the catalog pool (ADR-0012 rule 10, single seam).
-			// Submit pins its snapshot atomically via
-			// catalog.SaveRoutingSnapshot with the settlement tx's
-			// Queries. The fail-closed fallback for an unset resolver is
-			// the canonical unavailable sentinel (#854: no legacy gate).
-			TaskRouter:            taskServices.workspaceTaskRouter,
-			TaskSnapshotSaver:     newPoolRoutingSnapshotSaver(),
-			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
-			// #946: the same transaction enforces the member
-			// cross-workspace quota after Quote and
-			// before Hold (the quote preflight below reports it early).
-			TaskQuotas: memberquotas.NewStore(repos.db),
+			Tasks: v1.ContractV1TaskDeps{
+				Tasks:                taskServices.workspaceTaskStore,
+				TaskLifecycle:        taskServices.workspaceTaskStore,
+				TaskBilling:          taskServices.workspaceTaskStore,
+				TaskSubmissionClaims: taskServices.workspaceTaskStore,
+				TaskBillingAccounts:  taskServices.workspaceTaskStore,
+				TaskQuoter:           taskServices.workspaceTaskQuoter,
+				TaskHolder:           taskServices.workspaceTaskHolder,
+				TaskQueue:            taskServices.workspaceTaskQueue,
+				TaskAssets:           taskServices.workspaceTaskAssets,
+				// #917: the quote/readiness preflight resolves the same stable
+				// Billing Account submit holds (no owner-wallet fallback) and
+				// gates the same Wallet funds (402 insufficient vs 403
+				// restricted). The store below is the same tenancy seam the
+				// workspace billing reads use, so every surface names one payer.
+				TaskQuoteBillingAccounts: billingAccounts,
+				TaskQuoteWallets:         services.creditService,
+				// #946: the quote/readiness preflight reports the same
+				// member quota submit enforces (not-ready early).
+				TaskQuoteQuotas: memberquotas.NewStore(repos.db),
+				// #848: quote, submit, and readiness share one RoutingResolver
+				// over the catalog pool (ADR-0012 rule 10, single seam).
+				// Submit pins its snapshot atomically via
+				// catalog.SaveRoutingSnapshot with the settlement tx's
+				// Queries. The fail-closed fallback for an unset resolver is
+				// the canonical unavailable sentinel (#854: no legacy gate).
+				TaskRouter:            taskServices.workspaceTaskRouter,
+				TaskSnapshotSaver:     newPoolRoutingSnapshotSaver(),
+				TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+				// #946: the same transaction enforces the member
+				// cross-workspace quota after Quote and
+				// before Hold (the quote preflight below reports it early).
+				TaskQuotas: memberquotas.NewStore(repos.db),
+				TaskTracer: taskadapters.NewWorkspaceSettlementTracer(),
+			},
 			// #833: the webhook store is shared with the River delivery
 			// worker (built in task_wiring.go where the client exists),
 			// so HTTP views and the worker observe one registry.
@@ -412,7 +418,7 @@ func NewAppRouter(
 // settlement transaction's Queries. A missing transaction is a production
 // wiring error and fails closed; snapshots must never be persisted outside
 // the settlement transaction.
-func newPoolRoutingSnapshotSaver() workspacetasks.RoutingSnapshotSaver {
+func newPoolRoutingSnapshotSaver() taskports.RoutingSnapshotSaver {
 	return func(ctx context.Context, tx pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
 		if tx == nil {
 			return errors.New("routing snapshot saver requires the settlement transaction")

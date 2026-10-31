@@ -21,7 +21,7 @@ import {
   refreshWorkspaceMediaAssetMetadata,
   subscribeAssetInvalidation,
   type MediaAssetDeliveryMetadata,
-} from '../../../../api/mediaAssetMetadata'
+} from '@/api/media/mediaAssetMetadata'
 import { SCENE_THUMBNAIL_TIER } from '../../core/preview/renderer'
 
 // Gallery thumbnail media.

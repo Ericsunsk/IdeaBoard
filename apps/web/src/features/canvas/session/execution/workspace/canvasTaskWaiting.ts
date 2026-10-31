@@ -5,17 +5,17 @@
 // Asset refs retain explicit workspace binding. Lifecycle and feedback stay
 // in the execution workspace assembly.
 
-import { isWorkspaceTaskGoneError } from '../../../../../api/workspaceTaskTransport'
-import { waitWorkspaceTaskTerminal } from '../../../../../api/workspaceTaskWaiter'
+import { isWorkspaceTaskGoneError } from '@/api/tasks/workspaceTaskTransport'
+import { waitWorkspaceTaskTerminal } from '@/api/tasks/workspaceTaskWaiter'
 import {
   isWorkspaceTaskTerminal,
   type WorkspaceTaskItem,
-} from '../../../../../api/workspaceTaskContract'
-import type { WorkspaceTaskOutputRef } from '../../../../../api/workspaceTaskContract'
+} from '@/api/tasks/workspaceTaskContract'
+import type { WorkspaceTaskOutputRef } from '@/api/tasks/workspaceTaskContract'
 import { i18n } from '../../../../../core/i18n'
 import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'
 import type { TaskImageResult } from '../../../../../core/query/taskResult'
-import type { WaitWorkspaceTaskOptions } from '../../../../../api/workspaceTaskWaiter'
+import type { WaitWorkspaceTaskOptions } from '@/api/tasks/workspaceTaskWaiter'
 import type { TaskImageOutcome } from '../task-runner/taskImageOutcome'
 import {
   createTaskResultFailureError,

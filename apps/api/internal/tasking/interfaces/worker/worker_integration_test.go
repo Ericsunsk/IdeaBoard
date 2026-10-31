@@ -7,7 +7,7 @@ package worker
 // API_TEST_DATABASE_DSN (same harness as workspace_integration_test.go).
 //
 // What this proves: the River job payload the enqueuer writes
-// (workspacetasks.WorkspaceTaskArgs with the submit-time execution token) drives the
+// (taskqueue.WorkspaceTaskArgs with the submit-time execution token) drives the
 // worker through ClaimTask (lease-guarded), read-only media resolution,
 // the provider seam, and terminal Complete with task_outputs mapping
 // (ListTaskAssets reads the output back). The provider itself is an
@@ -25,19 +25,21 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/media/workspacemedia"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
 )
 
-func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.Service, *integrationHolder, *integrationQueue) {
+func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*taskapp.Service, *integrationHolder, *integrationQueue) {
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
 	assets := &workspacemedia.TaskAssetAdapter{Store: env.media}
 	txStore := newTxPGServiceStore(env.tasks)
 	// TaskBilling stays nil and the claim fence is in-memory: the fixture
 	// schema carries neither billing fact table (see integration_test.go).
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := taskapp.NewService(taskapp.ServiceDeps{
 		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
@@ -48,7 +50,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.
 
 func newWorkerIntegrationWorker(
 	env *workspaceIntegrationEnv,
-	service *workspacetasks.Service,
+	service *taskapp.Service,
 	provider WorkspaceTaskProvider,
 ) *WorkspaceTaskWorker {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
@@ -68,7 +70,7 @@ func newWorkerIntegrationWorker(
 // pinIntegrationSnapshot pins the submit-time RoutingSnapshot through
 // the real catalog path (the same SaveRoutingSnapshot the submit
 // transaction calls), so the worker executes the pinned selection.
-func pinIntegrationSnapshot(t *testing.T, env *workspaceIntegrationEnv, created *workspacetasks.WorkspaceTask, models ...string) {
+func pinIntegrationSnapshot(t *testing.T, env *workspaceIntegrationEnv, created *tasks.WorkspaceTask, models ...string) {
 	t.Helper()
 	if err := catalog.SaveRoutingSnapshot(context.Background(), dbsqlc.New(env.pool), created.ID, workerTestSnapshot(t, created.Service, models)); err != nil {
 		t.Fatalf("SaveRoutingSnapshot: %v", err)
@@ -85,7 +87,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 
 	asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "worker-input.png")
 
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-loop-%d", time.Now().UnixNano()))
@@ -96,18 +98,18 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 
 	// The args mirror exactly what workspaceTaskEnqueuer writes at submit.
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			if task.Status != workspacetasks.StatusRunning {
+		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			if task.Status != tasks.StatusRunning {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
 			if len(task.MediaAssetIDs) != 1 || task.MediaAssetIDs[0] != asset.ID {
 				t.Errorf("provider saw inputs %+v, want the submitted asset", task.MediaAssetIDs)
 			}
-			return []workspacetasks.OutputRef{
-				{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
+			return []tasks.OutputRef{
+				{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 			}, nil
 		}))
-	if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+	if err := worker.Work(ctx, &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
@@ -118,7 +120,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if stored.Status != workspacetasks.StatusCompleted {
+	if stored.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", stored.Status)
 	}
 	if len(stored.OutputRefs) != 1 || stored.OutputRefs[0].AssetID != asset.ID {
@@ -140,7 +142,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 	ctx := context.Background()
 	service, _, _ := newWorkerIntegrationService(env)
 
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-fail-%d", time.Now().UnixNano()))
@@ -150,10 +152,10 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return nil, fmt.Errorf("上游图像服务未配置，请联系管理员")
 		}))
-	if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+	if err := worker.Work(ctx, &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
@@ -164,7 +166,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if stored.Status != workspacetasks.StatusFailed {
+	if stored.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", stored.Status)
 	}
 	if !strings.Contains(stored.ErrorMsg, "上游图像服务未配置") {

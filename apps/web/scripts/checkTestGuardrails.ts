@@ -407,13 +407,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
-  'src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts': [
+  'src/features/canvas/ui/nodes/primitives/tools/NodeToolIconButton.component.spec.ts': [
     {
       reason:
         'Verifies native button class forwarding used by the ImageActionMenu strength control to hide the active trigger while preserving shared button styling.',
     },
   ],
-  'src/features/canvas/ui/nodes/primitives/PromptComposerControls.options.component.spec.ts': [
+  'src/features/canvas/ui/nodes/primitives/composer/PromptComposerControls.options.component.spec.ts': [
     {
       reason:
         'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',

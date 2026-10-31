@@ -1,4 +1,4 @@
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { ControlMutationOptions } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'

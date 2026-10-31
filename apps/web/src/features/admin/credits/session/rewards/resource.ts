@@ -11,9 +11,9 @@ import type {
   ControlRewardCodePage,
   ControlUpdatedRewardCode,
 } from '@/api/generated-query/control/model'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { withSignal } from '@/core/utils/request'
-import { controlCreditIdempotencyKey } from '@/api/idempotencyKey'
+import { controlCreditIdempotencyKey } from '@/api/http/idempotencyKey'
 import {
   buildControlMutationHeaders,
   createControlError,

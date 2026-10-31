@@ -5,7 +5,7 @@ import { TaskCancelledError, TaskResultPendingError } from '../task-runner/taskR
 import { i18n } from '../../../../../core/i18n'
 import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
 import { createEmptyBoardSnapshot, type ImageNodeItem } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { BoardGraphSession } from '../pending-execution/boardGraphSession'
 import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'

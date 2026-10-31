@@ -42,7 +42,7 @@ import AdminAlert from '../feedback/AdminAlert.vue'
 import AdminButton from '../AdminButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
 import AdminSpinner from '../AdminSpinner.vue'
-import { adminTextButtonClass } from '../../core/uiClasses'
+import { adminTextButtonClass } from '../styling/uiClasses'
 
 defineProps<{
   visible: boolean

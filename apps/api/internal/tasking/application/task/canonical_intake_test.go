@@ -2,11 +2,11 @@ package task
 
 import (
 	"encoding/json"
-	tasks "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
-	"ideaboard/api/internal/workflow"
 	"strings"
 	"testing"
+
+	tasks "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestCompileWorkspaceParamsPersistsDurableExecutionFacts(t *testing.T) {
@@ -321,7 +321,7 @@ func TestCompileWorkspaceParamsThreadsPrompt(t *testing.T) {
 }
 
 // Prompt-required features (generation, inpaint) reject an empty prompt;
-// the bound is workspacetasks.MaxWorkspaceTaskPromptBytes (8KB).
+// the bound is tasks.MaxWorkspaceTaskPromptBytes (8KB).
 func TestCompileWorkspaceParamsRejectsMissingPrompt(t *testing.T) {
 	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "   ", map[string]interface{}{}); err == nil {
 		t.Fatal("empty prompt on generation = nil, want error")
@@ -332,7 +332,7 @@ func TestCompileWorkspaceParamsRejectsMissingPrompt(t *testing.T) {
 	}); err == nil {
 		t.Fatal("empty prompt on inpaint = nil, want error")
 	}
-	over := strings.Repeat("x", workspacetasks.MaxWorkspaceTaskPromptBytes+1)
+	over := strings.Repeat("x", tasks.MaxWorkspaceTaskPromptBytes+1)
 	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, over, map[string]interface{}{}); err == nil {
 		t.Fatal("over-long prompt = nil, want error")
 	}

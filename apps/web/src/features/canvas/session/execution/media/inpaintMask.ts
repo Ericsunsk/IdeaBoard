@@ -1,4 +1,4 @@
-import { workspaceUploadApi } from '../../../../../api/upload'
+import { workspaceUploadApi } from '@/api/media/upload'
 import { i18n } from '../../../../../core/i18n'
 import { isDataUrl } from '../../../session/media/canvasMediaIo.ts'
 import {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '../../../../test/render'
 import CanvasGroupFramesOverlay from './CanvasGroupFramesOverlay.vue'
-import type { CanvasGroupFrame } from '../../core/graph/canvasGroupGeometry.ts'
+import type { CanvasGroupFrame } from '../../core/graph/groupGeometry.ts'
 
 function createFrame(id: string, isSelected: boolean, left = 100, top = 80): CanvasGroupFrame {
   return {

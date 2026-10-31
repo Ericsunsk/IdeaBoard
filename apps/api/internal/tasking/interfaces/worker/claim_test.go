@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/platform/riverpolicy"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 )
 
 // attemptClaimStore adapts the in-memory task store to the merged
@@ -32,8 +34,8 @@ import (
 // "UPDATE ... RETURNING + INSERT ... SELECT FROM that CTE roll back together"
 // is a PostgreSQL property this double cannot faithfully emulate.
 type attemptClaimStore struct {
-	*workspacetasks.InMemoryStore
-	attempts workspacetasks.AttemptRecorder
+	*taskmemory.InMemoryStore
+	attempts taskports.AttemptRecorder
 	// factErr forces the attempt write to fail, which must take the lease
 	// flip with it (the "attempt INSERT rejected" branch of the statement).
 	factErr error
@@ -43,13 +45,13 @@ type attemptClaimStore struct {
 
 var _ WorkspaceTaskAttemptClaimStore = (*attemptClaimStore)(nil)
 
-func newAttemptClaimStore(store *workspacetasks.InMemoryStore, attempts workspacetasks.AttemptRecorder) *attemptClaimStore {
+func newAttemptClaimStore(store *taskmemory.InMemoryStore, attempts taskports.AttemptRecorder) *attemptClaimStore {
 	return &attemptClaimStore{InMemoryStore: store, attempts: attempts}
 }
 
 // ClaimTaskWithAttempt mirrors ClaimWorkspaceTaskWithAttempt: the lease flip
 // and the send fact become visible together, keyed by the lease token.
-func (s *attemptClaimStore) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error) {
+func (s *attemptClaimStore) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start tasks.AttemptStart) (*tasks.WorkspaceTask, bool, error) {
 	if s.factErr != nil {
 		// One statement: a failed attempt INSERT rolls the lease flip back,
 		// so nothing about this claim may become observable.
@@ -90,7 +92,7 @@ type faultingSettler struct {
 	failCall     int
 }
 
-func (s *faultingSettler) Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *faultingSettler) Complete(ctx context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	s.completeCall++
 	s.mu.Unlock()
@@ -100,7 +102,7 @@ func (s *faultingSettler) Complete(ctx context.Context, workspaceID, taskID stri
 	return s.inner.Complete(ctx, workspaceID, taskID, outputs)
 }
 
-func (s *faultingSettler) Fail(ctx context.Context, workspaceID, taskID, reason string) (*workspacetasks.WorkspaceTask, error) {
+func (s *faultingSettler) Fail(ctx context.Context, workspaceID, taskID, reason string) (*tasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	s.failCall++
 	s.mu.Unlock()
@@ -110,7 +112,7 @@ func (s *faultingSettler) Fail(ctx context.Context, workspaceID, taskID, reason 
 	return s.inner.Fail(ctx, workspaceID, taskID, reason)
 }
 
-func (s *faultingSettler) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*workspacetasks.WorkspaceTask, error) {
+func (s *faultingSettler) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*tasks.WorkspaceTask, error) {
 	return s.inner.Retry(ctx, workspaceID, taskID, retryable)
 }
 
@@ -127,7 +129,7 @@ type countingProvider struct {
 	calls int
 }
 
-func (p *countingProvider) Generate(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+func (p *countingProvider) Generate(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	p.mu.Lock()
 	p.calls++
 	p.mu.Unlock()
@@ -166,14 +168,14 @@ func TestWorkerClaimCommitsAttemptFactWithTheLease(t *testing.T) {
 		t.Fatalf("attempt execution_token = %q, want the lease token %q (one token per execution)",
 			started[0].ExecutionToken, created.ExecutionToken)
 	}
-	if started[0].RetryLayer != workspacetasks.AttemptRetryLayerGateway {
+	if started[0].RetryLayer != tasks.AttemptRetryLayerGateway {
 		t.Fatalf("retry_layer = %q, want gateway for the initial schedule", started[0].RetryLayer)
 	}
 	if started[0].RequestedModel != snap.SelectedModel || started[0].Provider != "openrouter" {
 		t.Fatalf("attempt routing facts = %+v, want the snapshot model %q and its provider", started[0], snap.SelectedModel)
 	}
 	finished := env.attempts.FinishedAttempts(created.ID)
-	if len(finished) != 1 || finished[0].Status != workspacetasks.AttemptStatusCompleted {
+	if len(finished) != 1 || finished[0].Status != tasks.AttemptStatusCompleted {
 		t.Fatalf("finished facts = %+v, want one completed fact closed by the lease token", finished)
 	}
 	if finished[0].ExecutionToken != created.ExecutionToken {
@@ -211,7 +213,7 @@ func TestWorkerClaimNeverTakesALeaseWithoutItsAttemptFact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if untouched.Status != workspacetasks.StatusPending {
+	if untouched.Status != tasks.StatusPending {
 		t.Fatalf("status = %q, want pending (the lease flip went back with the attempt fact)", untouched.Status)
 	}
 }
@@ -267,7 +269,7 @@ func TestSettlementFailureAfterBilledSendDoesNotReenterProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed (the billed send converges terminally)", got.Status)
 	}
 	if got.RetryCount != 0 {
@@ -347,7 +349,7 @@ func TestSettlementFailureWithDeadSettlerStillDoesNotReenterProvider(t *testing.
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusRunning {
+	if got.Status != tasks.StatusRunning {
 		t.Fatalf("status = %q, want running (no terminal write could commit)", got.Status)
 	}
 	if got.RetryCount != 0 {
@@ -376,10 +378,10 @@ func TestWorkspaceAttemptLayer(t *testing.T) {
 		jobAttempt int
 		want       string
 	}{
-		{"initial schedule", 0, 0, workspacetasks.AttemptRetryLayerGateway},
-		{"after a worker requeue rotated the token", 1, 0, workspacetasks.AttemptRetryLayerRiverTask},
-		{"river redelivery of the same job", 0, 1, workspacetasks.AttemptRetryLayerRiverTask},
-		{"redelivery after a requeue", 2, 3, workspacetasks.AttemptRetryLayerRiverTask},
+		{"initial schedule", 0, 0, tasks.AttemptRetryLayerGateway},
+		{"after a worker requeue rotated the token", 1, 0, tasks.AttemptRetryLayerRiverTask},
+		{"river redelivery of the same job", 0, 1, tasks.AttemptRetryLayerRiverTask},
+		{"redelivery after a requeue", 2, 3, tasks.AttemptRetryLayerRiverTask},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := workspaceAttemptLayer(tc.retryCount, tc.jobAttempt); got != tc.want {
@@ -404,7 +406,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 		return env, assets
 	}
 	env, assets := newMaskEnv()
-	created, err := env.service.Create(ctx, workspacetasks.CreateInput{
+	created, err := env.service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "inpaint",
 		Params: map[string]any{"mask_asset_id": "asset_mask1"},
 	}, "mask-loop")
@@ -413,8 +415,8 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	}
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "inpaint", []string{"openrouter/only-model"}))
 	seenMask := ""
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-		id, _ := workspacetasks.MaskAssetIDFromParams(task.Params)
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		id, _ := tasks.MaskAssetIDFromParams(task.Params)
 		seenMask = id
 		return workerTestRemoteOutput(), nil
 	}), assets)
@@ -428,26 +430,26 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 
 	// A mask that vanished after submit fails the task without claiming
 	// (token must not rotate) and without calling the provider.
-	token, err := workspacetasks.NewExecutionToken()
+	token, err := tasks.NewExecutionToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-	seeded, err := env.store.CreateTask(ctx, &workspacetasks.WorkspaceTask{
+	seeded, err := env.store.CreateTask(ctx, &tasks.WorkspaceTask{
 		ID: "task_gone_mask", WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "inpaint", Status: workspacetasks.StatusPending, ExecutionToken: token,
+		Service: "inpaint", Status: tasks.StatusPending, ExecutionToken: token,
 		Params: map[string]any{"mask_asset_id": "asset_vanished"},
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker = env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker = env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), assets)
@@ -461,7 +463,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 	if got.ExecutionToken != token {

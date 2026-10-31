@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 type fallbackObservation struct {
@@ -57,7 +57,7 @@ func TestWorkspaceTaskWorkerObservesSuccessfulFallback(t *testing.T) {
 
 	observer := &recordingFallbackObserver{}
 	var seen []string
-	worker := newObservedWorker(env, modelObservingProvider(&seen, func(model string) ([]workspacetasks.OutputRef, error) {
+	worker := newObservedWorker(env, modelObservingProvider(&seen, func(model string) ([]tasks.OutputRef, error) {
 		if model == snap.SelectedModel {
 			return nil, workerUpstreamError(503)
 		}
@@ -84,7 +84,7 @@ func TestWorkspaceTaskWorkerObservesFailedFallback(t *testing.T) {
 
 	observer := &recordingFallbackObserver{}
 	var seen []string
-	worker := newObservedWorker(env, modelObservingProvider(&seen, func(string) ([]workspacetasks.OutputRef, error) {
+	worker := newObservedWorker(env, modelObservingProvider(&seen, func(string) ([]tasks.OutputRef, error) {
 		return nil, workerUpstreamError(503)
 	}), observer)
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
@@ -101,7 +101,7 @@ func TestWorkspaceTaskWorkerObservesFailedFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusPending || got.RetryCount != 1 {
+	if got.Status != tasks.StatusPending || got.RetryCount != 1 {
 		t.Fatalf("task = (%q, retry %d), want (pending, 1) river requeue", got.Status, got.RetryCount)
 	}
 }
@@ -115,7 +115,7 @@ func TestWorkspaceTaskWorkerSkipsObservationWithoutFallback(t *testing.T) {
 
 	observer := &recordingFallbackObserver{}
 	var seen []string
-	worker := newObservedWorker(env, modelObservingProvider(&seen, func(string) ([]workspacetasks.OutputRef, error) {
+	worker := newObservedWorker(env, modelObservingProvider(&seen, func(string) ([]tasks.OutputRef, error) {
 		return nil, workerUpstreamError(400)
 	}), observer)
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
@@ -128,7 +128,7 @@ func TestWorkspaceTaskWorkerSkipsObservationWithoutFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed", got.Status)
 	}
 }

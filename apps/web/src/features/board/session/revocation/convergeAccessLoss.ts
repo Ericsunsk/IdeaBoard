@@ -1,12 +1,12 @@
 import type { QueryClient } from '@tanstack/vue-query'
 import { queryClient } from '../../../../core/query/queryClient'
-import { invalidateWorkspaceMediaAssetMetadata } from '../../../../api/mediaAssetMetadata'
+import { invalidateWorkspaceMediaAssetMetadata } from '@/api/media/mediaAssetMetadata'
 import { deleteBoard } from '../catalog/boards'
 import { getBoardScope, isBoardScopeCurrent, subscribeBoardScopeChange } from '../catalog/scope'
 import {
   subscribeWorkspaceEvent,
   type WorkspaceEventEnvelope,
-} from '../../../../api/workspaceEventStream'
+} from '@/api/realtime/workspaceEventStream'
 import { deleteBoardState } from '../persistence/state'
 import { clearPendingBoardSyncRollback } from '../sync/boardSync'
 import { forgetBoardServerContent } from '../sync/boardDraftState'

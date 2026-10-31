@@ -15,7 +15,7 @@ import {
   type CanvasGroupResizeHandle,
   type CanvasPoint,
   type CanvasRect,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 
 type ActiveGroupResize = {
   store: CanvasGraphStore

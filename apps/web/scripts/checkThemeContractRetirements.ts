@@ -41,7 +41,7 @@ import { NodeTypes, parse as parseTemplate } from '@vue/compiler-dom'
 
 export type ThemeContractViolation = { rule: string; file: string; message: string }
 
-const BOARDS_FILE = 'features/board/ui/gallery/BoardsPage.vue'
+const BOARDS_FILE = 'features/board/ui/gallery/views/BoardsPage.vue'
 const REWARDS_FILE = 'features/account/ui/rewards/RewardsPane.vue'
 
 export const BOARDS_SORT_SELECT_RULE = 'boards-sort-select'

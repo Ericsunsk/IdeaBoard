@@ -26,7 +26,7 @@ export default defineConfig({
         // prefixes every generated Public path with `/v1`; see controlQuery
         // below for the Control analogue.
         mutator: {
-          path: './src/api/publicMutator.ts',
+          path: './src/api/http/publicMutator.ts',
           name: 'publicMutator',
         },
         fetch: {
@@ -60,7 +60,7 @@ export default defineConfig({
       urlEncodeParameters: true,
       override: {
         mutator: {
-          path: './src/api/controlMutator.ts',
+          path: './src/api/http/controlMutator.ts',
           name: 'controlMutator',
         },
         fetch: {

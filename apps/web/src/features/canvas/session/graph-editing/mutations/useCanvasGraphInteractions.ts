@@ -15,15 +15,15 @@ import {
   type CanvasGraphStore,
   type CanvasGraphReadPort,
 } from '../../../core/graph'
-import { useFlowCanvasInteractionState } from '../../../ui/screens/useFlowCanvasInteractionState.ts'
+import { useFlowCanvasInteractionState } from '../../../ui/screens/controllers/useFlowCanvasInteractionState.ts'
 import { useFlowNodeUiState } from '../../../ui/nodes/useFlowNodeUiState.ts'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import { createCanvasNodeAt } from '../../../core/nodes/canvasNodeFactory.ts'
 import { resolveImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import type { CanvasGraphInteractionBrowserAdapter } from '../inputs/interactionBrowserAdapter'
-import { resolveWritableCanvasGraphStore } from '../../../core/graph/canvasGraphStoreWriter'
+import { resolveWritableCanvasGraphStore } from '../../../core/graph/graphStoreWriter'
 import { renderImageRetouchRecipeFile, type ImageRetouchRenderSource } from '../../../tools/retouch'
-import { resolveMediaAssetOriginalURL } from '../../../../../api/mediaAssetDelivery'
+import { resolveMediaAssetOriginalURL } from '@/api/media/mediaAssetDelivery'
 
 type MessageLoadingHandle = {
   destroy: () => void

@@ -128,7 +128,7 @@ import '../styles/canvas-style-contracts.css'
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { stringParam } from '../../../../core/router/queryParams'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { uploadApi } from '../../../../api/upload.ts'
+import { uploadApi } from '@/api/media/upload'
 import { USER_BOARDS_PATH } from '../../../workspace/routePaths.ts'
 import {
   PanOnScrollMode,
@@ -139,7 +139,7 @@ import {
 } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import { useCanvasImageLightbox } from './useCanvasImageLightbox'
+import { useCanvasImageLightbox } from './controllers/useCanvasImageLightbox'
 import { CanvasGroupPresentation } from '../nodes/groups'
 import {
   createCanvasConnectionDropLifecycle,

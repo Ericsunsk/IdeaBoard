@@ -1,6 +1,6 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { withSignal } from '@/core/utils/request'
 import { keepPrevious, STALE_TIME_MS } from '@/core/query/queryDefaults'
 import { getControlStatistics } from '@/api/generated-query/control/control-platform/control-platform'

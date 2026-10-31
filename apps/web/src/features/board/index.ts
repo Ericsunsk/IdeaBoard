@@ -51,7 +51,7 @@ export * from './session/sync/boardSseInvalidation'
 // Stable adapters for persistence and gallery scene boundaries.
 export * from './session/persistence/state'
 export * from './session/persistence/boardStateSerialization'
-export { blankBoardPreviewSurfaceClass } from './ui/gallery/skin'
+export { blankBoardPreviewSurfaceClass } from './ui/gallery'
 export {
   captureShareScope,
   classifyShareError,
@@ -87,18 +87,18 @@ export {
 } from './session/share/feedback'
 export { default as ShareDialog } from './ui/share/ShareDialog.vue'
 // Catalog presentation composition (route-level public surface).
-export type {
-  CatalogEntry,
-  CatalogSortMode,
-  Catalog,
-  CatalogNavigation,
-} from './ui/gallery/contract'
-export { createCatalog, formatCatalogDate, useCatalog } from './ui/gallery/useCatalog'
-export { createGalleryController } from './ui/gallery/controller'
-export { createCommandHandlers } from './ui/gallery/commandHandlers'
 export {
+  type CatalogEntry,
+  type CatalogSortMode,
+  type Catalog,
+  type CatalogNavigation,
+  createCatalog,
+  formatCatalogDate,
+  useCatalog,
+  createGalleryController,
+  createCommandHandlers,
   createBoardFeedback,
   useBoardFeedback,
   type BoardFeedback,
-} from './ui/gallery/useBoardFeedback'
-export { default as BoardsPage } from './ui/gallery/BoardsPage.vue'
+  BoardsPage,
+} from './ui/gallery'

@@ -8,7 +8,7 @@ import {
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaWorkspaceScope'
+} from '@/api/media/mediaWorkspaceScope'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

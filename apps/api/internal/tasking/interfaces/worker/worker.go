@@ -72,7 +72,9 @@ import (
 	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/platform/telemetry"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/riverqueue/river"
 	"go.opentelemetry.io/otel/attribute"
@@ -80,13 +82,13 @@ import (
 
 // WorkspaceTaskWorkerStore is the narrow persistence seam the worker needs:
 // one read plus the kernel lease-fence claim. It embeds TaskClaimStore so
-// the claim contract is owned once by the workspacetasks kernel; GetTask is
+// the claim contract is owned once by the tasks kernel; GetTask is
 // redeclared (not the full TaskReadStore) because the worker must not
 // observe List/Count. *taskpostgres.Store and
-// *workspacetasks.InMemoryStore both satisfy it.
+// *taskmemory.InMemoryStore both satisfy it.
 type WorkspaceTaskWorkerStore interface {
-	GetTask(ctx context.Context, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error)
-	workspacetasks.TaskClaimStore
+	GetTask(ctx context.Context, workspaceID, taskID string) (*tasks.WorkspaceTask, error)
+	taskports.TaskClaimStore
 }
 
 // WorkspaceTaskAttemptClaimStore is the merged claim seam (DESIGN.md
@@ -103,16 +105,16 @@ type WorkspaceTaskWorkerStore interface {
 // owns an attempt row; that is the SAME send resuming, not a second attempt,
 // and the caller keeps the existing attempt fact.
 type WorkspaceTaskAttemptClaimStore interface {
-	ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error)
+	ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start tasks.AttemptStart) (*tasks.WorkspaceTask, bool, error)
 }
 
 // WorkspaceTaskWorkerSettler is the terminal settlement seam. The worker
 // settles ONLY through it so billing Capture/Release stays compensating and
-// centralized. *workspacetasks.Service satisfies it.
+// centralized. *taskapp.Service satisfies it.
 type WorkspaceTaskWorkerSettler interface {
-	Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error)
-	Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error)
-	Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*workspacetasks.WorkspaceTask, error)
+	Complete(ctx context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error)
+	Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*tasks.WorkspaceTask, error)
+	Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*tasks.WorkspaceTask, error)
 }
 
 // WorkspaceTaskProvider generates persisted output refs for one claimed task.
@@ -120,14 +122,14 @@ type WorkspaceTaskWorkerSettler interface {
 // NewWorkspaceGatewayProvider); tests inject deterministic fakes. A nil
 // provider fails closed: tasks converge to failed, never strand.
 type WorkspaceTaskProvider interface {
-	Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error)
+	Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
 }
 
 // WorkspaceTaskGenerateFunc adapts a function to WorkspaceTaskProvider.
-type WorkspaceTaskGenerateFunc func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error)
+type WorkspaceTaskGenerateFunc func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
 
 // Generate implements WorkspaceTaskProvider.
-func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	return f(ctx, task)
 }
 
@@ -150,11 +152,11 @@ func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *workspace
 type WorkspaceTaskWorkerDeps struct {
 	Store        WorkspaceTaskWorkerStore
 	Settler      WorkspaceTaskWorkerSettler
-	Assets       workspacetasks.AssetReader
+	Assets       taskports.AssetReader
 	Provider     WorkspaceTaskProvider
 	Renderer     taskruntime.WorkspaceTaskRenderer
 	LibrarySaver taskruntime.WorkspaceTaskAutoSaver
-	Attempts     workspacetasks.AttemptRecorder
+	Attempts     taskports.AttemptRecorder
 	Metrics      ModelFallbackObserver
 }
 
@@ -171,19 +173,19 @@ type ModelFallbackObserver interface {
 // drawing_default queue and worker concurrency (no new queues, pools, or
 // periodic jobs); Timeout pins the River drawing budget.
 type WorkspaceTaskWorker struct {
-	river.WorkerDefaults[workspacetasks.WorkspaceTaskArgs]
+	river.WorkerDefaults[taskqueue.WorkspaceTaskArgs]
 	store        WorkspaceTaskWorkerStore
 	settler      WorkspaceTaskWorkerSettler
-	assets       workspacetasks.AssetReader
+	assets       taskports.AssetReader
 	provider     WorkspaceTaskProvider
 	renderer     taskruntime.WorkspaceTaskRenderer
 	librarySaver taskruntime.WorkspaceTaskAutoSaver
-	attempts     workspacetasks.AttemptRecorder
+	attempts     taskports.AttemptRecorder
 	metrics      ModelFallbackObserver
 	claims       WorkspaceTaskAttemptClaimStore
 }
 
-var _ river.Worker[workspacetasks.WorkspaceTaskArgs] = (*WorkspaceTaskWorker)(nil)
+var _ river.Worker[taskqueue.WorkspaceTaskArgs] = (*WorkspaceTaskWorker)(nil)
 
 // NewWorkspaceTaskWorker builds the consumer. Nil store/settler fail fast:
 // a worker that cannot settle must never claim. A store that cannot claim
@@ -212,7 +214,7 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 
 // Timeout pins the outer River job budget. Provider sends share the shorter
 // execution context created by Work, leaving the parent alive for settlement.
-func (w *WorkspaceTaskWorker) Timeout(*river.Job[workspacetasks.WorkspaceTaskArgs]) time.Duration {
+func (w *WorkspaceTaskWorker) Timeout(*river.Job[taskqueue.WorkspaceTaskArgs]) time.Duration {
 	return riverpolicy.RiverJobTimeoutDrawing
 }
 
@@ -220,7 +222,7 @@ func (w *WorkspaceTaskWorker) Timeout(*river.Job[workspacetasks.WorkspaceTaskArg
 // nil once the task converges (completed/failed/requeued/dropped) and a
 // non-nil error ONLY for transient infra failures where River backoff and
 // redelivery is the correct recovery.
-func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[workspacetasks.WorkspaceTaskArgs]) error {
+func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.WorkspaceTaskArgs]) error {
 	if w == nil || w.store == nil || w.settler == nil {
 		return errors.New("workspace task worker is not configured")
 	}
@@ -315,7 +317,7 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[workspace
 // workspaceRiverJobID extracts the River job id for attempt facts.
 // Synthetic jobs in unit tests carry no JobRow: they record 0, which
 // the column accepts (river_job_id >= 0).
-func workspaceRiverJobID(job *river.Job[workspacetasks.WorkspaceTaskArgs]) int64 {
+func workspaceRiverJobID(job *river.Job[taskqueue.WorkspaceTaskArgs]) int64 {
 	if job == nil || job.JobRow == nil {
 		return 0
 	}

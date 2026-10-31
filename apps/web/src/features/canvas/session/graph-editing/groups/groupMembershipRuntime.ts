@@ -17,7 +17,7 @@ import {
   type CanvasGroupFrame,
   type CanvasPoint,
   type CanvasRect,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 
 type PendingGroupJoin = {
   groupId: CanvasGraphGroupId

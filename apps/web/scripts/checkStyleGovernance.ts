@@ -74,14 +74,14 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     reason:
       'Cleared: status glow/wash resolve through admin status tokens and dot halos through shadow-admin-status-dot-* (see legacy-token allowance). Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/admin/shared/core/adminThemeTokens.ts': {
+  'src/features/admin/shared/ui/styling/adminThemeTokens.ts': {
     counts: {
       'raw-color': 41,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
   },
-  'src/features/admin/shared/core/taskMetricTokens.ts': {
+  'src/features/admin/shared/ui/styling/taskMetricTokens.ts': {
     counts: {
       'raw-color': 0,
     },
@@ -117,7 +117,7 @@ const selectorCountRules = [
 type SelectorCountRuleId = (typeof selectorCountRules)[number]['id']
 
 const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = {
-  'src/features/canvas/ui/nodes/primitives/NodeToolIconButton.vue': {
+  'src/features/canvas/ui/nodes/primitives/tools/NodeToolIconButton.vue': {
     counts: {
       'deep-selector': 1,
     },
@@ -159,8 +159,8 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 function isTokenOwnerFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath === 'src/features/admin/shared/core/taskMetricTokens.ts' ||
-    file.sourcePath === 'src/features/admin/shared/core/adminThemeTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/ui/styling/taskMetricTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/ui/styling/adminThemeTokens.ts' ||
     file.sourcePath.startsWith('src/theme/')
   )
 }
@@ -239,7 +239,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     reason:
       'Account usage chart palette is a domain visual contract (dark + light fallbacks for accent/axis/surface/text).',
   },
-  'src/features/board/ui/gallery/skin.ts': {
+  'src/features/board/ui/gallery/styling/skin.ts': {
     counts: {
       'hex-color': 0,
     },
@@ -253,7 +253,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     reason:
       'Cleared: outpaint handle fill now resolves through canvas tokens; allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/canvas/ui/nodes/primitives/NodeActionButton.vue': {
+  'src/features/canvas/ui/nodes/primitives/tools/NodeActionButton.vue': {
     counts: {
       'hex-color': 0,
     },
@@ -321,7 +321,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Auth kicker optical size; no type-scale tier.',
   },
-  'src/features/board/ui/gallery/skin.ts': {
+  'src/features/board/ui/gallery/styling/skin.ts': {
     counts: {
       'text-px': 2,
     },
@@ -343,7 +343,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
 }
 
 const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/admin/shared/core/uiClasses.ts': {
+  'src/features/admin/shared/ui/styling/uiClasses.ts': {
     counts: {
       'arbitrary-breakpoint': 1,
     },
@@ -391,14 +391,14 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     reason:
       'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/board/ui/gallery/skin.ts': {
+  'src/features/board/ui/gallery/styling/skin.ts': {
     counts: {
       'legacy-token': 2,
     },
     reason:
       'Board empty-card preview surface mirrors the retired serialized thumbnail surface (moved from the deleted serializer style module, not new chrome).',
   },
-  'src/features/board/ui/gallery/BoardCard.vue': {
+  'src/features/board/ui/gallery/cards/BoardCard.vue': {
     counts: {
       'legacy-token': 4,
     },

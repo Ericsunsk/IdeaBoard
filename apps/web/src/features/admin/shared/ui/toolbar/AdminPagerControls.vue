@@ -27,7 +27,7 @@
 <script setup lang="ts">
 import { NavArrowLeft, NavArrowRight } from '@iconoir/vue'
 import AdminButton from '../AdminButton.vue'
-import { adminToolbarPageLabelClass, adminCompactIconButtonClass } from '../../core/uiClasses'
+import { adminToolbarPageLabelClass, adminCompactIconButtonClass } from '../styling/uiClasses'
 
 defineProps<{
   currentPage: number

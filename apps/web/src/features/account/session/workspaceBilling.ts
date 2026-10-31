@@ -1,6 +1,6 @@
 import { formatDisplayErrorMessage } from '../../../core/utils/errorMessages'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../core/utils/workspaceId'
-import { requireContractData } from '../../../api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { i18n } from '../../../core/i18n'
 
 // Workspace billing seam for the account surface (W2 transports).

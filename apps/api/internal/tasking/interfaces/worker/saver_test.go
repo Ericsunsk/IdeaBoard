@@ -13,18 +13,19 @@ import (
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/riverqueue/river"
 )
 
-func completedTriggerTask() *workspacetasks.WorkspaceTask {
-	return &workspacetasks.WorkspaceTask{
+func completedTriggerTask() *tasks.WorkspaceTask {
+	return &tasks.WorkspaceTask{
 		ID: "task_trigger_1", WorkspaceID: "ws_trigger", OwnerUserID: 9,
-		Service: "render", Status: workspacetasks.StatusCompleted,
-		OutputRefs: []workspacetasks.OutputRef{
-			{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_media_aaa", ResultIndex: 0},
-			{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_media_bbb", ResultIndex: 1},
+		Service: "render", Status: tasks.StatusCompleted,
+		OutputRefs: []tasks.OutputRef{
+			{Kind: tasks.OutputKindAsset, AssetID: "asset_media_aaa", ResultIndex: 0},
+			{Kind: tasks.OutputKindAsset, AssetID: "asset_media_bbb", ResultIndex: 1},
 		},
 	}
 }
@@ -90,8 +91,8 @@ func TestTaskAutoSaveSkipsRemoteOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	task := completedTriggerTask()
-	task.OutputRefs = []workspacetasks.OutputRef{{
-		Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/r.png",
+	task.OutputRefs = []tasks.OutputRef{{
+		Kind: tasks.OutputKindRemote, URL: "https://cdn.example.com/r.png",
 		ChecksumSHA256: strings.Repeat("b", 64), ResultIndex: 0,
 	}}
 	if err := trigger.SaveCompletedTask(context.Background(), task); err != nil || len(saver.calls) != 0 {
@@ -107,11 +108,11 @@ func TestTaskAutoSaverRequiresSaver(t *testing.T) {
 
 type recordingWorkerLibrarySaver struct {
 	mu    sync.Mutex
-	calls []*workspacetasks.WorkspaceTask
+	calls []*tasks.WorkspaceTask
 	err   error
 }
 
-func (f *recordingWorkerLibrarySaver) SaveCompletedTask(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+func (f *recordingWorkerLibrarySaver) SaveCompletedTask(ctx context.Context, task *tasks.WorkspaceTask) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, task)
@@ -136,7 +137,7 @@ func TestWorkerReplaysLibrarySaverAfterCompleteRedelivery(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return workerTestRemoteOutput(), nil
 		}),
 		LibrarySaver: recorder,
@@ -151,7 +152,7 @@ func TestWorkerReplaysLibrarySaverAfterCompleteRedelivery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", got.Status)
 	}
 	if err := worker.Work(ctx, workerJobFor(got)); err != nil {
@@ -163,7 +164,7 @@ func TestWorkerReplaysLibrarySaverAfterCompleteRedelivery(t *testing.T) {
 	recorder.mu.Lock()
 	seen := recorder.calls[0]
 	recorder.mu.Unlock()
-	if seen.ID != created.ID || seen.Status != workspacetasks.StatusCompleted {
+	if seen.ID != created.ID || seen.Status != tasks.StatusCompleted {
 		t.Fatalf("trigger saw %+v, want the completed task", seen)
 	}
 }
@@ -178,7 +179,7 @@ func TestWorkerSwallowsLibrarySaverError(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return workerTestRemoteOutput(), nil
 		}),
 		LibrarySaver: &recordingWorkerLibrarySaver{err: errors.New("library down")},
@@ -193,7 +194,7 @@ func TestWorkerSwallowsLibrarySaverError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
+	if got.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed despite trigger failure", got.Status)
 	}
 }
@@ -206,7 +207,7 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 	service, _, _ := newWorkerIntegrationService(env)
 
 	asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "trigger-input.png")
-	created, err := service.Create(ctx, workspacetasks.CreateInput{
+	created, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
 		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-trigger-%d", time.Now().UnixNano()))
@@ -222,8 +223,8 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.tasks, Settler: service,
 		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			return []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0}}, nil
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			return []tasks.OutputRef{{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0}}, nil
 		}),
 		LibrarySaver: trigger,
 		Attempts:     env.tasks,
@@ -231,7 +232,7 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
+	job := &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}
@@ -245,7 +246,7 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if stored.Status != workspacetasks.StatusCompleted {
+	if stored.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", stored.Status)
 	}
 	assets, err := env.lib.ListAssets(ctx, env.wsA)
@@ -284,13 +285,13 @@ func TestAutoSaverRechecksMembershipForEachOutputPostgres(t *testing.T) {
 	service, _, _ := newWorkerIntegrationService(env)
 	first := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "batch-first.png")
 	second := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "batch-second.png")
-	created, err := service.Create(ctx, workspacetasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "batch-revoke")
+	created, err := service.Create(ctx, tasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "batch-revoke")
 	if err != nil {
 		t.Fatal(err)
 	}
-	completed, err := service.Complete(ctx, env.wsA, created.ID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: first.ID, Role: "result", ResultIndex: 0},
-		{Kind: workspacetasks.OutputKindAsset, AssetID: second.ID, Role: "result", ResultIndex: 1},
+	completed, err := service.Complete(ctx, env.wsA, created.ID, []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: first.ID, Role: "result", ResultIndex: 0},
+		{Kind: tasks.OutputKindAsset, AssetID: second.ID, Role: "result", ResultIndex: 1},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -321,7 +322,7 @@ func TestAutomaticPublicationRequiresPersistedOutputPostgres(t *testing.T) {
 	service, _, _ := newWorkerIntegrationService(env)
 	output := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "accepted-output.png")
 	unrelated := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "unrelated-upload.png")
-	task, err := service.Create(ctx, workspacetasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "exact-output")
+	task, err := service.Create(ctx, tasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "exact-output")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +331,7 @@ func TestAutomaticPublicationRequiresPersistedOutputPostgres(t *testing.T) {
 	if _, _, err := saver.SaveTaskOutputAsset(ctx, env.wsA, input); err == nil {
 		t.Fatal("pending Task published an output")
 	}
-	if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0}}); err != nil {
+	if _, err := service.Complete(ctx, env.wsA, task.ID, []tasks.OutputRef{{Kind: tasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, wrong := range []taskruntime.TaskOutputSaveInput{
@@ -360,20 +361,20 @@ func TestUnifiedSaveVerifiesTaskLineagePostgres(t *testing.T) {
 	ctx := t.Context()
 	service, _, _ := newWorkerIntegrationService(env)
 	output := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "lineage-verify.png")
-	pending, err := service.Create(ctx, workspacetasks.CreateInput{
+	pending, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
 	}, "lineage-pending-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	completed, err := service.Create(ctx, workspacetasks.CreateInput{
+	completed, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
 	}, "lineage-completed-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Complete(ctx, env.wsA, completed.ID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0},
+	if _, err := service.Complete(ctx, env.wsA, completed.ID, []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -432,14 +433,14 @@ func TestUnifiedSaveAutoManualConvergePostgres(t *testing.T) {
 				}
 				return id
 			}
-			task, err := service.Create(ctx, workspacetasks.CreateInput{
+			task, err := service.Create(ctx, tasks.CreateInput{
 				WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
 			}, "converge-"+order)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{
-				{Kind: workspacetasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
+			if _, err := service.Complete(ctx, env.wsA, task.ID, []tasks.OutputRef{
+				{Kind: tasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -521,14 +522,14 @@ func TestUnifiedSaveConcurrentAutoManualPostgres(t *testing.T) {
 	ctx := t.Context()
 	service, _, _ := newWorkerIntegrationService(env)
 	media := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "concurrent-unified.png")
-	task, err := service.Create(ctx, workspacetasks.CreateInput{
+	task, err := service.Create(ctx, tasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
 	}, "concurrent-unified-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
+	if _, err := service.Complete(ctx, env.wsA, task.ID, []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
 	}); err != nil {
 		t.Fatal(err)
 	}

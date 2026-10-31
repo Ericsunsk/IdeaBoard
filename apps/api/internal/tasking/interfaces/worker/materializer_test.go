@@ -15,14 +15,14 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 func materializerTestDeps(media *workspacemedia.InMemoryWorkspaceMediaStore, objects *fakeRendererObjects) taskruntime.WorkspaceProviderResultMaterializerDeps {
 	return taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media:   media,
 		Objects: objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
+		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *tasks.WorkspaceTask, _ tasks.OutputRef) ([]byte, error) {
 			return nil, errors.New("fake: fetcher must not run for inline results")
 		}),
 	}
@@ -119,7 +119,7 @@ func TestWorkspaceProviderMaterializerDownloadsRemote(t *testing.T) {
 	png := fixturePNGBytes(t)
 	calls := 0
 	deps := materializerTestDeps(media, objects)
-	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error) {
+	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, task *tasks.WorkspaceTask, ref tasks.OutputRef) ([]byte, error) {
 		calls++
 		if ref.URL != "https://cdn.example.com/fake-provider.png" {
 			return nil, errors.New("fake: unexpected fetch URL")
@@ -167,7 +167,7 @@ func TestWorkspaceProviderMaterializerPassesAllowHostsToFetcher(t *testing.T) {
 	png := fixturePNGBytes(t)
 	var got []string
 	deps := materializerTestDeps(media, objects)
-	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(ctx context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
+	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(ctx context.Context, _ *tasks.WorkspaceTask, _ tasks.OutputRef) ([]byte, error) {
 		got = taskruntime.WorkspaceResultAllowHostsFromCtx(ctx)
 		return append([]byte(nil), png...), nil
 	})
@@ -210,14 +210,14 @@ func TestWorkspaceProviderMaterializerRejectsBadBytes(t *testing.T) {
 func TestWorkspaceProviderMaterializerRejectsInvalidExecutionIdentity(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		mutate func(*workspacetasks.WorkspaceTask)
+		mutate func(*tasks.WorkspaceTask)
 		userID int64
 		taskID string
 	}{
 		{name: "wrong task", userID: 7, taskID: "task_other"},
 		{name: "wrong owner", userID: 8, taskID: "task_render1"},
-		{name: "missing token", mutate: func(task *workspacetasks.WorkspaceTask) { task.ExecutionToken = "" }, userID: 7, taskID: "task_render1"},
-		{name: "missing workspace", mutate: func(task *workspacetasks.WorkspaceTask) { task.WorkspaceID = "" }, userID: 7, taskID: "task_render1"},
+		{name: "missing token", mutate: func(task *tasks.WorkspaceTask) { task.ExecutionToken = "" }, userID: 7, taskID: "task_render1"},
+		{name: "missing workspace", mutate: func(task *tasks.WorkspaceTask) { task.WorkspaceID = "" }, userID: 7, taskID: "task_render1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newRendererTestEnv(t)

@@ -121,7 +121,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'bridge-fallback',
     invalidate: (s) => {
-      const file = 'src/features/admin/shared/core/adminThemeTokens.ts'
+      const file = 'src/features/admin/shared/ui/styling/adminThemeTokens.ts'
       s[file] = s[file]!.replace(
         "'--color-admin-text-1', '#f5f5f5'",
         "'--color-admin-text-1', '#ffffff'",
@@ -234,7 +234,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'chrome-consumer',
     invalidate: (s) => {
-      const file = 'src/features/board/ui/gallery/skin.ts'
+      const file = 'src/features/board/ui/gallery/styling/skin.ts'
       s[file] = s[file]!.replaceAll('page-chrome-surface', 'private-surface')
     },
   },
@@ -255,7 +255,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'readonly-controller',
     invalidate: (s) => {
-      s['src/features/board/ui/gallery/BoardsPage.vue'] =
+      s['src/features/board/ui/gallery/views/BoardsPage.vue'] =
         '<template><input v-model="controller.viewModel.sort" /></template>'
     },
   },
@@ -358,7 +358,7 @@ describe('effective retirement lint policies', () => {
       .toString()
       .replace('var(--color-canvas-text-secondary)', 'var( --color-canvas-text-secondary )')
     fixture[app] += '\n/* --color-ib-scrollbar-x: black; missing fake tokens do not count */'
-    fixture['src/features/board/ui/gallery/BoardsPage.vue'] +=
+    fixture['src/features/board/ui/gallery/views/BoardsPage.vue'] +=
       '\n<!-- <input v-model="controller.viewModel.sort" /> -->'
     expect(validateRetirementSources(fixture)).toEqual([])
   })

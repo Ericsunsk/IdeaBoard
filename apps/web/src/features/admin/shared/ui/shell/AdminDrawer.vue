@@ -63,7 +63,7 @@ import {
   DialogTitle,
 } from 'reka-ui'
 import { useAdminDialogInteraction } from '../../session/overlay/useAdminDialogInteraction'
-import { adminOverlayMaskClass } from '../../core/uiClasses'
+import { adminOverlayMaskClass } from '../styling/uiClasses'
 
 const props = withDefaults(
   defineProps<{

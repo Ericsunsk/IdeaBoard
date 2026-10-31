@@ -256,7 +256,7 @@ const (
 	// Rewards codes (rewards/interfaces/http edge). Wire-stable: do not
 	// rename without coordinating the frontend caller that branches on
 	// them. The v1 workspace redeem surface
-	// (runtime/interfaces/http/v1/billing_gaps.go) aliases
+	// (runtime/interfaces/http/v1/billing/gaps.go) aliases
 	// CodeRewardCodeUnavailable, CodeRewardWalletLocked, and
 	// CodeRewardRedeemConflict from here; statuses stay explicit at
 	// each render site.

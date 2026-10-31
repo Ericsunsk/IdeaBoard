@@ -166,7 +166,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../../../shared/index'
-import { newRequestId } from '@/api/contractKernel'
+import { newRequestId } from '@/api/http/contractKernel'
 import { SUPPORT_CHANNELS_QUERY_KEY } from '@/core/composables/useSupportChannels'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'
 import { SETTINGS_SECTIONS } from '../../pages/sections'

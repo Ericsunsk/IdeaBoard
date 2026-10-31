@@ -394,8 +394,8 @@ assert_output_line "${cross_contract_output}" 'api_tests=true'
 assert_output_line "${cross_contract_output}" 'web=true'
 assert_output_line "${cross_contract_output}" 'api_migrations=false'
 for cross_path in \
-  apps/web/src/api/workspaceTaskContract.ts \
-  apps/web/src/features/admin/shared/core/taskMetricTokens.ts \
+  apps/web/src/api/tasks/workspaceTaskContract.ts \
+  apps/web/src/features/admin/shared/ui/styling/taskMetricTokens.ts \
   contracts/library/library-source.fixtures.json \
   apps/api/internal/boards/previewscene/testdata/mixed.json; do
   owner_output="$(printf '%s\n' "${cross_path}" | "${classifier}")"

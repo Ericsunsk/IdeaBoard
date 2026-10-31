@@ -4,7 +4,7 @@ import {
 } from '@/api/generated-query/control/control-platform/control-platform'
 import { SupportChannelKind } from '@/api/generated-query/control/model/supportChannelKind'
 import type { SupportChannelsSetting } from '@/api/generated-query/control/model/supportChannelsSetting'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'

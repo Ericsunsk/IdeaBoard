@@ -22,6 +22,8 @@ It does not own platform Idea balances or the ledger; Wallet, the double-entry L
 | Purchase Refund Hold         | Standalone Credits typed Command reserving unconsumed Ideas from User Available to User Reserved on the order's fixed payer account; it is not spending and may run under an active Restriction                          |
 | Purchase Refund              | Return of reserved, unconsumed Ideas to System Issuance for a verified external refund on the order's fixed payer account, distinct from a Credits Refund.                                                               |
 
+Canonical accounting (see `GLOSSARY.md` and Credits `CONTEXT.md`): use only the full names linked Refund (Capture reversal) and linked Purchase Refund (verified external-payment settlement via Purchase Refund Hold), never a bare Refund.
+
 ## Public Seams
 
 - `Service.GetStripeConfiguration` returns only the safely displayable configuration summary, never API Key, Webhook Secret, or ciphertext.

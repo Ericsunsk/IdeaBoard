@@ -8,7 +8,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphAdapter,
@@ -24,15 +24,15 @@ import {
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
   getMetadata: vi.fn(),
 }))
 
-vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()),
+vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/media/mediaAssetDelivery')>()),
   getWorkspaceMediaAssetMetadata: mocks.getMetadata,
 }))
 

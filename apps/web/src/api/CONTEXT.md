@@ -14,12 +14,17 @@ This file owns the HTTP exit, transport contracts, and generated client policy. 
 Orval output (`public/` + `control/` per `apps/web/orval.config.ts`) lives under `src/api/generated-query/**` and is never hand-edited. Backend `apps/api/internal/db/sqlc/*.go` is out of frontend scope.
 
 - Generator inputs: `apps/api/openapi.public.yaml` + `apps/api/openapi.control.yaml` via `npm run api:generate`; drift gate: `npm run api:check-generated` (`apps/web/scripts/checkApiGeneratedDrift.ts`).
-- Mutators `orvalMutator.ts` / `publicMutator.ts` / `controlMutator.ts` live in `src/api/`.
-- Consumers use `src/api/*` wrappers or feature-owned resource/adapter boundaries. Route pages/components must not import generated code directly.
+- Mutators `orvalMutator.ts` / `publicMutator.ts` / `controlMutator.ts` live in `src/api/http/`.
+- Consumers use `src/api/*` wrappers, subdomains (`src/api/{http,realtime,media,tasks}`), or feature-owned resource/adapter boundaries. Route pages/components must not import generated code directly.
 
 ## Public Seams
 
-- `api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`. Media delivery is split by responsibility: `mediaAssetUrls` (pure URL parsing/generation), `mediaAssetMetadata` (HTTP/cache/invalidation transport), `useMediaAssetDelivery` (Vue lifecycle binding); `mediaAssetDelivery` remains the stable import seam.
+- `api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`. Subdomain layout:
+  - `src/api/http/`: client, contractKernel, stripUndefined, mutators, idempotencyKey, userSession, sessionUserType.
+  - `src/api/realtime/`: workspaceEventStream (SSE).
+  - `src/api/media/`: mediaAssetUrls (pure URL generation), mediaAssetMetadata (HTTP/cache/invalidation transport), mediaWorkspaceScope, mediaAssetDelivery, upload.
+  - `src/api/tasks/`: workspaceTaskContract, workspaceTaskTransport, workspaceTaskWaiter, workspaceTasks.
+  Media delivery composables (`useMediaAssetDelivery`) live in `src/core/media/` to keep `src/api` strictly free of Vue reactive lifecycle.
 - `api/generated-query` Orval output (`public/` + `control/`); never hand-edited; route pages never call directly.
 
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)

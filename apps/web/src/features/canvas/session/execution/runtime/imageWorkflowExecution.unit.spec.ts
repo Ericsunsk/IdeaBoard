@@ -8,7 +8,7 @@ import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
 } from '../../../session/flow-adapter'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import { BoardGraphSession } from '../pending-execution/boardGraphSession'
@@ -30,7 +30,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
     requireCanvasWorkspaceId: vi.fn(() => 'ws_test123'),
   }
 })
-vi.mock('../../../../../api/mediaAssetDelivery', () => ({
+vi.mock('@/api/media/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
     async (assetId: string) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),

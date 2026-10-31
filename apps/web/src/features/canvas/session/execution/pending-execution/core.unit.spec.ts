@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { BoardGraphSession, type PendingImageResultNodeId } from './boardGraphSession'
 import {
   createPendingImageExecutionCore,

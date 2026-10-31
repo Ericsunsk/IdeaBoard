@@ -2,7 +2,7 @@ package wiring
 
 // Terminal-settlement event fanout (#807 dead-channel fix).
 //
-// workspacetasks.Service STAGES a status event inside its settlement call
+// tasks.Service STAGES a status event inside its settlement call
 // and hands it to whoever drains it. The v1 HTTP submit and cancel edges
 // drain their own per-request Service; the River worker had no drain point
 // at all, so task.completed / task.failed / the requeue's task.pending were
@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // settlementPhase is what the stub settler reports at the moment the bridge
@@ -46,7 +46,7 @@ type bridgeStubSettler struct {
 	// phase is phaseSettling while a settlement call is in flight.
 	phase settlementPhase
 	// staged mirrors the Service's per-call staged-event buffer.
-	staged []workspacetasks.TaskEvent
+	staged []tasks.TaskEvent
 	// completeErr / failErr / retryErr inject settlement failures.
 	completeErr, failErr, retryErr error
 	calls                          int
@@ -139,41 +139,41 @@ func TestSettlerEventBridgePublishesValidatedWorkspaceEnvelopes(t *testing.T) {
 	}
 }
 
-func (s *bridgeStubSettler) Complete(_ context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusCompleted, s.completeErr, outputs)
+func (s *bridgeStubSettler) Complete(_ context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
+	return s.settle(workspaceID, taskID, tasks.StatusCompleted, s.completeErr, outputs)
 }
 
-func (s *bridgeStubSettler) Fail(_ context.Context, workspaceID, taskID, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusFailed, s.failErr, nil)
+func (s *bridgeStubSettler) Fail(_ context.Context, workspaceID, taskID, _ string) (*tasks.WorkspaceTask, error) {
+	return s.settle(workspaceID, taskID, tasks.StatusFailed, s.failErr, nil)
 }
 
-func (s *bridgeStubSettler) Retry(_ context.Context, workspaceID, taskID string, _ bool) (*workspacetasks.WorkspaceTask, error) {
-	return s.settle(workspaceID, taskID, workspacetasks.StatusPending, s.retryErr, nil)
+func (s *bridgeStubSettler) Retry(_ context.Context, workspaceID, taskID string, _ bool) (*tasks.WorkspaceTask, error) {
+	return s.settle(workspaceID, taskID, tasks.StatusPending, s.retryErr, nil)
 }
 
 // settle models the production Service: it stages its event only on the
 // post-commit line, so a failing settlement stages nothing.
-func (s *bridgeStubSettler) settle(workspaceID, taskID string, status workspacetasks.Status, err error, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *bridgeStubSettler) settle(workspaceID, taskID string, status tasks.Status, err error, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	s.phase = phaseSettling
 	s.calls++
 	s.mu.Unlock()
 
 	if err == nil {
-		s.staged = append(s.staged, workspacetasks.TaskEvent{
+		s.staged = append(s.staged, tasks.TaskEvent{
 			TaskID: taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: time.Now().UTC(),
-			Outputs: workspacetasks.BuildTaskCompletedOutputs(workspaceID, outputs),
+			Outputs: tasks.BuildTaskCompletedOutputs(workspaceID, outputs),
 		})
 	}
 
 	s.mu.Lock()
 	s.phase = phaseSettled
 	s.mu.Unlock()
-	return &workspacetasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, Status: status}, err
+	return &tasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, Status: status}, err
 }
 
-func (s *bridgeStubSettler) StagedEvents() []workspacetasks.TaskEvent {
-	staged := append([]workspacetasks.TaskEvent(nil), s.staged...)
+func (s *bridgeStubSettler) StagedEvents() []tasks.TaskEvent {
+	staged := append([]tasks.TaskEvent(nil), s.staged...)
 	s.staged = nil
 	return staged
 }
@@ -378,7 +378,7 @@ func TestSettlerEventBridgeKeepsSettlementResultWhenPublishFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Complete must not fail when the event channel is down: %v", err)
 	}
-	if completed == nil || completed.Status != workspacetasks.StatusCompleted {
+	if completed == nil || completed.Status != tasks.StatusCompleted {
 		t.Fatalf("completed = %+v, want a completed task", completed)
 	}
 	if published, _ := publisher.snapshot(); len(published) != 1 {
@@ -442,12 +442,12 @@ func TestSettlerEventBridgeEmitsMediaAssetReadyPerAssetOutput(t *testing.T) {
 	stub := &bridgeStubSettler{}
 	log := events.NewWorkspaceEventLog()
 	bridge := newSettlerEventBridge(stub, nil, settlerEventDelivery{log: log})
-	outputs := []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest02", Role: "result", ResultIndex: 1},
-		{Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/o.png", ChecksumSHA256: "ab", ResultIndex: 2},
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 3},
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "  ", Role: "result", ResultIndex: 4},
+	outputs := []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
+		{Kind: tasks.OutputKindAsset, AssetID: "asset_readytest02", Role: "result", ResultIndex: 1},
+		{Kind: tasks.OutputKindRemote, URL: "https://cdn.example.com/o.png", ChecksumSHA256: "ab", ResultIndex: 2},
+		{Kind: tasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 3},
+		{Kind: tasks.OutputKindAsset, AssetID: "  ", Role: "result", ResultIndex: 4},
 	}
 	if _, err := bridge.Complete(t.Context(), "ws_bridge", "task_bridge_media", outputs); err != nil {
 		t.Fatalf("Complete: %v", err)
@@ -512,8 +512,8 @@ func TestSettlerEventBridgeEmitsNoMediaAssetReadyOnRollback(t *testing.T) {
 	stub := &bridgeStubSettler{completeErr: rollback}
 	log := events.NewWorkspaceEventLog()
 	bridge := newSettlerEventBridge(stub, nil, settlerEventDelivery{log: log})
-	outputs := []workspacetasks.OutputRef{
-		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
+	outputs := []tasks.OutputRef{
+		{Kind: tasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
 	}
 	if _, err := bridge.Complete(t.Context(), "ws_bridge", "task_bridge_rb", outputs); !errors.Is(err, rollback) {
 		t.Fatalf("Complete err = %v, want %v", err, rollback)

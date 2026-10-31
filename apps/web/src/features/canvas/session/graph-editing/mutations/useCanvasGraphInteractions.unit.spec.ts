@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../../board'
 import { i18n } from '../../../../../core/i18n'
 import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

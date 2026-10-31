@@ -86,7 +86,7 @@ import {
   adminSelectTriggerCompactClass,
   adminSelectTriggerIconClass,
   adminSelectViewportClass,
-} from '../../core/adminSelectSkin'
+} from '../styling/adminSelectSkin'
 
 /**
  * Admin skin adapter for the neutral shared Select primitive.

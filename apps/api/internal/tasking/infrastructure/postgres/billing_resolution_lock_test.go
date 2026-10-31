@@ -8,7 +8,7 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/media/workspacemedia"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 )
@@ -36,7 +36,7 @@ func TestOrganizationBillingResolutionDoesNotDeadlockWorkspaceDeletion(t *testin
 	// Use the production submission gate: it holds the Workspace membership
 	// lock until the settlement transaction completes.
 	authorizer := workspacemedia.TaskSubmissionAuthorizer{Boards: boards.NewPostgresWorkspaceBoardStore(db, nil)}
-	if _, err := authorizer.AuthorizeSubmission(ctx, submit, workspacetasks.CreateInput{
+	if _, err := authorizer.AuthorizeSubmission(ctx, submit, tasks.CreateInput{
 		WorkspaceID: workspace.PublicID, OwnerUserID: ownerID,
 	}); err != nil {
 		t.Fatalf("authorize submission: %v", err)

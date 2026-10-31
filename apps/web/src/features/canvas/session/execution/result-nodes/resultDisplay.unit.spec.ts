@@ -8,10 +8,10 @@ import {
   getWorkspaceMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
-vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()
+vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/api/media/mediaAssetDelivery')>()
   return { ...original, getWorkspaceMediaAssetMetadata: vi.fn() }
 })
 

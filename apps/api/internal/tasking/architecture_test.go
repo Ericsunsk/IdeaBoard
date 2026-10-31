@@ -38,3 +38,28 @@ func TestDomainDoesNotImportTaskingAdapters(t *testing.T) {
 		"ideaboard/api/internal/tasking/ports",
 	})
 }
+
+// TestTaskingSubpackagesDoNotDependOnConcreteRepositoryOrWorker consolidates
+// the four former per-package ratchets (application/task, ports/media,
+// application/submission, application/billing): the seams stay small and
+// depend on narrow consumer interfaces, never on the concrete
+// taskstore.Repository or the Runtime worker implementation.
+func TestTaskingSubpackagesDoNotDependOnConcreteRepositoryOrWorker(t *testing.T) {
+	for _, dir := range []string{
+		"application/task",
+		"ports/media",
+		"application/submission",
+		"application/billing",
+	} {
+		archtest.AssertNoForbiddenImports(t, dir, []string{"ideaboard/api/internal/runtime"})
+		archtest.AssertNoForbiddenText(t, dir, []string{"taskstore.Repository"})
+	}
+}
+
+// TestTaskBillingNeverReadsModelMappings preserves the durable-usage rule
+// from application/billing: historical task usage reads persisted billing
+// facts only; live model mappings must never affect it.
+func TestTaskBillingNeverReadsModelMappings(t *testing.T) {
+	archtest.AssertNoForbiddenImports(t, "application/billing", []string{"ideaboard/api/internal/aigateway"})
+	archtest.AssertNoForbiddenText(t, "application/billing", []string{"ai_gateway_model_", "ResolveModel", "ModelStore"})
+}

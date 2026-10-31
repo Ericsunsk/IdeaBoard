@@ -141,7 +141,7 @@ module.exports = {
       name: 'no-cross-feature-deep-imports',
       severity: 'error',
       comment:
-        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting; routePaths.ts stays public for cross-feature path constants); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
+        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting; routePaths.ts stays public for cross-feature path constants; ui stays public for workspace dialogs/settings to avoid shell/account cycles); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
       from: {
         path: '^src/(?:app|features/[^/]+)(?:/|$)',
         pathNot:
@@ -149,7 +149,7 @@ module.exports = {
       },
       to: {
         path: '^src/features/workspace/',
-        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/|routePaths\\.ts$)',
+        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/|routePaths\\.ts$|ui(?:/|$))',
       },
     },
     {
@@ -192,6 +192,20 @@ module.exports = {
       to: {
         path: '^src/features/notification/',
         pathNot: '^src/features/notification/index\\.ts$',
+      },
+    },
+    {
+      name: 'core-pure-domain-no-ui',
+      severity: 'error',
+      comment:
+        'Core zones are pure domain models, math, and algorithms. Core must never import UI frameworks (Vue/Reka UI), styling, or infrastructure adapters.',
+      from: {
+        path: '^src/(?:features/[^/]+/core|core)(?:/|$)',
+        pathNot:
+          '\\.(?:spec|test)\\.[jt]sx?$|^src/core/(?:components|composables|media|query|router|i18n|lib|auth)/',
+      },
+      to: {
+        path: '(?:^(?:vue|reka-ui|@vueuse/core|tailwindcss)(?:/|$)|(?:^|/)node_modules/(?:vue|reka-ui|@vueuse/core|tailwindcss)(?:/|$)|(?:^src/features/[^/]+/(?:ui|adapters)|^@/features/[^/]+/(?:ui|adapters)))',
       },
     },
     {

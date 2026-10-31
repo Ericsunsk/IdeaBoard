@@ -1,7 +1,7 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, waitFor } from '../../../test/render'
-import type { User } from '../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import { ADMIN_ROOT_PATH } from '../../admin/routePaths'
 import { HOME_PATH } from '../routePaths'
 import {

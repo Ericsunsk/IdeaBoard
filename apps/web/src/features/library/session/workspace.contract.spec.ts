@@ -29,10 +29,10 @@ import {
   getResolveWorkspaceLibraryAssetsUrl,
   getSaveWorkspaceLibraryAssetUrl,
 } from '../../../api/generated-query/public/workspace-library/workspace-library'
-import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
+import { getWorkspaceMediaAssetMetadata } from '@/api/media/mediaAssetDelivery'
 
-vi.mock('../../../api/mediaAssetDelivery', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/mediaAssetDelivery')>()
+vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/media/mediaAssetDelivery')>()
   return {
     ...actual,
     getWorkspaceMediaAssetMetadata: vi.fn(async () => ({

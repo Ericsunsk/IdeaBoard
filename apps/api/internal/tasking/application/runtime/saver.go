@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	librarydomain "ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // TaskOutputSaveInput identifies settled media and its Task provenance.
@@ -27,7 +27,7 @@ type TaskOutputLibrarySaver interface {
 // WorkspaceTaskAutoSaver saves settled outputs after Task completion.
 // Per-output failures never change the completed Task or requeue execution.
 type WorkspaceTaskAutoSaver interface {
-	SaveCompletedTask(ctx context.Context, task *workspacetasks.WorkspaceTask) error
+	SaveCompletedTask(ctx context.Context, task *tasks.WorkspaceTask) error
 }
 
 type workspaceTaskAutoSaver struct {
@@ -41,7 +41,7 @@ func NewWorkspaceTaskAutoSaver(saver TaskOutputLibrarySaver) (WorkspaceTaskAutoS
 	return &workspaceTaskAutoSaver{saver: saver}, nil
 }
 
-func (s *workspaceTaskAutoSaver) SaveCompletedTask(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
+func (s *workspaceTaskAutoSaver) SaveCompletedTask(ctx context.Context, task *tasks.WorkspaceTask) error {
 	if s == nil || s.saver == nil {
 		return fmt.Errorf("task auto-saver is not configured")
 	}
@@ -49,7 +49,7 @@ func (s *workspaceTaskAutoSaver) SaveCompletedTask(ctx context.Context, task *wo
 		return fmt.Errorf("task auto-saver: task identity required")
 	}
 	for _, ref := range task.OutputRefs {
-		if ref.Kind != workspacetasks.OutputKindAsset || strings.TrimSpace(ref.AssetID) == "" {
+		if ref.Kind != tasks.OutputKindAsset || strings.TrimSpace(ref.AssetID) == "" {
 			continue
 		}
 		if _, _, err := s.saver.SaveTaskOutputAsset(ctx, strings.TrimSpace(task.WorkspaceID), TaskOutputSaveInput{

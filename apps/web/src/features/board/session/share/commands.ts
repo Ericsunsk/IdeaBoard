@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/vue-query'
 import { queryClient } from '../../../../core/query/queryClient'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
-import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
+import { boardOperationIdempotencyKey } from '@/api/http/idempotencyKey'
 import { getBoardScope, isBoardScopeCurrent } from '../catalog/scope'
 import { boardQueryKeys } from '../sync/boardQueryKeys'
 import { fetchWorkspaceMembers as defaultFetchWorkspaceMembers } from '../../../workspace'

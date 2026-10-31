@@ -12,7 +12,7 @@ import {
   type CanvasGroupFrame,
   type CanvasPoint,
   type CanvasRect,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 
 type ActiveGroupDrag = {

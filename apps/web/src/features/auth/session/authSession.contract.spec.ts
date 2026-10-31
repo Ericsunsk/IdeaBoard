@@ -16,7 +16,7 @@ async function getFreshUserStore() {
     getSession: vi.fn(),
   }
 
-  vi.doMock('../../../api/userSession', () => ({
+  vi.doMock('@/api/http/userSession', () => ({
     fetchCurrentUserInfo: getUserInfo,
   }))
   vi.doMock('../../../core/auth/client', () => ({

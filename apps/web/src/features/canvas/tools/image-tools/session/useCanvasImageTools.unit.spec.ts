@@ -12,11 +12,11 @@ import { deserializeImageRetouchPlan } from '../../retouch/core/recipe'
 
 type RetouchFinalRenderModule = typeof import('../../retouch/session/stage/runtime/finalRender')
 type MaskPaintingCanvasModule = typeof import('../../inpaint/session/maskPaintingCanvas')
-import * as mediaAssetDelivery from '../../../../../api/mediaAssetDelivery'
+import * as mediaAssetDelivery from '@/api/media/mediaAssetDelivery'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 vi.mock('../../retouch/session/stage/runtime/finalRender', async (importOriginal) => {
   const actual = await importOriginal<RetouchFinalRenderModule>()
@@ -65,10 +65,10 @@ vi.mock('../../inpaint/session/fabric/loader', () => ({
 const renderLayerStackFileMock = vi.mocked(renderRetouchLayerStackFile)
 
 const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
-vi.mock('../../../../../api/client', () => ({
+vi.mock('@/api/http/client', () => ({
   api: { request: mediaAssetRequestMock },
 }))
-vi.mock('../../../../../api/workspaceEventStream', () => ({
+vi.mock('@/api/realtime/workspaceEventStream', () => ({
   subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),
 }))
 

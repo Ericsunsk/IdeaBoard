@@ -34,7 +34,7 @@ vi.mock(
 )
 
 import type { ControlWalletRestrictionResult } from '@/api/generated-query/control/model/controlWalletRestrictionResult'
-import { adminCreditsBillingApi } from './api'
+import { adminCreditsBillingApi, buildAdminCreditCommandRequest } from './api'
 
 describe('credits billing API adapter', () => {
   const userId = 'usr_11111111111111111111111111111111'
@@ -310,5 +310,92 @@ describe('credits billing API adapter', () => {
         { idempotencyKey: 'k1' },
       ),
     ).rejects.toMatchObject({ code: 'billing_wallet_restricted' })
+  })
+})
+
+describe('admin credit command DTO assembly', () => {
+  const publicId = 'usr_11111111111111111111111111111111'
+  it('builds auditable Grant and Deduction requests with independent idempotency identities', () => {
+    const grant = buildAdminCreditCommandRequest(
+      { kind: 'grant', userPublicId: publicId, amountCredits: 20 },
+      () => 'grant-operation',
+    )
+    const deduction = buildAdminCreditCommandRequest(
+      { kind: 'deduction', userPublicId: publicId, amountCredits: 3 },
+      () => 'deduct-operation',
+    )
+
+    expect(grant).toEqual({
+      body: {
+        user_id: publicId,
+        amount_credits: 20,
+        business_reference_id: 'control-ui:grant:grant-operation',
+      },
+      idempotencyKey: 'control-ui:grant:grant-operation',
+    })
+    expect(deduction.idempotencyKey).toBe('control-ui:deduction:deduct-operation')
+    expect(deduction.body).not.toHaveProperty('idempotency_key')
+  })
+
+  it('builds Refund and Correction bodies with link fields', () => {
+    expect(
+      buildAdminCreditCommandRequest(
+        {
+          kind: 'refund',
+          userPublicId: publicId,
+          amountCredits: 5,
+
+          chargeTransactionId: 'charge-1',
+          remainingRefundableCredits: 5,
+        },
+        () => 'refund-operation',
+      ),
+    ).toMatchObject({
+      body: {
+        user_id: publicId,
+        charge_transaction_id: 'charge-1',
+      },
+      idempotencyKey: 'control-ui:refund:refund-operation',
+    })
+    expect(
+      buildAdminCreditCommandRequest(
+        {
+          kind: 'correction',
+          userPublicId: publicId,
+          amountCredits: 5,
+          originalTransactionId: 'ctxn-1',
+          originalAmountCredits: 8,
+        },
+        () => 'correction-operation',
+      ),
+    ).toMatchObject({
+      body: {
+        user_id: publicId,
+        original_transaction_id: 'ctxn-1',
+      },
+      idempotencyKey: 'control-ui:correction:correction-operation',
+    })
+  })
+
+  it('addresses explicit billing accounts without user linkage', () => {
+    const accountId = 'ba_orgpool00000000000000000000000001'
+    expect(
+      buildAdminCreditCommandRequest(
+        { kind: 'grant', billingAccountId: accountId, amountCredits: 5 },
+        () => 'account-grant-operation',
+      ),
+    ).toMatchObject({
+      body: {
+        billing_account_id: accountId,
+        amount_credits: 5,
+      },
+      idempotencyKey: 'control-ui:grant:account-grant-operation',
+    })
+  })
+
+  it('rejects invalid command inputs before DTO assembly', () => {
+    expect(() =>
+      buildAdminCreditCommandRequest({ kind: 'grant', amountCredits: 1 }),
+    ).toThrow()
   })
 })

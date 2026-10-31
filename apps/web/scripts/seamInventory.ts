@@ -414,7 +414,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (!source.includes('<!-- SEAM_TABLE_START -->')) fail('generated table marker missing')
     fs.writeFileSync(
       SEAM_INVENTORY_PATH,
-      source.replace(/<!-- SEAM_TABLE_START -->[\s\S]*?<!-- SEAM_TABLE_END -->/, table),
+      source.replace(/<!-- SEAM_TABLE_START -->[\s\S]*?<!-- SEAM_TABLE_END -->/, () => table),
     )
   } else if (process.argv.includes('--freeze-measurements')) {
     const graphArgument = process.argv.find((argument) => argument.startsWith('--graph='))
@@ -443,7 +443,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       SEAM_INVENTORY_PATH,
       source.replace(
         /```json seam-inventory\r?\n[\s\S]*?\r?\n```/,
-        `\`\`\`json seam-inventory\n${JSON.stringify(inventory, null, 2)}\n\`\`\``,
+        () => `\`\`\`json seam-inventory\n${JSON.stringify(inventory, null, 2)}\n\`\`\``,
       ),
     )
     console.log(

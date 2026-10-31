@@ -1,9 +1,9 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
 import type { NodeChange, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
 import type { CanvasCreatableNodeKind } from '../../../../board/ports/canvas'
-import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
-import { useFlowCanvasShellInteractions } from '../useFlowCanvasShellInteractions'
-import { useFlowTransientUiDismissal } from '../useFlowTransientUiDismissal'
+import { useFlowNodeDragInteractions } from '../controllers/useFlowNodeDragInteractions'
+import { useFlowCanvasShellInteractions } from '../controllers/useFlowCanvasShellInteractions'
+import { useFlowTransientUiDismissal } from '../controllers/useFlowTransientUiDismissal'
 import { useCanvasCustomLayerOverlay } from '../../overlays'
 import {
   useVueFlowSelectionAdapter,
@@ -12,8 +12,8 @@ import {
 import { useCanvasGroupPresentationInteraction } from '../../nodes/groups'
 import type { CanvasCollaborationSession } from '../../../session/collaboration'
 import type { CanvasWorkspaceRuntime } from '../../../session/workspace'
-import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'
-import type { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
+import { useCanvasNodeContextMenu } from '../controllers/useCanvasNodeContextMenu'
+import type { useFlowActiveNodePanels } from '../controllers/useFlowActiveNodePanels'
 import type { LibraryDropHit, LibrarySaveModule } from '../../../../library'
 
 type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>

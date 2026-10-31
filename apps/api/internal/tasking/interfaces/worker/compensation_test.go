@@ -19,7 +19,7 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // compensateCountingRenderer wraps a production renderer and counts
@@ -34,7 +34,7 @@ type compensateCountingRenderer struct {
 var _ taskruntime.WorkspaceTaskRenderer = (*compensateCountingRenderer)(nil)
 
 // CompensateRenderedOutputs implements taskruntime.WorkspaceTaskRenderer.
-func (f *compensateCountingRenderer) CompensateRenderedOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) error {
+func (f *compensateCountingRenderer) CompensateRenderedOutputs(ctx context.Context, task *tasks.WorkspaceTask, outputs []tasks.OutputRef) error {
 	f.calls++
 	return f.WorkspaceTaskRenderer.CompensateRenderedOutputs(ctx, task, outputs)
 }
@@ -50,7 +50,7 @@ func TestWorkspaceProviderMaterializerPartialFailureArchivesIngested(t *testing.
 	png := fixturePNGBytes(t)
 	calls := 0
 	deps := materializerTestDeps(media, objects)
-	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
+	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *tasks.WorkspaceTask, _ tasks.OutputRef) ([]byte, error) {
 		calls++
 		if calls > 1 {
 			return nil, errors.New("fake: provider result download failed")
@@ -91,12 +91,12 @@ func TestWorkspaceTaskRendererCompensateRenderedOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderOutputs: %v", err)
 	}
-	mixed := append(append([]workspacetasks.OutputRef(nil), refs...), workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/remote.png",
+	mixed := append(append([]tasks.OutputRef(nil), refs...), tasks.OutputRef{
+		Kind: tasks.OutputKindRemote, URL: "https://cdn.example.com/remote.png",
 		ChecksumSHA256: strings.Repeat("c", 64), Role: "result", ResultIndex: 1,
 	})
 	failed := rendererTestTask()
-	failed.Status = workspacetasks.StatusFailed
+	failed.Status = tasks.StatusFailed
 	if err := r.CompensateRenderedOutputs(ctx, failed, mixed); err != nil {
 		t.Fatalf("CompensateRenderedOutputs: %v", err)
 	}
@@ -124,18 +124,18 @@ type compensateStubSettler struct {
 	completeErr error
 	failErr     error
 	mu          sync.Mutex
-	outputs     []workspacetasks.OutputRef
+	outputs     []tasks.OutputRef
 	failCalls   int
 }
 
-func (s *compensateStubSettler) Complete(_ context.Context, _, _ string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *compensateStubSettler) Complete(_ context.Context, _, _ string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.outputs = append([]workspacetasks.OutputRef(nil), outputs...)
+	s.outputs = append([]tasks.OutputRef(nil), outputs...)
 	return nil, s.completeErr
 }
 
-func (s *compensateStubSettler) Fail(ctx context.Context, workspaceID, taskID, reason string) (*workspacetasks.WorkspaceTask, error) {
+func (s *compensateStubSettler) Fail(ctx context.Context, workspaceID, taskID, reason string) (*tasks.WorkspaceTask, error) {
 	s.mu.Lock()
 	s.failCalls++
 	s.mu.Unlock()
@@ -145,7 +145,7 @@ func (s *compensateStubSettler) Fail(ctx context.Context, workspaceID, taskID, r
 	return s.inner.Fail(ctx, workspaceID, taskID, reason)
 }
 
-func (s *compensateStubSettler) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*workspacetasks.WorkspaceTask, error) {
+func (s *compensateStubSettler) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*tasks.WorkspaceTask, error) {
 	return s.inner.Retry(ctx, workspaceID, taskID, retryable)
 }
 
@@ -186,7 +186,7 @@ func TestWorkerSettlementFailureCompensatesRenderedAssets(t *testing.T) {
 	if settler.failCalls != 1 {
 		t.Fatalf("fail calls = %d, want 1 (terminal convergence after rollback)", settler.failCalls)
 	}
-	if len(settler.outputs) != 1 || settler.outputs[0].Kind != workspacetasks.OutputKindAsset {
+	if len(settler.outputs) != 1 || settler.outputs[0].Kind != tasks.OutputKindAsset {
 		t.Fatalf("settled outputs = %+v, want the rendered asset ref", settler.outputs)
 	}
 	if len(objects.objects) != 1 {
@@ -203,7 +203,7 @@ func TestWorkerSettlementFailureCompensatesRenderedAssets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed (terminal convergence)", got.Status)
 	}
 }
@@ -224,7 +224,7 @@ func TestWorkerConvergedDropCompensatesOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorkspaceTaskRenderer: %v", err)
 	}
-	settler := &compensateStubSettler{inner: env.service, completeErr: workspacetasks.ErrStateConflict}
+	settler := &compensateStubSettler{inner: env.service, completeErr: tasks.ErrStateConflict}
 	provider := materializingProvider(t, media, objects, png)
 	compensating := &compensateCountingRenderer{WorkspaceTaskRenderer: renderer}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
@@ -260,10 +260,10 @@ func TestWorkerConvergedDropCompensatesOutputs(t *testing.T) {
 type commitUnknownSettler struct {
 	WorkspaceTaskWorkerSettler
 	store   *attemptClaimStore
-	outputs []workspacetasks.OutputRef
+	outputs []tasks.OutputRef
 }
 
-func (s *commitUnknownSettler) Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *commitUnknownSettler) Complete(ctx context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	s.outputs = outputs
 	if _, err := s.store.CompleteTask(ctx, workspaceID, taskID, outputs); err != nil {
 		return nil, err
@@ -278,7 +278,7 @@ func TestWorkerCommitUnknownPreservesCompletedAssets(t *testing.T) {
 	media := newRendererTestEnv(t)
 	settler := &commitUnknownSettler{WorkspaceTaskWorkerSettler: env.service, store: env.store}
 	providerCalls := 0
-	provider := WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	provider := WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		providerCalls++
 		return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, task)
 	})
@@ -295,7 +295,7 @@ func TestWorkerCommitUnknownPreservesCompletedAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.Status != workspacetasks.StatusCompleted {
+	if task.Status != tasks.StatusCompleted {
 		t.Fatalf("status = %s, want completed", task.Status)
 	}
 	asset, err := media.media.GetAsset(context.Background(), created.WorkspaceID, settler.outputs[0].AssetID)
@@ -319,7 +319,7 @@ func TestWorkerUnknownSettlementPreservesUnconfirmedAssets(t *testing.T) {
 	providerCalls := 0
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: settler, Renderer: media.renderer(t, nil), Attempts: env.attempts,
-		Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			providerCalls++
 			return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, task)
 		}),
@@ -351,7 +351,7 @@ func TestResultCompensationPreservesPassthroughAndReferencedAssets(t *testing.T)
 	refs := append(seed, env.materialize(t, ctx, rendererTestTask())...)
 	env.media.SeedTaskAssetForTests("ws_test", "task_other", 7, "", &workspacemedia.TaskAsset{Asset: mustRendererAsset(t, env.media, refs[1].AssetID)})
 	failed := rendererTestTask()
-	failed.Status = workspacetasks.StatusFailed
+	failed.Status = tasks.StatusFailed
 	if err := renderer.CompensateRenderedOutputs(ctx, failed, refs); err != nil {
 		t.Fatal(err)
 	}
@@ -379,17 +379,17 @@ func TestResultCompensationRequiresMatchingFailedExecution(t *testing.T) {
 	renderer := env.renderer(t, nil)
 	for _, tc := range []struct {
 		name   string
-		mutate func(*workspacetasks.WorkspaceTask)
+		mutate func(*tasks.WorkspaceTask)
 	}{
-		{name: "running", mutate: func(task *workspacetasks.WorkspaceTask) { task.Status = workspacetasks.StatusRunning }},
-		{name: "other task", mutate: func(task *workspacetasks.WorkspaceTask) { task.ID = "task_other" }},
-		{name: "other workspace", mutate: func(task *workspacetasks.WorkspaceTask) { task.WorkspaceID = "ws_other" }},
-		{name: "other owner", mutate: func(task *workspacetasks.WorkspaceTask) { task.OwnerUserID++ }},
-		{name: "other execution", mutate: func(task *workspacetasks.WorkspaceTask) { task.ExecutionToken = "token_next_attempt" }},
+		{name: "running", mutate: func(task *tasks.WorkspaceTask) { task.Status = tasks.StatusRunning }},
+		{name: "other task", mutate: func(task *tasks.WorkspaceTask) { task.ID = "task_other" }},
+		{name: "other workspace", mutate: func(task *tasks.WorkspaceTask) { task.WorkspaceID = "ws_other" }},
+		{name: "other owner", mutate: func(task *tasks.WorkspaceTask) { task.OwnerUserID++ }},
+		{name: "other execution", mutate: func(task *tasks.WorkspaceTask) { task.ExecutionToken = "token_next_attempt" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			failed := *task
-			failed.Status = workspacetasks.StatusFailed
+			failed.Status = tasks.StatusFailed
 			tc.mutate(&failed)
 			if err := renderer.CompensateRenderedOutputs(ctx, &failed, refs); err == nil {
 				t.Fatal("invalid failure authorized compensation")
@@ -400,7 +400,7 @@ func TestResultCompensationRequiresMatchingFailedExecution(t *testing.T) {
 		})
 	}
 	failed := *task
-	failed.Status = workspacetasks.StatusFailed
+	failed.Status = tasks.StatusFailed
 	if err := renderer.CompensateRenderedOutputs(context.Background(), &failed, refs); err == nil {
 		t.Fatal("missing scope authorized compensation")
 	}
@@ -430,13 +430,13 @@ func TestWorkerRenderFailureCompensatesOnlyAfterConfirmedFail(t *testing.T) {
 			provider := materializingProvider(t, media.media, media.objects, media.pegged)
 			worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 				Store: env.store, Settler: settler, Attempts: env.attempts, Renderer: counting,
-				Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+				Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 					refs, err := provider(ctx, task)
 					if err != nil {
 						return nil, err
 					}
 					assetID = refs[0].AssetID
-					return append(refs, workspacetasks.OutputRef{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_missing0001", ResultIndex: 1}), nil
+					return append(refs, tasks.OutputRef{Kind: tasks.OutputKindAsset, AssetID: "asset_missing0001", ResultIndex: 1}), nil
 				}),
 			})
 			if err != nil {

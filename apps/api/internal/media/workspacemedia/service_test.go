@@ -409,6 +409,32 @@ func TestMediaServiceLazyExpiry(t *testing.T) {
 	}
 }
 
+func TestMediaServiceCompleteExpiredSessionPersistsExpiry(t *testing.T) {
+	env := openMediaTestEnv(t)
+	ctx := context.Background()
+	session := mustCreateDBSession(t, ctx, env.svc, env.wsA, env.owner)
+	if _, err := env.pool.Exec(ctx,
+		`UPDATE upload_sessions SET created_at = now() - make_interval(mins => 31) WHERE public_id = $1`,
+		session.ID,
+	); err != nil {
+		t.Fatalf("backdate session: %v", err)
+	}
+
+	if _, _, err := env.svc.CompleteSession(ctx, env.wsA, session.ID, dbCompleteFacts(), CreateAssetParams{}); !errors.Is(err, ErrExpired) {
+		t.Fatalf("complete expired err = %v, want expired", err)
+	}
+	var status string
+	var expiredAt *time.Time
+	if err := env.pool.QueryRow(ctx,
+		`SELECT status, expired_at FROM upload_sessions WHERE public_id = $1`, session.ID,
+	).Scan(&status, &expiredAt); err != nil {
+		t.Fatalf("read persisted session: %v", err)
+	}
+	if status != string(StatusExpired) || expiredAt == nil {
+		t.Fatalf("persisted status = %q, expired_at = %v; want expired with timestamp", status, expiredAt)
+	}
+}
+
 // TestMediaServiceCrossWorkspace proves invisibility (never a distinct
 // status) for foreign ids and malformed shapes.
 func TestMediaServiceCrossWorkspace(t *testing.T) {

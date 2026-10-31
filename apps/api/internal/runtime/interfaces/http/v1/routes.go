@@ -2,9 +2,7 @@ package v1
 
 import (
 	"context"
-	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"ideaboard/api/internal/boards"
@@ -12,22 +10,115 @@ import (
 	eventnats "ideaboard/api/internal/events/nats"
 	eventoutbox "ideaboard/api/internal/events/outbox"
 	eventwebhook "ideaboard/api/internal/events/webhook"
-	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
-	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	"ideaboard/api/internal/notifications"
-	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
+	v1boards "ideaboard/api/internal/runtime/interfaces/http/v1/boards"
+	v1library "ideaboard/api/internal/runtime/interfaces/http/v1/library"
+	v1media "ideaboard/api/internal/runtime/interfaces/http/v1/media"
+	v1system "ideaboard/api/internal/runtime/interfaces/http/v1/system"
+	v1tasks "ideaboard/api/internal/runtime/interfaces/http/v1/tasks"
+	v1tenancy "ideaboard/api/internal/runtime/interfaces/http/v1/tenancy"
+	"ideaboard/api/internal/media/workspacemedia"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/invitations"
 
 	"github.com/gin-gonic/gin"
 )
+
+// ContractV1TaskDeps wires workspace task operations, quoting, settlement, and lifecycle.
+type ContractV1TaskDeps = v1tasks.ContractV1TaskDeps
+type WorkspaceTaskReadStore = v1tasks.WorkspaceTaskReadStore
+type WorkspaceTaskLifecycleStore = v1tasks.WorkspaceTaskLifecycleStore
+type WorkspaceTaskBillingStore = v1tasks.WorkspaceTaskBillingStore
+type WorkspaceTaskQuoter = v1tasks.WorkspaceTaskQuoter
+type WorkspaceTaskHolder = v1tasks.WorkspaceTaskHolder
+type WorkspaceTaskEnqueuer = v1tasks.WorkspaceTaskEnqueuer
+type WorkspaceTaskAssetReader = v1tasks.WorkspaceTaskAssetReader
+type WorkspaceTaskSnapshotSaver = v1tasks.WorkspaceTaskSnapshotSaver
+type taskQuoteBillingAccountReader = v1tasks.QuoteBillingAccountReader
+type taskQuoteWalletReader = v1tasks.QuoteWalletReader
+type taskQuoteQuotaReader = v1tasks.QuoteQuotaReader
+
+// ContractV1LibraryDeps wires workspace library store, idempotency, read-through, and sources.
+type ContractV1LibraryDeps = v1library.ContractV1LibraryDeps
+
+// ContractV1SearchDeps wires workspace search and vision query operations.
+type ContractV1SearchDeps = v1system.ContractV1SearchDeps
+type V1BillingQuoter = v1system.V1BillingQuoter
+type V1CreditSettler = v1system.V1CreditSettler
+type V1VisionExtractor = v1system.V1VisionExtractor
+type V1VisionExtractInput = v1system.V1VisionExtractInput
+const V1VisionSKU = v1system.V1VisionSKU
+var errV1CursorInvalid = v1system.ErrV1CursorInvalid
+var errV1BillingRestricted = v1system.ErrV1BillingRestricted
+var errV1BillingQuoteUnavailable = v1system.ErrV1BillingQuoteUnavailable
+var publicSupportChannelsV1Handler = v1system.PublicSupportChannelsV1Handler
+var publicBrandingSettingsV1Handler = v1system.PublicBrandingSettingsV1Handler
+var publicSearchV1Handler = v1system.PublicSearchV1Handler
+var NewBoardDocumentPublisher = v1system.NewBoardDocumentPublisher
+
+type v1NotificationDTO = v1system.V1NotificationDTO
+type v1NotificationListDTO = v1system.V1NotificationListDTO
+type v1UnreadCountDTO = v1system.V1UnreadCountDTO
+type v1MarkAllReadDTO = v1system.V1MarkAllReadDTO
+
+var v1VisionBillingDeferredObserve func(sku, reason, operationID string)
+
+func init() {
+	defaultObserver := v1system.V1VisionBillingDeferredObserve
+	v1system.V1VisionBillingDeferredObserve = func(sku, reason, operationID string) {
+		if v1VisionBillingDeferredObserve != nil {
+			v1VisionBillingDeferredObserve(sku, reason, operationID)
+			return
+		}
+		defaultObserver(sku, reason, operationID)
+	}
+}
+
+// ContractV1MediaDeps wires workspace media storage, upload sessions, and image delivery.
+type ContractV1MediaDeps = v1media.ContractV1MediaDeps
+type WorkspaceMediaStore = workspacemedia.WorkspaceMediaStore
+type WorkspaceMediaObjects = workspacemedia.MediaObjects
+
+// ContractV1AvatarDeps wires avatar storage UID resolution and avatar object persistence.
+type ContractV1AvatarDeps = v1media.ContractV1AvatarDeps
+type V1AvatarUIDDirectory = v1media.V1AvatarUIDDirectory
+type V1AvatarObjects = v1media.V1AvatarObjects
+var NewV1AvatarDirectory = v1media.NewV1AvatarDirectory
+var toMediaAssetDTO = v1media.ToMediaAssetDTO
+var v1SniffedImageMIME = v1media.SniffedImageMIME
+var v1StagedChecksum = v1media.StagedChecksum
+var errV1AvatarUIDUnavailable = v1media.ErrV1AvatarUIDUnavailable
+const v1AvatarMaxBytes = v1media.AvatarMaxBytes
+const maxV1MediaBatchAssets = v1media.MaxMediaBatchAssets
+
+// ContractV1MemberDeps wires workspace-member display facts and invite lookups.
+type ContractV1MemberDeps = v1tenancy.MemberDeps
+type V1MemberLookupProvider = v1tenancy.V1MemberLookupProvider
+type V1MemberDisplayProvider = shared.MemberDisplayProvider
+type V1MemberDisplay = shared.MemberDisplay
+var batchDisplayFacts = shared.BatchDisplayFacts
+var NewMemberLookupService = v1tenancy.NewMemberLookupService
+var NewMemberDisplayService = v1tenancy.NewMemberDisplayService
+var NewInvitationReader = v1tenancy.NewInvitationReader
+var NewInvitationIdentityReader = v1tenancy.NewInvitationIdentityReader
+
+type v1UserDTO = v1tenancy.UserDTO
+type v1MemberDTO = v1tenancy.MemberDTO
+type v1OrganizationDTO = v1tenancy.OrganizationDTO
+type v1OrganizationMemberDTO = v1tenancy.OrganizationMemberDTO
+type v1WorkspaceMemberInviteDTO = v1tenancy.WorkspaceMemberInviteDTO
+type v1OrganizationMemberInviteDTO = v1tenancy.OrganizationMemberInviteDTO
+type v1WorkspaceInvitePreviewDTO = v1tenancy.WorkspaceInvitePreviewDTO
+type v1WorkspaceInviteAckDTO = v1tenancy.WorkspaceInviteAckDTO
+type v1OrganizationInviteAckDTO = v1tenancy.OrganizationInviteAckDTO
+type v1DeletedDTO = shared.DeletedDTO
 
 // ContractV1Deps wires the Public Data Plane v1 handlers (issue #801).
 //
@@ -57,72 +148,15 @@ type ContractV1Deps struct {
 	// Tasks is the workspace-scoped async job surface (issue #805).
 	// Production wires the postgres store and settlement adapters; tests
 	// inject the in-memory implementation plus quoter/holder/queue/asset fakes.
-	Tasks                 WorkspaceTaskReadStore
-	TaskLifecycle         WorkspaceTaskLifecycleStore
-	TaskBilling           WorkspaceTaskBillingStore
-	TaskQuoter            WorkspaceTaskQuoter
-	TaskHolder            WorkspaceTaskHolder
-	TaskQueue             WorkspaceTaskEnqueuer
-	TaskAssets            WorkspaceTaskAssetReader
-	TaskCanonicalCompiler func(service, userPrompt string, params map[string]interface{}) (string, error)
-	// TaskAcceptance is the submit gate for the settlement transaction.
-	// Nil wires the production workspacemedia.TaskSubmissionAuthorizer;
-	// in-memory HTTP fixtures inject their test double instead (no
-	// database for the workspace lock the production gate takes).
-	TaskAcceptance workspacetasks.SubmissionAuthorizer
-	// TaskRouter is the shared RoutingResolver quote/submit consume (same
-	// instance, never an independent lookup). Nil fails closed with the
-	// canonical service_resolution_unavailable sentinel.
-	TaskRouter *routing.RoutingResolver
-	// TaskSnapshotSaver pins the Resolve snapshot. Production wiring must
-	// provide it; atomic settlement fails closed when it is absent.
-	TaskSnapshotSaver WorkspaceTaskSnapshotSaver
-	// TaskBillingAccounts explicitly resolves stable funds in the submit
-	// transaction. Missing wiring fails closed before settlement writes.
-	TaskBillingAccounts  workspacetasks.TxBillingAccountResolver
-	TaskSubmissionClaims workspacetasks.TxSubmissionClaimStore
-	// TaskQuotas enforces the member cross-workspace consumption quota
-	// inside the submit settlement transaction (#946: after Quote,
-	// before Hold, same snapshot). Production wires the
-	// memberquotas Store; in-memory HTTP fixtures inject their test
-	// double instead. Nil means no quota enforcement (unlimited).
-	TaskQuotas workspacetasks.TxMemberQuotaChecker
-	// TaskQuoteBillingAccounts resolves the same stable funds identity
-	// for the quote/readiness preflight without a settlement transaction
-	// (#917). Production wires the tenancy billing-account store; tests
-	// inject their double. Nil fails the preflight closed (503), never
-	// an owner-wallet fallback.
-	TaskQuoteBillingAccounts taskQuoteBillingAccountReader
-	// TaskQuoteWallets reads the resolved account Wallet for the
-	// preflight funds gate (#917: 402 insufficient vs 403 restricted,
-	// mirroring the submit Hold). Production wires the Credits service;
-	// tests inject their double. Nil fails the preflight closed.
-	TaskQuoteWallets taskQuoteWalletReader
-	// TaskQuoteQuotas reads the member cross-workspace consumption
-	// quota for the quote/readiness preflight (#946: same cap submit
-	// enforces, reported early). Production wires the memberquotas
-	// Store; tests inject their double. Nil skips the quota gate
-	// (unlimited).
-	TaskQuoteQuotas taskQuoteQuotaReader
+	Tasks ContractV1TaskDeps
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
-	// MediaObjects reads stored bytes for the content endpoint (nil
-	// fails content reads closed with 503 while metadata keeps
-	// working).
-	Media         WorkspaceMediaStore
-	MediaObjects  WorkspaceMediaObjects
-	MediaRenderer *imgproxy.Renderer
-	// AvatarUID resolves a caller's storage UID for the user-scoped
-	// avatar PUT (issue #809 media gap batch). Nil fails ONLY the
-	// avatar endpoint closed with 501; every other v1 route is
-	// unaffected. Production wires NewV1AvatarDirectory(userRepo).
-	AvatarUID V1AvatarUIDDirectory
-	// AvatarObjects persists avatar bytes through the storage
-	// abstraction (active profile). Nil fails ONLY the avatar PUT
-	// closed with 503. Production wires services.storageService;
-	// tests inject fakes.
-	AvatarObjects V1AvatarObjects
+	Media ContractV1MediaDeps
+	// Avatar resolves caller storage UIDs and persists avatar bytes.
+	Avatar ContractV1AvatarDeps
+	// Members resolves workspace-member display facts and registered user lookups.
+	Members ContractV1MemberDeps
 	// Events is the workspace event hot log + SSE replay window (issue
 	// #807). Nil normalizes to a process-local log; tests inject a
 	// fresh instance per engine for isolation.
@@ -145,20 +179,6 @@ type ContractV1Deps struct {
 	// UserProfile persists profile updates and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
 	UserProfile   runtimehttp.V1UserProfileDirectory
-	MediaPreviews *preview.Service
-	// MemberDisplay resolves workspace-member display facts (Auth-owned
-	// email for invite search plus avatar public URL) for the member
-	// list/write shapes (display auxiliaries; usr_ stays the write
-	// identity). Nil fails closed to no facts (fields omitted) and never
-	// fails the request. Production wires NewMemberDisplayService over
-	// the users repository plus the Auth email reader; tests inject fakes.
-	MemberDisplay V1MemberDisplayProvider
-	// MemberLookup resolves one registered user's usr_ identity from an
-	// Auth-owned email for the invite search (query-only; the email is
-	// resolved per call and never stored). Nil fails the lookup closed
-	// with 501. Production wires NewMemberLookupService over the users
-	// repository plus the Auth lookup reader; tests inject fakes.
-	MemberLookup V1MemberLookupProvider
 	// RealtimeTicketSecret is the HMAC secret for board presence tickets
 	// (RT_TICKET_SECRET). Empty fails the realtime-ticket endpoint
 	// closed with 500 (no fallback default); Load records the missing
@@ -180,19 +200,6 @@ type ContractV1Deps struct {
 	InvitationReader invitations.Reader
 	// Invitations owns atomic membership decisions, notifications, and mail enqueue.
 	Invitations *invitations.Service
-}
-
-// requireV1IdempotencyKey enforces the shared header-only idempotency contract
-// for required v1 mutations. Missing, blank, malformed, and overlong values
-// all converge to the stable 400 idempotency_key_required response.
-func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-		c.Abort()
-		return "", false
-	}
-	return key, true
 }
 
 // contractV1UserDirectoryNote: runtimehttp.V1UserDirectory, runtimehttp.V1UserProfileDirectory,
@@ -221,535 +228,224 @@ func (d *ContractV1Deps) normalize() {
 func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthDeps, deps ContractV1Deps) {
 	deps.normalize()
 	handler := &contractV1Handler{deps: deps}
-	group.GET("/support-channels", publicSupportChannelsV1Handler(deps.SupportChannels))
-	group.GET("/settings/branding", publicBrandingSettingsV1Handler(deps.Branding))
-	group.GET("/search", publicSearchV1Handler(deps.PublicSearchHandler))
-	// Public avatar delivery (no auth: avatars are public). Registered
-	// before the session middleware so it never requires a principal;
-	// per-IP rate limiting still rides the global engine middleware.
-	group.GET("/public/users/:uid/avatar", handler.publicAvatar)
-	// Public branding logo delivery (no auth: the logo is public). Same
-	// placement discipline as the avatar route: before the session
-	// middleware, single serving path for site-asset keys.
-	group.GET("/public/branding/logo", handler.publicBrandingLogo)
-	// Public invitation preview by raw token (no auth required)
-	group.GET("/invites/:token", handler.getWorkspaceInviteByToken)
+	handler.systemHandler().MountPublic(group)
+	handler.mediaHandler().MountPublic(group)
+	handler.tenancyHandler().MountPublic(group)
+
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
-	group.GET("/user", handler.getUser)
-	group.PATCH("/user", handler.updateUser)
-	group.GET("/workspaces", handler.listWorkspaces)
-	group.POST("/workspaces", handler.createWorkspace)
-	group.GET("/workspaces/:workspace_id", handler.getWorkspace)
-	group.PATCH("/workspaces/:workspace_id", handler.updateWorkspace)
-	group.DELETE("/workspaces/:workspace_id", handler.deleteWorkspace)
-	group.GET("/workspaces/:workspace_id/members", handler.listWorkspaceMembers)
-	group.POST("/workspaces/:workspace_id/members", handler.grantOrganizationWorkspaceMember)
-	group.GET("/workspaces/:workspace_id/members/lookup", handler.lookupWorkspaceMemberByEmail)
-	group.PATCH("/workspaces/:workspace_id/members/:member_id", handler.updateWorkspaceMember)
-	group.DELETE("/workspaces/:workspace_id/members/:member_id", handler.removeWorkspaceMember)
-	group.POST("/workspaces/:workspace_id/invites", handler.createWorkspaceInvite)
-	group.GET("/workspaces/:workspace_id/invites", handler.listWorkspaceInvites)
-	group.DELETE("/workspaces/:workspace_id/invites/:invite_id", handler.cancelWorkspaceInvite)
-	group.GET("/user/invites", handler.listUserWorkspaceInvites)
-	group.POST("/user/invites/:invite_id/accept", handler.acceptUserWorkspaceInvite)
-	group.POST("/user/invites/:invite_id/decline", handler.declineUserWorkspaceInvite)
-	group.GET("/user/notifications", handler.listUserNotifications)
-	group.GET("/user/notifications/events", handler.streamUserNotificationEvents)
-	group.GET("/user/notifications/unread-count", handler.getUserNotificationsUnreadCount)
-	group.POST("/user/notifications/:id/read", handler.markUserNotificationRead)
-	group.POST("/user/notifications/read-all", handler.markAllUserNotificationsRead)
-	group.POST("/user/notifications/:id/archive", handler.archiveUserNotification)
-	group.POST("/invites/:token/accept", handler.acceptWorkspaceInviteByToken)
-	group.POST("/invites/:token/decline", handler.declineWorkspaceInviteByToken)
-	group.GET("/organizations", handler.listOrganizations)
-	group.POST("/organizations", handler.createOrganization)
-	group.GET("/organizations/:organization_id", handler.getOrganization)
-	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
-	group.POST("/organizations/:organization_id/closure", handler.closeOrganization)
-	group.GET("/organizations/:organization_id/members", handler.listOrganizationMembers)
-	group.GET("/organizations/:organization_id/members/lookup", handler.lookupOrganizationMemberByEmail)
-	group.PATCH("/organizations/:organization_id/members/:member_id", handler.updateOrganizationMember)
-	group.DELETE("/organizations/:organization_id/members/:member_id", handler.removeOrganizationMember)
-	group.POST("/organizations/:organization_id/invites", handler.createOrganizationInvite)
-	group.GET("/organizations/:organization_id/invites", handler.listOrganizationInvites)
-	group.DELETE("/organizations/:organization_id/invites/:invite_id", handler.cancelOrganizationInvite)
-	group.GET("/user/organization-invites", handler.listUserOrganizationInvites)
-	group.POST("/user/organization-invites/:invite_id/accept", handler.acceptUserOrganizationInvite)
-	group.POST("/user/organization-invites/:invite_id/decline", handler.declineUserOrganizationInvite)
-	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
-	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
-	// Workspace upload sessions + media assets (issue #803, restored
-	// in #820): the routes below serve the workspace-scoped
-	// replacement; media.asset_ready and media.asset_archived emit
-	// after their commits.
-	handler.registerMediaRoutes(group)
+
+	handler.tenancyHandler().Mount(group)
+	handler.mediaHandler().Mount(group)
 	handler.registerBoardRoutes(group)
 	handler.registerLibraryRoutes(group)
-	handler.registerSearchRoutes(group)
 	handler.registerTaskRoutes(group)
-	handler.registerEventRoutes(group)
+	handler.systemHandler().Mount(group)
 }
 
-type contractV1Handler struct {
-	deps ContractV1Deps
+func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
+	boardHandler := v1boards.NewHandler(v1boards.Deps{
+		Store:                     h.deps.Store,
+		Users:                     h.deps.Users,
+		Boards:                    h.deps.Boards,
+		Idempotency:               h.deps.Idempotency,
+		MemberDisplay:             h.deps.Members.MemberDisplay,
+		RealtimeTicketSecret:      h.deps.RealtimeTicketSecret,
+		EmitWorkspaceEvent:        h.emitWorkspaceEvent,
+		DeliverBoardAccessSignals: h.deliverBoardAccessSignals,
+	})
+	boardHandler.Mount(group)
 }
 
-// v1ListCursor is the opaque keyset position for v1 list endpoints. It is
-// bound to principal + operation at encode sites (Baseline 5.5); decode
-// failures render pagination_cursor_invalid.
-type v1ListCursor struct {
-	Offset int `json:"offset"`
+func (h *contractV1Handler) authorizeBoardByID(c *gin.Context, workspace *tenancy.Workspace, boardID, workspaceRole string, userID int64, cap boards.Capability) (*boards.V1Board, boards.AccessRole, bool) {
+	return v1boards.AuthorizeBoardByID(c, h.deps.Boards, workspace, boardID, workspaceRole, userID, cap)
 }
 
-func (h *contractV1Handler) requireStore(c *gin.Context) bool {
-	if h.deps.Store == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
+func (h *contractV1Handler) requireBoardsStore(c *gin.Context) bool {
+	if h.deps.Boards == nil {
+		contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, "The v1 boards surface is not implemented yet")
 		c.Abort()
 		return false
 	}
 	return true
 }
 
-func v1RequestPrincipal(c *gin.Context) (principal.Principal, bool) {
-	identityPrincipal, ok := principal.From(c)
-	if !ok {
-		contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, runtimehttp.MsgUnauthorized)
-		c.Abort()
-		return principal.Principal{}, false
-	}
-	c.Request = c.Request.WithContext(notifications.ContextWithActor(c.Request.Context(), tenancy.FormatUserPublicID(identityPrincipal.PublicID())))
-	return identityPrincipal, true
-}
-
-// v1WorkspaceContext resolves the explicit workspace context: malformed
-// ids and unknown workspaces are invisible (ok=false, 404 already
-// rendered); visible workspaces return the caller's role (member=false
-// when the caller holds no membership).
-func (h *contractV1Handler) v1WorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
-	raw := strings.TrimSpace(c.Param("workspace_id"))
-	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-		c.Abort()
-		return nil, "", false
-	}
-	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), raw)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-		c.Abort()
-		return nil, "", false
-	}
-	role, member, err := h.deps.Store.GetWorkspaceRole(c.Request.Context(), raw, identityPrincipal.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-		c.Abort()
-		return nil, "", false
-	}
-	if !member {
-		return workspace, "", false
-	}
-	return workspace, role, true
-}
-
-// v1OrganizationContext is the organization-scoped counterpart: hidden
-// orgs converge to 404 organization_not_found.
-func (h *contractV1Handler) v1OrganizationContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Organization, string, bool) {
-	raw := strings.TrimSpace(c.Param("organization_id"))
-	if !contract.IsOrganizationID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		c.Abort()
-		return nil, "", false
-	}
-	organization, err := h.deps.Store.GetOrganization(c.Request.Context(), raw)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		c.Abort()
-		return nil, "", false
-	}
-	role, member, err := h.deps.Store.GetOrganizationRole(c.Request.Context(), raw, identityPrincipal.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		c.Abort()
-		return nil, "", false
-	}
-	if !member {
-		return organization, "", false
-	}
-	return organization, role, true
-}
-
-func v1FormatTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format(time.RFC3339)
-}
-
-type v1UserDTO struct {
-	ID                  string  `json:"id"`
-	DisplayName         string  `json:"display_name"`
-	Role                string  `json:"role"`
-	PersonalWorkspaceID *string `json:"personal_workspace_id,omitempty"`
-	Avatar              string  `json:"avatar,omitempty"`
-	// StorageNamespace is users.storage_uid (Media namespace display).
-	StorageNamespace string `json:"storage_namespace,omitempty"`
-	CreatedAt        string `json:"created_at,omitempty"`
-	UpdatedAt        string `json:"updated_at,omitempty"`
-	// Status is the numeric user status (0 = banned). It is never
-	// omitted: omitempty would drop the banned zero value.
-	Status int16 `json:"status"`
-}
-
-func (h *contractV1Handler) getUser(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok {
-		return
-	}
-	h.renderUser(c, identityPrincipal, identityPrincipal.DisplayName())
-}
-
-type v1WorkspaceDTO struct {
-	ID             string  `json:"id"`
-	OrganizationID *string `json:"organization_id"`
-	Name           string  `json:"name"`
-	// IsDefault marks the owner's Default workspace: exactly one row
-	// per user, never deleted or renamed, auto-provisioned
-	// when missing. Organization workspaces always report false.
-	IsDefault bool   `json:"is_default"`
-	CreatedAt string `json:"created_at"`
-	// BillingAccountID names the stable funds identity (#944) when the
-	// billing store resolved it; omitted for legacy in-memory fixtures
-	// without a billing store. Workspaces sharing one account report the
-	// same ba_ value; independent accounts never share.
-	BillingAccountID *string `json:"billing_account_id,omitempty"`
-}
-
-func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
-	dto := v1WorkspaceDTO{
-		ID:        w.PublicID,
-		Name:      w.Name,
-		IsDefault: w.IsDefaultWorkspace(),
-		CreatedAt: v1FormatTime(w.CreatedAt),
-	}
-	if w.OrganizationID != nil {
-		org := *w.OrganizationID
-		dto.OrganizationID = &org
-	}
-	return dto
-}
-
-func withWorkspaceBillingAccount(dto v1WorkspaceDTO, billingAccountPublicID string) v1WorkspaceDTO {
-	if trimmed := strings.TrimSpace(billingAccountPublicID); contract.IsBillingAccountID(trimmed) {
-		dto.BillingAccountID = &trimmed
-	}
-	return dto
-}
-
-func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	ctx := c.Request.Context()
-	workspaces, err := h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
-	// Default auto-provision hook when the user holds no Default yet.
-	// Non-Default personal rows do not satisfy it: a user with only plain
-	// rows still gets a fresh Default row here.
-	hasDefault := false
-	for _, w := range workspaces {
-		if w.IsDefaultWorkspace() {
-			hasDefault = true
-			break
-		}
-	}
-	if !hasDefault {
-		if def, provisionErr := h.deps.Store.EnsureDefaultWorkspace(ctx, identityPrincipal.UserID()); provisionErr == nil && def != nil {
-			workspaces, err = h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
-			if err != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-				c.Abort()
-				return
+func (h *contractV1Handler) libraryHandler() *v1library.Handler {
+	return v1library.NewHandler(v1library.Deps{
+		Store:                     h.deps.Store,
+		Library:                   h.deps.Library,
+		Tasks:                     h.deps.Tasks.Tasks,
+		ResolveTaskBoardAccess:    h.resolveTaskBoardAccess,
+		MediaPreviews:             h.deps.Media.MediaPreviews,
+		MediaRenderer:             h.deps.Media.MediaRenderer,
+		AuthorizeMediaBinaryAsset: h.v1MediaBinaryAsset,
+		RenderMediaAsset: func(c *gin.Context, workspacePublicID, mediaAssetID string, userID int64, workspaceRole string) bool {
+			if asset, ok := h.authorizeMediaAsset(c, workspacePublicID, mediaAssetID, userID, workspaceRole); ok {
+				contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, shared.FormatTime(asset.CreatedAt)))
+				return true
 			}
-		}
-	}
-	slice, meta, ok := v1OffsetPage(c, workspaces, runtimehttp.MsgServiceUnavailable38)
+			return false
+		},
+	})
+}
+
+func (h *contractV1Handler) registerLibraryRoutes(group *gin.RouterGroup) {
+	h.libraryHandler().Mount(group)
+}
+
+func (h *contractV1Handler) getLibraryMaterializedMediaAsset(c *gin.Context, workspacePublicID, assetPublicID string, userID int64, workspaceRole string) {
+	h.libraryHandler().GetLibraryMaterializedMediaAsset(c, workspacePublicID, assetPublicID, userID, workspaceRole)
+}
+
+func (h *contractV1Handler) mediaHandler() *v1media.Handler {
+	return v1media.NewHandler(v1media.Deps{
+		Store:                            h.deps.Store,
+		Media:                            h.deps.Media,
+		Avatar:                           h.deps.Avatar,
+		UserProfile:                      h.deps.UserProfile,
+		Boards:                           h.deps.Boards,
+		Idempotency:                      h.deps.Idempotency,
+		EmitWorkspaceEvent:               h.emitWorkspaceEvent,
+		GetLibraryMaterializedMediaAsset: h.getLibraryMaterializedMediaAsset,
+	})
+}
+
+func (h *contractV1Handler) publicAvatar(c *gin.Context) {
+	h.mediaHandler().PublicAvatar(c)
+}
+
+func (h *contractV1Handler) publicBrandingLogo(c *gin.Context) {
+	h.mediaHandler().PublicBrandingLogo(c)
+}
+
+func (h *contractV1Handler) v1MediaBinaryAsset(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
+	return h.mediaHandler().MediaBinaryAsset(c, workspacePublicID, assetID, userID, workspaceRole)
+}
+
+func (h *contractV1Handler) authorizeMediaAsset(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
+	return h.mediaHandler().AuthorizeMediaAsset(c, workspacePublicID, assetID, userID, workspaceRole)
+}
+
+func (h *contractV1Handler) systemHandler() *v1system.Handler {
+	return v1system.NewHandler(v1system.Deps{
+		Store:               h.deps.Store,
+		Users:               h.deps.Users,
+		Boards:              h.deps.Boards,
+		Media:               h.deps.Media,
+		Tasks:               h.deps.Tasks,
+		Search:              h.deps.Search,
+		Notifications:       h.deps.Notifications,
+		UserEvents:          h.deps.UserEvents,
+		Events:              h.deps.Events,
+		Webhooks:            h.deps.Webhooks,
+		EventBus:            h.deps.EventBus,
+		BoardAccessOutbox:   h.deps.BoardAccessOutbox,
+		SupportChannels:     h.deps.SupportChannels,
+		Branding:            h.deps.Branding,
+		PublicSearchHandler: h.deps.PublicSearchHandler,
+		Idempotency:         h.deps.Idempotency,
+		TaskEventVisibleToViewer: func(ctx context.Context, workspacePublicID string, viewerID int64, viewerRole string, envelope events.V1Envelope) bool {
+			return h.taskEventVisibleToViewer(ctx, workspacePublicID, workspaceEventViewer{userID: viewerID, workspaceRole: viewerRole}, envelope)
+		},
+	})
+}
+
+func (h *contractV1Handler) emitWorkspaceEvent(ctx context.Context, identityPrincipal principal.Principal, workspaceID, typ string, resource events.V1Resource, data any) {
+	h.systemHandler().EmitWorkspaceEvent(ctx, identityPrincipal, workspaceID, typ, resource, data)
+}
+
+func (h *contractV1Handler) emitWorkspaceEventWithID(ctx context.Context, identityPrincipal principal.Principal, workspaceID, typ string, resource events.V1Resource, data any, eventID string, occurredAt time.Time) {
+	h.systemHandler().EmitWorkspaceEventWithID(ctx, identityPrincipal, workspaceID, typ, resource, data, eventID, occurredAt)
+}
+
+func (h *contractV1Handler) emitTaskBillingSettled(ctx context.Context, identityPrincipal principal.Principal, workspaceID, taskID, settlementState, holdTransactionID string) {
+	h.systemHandler().EmitTaskBillingSettled(ctx, identityPrincipal, workspaceID, taskID, settlementState, holdTransactionID)
+}
+
+func (h *contractV1Handler) deliverBoardAccessSignals(ctx context.Context, records []eventoutbox.BoardAccessOutboxRecord) {
+	h.systemHandler().DeliverBoardAccessSignals(ctx, records)
+}
+
+type workspaceEventViewer struct {
+	userID        int64
+	userPublicID  string
+	workspaceRole string
+}
+
+func (h *contractV1Handler) eventViewerFor(ctx context.Context, identityPrincipal principal.Principal, workspaceRole string) (workspaceEventViewer, bool) {
+	v, ok := h.systemHandler().EventViewerFor(ctx, identityPrincipal, workspaceRole)
 	if !ok {
-		return
+		return workspaceEventViewer{}, false
 	}
-	page := make([]v1WorkspaceDTO, 0, len(slice))
-	for _, w := range slice {
-		page = append(page, toWorkspaceDTO(w))
-	}
-	contract.RenderPaginated(c, page, meta)
+	return workspaceEventViewer{userID: v.UserID, userPublicID: v.UserPublicID, workspaceRole: v.WorkspaceRole}, true
 }
 
-type v1CreateWorkspaceBody struct {
-	Data struct {
-		Name           string  `json:"name"`
-		OrganizationID *string `json:"organization_id"`
-	} `json:"data"`
+func (h *contractV1Handler) eventVisibleToViewer(ctx context.Context, workspacePublicID string, viewer workspaceEventViewer, envelope events.V1Envelope) bool {
+	return h.systemHandler().EventVisibleToViewer(ctx, workspacePublicID, v1system.WorkspaceEventViewer{
+		UserID:        viewer.userID,
+		UserPublicID:  viewer.userPublicID,
+		WorkspaceRole: viewer.workspaceRole,
+	}, envelope)
 }
 
-func (h *contractV1Handler) createWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-		c.Abort()
-		return
-	}
-	var body v1CreateWorkspaceBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		writeV1InputError(c)
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if validateErr := tenancy.ValidateName(name); validateErr != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			runtimehttp.MsgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	var orgID *string
-	if body.Data.OrganizationID != nil {
-		candidate := strings.TrimSpace(*body.Data.OrganizationID)
-		if !contract.IsOrganizationID(candidate) {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				runtimehttp.MsgCreateWorkspace2, contract.FieldErrors{Fields: map[string]string{"organization_id": "invalid"}})
-			c.Abort()
-			return
-		}
-		orgID = &candidate
-	}
-	// Billing scope (ADR-0038) is the creation scope and nothing else:
-	// personal workspaces resolve to the caller's Personal survivor,
-	// organization scopes use the shared org pool. There is no
-	// billing_account_id / new_billing_account option: retired billing
-	// fields fail closed at strict binding above (pinned by
-	// TestV1CreateWorkspaceRejectsBillingFields, no store touch), and
-	// scope changes after creation do not exist (the link surface is
-	// removed). Strict stays: billing scope is funds-adjacent.
-	ctx := c.Request.Context()
-	// Organization-scoped creation requires org visibility: hidden orgs
-	// (unknown id or caller holds no membership) converge to 404
-	// organization_not_found; org members without owner/admin get 403.
-	if orgID != nil {
-		_, role, orgErr := h.orgRoleForCreate(ctx, *orgID, identityPrincipal.UserID())
-		if orgErr != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-			c.Abort()
-			return
-		}
-		if role != tenancy.RoleOwner && role != tenancy.RoleAdmin {
-			if !runtimehttp.RequireOrganizationCapability(c, true, false) {
-				return
-			}
-		}
-	}
-	// Default shared linkage is gone (ADR-0038): personal workspaces
-	// resolve to the owner's Personal survivor at read time, so creation
-	// writes no billing state. Resolution happens inside the settlement
-	// transaction; failures there never claim the idempotency key because
-	// the claim below only covers the workspace row.
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	orgPart := ""
-	if orgID != nil {
-		orgPart = *orgID
-	}
-	scope := contract.IdempotencyScope(externalUser, "workspace:create")
-	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		// Plain POST creation (no organization) always mints a non-Default
-		// personal workspace; such rows are unlimited. Only
-		// EnsureDefaultWorkspace mints the Default row.
-		params := tenancy.CreateWorkspaceParams{Name: name, OrganizationID: orgID, OwnerUserID: identityPrincipal.UserID()}
-		if orgID != nil {
-			return h.deps.Store.CreateOrganizationWorkspace(ctx, *orgID, identityPrincipal.UserID(), name)
-		}
-		return h.deps.Store.CreateWorkspace(ctx, params)
+func (h *contractV1Handler) registerTaskRoutes(group *gin.RouterGroup) {
+	taskHandler := v1tasks.NewHandler(v1tasks.Deps{
+		Store:                    h.deps.Store,
+		Users:                    h.deps.Users,
+		Boards:                   h.deps.Boards,
+		Idempotency:              h.deps.Idempotency,
+		Tasks:                    h.deps.Tasks,
+		EmitWorkspaceEventWithID: h.emitWorkspaceEventWithID,
+		EmitTaskBillingSettled:   h.emitTaskBillingSettled,
 	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
-			c.Abort()
-			return
-		}
-		if errors.Is(doErr, tenancy.ErrDefaultWorkspaceConflict) {
-			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultConflict), contract.CodeWorkspaceDefaultConflict, runtimehttp.MsgWorkspaceDefaultConflict)
-			c.Abort()
-			return
-		}
-		if errors.Is(doErr, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-			c.Abort()
-			return
-		}
-		if errors.Is(doErr, tenancy.ErrBillingForbidden) {
-			contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
-			c.Abort()
-			return
-		}
-		if errors.Is(doErr, tenancy.ErrBillingNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
-			c.Abort()
-			return
-		}
-		if errors.Is(doErr, tenancy.ErrBillingConflict) || errors.Is(doErr, tenancy.ErrBillingAmbiguous) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-			c.Abort()
-			return
-		}
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
-	created, ok := result.(*tenancy.Workspace)
-	if !ok || created == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
-	dto := toWorkspaceDTO(created)
-	if h.deps.BillingAccounts != nil {
-		if identity, resErr := h.deps.BillingAccounts.ResolveFunds(ctx, created.PublicID); resErr == nil && identity.BA() != "" {
-			dto = withWorkspaceBillingAccount(dto, identity.BA())
-		}
-	}
-	contract.RenderCreated(c, dto)
+	taskHandler.Mount(group)
 }
 
-func (h *contractV1Handler) orgRoleForCreate(ctx context.Context, orgID string, userID int64) (*tenancy.Organization, string, error) {
-	organization, err := h.deps.Store.GetOrganization(ctx, orgID)
-	if err != nil {
-		return nil, "", err
-	}
-	role, member, err := h.deps.Store.GetOrganizationRole(ctx, orgID, userID)
-	if err != nil {
-		return nil, "", err
-	}
-	if !member {
-		return organization, "", tenancy.ErrForbidden
-	}
-	return organization, role, nil
+func (h *contractV1Handler) taskEventVisibleToViewer(ctx context.Context, workspacePublicID string, viewer workspaceEventViewer, envelope events.V1Envelope) bool {
+	taskHandler := v1tasks.NewHandler(v1tasks.Deps{
+		Store:  h.deps.Store,
+		Boards: h.deps.Boards,
+		Tasks:  h.deps.Tasks,
+	})
+	return taskHandler.TaskEventVisibleToViewer(ctx, workspacePublicID, viewer.userID, viewer.workspaceRole, envelope)
 }
 
-func (h *contractV1Handler) getWorkspace(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		contract.RenderSuccess(c, toWorkspaceDTO(wctx.Workspace))
+func (h *contractV1Handler) resolveTaskBoardAccess(ctx context.Context, workspace *tenancy.Workspace, workspaceRole string, userID int64, task *taskdomain.WorkspaceTask) *taskdomain.BoardAccess {
+	taskHandler := v1tasks.NewHandler(v1tasks.Deps{
+		Store:  h.deps.Store,
+		Boards: h.deps.Boards,
+		Tasks:  h.deps.Tasks,
+	})
+	return taskHandler.ResolveTaskBoardAccess(ctx, workspace, workspaceRole, userID, task)
+}
+
+var isTaskContentEvent = v1tasks.IsTaskContentEvent
+var reconcileTaskResolution = v1tasks.ReconcileTaskResolution
+
+type contractV1Handler struct {
+	deps ContractV1Deps
+}
+
+// v1ListCursor is the opaque keyset position for v1 list endpoints.
+type v1ListCursor = shared.ListCursor
+type v1BoardBundleDTO = v1boards.BoardBundleDTO
+
+func (h *contractV1Handler) tenancyHandler() *v1tenancy.Handler {
+	return v1tenancy.NewHandler(v1tenancy.Deps{
+		Store:                     h.deps.Store,
+		Users:                     h.deps.Users,
+		Idempotency:               h.deps.Idempotency,
+		UserProfile:               h.deps.UserProfile,
+		BillingAccounts:           h.deps.BillingAccounts,
+		Members:                   h.deps.Members,
+		InvitationReader:          h.deps.InvitationReader,
+		Invitations:               h.deps.Invitations,
+		Boards:                    h.deps.Boards,
+		DeliverBoardAccessSignals: h.deliverBoardAccessSignals,
 	})
 }
 
-type v1UpdateWorkspaceBody struct {
-	Data struct {
-		Name string `json:"name"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
-	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx, body v1UpdateWorkspaceBody) {
-		name := strings.TrimSpace(body.Data.Name)
-		if validateErr := tenancy.ValidateName(name); validateErr != nil {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				runtimehttp.MsgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-			c.Abort()
-			return
-		}
-		updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), wctx.Workspace.PublicID, name)
-		if err != nil {
-			if errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
-				contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
-				c.Abort()
-				return
-			}
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-			c.Abort()
-			return
-		}
-		contract.RenderSuccess(c, toWorkspaceDTO(updated))
-	})
-}
-
-func (h *contractV1Handler) deleteWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
-	if !contract.IsWorkspaceID(workspaceID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-		c.Abort()
-		return
-	}
-	key, ok := requireV1IdempotencyKey(c)
-	if !ok {
-		return
-	}
-	// Unlike other workspace-scoped writes, deletion must resolve the
-	// workspace and authorize only inside the once-fn: successful retries
-	// (including in-flight ones) replay after the workspace is gone.
-	// The authenticated principal + operation scope isolates that replay.
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("workspace:delete", workspaceID)
-	result, fnErr, ok := h.workspaceDo(c, externalUser, identityPrincipal.UserID(), "delete", key, hash, func() (any, error) {
-		workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
-		if workspace == nil || !visible {
-			return nil, tenancy.ErrNotFound
-		}
-		if !v1AllowOwnerOrAdmin(role, visible) {
-			return nil, tenancy.ErrForbidden
-		}
-		if err := h.deps.Store.DeleteWorkspace(c.Request.Context(), workspaceID); err != nil {
-			return nil, err
-		}
-		return &v1DeletedDTO{Deleted: true, ID: workspaceID}, nil
-	})
-	if !ok || c.IsAborted() {
-		return
-	}
-	if fnErr != nil {
-		if errors.Is(fnErr, tenancy.ErrForbidden) {
-			runtimehttp.RequireWorkspaceCapability(c, true, false)
-			return
-		}
-		if errors.Is(fnErr, tenancy.ErrWorkspaceActiveTasks) {
-			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceActiveTasks), contract.CodeWorkspaceActiveTasks, runtimehttp.MsgWorkspaceActiveTasks)
-			c.Abort()
-			return
-		}
-		if errors.Is(fnErr, tenancy.ErrBillingConflict) || errors.Is(fnErr, tenancy.ErrBillingAmbiguous) {
-			contract.RenderError(c, contract.StatusOf(contract.CodeBillingAccountConflict), contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-			c.Abort()
-			return
-		}
-		if errors.Is(fnErr, tenancy.ErrDefaultWorkspaceProtected) {
-			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
-			c.Abort()
-			return
-		}
-		if errors.Is(fnErr, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
-		} else {
-			applog.FromContext(c.Request.Context()).Error("workspace deletion failed", "err", fnErr)
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		}
-		c.Abort()
-		return
-	}
-	deleted, ok := result.(*v1DeletedDTO)
-	if !ok || deleted == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, *deleted)
+func (h *contractV1Handler) getWorkspaceInviteByToken(c *gin.Context) {
+	h.tenancyHandler().GetWorkspaceInviteByToken(c)
 }
 
 // RegisterContractV1RoutesOnEngine mounts the additive v1 group on the

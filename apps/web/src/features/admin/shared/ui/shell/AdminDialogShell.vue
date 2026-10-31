@@ -102,7 +102,7 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
   adminOverlayMaskClass,
-} from '../../core/uiClasses'
+} from '../styling/uiClasses'
 
 export type AdminDialogSize = DialogShellSize
 export type AdminDialogContentLayout = 'form' | 'scrollable' | 'plain'

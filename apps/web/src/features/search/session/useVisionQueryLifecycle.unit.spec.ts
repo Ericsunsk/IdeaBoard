@@ -25,7 +25,7 @@ vi.mock('./adapters/visionBillingResource', () => ({
 vi.mock('./adapters/workspace', () => ({
   workspaceSearchApi: { createVisionQuery: mocks.createVisionQuery },
 }))
-vi.mock('../../../api/upload', () => ({
+vi.mock('@/api/media/upload', () => ({
   workspaceUploadApi: {},
 }))
 vi.mock('../../library', async (importOriginal) => {

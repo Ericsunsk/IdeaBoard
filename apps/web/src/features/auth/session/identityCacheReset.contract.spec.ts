@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 import { queryClient } from '../../../core/query/queryClient'
 import { clearStoredAuthState, getStoredUser, setStoredAuth } from '../../../core/utils/auth'
 import {
@@ -7,11 +7,11 @@ import {
   getWorkspaceMediaAssetMetadata,
   getWorkspaceMediaAssetMetadataBatch,
   invalidateMediaAssetMetadata,
-} from '../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 import {
   resetWorkspaceEventStreamsForTests,
   subscribeWorkspaceEvent,
-} from '../../../api/workspaceEventStream'
+} from '@/api/realtime/workspaceEventStream'
 import { makeSessionUser } from '../../../test/factories'
 import { createBrowserSessionTransition } from './browserSessionTransition'
 import { SESSION_TRUST_WINDOW_MS } from './freshness'
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
 }))
 
-vi.mock('../../../api/client', () => ({
+vi.mock('@/api/http/client', () => ({
   api: { request: mocks.request },
 }))
 

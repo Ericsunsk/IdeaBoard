@@ -1,4 +1,4 @@
-import { resolveMediaAssetOriginalURL } from '../../../../../api/mediaAssetDelivery'
+import { resolveMediaAssetOriginalURL } from '@/api/media/mediaAssetDelivery'
 
 export type CanvasGraphInteractionBrowserAdapter = {
   downloadImage: (request: {

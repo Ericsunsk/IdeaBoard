@@ -177,4 +177,27 @@ describe('LibraryAssetGallery', () => {
     expect(preservedViewer).toBe(viewer)
     expect(Object.getOwnPropertyDescriptor(preservedViewer, 'localState')?.value).toBe(localState)
   })
+
+  it('covers the empty and loading states (browser-spec consolidation)', async () => {
+    const empty = render(LibraryAssetGallery, { props: baseProps([]) })
+    expect(screen.getByText('No saved references')).toBeInTheDocument()
+    expect(screen.queryByRole('article')).toBeNull()
+    empty.unmount()
+
+    render(LibraryAssetGallery, { props: { ...baseProps([]), isLoading: true } })
+    expect(screen.queryByText('No saved references')).toBeNull()
+    expect(screen.queryByRole('article')).toBeNull()
+  })
+
+  it('starts round-robin layout at the origin (first card at 0,0)', () => {
+    const assets = [0, 1, 2].map(galleryAsset)
+    const view = render(LibraryAssetGallery, { props: baseProps(assets) })
+    try {
+      const first = screen.getByText('Reference 0').closest('article') as HTMLElement
+      expect(first.style.top).toBe('0px')
+      expect(first.style.left).toBe('0px')
+    } finally {
+      view.unmount()
+    }
+  })
 })

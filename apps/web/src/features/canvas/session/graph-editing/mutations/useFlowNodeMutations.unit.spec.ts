@@ -8,7 +8,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter'
 import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
 import { FLOW_NODE_DRAG_HANDLE } from '../../../session/flow-adapter'

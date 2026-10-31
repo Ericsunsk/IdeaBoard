@@ -284,6 +284,9 @@ Vue UI -> application use case -> resource/adapter -> generated API
 - Vue 组件、路由页面与 app composition 层严禁直接调用 `apps/web/src/api/generated-query` 生成代码。
 - Generated API 仅允许在各 feature 的 resource/adapter 或 API adapter 中被封装调用。
 - 绝不手工编辑生成的 API 代码。
+- `Resource` = 唯一 `generated-query` 出口（transport + DTO 归一）；`Adapter` = 协议/坐标/投影转换（不拥有 lifecycle）。
+- `UseCase` / `Workspace` / `Context` = 带 lifecycle 编排的用例层（组合 resource + feedback + async action）。
+- 例外：`libraryUseCases` 为显示/引用编排例外，不带完整 lifecycle（详见 `features/library/CONTEXT.md`）。
 - 领域层代码严禁接触网络传输层 DTO。
 - 跨特性协作必须通过明确声明的 public entrypoint 或 public subpath（例如特性根目录 `index.ts` 或稳定的领域子路径）进行；禁止访问另一特性的 `internal`/private implementation。
 - `apps/web/src/core`、`api`、`theme`、`lib`、`components` 是 horizontal roots，严禁 runtime 或 type-only 反向依赖 concrete feature modules。

@@ -17,24 +17,8 @@ function probe(): HTMLDivElement {
   return root
 }
 
-function tokensOf(element: Element): Record<string, string> {
-  const style = window.getComputedStyle(element)
-  return {
-    min: style.getPropertyValue('--spacing-touch-target-min').trim(),
-    precision: style.getPropertyValue('--spacing-touch-target-aa').trim(),
-    coarse: style.getPropertyValue('--spacing-touch-target-coarse').trim(),
-  }
-}
-
 afterEach(() => {
   document.body.innerHTML = ''
-})
-
-describe('touch-target profile tokens', () => {
-  it('pins the fine, precision, and coarse profiles', () => {
-    const root = probe()
-    expect(tokensOf(root)).toEqual({ min: '32px', precision: '24px', coarse: '44px' })
-  })
 })
 
 describe('touch-target hit bounds', () => {

@@ -16,12 +16,12 @@ import {
 } from '../../../../../core/config/runtimeUrls'
 import { resolveMediaDisplayTier } from '../../../../../core/media/displayTier'
 import { isMediaAssetDeliveryPath } from '../../../../../core/media/mediaAssetPath'
+import { useMediaAssetDelivery } from '../../../../../core/media/useMediaAssetDelivery'
 import {
   normalizeMediaAssetId,
-  useMediaAssetDelivery,
   type MediaAssetDeliveryTier,
   type MediaAssetId,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>

@@ -4,7 +4,7 @@ import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../workspaceBilling'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { i18n } from '../../../../core/i18n'
-import type { User } from '../../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 
 type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'warning' | 'error'>
 

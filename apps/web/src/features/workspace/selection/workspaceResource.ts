@@ -40,13 +40,13 @@ import {
   opaqueIdPrefix,
   requireContractData,
   type OpaqueIdPrefix,
-} from '../../../api/contractKernel'
+} from '@/api/http/contractKernel'
 import {
   workspaceCreationIdempotencyKey,
   workspaceDeletionIdempotencyKey,
-} from '../../../api/idempotencyKey'
+} from '@/api/http/idempotencyKey'
 import { normalizePageSize, PAGE_SIZES } from '../../../core/config/pagination'
-import type { AuthFailureMode } from '../../../api/client'
+import type { AuthFailureMode } from '@/api/http/client'
 import { withSignal } from '../../../core/utils/request'
 import { asTrimmedString, isRecord } from '../../../core/utils/guards'
 import { resolveApiUrl } from '../../../core/config/runtimeUrls'

@@ -43,11 +43,12 @@ import (
 	searchapplication "ideaboard/api/internal/searchcatalog/application"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
-	"ideaboard/api/internal/tasking/workspacetasks"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/tenancy/invitations"
 
@@ -61,7 +62,7 @@ type AppTaskServices struct {
 	// NewAppTaskRuntime (user-event fanout + queue RED metrics); HTTP
 	// wiring only consumes the workspace settlement pieces below.
 	// workspaceTaskQueue carries the River client for the v1 workspace
-	// task surface (workspacetasks.TxEnqueuer). Built here where the
+	// task surface (tasks.TxEnqueuer). Built here where the
 	// riverClient exists; consumed by http_wiring.go. Nil only when the
 	// River client failed to build (startup already failed then).
 	workspaceTaskQueue *taskadapters.WorkspaceTaskEnqueuer
@@ -280,7 +281,7 @@ func NewAppTaskRuntime(
 	workspaceAssets := &workspacemedia.TaskAssetAdapter{Store: workspaceMedia}
 	workspaceEnqueuer := taskadapters.NewWorkspaceTaskEnqueuer(nil, riverpolicy.RiverQueueDefault, riverpolicy.RiverMaxAttemptsDefault)
 	workspaceRouter := routing.NewRoutingResolver(catalog.NewRepository(dbs.DB))
-	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	workspaceSettler := taskapp.NewService(taskapp.ServiceDeps{
 		TaskRead: workspaceStore, TaskLifecycle: workspaceStore,
 		TaskBilling: workspaceStore, SubmissionClaims: workspaceStore, BillingAccounts: workspaceStore,
 		Quoter: workspaceQuoter, Holder: workspaceHolder,
@@ -288,6 +289,7 @@ func NewAppTaskRuntime(
 		// #946: the member cross-workspace consumption quota joins the
 		// settlement transaction after Quote and before Hold.
 		Quotas: memberquotas.NewStore(dbs.DB),
+		Tracer: taskadapters.NewWorkspaceSettlementTracer(),
 	})
 	// The worker settles terminal transitions through the bridge, not the
 	// bare Service: the Service only STAGES status events in a per-call
@@ -588,7 +590,7 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 // settlerEventBridge is the worker's terminal-settlement seam onto the
 // task status event channel.
 //
-// Why it exists: workspacetasks.Service STAGES a status event inside the
+// Why it exists: taskapp.Service STAGES a status event inside the
 // settlement call (after its own commit) and hands it to whoever calls
 // StagedEvents. The v1 HTTP submit and cancel edges drain it themselves;
 // the River worker had no drain point, so task.completed, task.failed, and
@@ -618,18 +620,18 @@ type settlerEventBridge struct {
 }
 
 // settlerStager is the narrow settlement seam the bridge needs: the three
-// terminal writes plus the staged-event drain. *workspacetasks.Service is
+// terminal writes plus the staged-event drain. *taskapp.Service is
 // the production implementation.
 type settlerStager interface {
-	Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error)
-	Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error)
-	Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*workspacetasks.WorkspaceTask, error)
-	StagedEvents() []workspacetasks.TaskEvent
+	Complete(ctx context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error)
+	Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*tasks.WorkspaceTask, error)
+	Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*tasks.WorkspaceTask, error)
+	StagedEvents() []tasks.TaskEvent
 }
 
 var (
 	_ taskworker.WorkspaceTaskWorkerSettler = (*settlerEventBridge)(nil)
-	_ settlerStager                         = (*workspacetasks.Service)(nil)
+	_ settlerStager                         = (*taskapp.Service)(nil)
 )
 
 func newSettlerEventBridge(inner settlerStager, publisher events.TaskStatusPublisher, delivery settlerEventDelivery) *settlerEventBridge {
@@ -638,7 +640,7 @@ func newSettlerEventBridge(inner settlerStager, publisher events.TaskStatusPubli
 
 // Complete publishes task.completed and distinct media.asset_ready hints
 // after successful settlement. Worker ingestion has no separate event seam.
-func (b *settlerEventBridge) Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (b *settlerEventBridge) Complete(ctx context.Context, workspaceID, taskID string, outputs []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	completed, err := b.inner.Complete(ctx, workspaceID, taskID, outputs)
@@ -650,7 +652,7 @@ func (b *settlerEventBridge) Complete(ctx context.Context, workspaceID, taskID s
 }
 
 // Fail converges the task to failed, then publishes task.failed.
-func (b *settlerEventBridge) Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+func (b *settlerEventBridge) Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*tasks.WorkspaceTask, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	failed, err := b.inner.Fail(ctx, workspaceID, taskID, errorMsg)
@@ -662,7 +664,7 @@ func (b *settlerEventBridge) Fail(ctx context.Context, workspaceID, taskID, erro
 // running -> pending transition. It is a requeue signal, never a create
 // signal: the bridge exposes no Create, so the worker can never re-emit
 // the task.created the submit edge already published.
-func (b *settlerEventBridge) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*workspacetasks.WorkspaceTask, error) {
+func (b *settlerEventBridge) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*tasks.WorkspaceTask, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	retried, err := b.inner.Retry(ctx, workspaceID, taskID, retryable)
@@ -708,7 +710,7 @@ func (b *settlerEventBridge) flush(ctx context.Context, settleErr error) {
 
 // emitWorkspaceEvent maps the staged worker transition to the frozen v1
 // envelope contract. It runs only after settlement returned successfully.
-func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event workspacetasks.TaskEvent) {
+func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event tasks.TaskEvent) {
 	// The frozen workspace event registry has no task.pending event. Pending
 	// is the internal status word used for a requeue; task.created is reserved
 	// for the original submit edge and must never be re-emitted by a retry.
@@ -725,11 +727,11 @@ func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event works
 }
 
 // Stable per-asset event IDs let the sinks deduplicate redelivered hints.
-func (b *settlerEventBridge) emitMediaAssetReadyEvents(ctx context.Context, workspaceID string, outputs []workspacetasks.OutputRef) {
+func (b *settlerEventBridge) emitMediaAssetReadyEvents(ctx context.Context, workspaceID string, outputs []tasks.OutputRef) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	seen := make(map[string]struct{}, len(outputs))
 	for _, ref := range outputs {
-		if strings.TrimSpace(ref.Kind) != workspacetasks.OutputKindAsset {
+		if strings.TrimSpace(ref.Kind) != tasks.OutputKindAsset {
 			continue
 		}
 		assetID := strings.TrimSpace(ref.AssetID)
@@ -773,7 +775,7 @@ func (b *settlerEventBridge) deliverWorkspaceEnvelope(ctx context.Context, id, t
 	}
 }
 
-func workerWorkspaceEventData(typ string, event workspacetasks.TaskEvent) any {
+func workerWorkspaceEventData(typ string, event tasks.TaskEvent) any {
 	switch typ {
 	case events.EventV1TaskCompleted:
 		return events.V1TaskCompletedData{

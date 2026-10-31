@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	taskservice "ideaboard/api/internal/tasking/application/task"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // The worker must actually USE the v1 prompt: the bridge reads the
@@ -21,7 +21,7 @@ func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
-	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	legacy, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{
 		ID: "task_prompt1", WorkspaceID: "ws_test", OwnerUserID: 7,
 		Service:         "generation",
 		CanonicalParams: raw,
@@ -37,7 +37,7 @@ func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 // Snapshot precedence: CompiledPrompt wins; UserPrompt is the fallback.
 func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 	compiled := `{"schema_version":6,"service":"generation","generation":{"user_prompt":"user text","compiled_prompt":"compiled text"}}`
-	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	legacy, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{
 		ID: "task_prec1", Service: "generation",
 		CanonicalParams: compiled, Params: map[string]any{"prompt": "stale"},
 	})
@@ -49,7 +49,7 @@ func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 	}
 
 	userOnly := `{"schema_version":6,"service":"generation","generation":{"user_prompt":"user text"}}`
-	legacy, err = workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	legacy, err = workspaceBridgeTaskPayload(&tasks.WorkspaceTask{
 		ID: "task_prec2", Service: "generation", CanonicalParams: userOnly,
 	})
 	if err != nil {
@@ -59,7 +59,7 @@ func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 		t.Fatalf("prompt = %q, want user snapshot text", legacy.Prompt)
 	}
 
-	if _, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	if _, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{
 		ID: "task_prec3", Service: "render", Params: map[string]any{"prompt": "legacy"},
 	}); err == nil {
 		t.Fatal("missing canonical params = nil, want fail-closed error")

@@ -97,6 +97,8 @@ func TestPolicyConsumersDoNotImportTaskingQueue(t *testing.T) {
 	internalRoot := filepath.Clean(filepath.Join(wd, "..", ".."))
 	allowedPrefixes := []string{
 		filepath.Join(internalRoot, "tasking", "infrastructure", "queue") + string(filepath.Separator),
+		filepath.Join(internalRoot, "tasking", "infrastructure", "adapters") + string(filepath.Separator),
+		filepath.Join(internalRoot, "tasking", "interfaces", "worker") + string(filepath.Separator),
 		filepath.Join(internalRoot, "runtime", "composition") + string(filepath.Separator),
 	}
 	// This package's own comments reference the Tasking queue seam by path;

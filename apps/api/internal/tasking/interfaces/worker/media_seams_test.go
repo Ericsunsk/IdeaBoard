@@ -18,7 +18,7 @@ import (
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // pngHitServer serves the fixture PNG and counts inbound requests so
@@ -32,9 +32,9 @@ func pngHitServer(t *testing.T, hits *int64, payload []byte) *httptest.Server {
 	}))
 }
 
-func fetcherTestRef(rawURL string) workspacetasks.OutputRef {
-	return workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindRemote, URL: rawURL,
+func fetcherTestRef(rawURL string) tasks.OutputRef {
+	return tasks.OutputRef{
+		Kind: tasks.OutputKindRemote, URL: rawURL,
 		Role: "result", ResultIndex: 0,
 	}
 }

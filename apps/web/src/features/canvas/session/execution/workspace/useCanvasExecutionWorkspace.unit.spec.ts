@@ -2,7 +2,7 @@ import type { TaskImageOutcome, TaskImageOutcomeWaiter } from '../task-runner/ta
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { BoardGraphSession } from '../pending-execution/boardGraphSession'
 import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { collectPendingImageTasks } from '../pending-execution/taskSnapshot'
@@ -11,7 +11,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

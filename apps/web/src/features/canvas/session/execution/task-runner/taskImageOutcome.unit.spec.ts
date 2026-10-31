@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 import { extractWorkspaceTaskImageResults } from '../workspace/canvasTaskWaiting'
 import type { ReceiptDerivativeWaiter } from '../result-nodes/resultDisplay'
 import { createTaskImageObserver } from './taskImageOutcome'

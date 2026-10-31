@@ -12,7 +12,7 @@ import { useAppToast } from '../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import { i18n } from '../../../core/i18n'
 import { createUniqueId } from '../../../core/utils/ids'
-import { workspaceUploadApi } from '../../../api/upload'
+import { workspaceUploadApi } from '@/api/media/upload'
 import { libraryAssetKeyFor, type LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../core/authAction'
 import {

@@ -18,7 +18,7 @@ transport details.
 | Task Billing Snapshot   | Immutable price, quantity, and amount facts accepted for a Task.                                                       |
 | Task Billing Settlement | The Task's accounting outcome: free, held, captured, or released.                                                      |
 
-An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Snapshot belongs to [Generation](../generation/catalog/CONTEXT.md); Tasking persists it and execution consumes it. Neither a River job nor a gateway request is the Task itself.
+An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Snapshot belongs to [Generation](../generation/catalog/CONTEXT.md); Tasking persists it and execution consumes it. Neither a River job nor a gateway request is the Task itself. Canonical ownership (see `GLOSSARY.md`): Task Billing Snapshot belongs to Tasking as the persisted frozen copy of the Billing PriceSnapshot/Quote, never a live re-quote.
 
 ## Package map
 
@@ -119,6 +119,10 @@ runtime worker -> application / domain / ports
 ```
 
 Keep SQL, River types, provider SDKs, and Gin handlers out of `domain`.
+
+The dependency-free `workflow/features` contract owns the feature slugs used by
+domain validation. Workflow execution stays in the parent `workflow` package,
+whose provider parameter adapter already depends on Tasking domain types.
 
 Terminal billing settlement belongs to the PostgreSQL adapter because it must
 share the caller-owned SQL transaction and lock order with terminal Task facts.

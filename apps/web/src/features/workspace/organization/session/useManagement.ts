@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import {
   organizationClosureIdempotencyKey,
   organizationCreationIdempotencyKey,
-} from '../../../../api/idempotencyKey'
+} from '@/api/http/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import {

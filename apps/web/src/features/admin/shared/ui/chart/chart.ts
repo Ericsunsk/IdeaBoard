@@ -15,7 +15,7 @@ import {
 } from '@/core/lib/chartTheme'
 import { resolveChartAnimation } from '@/core/motion/chartMotion'
 import { isDarkModeActive } from '@/theme/composables/useTheme'
-import { adminThemeTokenFallbacks, adminThemeTokenVars } from '../../core/adminThemeTokens'
+import { adminThemeTokenFallbacks, adminThemeTokenVars } from '../styling/adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
 const adminChartPointClipPadding = 6

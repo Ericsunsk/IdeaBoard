@@ -2,7 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board'
-import { CanvasGraphSession } from '../../../core/graph'
+import { CanvasGraphSession } from '../../board-session'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 

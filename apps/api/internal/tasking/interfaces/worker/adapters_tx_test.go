@@ -10,7 +10,8 @@ import (
 	"testing"
 
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -36,7 +37,7 @@ func TestWorkspaceTaskEnqueueInTxJoinsRiverTx(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubWorkspaceRiverClient{}
 	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
-	task := &workspacetasks.WorkspaceTask{
+	task := &tasks.WorkspaceTask{
 		ID: "task_txjoin1", WorkspaceID: "ws_txjoin1",
 		Service: "render", ExecutionToken: "exec_txjoin1",
 	}
@@ -63,7 +64,7 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubWorkspaceRiverClient{}
 	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
-	task := &workspacetasks.WorkspaceTask{
+	task := &tasks.WorkspaceTask{
 		ID: "task_txfwd1", WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: "exec_txfwd1",
 	}
@@ -79,9 +80,9 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 	if stub.insertTx == nil {
 		t.Fatal("EnqueueInTx must forward a tx to River.InsertTx")
 	}
-	args, ok := stub.insertTxArgs.(workspacetasks.WorkspaceTaskArgs)
+	args, ok := stub.insertTxArgs.(taskqueue.WorkspaceTaskArgs)
 	if !ok {
-		t.Fatalf("forwarded args = %T, want workspacetasks.WorkspaceTaskArgs", stub.insertTxArgs)
+		t.Fatalf("forwarded args = %T, want taskqueue.WorkspaceTaskArgs", stub.insertTxArgs)
 	}
 	if args.TaskID != task.ID || args.WorkspaceID != task.WorkspaceID || args.ExecutionToken != task.ExecutionToken {
 		t.Fatalf("forwarded args = %+v, want task identity", args)
@@ -94,10 +95,10 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 func TestWorkspaceTaskEnqueueInTxFailsClosedWithoutClient(t *testing.T) {
 	ctx := context.Background()
 	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(nil, "drawing_default", 25)
-	task := &workspacetasks.WorkspaceTask{ID: "task_txjoin2", WorkspaceID: "ws_txjoin2"}
+	task := &tasks.WorkspaceTask{ID: "task_txjoin2", WorkspaceID: "ws_txjoin2"}
 
 	var tx pgx.Tx
-	if err := enqueuer.EnqueueInTx(ctx, tx, task); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if err := enqueuer.EnqueueInTx(ctx, tx, task); !errors.Is(err, tasks.ErrQuoteUnavailable) {
 		t.Fatalf("clientless EnqueueInTx = %v, want quote unavailable", err)
 	}
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../../api/sessionUserType'
+import type { User } from '@/api/http/sessionUserType'
 
 const mocks = vi.hoisted(() => ({
   clearAuthScopedQueryCache: vi.fn(),

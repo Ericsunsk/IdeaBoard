@@ -6,7 +6,7 @@ import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../api/mediaAssetDelivery'
+} from '@/api/media/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),

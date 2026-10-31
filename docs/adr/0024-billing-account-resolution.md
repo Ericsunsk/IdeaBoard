@@ -50,3 +50,5 @@ Task/River 原子事务契约必须保留；额度计算（945/946）、Workspac
 ## Status
 
 Accepted
+
+Superseded by [ADR-0038](./0038-personal-organization-billing-model.md)：显式 `workspace_billing_links` 解析顺序、per-Workspace 独立账户与 payer 切换规则作废；Workspace 只记录消费位置，不再是资金边界，资金范围仅为 Personal 与 Organization。当前产品合同以 ADR-0038 为准，本 ADR 仅作历史理解。

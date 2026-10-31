@@ -48,10 +48,12 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
   const tempWebRoot = path.join(tempRoot, 'apps/web')
   const tempApiRoot = path.join(tempRoot, 'apps/api')
   const tempApiSourceRoot = path.join(tempWebRoot, 'src/api')
+  const tempApiHttpRoot = path.join(tempWebRoot, 'src/api/http')
 
   await Promise.all([
     mkdir(tempApiRoot, { recursive: true }),
     mkdir(tempApiSourceRoot, { recursive: true }),
+    mkdir(tempApiHttpRoot, { recursive: true }),
   ])
 
   // Post-#809: the legacy single-file `openapi.yaml` was deleted in the hard
@@ -78,20 +80,20 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
       path.join(tempWebRoot, 'prettier.config.js'),
     ),
     copyFile(
-      path.join(webRoot, 'src/api/orvalMutator.ts'),
-      path.join(tempApiSourceRoot, 'orvalMutator.ts'),
+      path.join(webRoot, 'src/api/http/orvalMutator.ts'),
+      path.join(tempApiHttpRoot, 'orvalMutator.ts'),
     ),
     // Issue #808: the Control client resolves through its own transport
     // mutator (control/v1 prefix); the drift workspace needs it too.
     copyFile(
-      path.join(webRoot, 'src/api/controlMutator.ts'),
-      path.join(tempApiSourceRoot, 'controlMutator.ts'),
+      path.join(webRoot, 'src/api/http/controlMutator.ts'),
+      path.join(tempApiHttpRoot, 'controlMutator.ts'),
     ),
     // The Public client resolves through its own transport mutator
     // (v1 prefix); the drift workspace needs it too.
     copyFile(
-      path.join(webRoot, 'src/api/publicMutator.ts'),
-      path.join(tempApiSourceRoot, 'publicMutator.ts'),
+      path.join(webRoot, 'src/api/http/publicMutator.ts'),
+      path.join(tempApiHttpRoot, 'publicMutator.ts'),
     ),
     symlink(path.join(webRoot, 'node_modules'), path.join(tempWebRoot, 'node_modules'), 'dir'),
   ])

@@ -2,8 +2,8 @@ import { toMediaDisplay } from '../../../../core/media/mediaDisplay'
 import type { SearchPage } from '../../core/models'
 import { searchInspiration as searchInspirationTransport } from '../../../../api/generated-query/public/workspace-search/workspace-search'
 import { withSignal } from '../../../../core/utils/request'
-import { resolveContractData } from '../../../../api/contractKernel'
-import { stripUndefined } from '../../../../api/stripUndefined'
+import { resolveContractData } from '@/api/http/contractKernel'
+import { stripUndefined } from '@/api/http/stripUndefined'
 import { i18n } from '../../../../core/i18n'
 
 // Search boundary (issue #809).

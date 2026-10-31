@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { queryClient } from '../../../../core/query/queryClient'
 import type { BoardRepository } from '../catalog/repository'
 import type { BoardMeta } from '../catalog/boards'
-import { createGalleryController } from '../../ui/gallery/controller'
+import { createGalleryController } from '../../ui/gallery/controllers/galleryController'
 import { makeBoardMeta as makeBoard } from '../../testing'
 import { createBoardAutosavePolicy, useBoardAutosave } from '../../../canvas/session/board-session'
 

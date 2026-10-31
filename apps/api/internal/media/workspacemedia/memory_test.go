@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	taskdomain "ideaboard/api/internal/tasking/domain"
 )
 
 func newMemoryTestStore() *InMemoryWorkspaceMediaStore {
@@ -234,20 +234,20 @@ func TestTaskAssetAdapter(t *testing.T) {
 	if info.ID != asset.ID || info.Status != AssetStatusReady || info.Archived {
 		t.Fatalf("info = %+v, want ready asset", info)
 	}
-	if _, err := adapter.GetAsset(ctx, "ws_a", "asset_missing0001"); !errors.Is(err, workspacetasks.ErrMediaNotFound) {
+	if _, err := adapter.GetAsset(ctx, "ws_a", "asset_missing0001"); !errors.Is(err, taskdomain.ErrMediaNotFound) {
 		t.Fatalf("unknown err = %v, want media not found", err)
 	}
-	if _, err := adapter.GetAsset(ctx, "ws_b", asset.ID); !errors.Is(err, workspacetasks.ErrMediaNotFound) {
+	if _, err := adapter.GetAsset(ctx, "ws_b", asset.ID); !errors.Is(err, taskdomain.ErrMediaNotFound) {
 		t.Fatalf("cross-workspace err = %v, want media not found", err)
 	}
 	if _, err := store.ArchiveAsset(ctx, "ws_a", asset.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := adapter.GetAsset(ctx, "ws_a", asset.ID); !errors.Is(err, workspacetasks.ErrMediaArchived) {
+	if _, err := adapter.GetAsset(ctx, "ws_a", asset.ID); !errors.Is(err, taskdomain.ErrMediaArchived) {
 		t.Fatalf("archived err = %v, want media archived", err)
 	}
 	var nilAdapter *TaskAssetAdapter
-	if _, err := nilAdapter.GetAsset(ctx, "ws_a", asset.ID); !errors.Is(err, workspacetasks.ErrMediaNotFound) {
+	if _, err := nilAdapter.GetAsset(ctx, "ws_a", asset.ID); !errors.Is(err, taskdomain.ErrMediaNotFound) {
 		t.Fatalf("nil adapter err = %v, want media not found", err)
 	}
 }

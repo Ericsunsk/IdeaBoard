@@ -40,7 +40,8 @@ func findEventParityRepoRoot(t *testing.T) string {
 	dir := filepath.Dir(filename)
 	for {
 		if fileExists(filepath.Join(dir, "apps", "api", "internal", "events", "v1_envelope.go")) &&
-			fileExists(filepath.Join(dir, "apps", "web", "src", "api", "workspaceEventStream.ts")) {
+			(fileExists(filepath.Join(dir, "apps", "web", "src", "api", "realtime", "workspaceEventStream.ts")) ||
+				fileExists(filepath.Join(dir, "apps", "web", "src", "api", "workspaceEventStream.ts"))) {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -136,7 +137,11 @@ export const WORKSPACE_EVENT_TYPES = ['task.created', ...HINTS,] as const`, []st
 
 func TestWorkspaceEventRegistryMatchesFrontend(t *testing.T) {
 	root := findEventParityRepoRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "apps", "web", "src", "api", "workspaceEventStream.ts"))
+	streamPath := filepath.Join(root, "apps", "web", "src", "api", "realtime", "workspaceEventStream.ts")
+	if !fileExists(streamPath) {
+		streamPath = filepath.Join(root, "apps", "web", "src", "api", "workspaceEventStream.ts")
+	}
+	raw, err := os.ReadFile(streamPath)
 	if err != nil {
 		t.Fatalf("read frontend event stream: %v", err)
 	}

@@ -7,7 +7,7 @@ import {
   createWorkspaceVisionQuery as createWorkspaceVisionQueryTransport,
   searchWorkspace as searchWorkspaceTransport,
 } from '../../../../api/generated-query/public/workspace-search/workspace-search'
-import { buildContractRequestHeaders, requireContractData } from '../../../../api/contractKernel'
+import { buildContractRequestHeaders, requireContractData } from '@/api/http/contractKernel'
 import { withSignal } from '../../../../core/utils/request'
 import { i18n } from '../../../../core/i18n'
 import { assertWorkspaceId } from '../../../../core/utils/workspaceId'

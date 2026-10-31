@@ -7,7 +7,7 @@ import {
   uploadControlBrandingLogo,
 } from '@/api/generated-query/control/control-platform/control-platform'
 import type { ControlBrandingLogoUpload } from '@/api/generated-query/control/model/controlBrandingLogoUpload'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminBrandingSettingsFeedback } from '../useSettingsFeedback'
 import {

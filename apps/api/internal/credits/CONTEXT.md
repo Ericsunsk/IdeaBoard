@@ -43,7 +43,7 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 | Finding                   | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject                                                               |
 | Finding Type              | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely          |
 
-A Refund reverses a Capture; a Purchase Refund settles an external-payment refund. They are distinct accounting operations. Wallet lifecycle controls the account lifecycle; Wallet Restrictions express independently releasable spending constraints.
+A Refund reverses a Capture; a Purchase Refund settles an external-payment refund. They are distinct accounting operations. Canonical names (see `GLOSSARY.md`): funds identity is only Billing Account (`ba_`), the container is only Credit Wallet, a ledger leg is always the full name Credit Account, and refunds use only the full names linked Refund / linked Purchase Refund. Wallet lifecycle controls the account lifecycle; Wallet Restrictions express independently releasable spending constraints.
 
 ## Public Seams
 

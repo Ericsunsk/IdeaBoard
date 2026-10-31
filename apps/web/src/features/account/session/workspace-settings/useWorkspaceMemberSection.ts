@@ -1,7 +1,7 @@
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
-import { workspaceMemberIdempotencyKey } from '../../../../api/idempotencyKey'
+import { workspaceMemberIdempotencyKey } from '@/api/http/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import { useWorkspaceSettingsRoster } from './reads'

@@ -6,17 +6,17 @@ import {
   OPAQUE_ID_SUFFIX_SOURCE,
 } from './opaqueIds'
 import { assertWorkspaceId } from './workspaceId'
-import { isOpaqueId, opaqueIdPrefix } from '../../api/contractKernel'
+import { isOpaqueId, opaqueIdPrefix } from '@/api/http/contractKernel'
 import {
   assertUploadId,
   assertWorkspaceAssetId,
   assertWorkspaceId as assertUploadWorkspaceId,
-} from '../../api/upload'
+} from '@/api/media/upload'
 import {
   assertWorkspaceTaskAssetId,
   assertWorkspaceTaskId,
   assertWorkspaceTaskWorkspaceId,
-} from '../../api/workspaceTasks'
+} from '@/api/tasks/workspaceTasks'
 
 const ACCEPT = [
   'ws_abc123',

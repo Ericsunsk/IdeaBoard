@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../api/client'
+import { api } from '@/api/http/client'
 import {
   fetchSiteBranding,
   getSiteBrandFallbackText,
@@ -11,7 +11,7 @@ import {
   validateSiteBrandingSetting,
 } from './useSiteBranding'
 
-vi.mock('../../api/client', () => ({ api: { request: vi.fn() } }))
+vi.mock('@/api/http/client', () => ({ api: { request: vi.fn() } }))
 
 describe('fetchSiteBranding fallback', () => {
   afterEach(() => {

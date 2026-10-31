@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/generation/routing"
-	"ideaboard/api/internal/tasking/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 // A job carrying no execution token fails closed (errors for River
@@ -27,7 +27,7 @@ func TestWorkspaceTaskClaimFailsClosedWhenJobTokenEmpty(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -44,7 +44,7 @@ func TestWorkspaceTaskClaimFailsClosedWhenJobTokenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusPending {
+	if got.Status != tasks.StatusPending {
 		t.Fatalf("status = %q, want pending (unclaimed, hold untouched)", got.Status)
 	}
 	if n := env.queue.count(); n != 1 {
@@ -61,14 +61,14 @@ func TestWorkspaceTaskGenerateRejectsOversizeOutputs(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
-	refs := make([]workspacetasks.OutputRef, 0, workspacetasks.MaxOutputsPerTask+1)
-	for i := 0; i <= workspacetasks.MaxOutputsPerTask; i++ {
-		refs = append(refs, workspacetasks.OutputRef{
-			Kind: workspacetasks.OutputKindRemote, URL: fmt.Sprintf("https://cdn.example.com/oversize-%d.png", i),
+	refs := make([]tasks.OutputRef, 0, tasks.MaxOutputsPerTask+1)
+	for i := 0; i <= tasks.MaxOutputsPerTask; i++ {
+		refs = append(refs, tasks.OutputRef{
+			Kind: tasks.OutputKindRemote, URL: fmt.Sprintf("https://cdn.example.com/oversize-%d.png", i),
 			ChecksumSHA256: workerTestRemoteChecksum, Role: "result", ResultIndex: i,
 		})
 	}
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return refs, nil
 	}), nil)
 
@@ -79,7 +79,7 @@ func TestWorkspaceTaskGenerateRejectsOversizeOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed for oversize outputs", got.Status)
 	}
 	env.holder.mu.Lock()
@@ -101,36 +101,36 @@ type phaseStubSettler struct {
 	retryCalls    int
 }
 
-func (s *phaseStubSettler) Complete(_ context.Context, _, _ string, _ []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+func (s *phaseStubSettler) Complete(_ context.Context, _, _ string, _ []tasks.OutputRef) (*tasks.WorkspaceTask, error) {
 	s.completeCalls++
-	return &workspacetasks.WorkspaceTask{}, nil
+	return &tasks.WorkspaceTask{}, nil
 }
 
-func (s *phaseStubSettler) Fail(_ context.Context, _, _, _ string) (*workspacetasks.WorkspaceTask, error) {
+func (s *phaseStubSettler) Fail(_ context.Context, _, _, _ string) (*tasks.WorkspaceTask, error) {
 	s.failCalls++
-	return &workspacetasks.WorkspaceTask{}, nil
+	return &tasks.WorkspaceTask{}, nil
 }
 
-func (s *phaseStubSettler) Retry(_ context.Context, _, _ string, _ bool) (*workspacetasks.WorkspaceTask, error) {
+func (s *phaseStubSettler) Retry(_ context.Context, _, _ string, _ bool) (*tasks.WorkspaceTask, error) {
 	s.retryCalls++
-	return &workspacetasks.WorkspaceTask{}, nil
+	return &tasks.WorkspaceTask{}, nil
 }
 
 // phaseStubStore satisfies the constructor; the converge path never reads.
 type phaseStubStore struct{}
 
-func (phaseStubStore) GetTask(_ context.Context, _, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return nil, workspacetasks.ErrNotFound
+func (phaseStubStore) GetTask(_ context.Context, _, _ string) (*tasks.WorkspaceTask, error) {
+	return nil, tasks.ErrNotFound
 }
 
-func (phaseStubStore) ClaimTask(_ context.Context, _, _, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return nil, workspacetasks.ErrStateConflict
+func (phaseStubStore) ClaimTask(_ context.Context, _, _, _ string) (*tasks.WorkspaceTask, error) {
+	return nil, tasks.ErrStateConflict
 }
 
 // ClaimTaskWithAttempt satisfies the merged claim seam the constructor
 // requires; this stub never claims, so it never opens an attempt fact.
-func (phaseStubStore) ClaimTaskWithAttempt(_ context.Context, _, _, _ string, _ workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error) {
-	return nil, false, workspacetasks.ErrStateConflict
+func (phaseStubStore) ClaimTaskWithAttempt(_ context.Context, _, _, _ string, _ tasks.AttemptStart) (*tasks.WorkspaceTask, bool, error) {
+	return nil, false, tasks.ErrStateConflict
 }
 
 // convergeSendFailure routes purely on (retryable, budget): retryable with
@@ -147,7 +147,7 @@ func TestConvergeSendFailureRetryVsTerminalMatrix(t *testing.T) {
 	}{
 		{"transient with budget requeues", routing.AttemptFailure{HTTPStatus: 503}, 0, 1, 0},
 		{"network error with budget requeues", routing.AttemptFailure{NetworkError: true}, 1, 1, 0},
-		{"transient with exhausted budget fails", routing.AttemptFailure{HTTPStatus: 503}, workspacetasks.MaxProviderRequeues, 0, 1},
+		{"transient with exhausted budget fails", routing.AttemptFailure{HTTPStatus: 503}, tasks.MaxProviderRequeues, 0, 1},
 		{"deterministic with budget fails", routing.AttemptFailure{InvalidParams: true}, 0, 0, 1},
 		{"unmarked failure fails closed", routing.AttemptFailure{}, 0, 0, 1},
 	} {
@@ -157,11 +157,11 @@ func TestConvergeSendFailureRetryVsTerminalMatrix(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewWorkspaceTaskWorker: %v", err)
 			}
-			claimed := &workspacetasks.WorkspaceTask{
+			claimed := &tasks.WorkspaceTask{
 				ID: "task_phase1", WorkspaceID: "ws_test", Service: "render", RetryCount: tc.retryCnt,
 			}
 			send := newWorkspaceSendTracker(nil, claimed.ID, 0, "render").
-				startSend(ctx, "openrouter/model-a", workspacetasks.AttemptRetryLayerGateway)
+				startSend(ctx, "openrouter/model-a", tasks.AttemptRetryLayerGateway)
 			genErr := fmt.Errorf("provider send failed: %s", tc.name)
 			if err := worker.convergeSendFailure(ctx, send, claimed, tc.failure, genErr, false); err != nil {
 				t.Fatalf("convergeSendFailure: %v", err)
@@ -198,7 +198,7 @@ func TestFailTerminalDropsConvergedTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusFailed {
+	if got.Status != tasks.StatusFailed {
 		t.Fatalf("status = %q, want failed (unchanged)", got.Status)
 	}
 }

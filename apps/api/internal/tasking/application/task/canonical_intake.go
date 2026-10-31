@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/platform/jsonlimit"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
-	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 )
@@ -65,7 +64,7 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 		working[key] = value
 	}
 	prompt := strings.TrimSpace(userPrompt)
-	if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
+	if err := tasks.ValidateWorkspacePrompt(prompt); err != nil {
 		return "", err
 	}
 	if err := normalizeSubmitExecutionMap(working, feature); err != nil {
@@ -103,12 +102,12 @@ func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug stri
 	params["service"] = featureSlug
 	delete(params, "model")
 	// v1 mask reference fail-closes here before any plan work; shape is
-	// owned by workspacetasks.IsValidMaskAssetID (same predicate as
-	// workspacetasks.ValidateParams) so durable params never carry media
+	// owned by tasks.IsValidMaskAssetID (same predicate as
+	// tasks.ValidateParams) so durable params never carry media
 	// bytes or URLs.
 	if raw, ok := params[paramkeys.MaskAssetID]; ok {
 		id, _ := raw.(string)
-		if !workspacetasks.IsValidMaskAssetID(id) {
+		if !tasks.IsValidMaskAssetID(id) {
 			return errorrender.NewValidationError(errorrender.MsgValidateWorkspaceMaskParam)
 		}
 	}
@@ -416,7 +415,7 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 	// v1 mask reference (workspace public asset_... id from the
 	// upload-session flow). Wins over the legacy numeric MaskImageAssetID
 	// when both are present; shape was fail-closed in
-	// normalizeSubmitExecutionMap above via workspacetasks.IsValidMaskAssetID.
+	// normalizeSubmitExecutionMap above via tasks.IsValidMaskAssetID.
 	if id, ok := params[paramkeys.MaskAssetID].(string); ok && strings.TrimSpace(id) != "" {
 		media.Mask = &tasks.MediaRef{PublicAssetID: strings.TrimSpace(id), Role: tasks.MediaRoleMask}
 		hasMedia = true

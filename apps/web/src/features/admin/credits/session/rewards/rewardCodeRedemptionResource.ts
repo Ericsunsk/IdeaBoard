@@ -2,7 +2,7 @@ import {
   getControlRewardRedemption,
   listControlRewardRedemptions,
 } from '@/api/generated-query/control/control-credits/control-credits'
-import { requireContractData } from '@/api/contractKernel'
+import { requireContractData } from '@/api/http/contractKernel'
 import { withSignal } from '@/core/utils/request'
 import { createControlError } from '../../../shared'
 import type {

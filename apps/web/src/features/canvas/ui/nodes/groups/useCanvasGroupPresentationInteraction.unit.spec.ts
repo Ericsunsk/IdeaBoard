@@ -5,7 +5,7 @@ import type { CanvasGraphGroupId } from '../../../core/graph'
 import type {
   CanvasFlowViewportTransform,
   CanvasGroupFrame,
-} from '../../../core/graph/canvasGroupGeometry.ts'
+} from '../../../core/graph/groupGeometry.ts'
 import { useCanvasGroupPresentationInteraction } from './index'
 import type { CanvasSelectionGroupAction } from '../../../session/graph-editing'
 
