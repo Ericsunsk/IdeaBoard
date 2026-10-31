@@ -1,20 +1,13 @@
+import type { ElementRefTarget } from '@/core/vue/refs'
 import { onLongPress } from '@vueuse/core'
-import {
-  getCurrentInstance,
-  onBeforeUnmount,
-  ref,
-  type ComponentPublicInstance,
-  type Ref,
-} from 'vue'
+import { getCurrentInstance, onBeforeUnmount, ref, type Ref } from 'vue'
 
 const DEFAULT_LONG_PRESS_MS = 260
 
-type StrengthRangeRefTarget = Element | ComponentPublicInstance | null
-
 type StrengthRangeEditSession<TKey> = {
   activeKey: Ref<TKey | null>
-  setRangeRef: (key: TKey, el: StrengthRangeRefTarget) => void
-  setTriggerRef: (key: TKey, el: StrengthRangeRefTarget) => void
+  setRangeRef: (key: TKey, el: ElementRefTarget) => void
+  setTriggerRef: (key: TKey, el: ElementRefTarget) => void
   beginEdit: (
     key: TKey,
     input: HTMLInputElement,
@@ -50,19 +43,19 @@ type UseStrengthRangeEditSessionOptions<TKey> = {
   isTriggerDisabled?: (key: TKey, trigger: HTMLElement, input: HTMLInputElement) => boolean
 }
 
-function getElement(el: StrengthRangeRefTarget): Element | null {
+function getElement(el: ElementRefTarget): Element | null {
   if (el instanceof Element) return el
   if (el && '$el' in el && el.$el instanceof Element) return el.$el
   return null
 }
 
-function getRangeInput(el: StrengthRangeRefTarget): HTMLInputElement | null {
+function getRangeInput(el: ElementRefTarget): HTMLInputElement | null {
   const element = getElement(el)
   if (element instanceof HTMLInputElement) return element
   return null
 }
 
-function getTriggerElement(el: StrengthRangeRefTarget): HTMLElement | null {
+function getTriggerElement(el: ElementRefTarget): HTMLElement | null {
   const element = getElement(el)
   if (element instanceof HTMLElement) return element
   return null
@@ -180,7 +173,7 @@ export function useStrengthRangeEditSession<TKey>(
     })
   }
 
-  function setRangeRef(key: TKey, el: StrengthRangeRefTarget) {
+  function setRangeRef(key: TKey, el: ElementRefTarget) {
     const input = getRangeInput(el)
     const current = rangeElements.get(key)
     if (current === input) return
@@ -191,7 +184,7 @@ export function useStrengthRangeEditSession<TKey>(
     rangeElements.set(key, input)
   }
 
-  function setTriggerRef(key: TKey, el: StrengthRangeRefTarget) {
+  function setTriggerRef(key: TKey, el: ElementRefTarget) {
     const trigger = getTriggerElement(el)
     const current = triggerElements.get(key)
     if (current === trigger) return

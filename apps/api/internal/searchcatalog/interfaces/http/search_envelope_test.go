@@ -12,7 +12,7 @@ import (
 	mediadomain "ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
-	"ideaboard/api/internal/searchcatalog/application"
+	"ideaboard/api/internal/searchcatalog/application/search"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
 
@@ -53,7 +53,7 @@ func enabledSearchConfigs() stubSearchConfigs {
 	}
 }
 
-func servePublicSearch(t *testing.T, service *application.SearchService, target string) *httptest.ResponseRecorder {
+func servePublicSearch(t *testing.T, service *search.SearchService, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -74,7 +74,7 @@ func TestPublicSearchRendersContractEnvelope(t *testing.T) {
 		ThumbnailURL: "https://th", PreviewURL: "https://p", OriginalURL: "https://o",
 		MediaKind: "image",
 	}
-	success := application.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{
+	success := search.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{
 		stubSearchProvider{provider: domain.ProviderUnsplash, page: ports.SearchProviderPage{Results: []domain.Result{hit}}},
 	})
 	recorder := servePublicSearch(t, success, "/api/search?q=test")
@@ -89,7 +89,7 @@ func TestPublicSearchRendersContractEnvelope(t *testing.T) {
 		t.Fatalf("body = %s, must not render the legacy numeric envelope", body)
 	}
 
-	failing := application.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{
+	failing := search.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{
 		stubSearchProvider{provider: domain.ProviderUnsplash, err: errors.New("provider down")},
 	})
 	recorder = servePublicSearch(t, failing, "/api/search?q=test")
@@ -104,7 +104,7 @@ func TestPublicSearchRendersContractEnvelope(t *testing.T) {
 
 func TestPublicSearchProjectsOpaqueDisplayWithoutImport(t *testing.T) {
 	hit := domain.Result{ID: "image", Provider: domain.ProviderUnsplash, SourceURL: "https://unsplash.com/image", ThumbnailURL: "https://images.unsplash.com/thumb", PreviewURL: "https://images.unsplash.com/preview", OriginalURL: "https://images.unsplash.com/original", MediaKind: "image", Width: 4000, Height: 3000}
-	service := application.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{stubSearchProvider{provider: domain.ProviderUnsplash, page: ports.SearchProviderPage{Results: []domain.Result{hit}}}})
+	service := search.NewSearchService(enabledSearchConfigs(), []ports.SearchProviderAdapter{stubSearchProvider{provider: domain.ProviderUnsplash, page: ports.SearchProviderPage{Results: []domain.Result{hit}}}})
 	config := imgproxy.Config{BaseURL: "http://unused.test", KeyHex: strings.Repeat("ab", 32), SaltHex: strings.Repeat("cd", 32)}
 	previews, err := preview.NewService(config, t.TempDir(), imgproxy.NewRenderer(config, nil))
 	if err != nil {

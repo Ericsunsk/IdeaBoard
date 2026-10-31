@@ -31,95 +31,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ContractV1TaskDeps wires workspace task operations, quoting, settlement, and lifecycle.
-type ContractV1TaskDeps = v1tasks.ContractV1TaskDeps
-type WorkspaceTaskReadStore = v1tasks.WorkspaceTaskReadStore
-type WorkspaceTaskLifecycleStore = v1tasks.WorkspaceTaskLifecycleStore
-type WorkspaceTaskBillingStore = v1tasks.WorkspaceTaskBillingStore
-type WorkspaceTaskQuoter = v1tasks.WorkspaceTaskQuoter
-type WorkspaceTaskHolder = v1tasks.WorkspaceTaskHolder
-type WorkspaceTaskEnqueuer = v1tasks.WorkspaceTaskEnqueuer
-type WorkspaceTaskAssetReader = v1tasks.WorkspaceTaskAssetReader
-type WorkspaceTaskSnapshotSaver = v1tasks.WorkspaceTaskSnapshotSaver
-type taskQuoteBillingAccountReader = v1tasks.QuoteBillingAccountReader
-type taskQuoteWalletReader = v1tasks.QuoteWalletReader
-type taskQuoteQuotaReader = v1tasks.QuoteQuotaReader
-
-// ContractV1LibraryDeps wires workspace library store, idempotency, read-through, and sources.
-type ContractV1LibraryDeps = v1library.ContractV1LibraryDeps
-
-// ContractV1SearchDeps wires workspace search and vision query operations.
-type ContractV1SearchDeps = v1system.ContractV1SearchDeps
-type V1BillingQuoter = v1system.V1BillingQuoter
-type V1CreditSettler = v1system.V1CreditSettler
-type V1VisionExtractor = v1system.V1VisionExtractor
-type V1VisionExtractInput = v1system.V1VisionExtractInput
-const V1VisionSKU = v1system.V1VisionSKU
-var errV1CursorInvalid = v1system.ErrV1CursorInvalid
-var errV1BillingRestricted = v1system.ErrV1BillingRestricted
-var errV1BillingQuoteUnavailable = v1system.ErrV1BillingQuoteUnavailable
-var publicSupportChannelsV1Handler = v1system.PublicSupportChannelsV1Handler
-var publicBrandingSettingsV1Handler = v1system.PublicBrandingSettingsV1Handler
-var publicSearchV1Handler = v1system.PublicSearchV1Handler
-var NewBoardDocumentPublisher = v1system.NewBoardDocumentPublisher
-
-type v1NotificationDTO = v1system.V1NotificationDTO
-type v1NotificationListDTO = v1system.V1NotificationListDTO
-type v1UnreadCountDTO = v1system.V1UnreadCountDTO
-type v1MarkAllReadDTO = v1system.V1MarkAllReadDTO
-
-var v1VisionBillingDeferredObserve func(sku, reason, operationID string)
-
-func init() {
-	defaultObserver := v1system.V1VisionBillingDeferredObserve
-	v1system.V1VisionBillingDeferredObserve = func(sku, reason, operationID string) {
-		if v1VisionBillingDeferredObserve != nil {
-			v1VisionBillingDeferredObserve(sku, reason, operationID)
-			return
-		}
-		defaultObserver(sku, reason, operationID)
-	}
-}
-
-// ContractV1MediaDeps wires workspace media storage, upload sessions, and image delivery.
-type ContractV1MediaDeps = v1media.ContractV1MediaDeps
-type WorkspaceMediaStore = workspacemedia.WorkspaceMediaStore
-type WorkspaceMediaObjects = workspacemedia.MediaObjects
-
-// ContractV1AvatarDeps wires avatar storage UID resolution and avatar object persistence.
-type ContractV1AvatarDeps = v1media.ContractV1AvatarDeps
-type V1AvatarUIDDirectory = v1media.V1AvatarUIDDirectory
-type V1AvatarObjects = v1media.V1AvatarObjects
-var NewV1AvatarDirectory = v1media.NewV1AvatarDirectory
-var toMediaAssetDTO = v1media.ToMediaAssetDTO
-var v1SniffedImageMIME = v1media.SniffedImageMIME
-var v1StagedChecksum = v1media.StagedChecksum
-var errV1AvatarUIDUnavailable = v1media.ErrV1AvatarUIDUnavailable
-const v1AvatarMaxBytes = v1media.AvatarMaxBytes
-const maxV1MediaBatchAssets = v1media.MaxMediaBatchAssets
-
-// ContractV1MemberDeps wires workspace-member display facts and invite lookups.
-type ContractV1MemberDeps = v1tenancy.MemberDeps
-type V1MemberLookupProvider = v1tenancy.V1MemberLookupProvider
-type V1MemberDisplayProvider = shared.MemberDisplayProvider
-type V1MemberDisplay = shared.MemberDisplay
-var batchDisplayFacts = shared.BatchDisplayFacts
-var NewMemberLookupService = v1tenancy.NewMemberLookupService
-var NewMemberDisplayService = v1tenancy.NewMemberDisplayService
-var NewInvitationReader = v1tenancy.NewInvitationReader
-var NewInvitationIdentityReader = v1tenancy.NewInvitationIdentityReader
-
-type v1UserDTO = v1tenancy.UserDTO
-type v1MemberDTO = v1tenancy.MemberDTO
-type v1OrganizationDTO = v1tenancy.OrganizationDTO
-type v1OrganizationMemberDTO = v1tenancy.OrganizationMemberDTO
-type v1WorkspaceMemberInviteDTO = v1tenancy.WorkspaceMemberInviteDTO
-type v1OrganizationMemberInviteDTO = v1tenancy.OrganizationMemberInviteDTO
-type v1WorkspaceInvitePreviewDTO = v1tenancy.WorkspaceInvitePreviewDTO
-type v1WorkspaceInviteAckDTO = v1tenancy.WorkspaceInviteAckDTO
-type v1OrganizationInviteAckDTO = v1tenancy.OrganizationInviteAckDTO
-type v1DeletedDTO = shared.DeletedDTO
-
 // ContractV1Deps wires the Public Data Plane v1 handlers (issue #801).
 //
 // Store is the tenancy persistence seam: production uses PostgreSQL, and
@@ -140,23 +51,23 @@ type ContractV1Deps struct {
 	// Library is the workspace-scoped library + materialization surface
 	// (issue #806). Zero value keeps the surface fail-closed (501/503);
 	// tests inject the in-memory store plus fakes.
-	Library ContractV1LibraryDeps
+	Library v1library.ContractV1LibraryDeps
 	// Search is the workspace-scoped search + vision-query surface
 	// (issue #806). Zero value keeps the surface fail-closed (501/503);
 	// tests inject fakes.
-	Search ContractV1SearchDeps
+	Search v1system.ContractV1SearchDeps
 	// Tasks is the workspace-scoped async job surface (issue #805).
 	// Production wires the postgres store and settlement adapters; tests
 	// inject the in-memory implementation plus quoter/holder/queue/asset fakes.
-	Tasks ContractV1TaskDeps
+	Tasks v1tasks.ContractV1TaskDeps
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
-	Media ContractV1MediaDeps
+	Media v1media.ContractV1MediaDeps
 	// Avatar resolves caller storage UIDs and persists avatar bytes.
-	Avatar ContractV1AvatarDeps
+	Avatar v1media.ContractV1AvatarDeps
 	// Members resolves workspace-member display facts and registered user lookups.
-	Members ContractV1MemberDeps
+	Members v1tenancy.MemberDeps
 	// Events is the workspace event hot log + SSE replay window (issue
 	// #807). Nil normalizes to a process-local log; tests inject a
 	// fresh instance per engine for isolation.
@@ -190,7 +101,7 @@ type ContractV1Deps struct {
 	// (no explicit linkage) so existing in-memory fixtures stay green.
 	// Explicit billing_account_id/new_billing_account requests with a nil
 	// store fail closed with 503, never silently unlinked.
-	BillingAccounts billingAccountStore
+	BillingAccounts shared.AccountStore
 	// Notifications is the explicitly wired user notification command boundary
 	// (#958, ADR-0040). Nil fails the notification endpoints closed with 503.
 	Notifications notifications.Store
@@ -280,7 +191,7 @@ func (h *contractV1Handler) libraryHandler() *v1library.Handler {
 		AuthorizeMediaBinaryAsset: h.v1MediaBinaryAsset,
 		RenderMediaAsset: func(c *gin.Context, workspacePublicID, mediaAssetID string, userID int64, workspaceRole string) bool {
 			if asset, ok := h.authorizeMediaAsset(c, workspacePublicID, mediaAssetID, userID, workspaceRole); ok {
-				contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, shared.FormatTime(asset.CreatedAt)))
+				contract.RenderSuccess(c, v1media.ToMediaAssetDTO(workspacePublicID, asset, shared.FormatTime(asset.CreatedAt)))
 				return true
 			}
 			return false
@@ -424,10 +335,6 @@ var reconcileTaskResolution = v1tasks.ReconcileTaskResolution
 type contractV1Handler struct {
 	deps ContractV1Deps
 }
-
-// v1ListCursor is the opaque keyset position for v1 list endpoints.
-type v1ListCursor = shared.ListCursor
-type v1BoardBundleDTO = v1boards.BoardBundleDTO
 
 func (h *contractV1Handler) tenancyHandler() *v1tenancy.Handler {
 	return v1tenancy.NewHandler(v1tenancy.Deps{

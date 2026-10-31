@@ -34,11 +34,9 @@ module.exports = {
       name: 'shared-not-to-features',
       severity: 'error',
       comment:
-        'Shared modules must not depend on concrete features or app. Only the enumerated P1 compatibility shims have a one-phase exception.',
+        'Shared modules must not depend on concrete features or app. The P1 compatibility shim exception is retired (no .shim.ts remains in src/shared); every shared-to-feature edge is a violation.',
       from: {
         path: '^src/shared(?:/|$)',
-        pathNot:
-          '^src/shared/(?:components/(?:UserAccountMenu|UserCreditBalanceButton|userAccountMenu\\.types|SupportChannelQr)|constants/(?:contacts|routePaths|legalLinks)|domain/(?:imageActions|serviceIcons|serviceRegistry)|media/preloadImage)\\.shim\\.ts$',
       },
       to: {
         path: '^src/(?:features|app)(?:/|$)',
@@ -141,7 +139,7 @@ module.exports = {
       name: 'no-cross-feature-deep-imports',
       severity: 'error',
       comment:
-        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting; routePaths.ts stays public for cross-feature path constants; ui stays public for workspace dialogs/settings to avoid shell/account cycles); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
+        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting; routePaths.ts stays public for cross-feature path constants; only the ui/dialogs and ui/settings narrow seams stay public for the account avatar menu); shell, infrastructure, layout, pages, and every other ui module are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
       from: {
         path: '^src/(?:app|features/[^/]+)(?:/|$)',
         pathNot:
@@ -149,7 +147,8 @@ module.exports = {
       },
       to: {
         path: '^src/features/workspace/',
-        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/|routePaths\\.ts$|ui(?:/|$))',
+        pathNot:
+          '^src/features/workspace/(?:index\\.ts$|routes/|routePaths\\.ts$|ui/dialogs/index\\.ts$|ui/settings/index\\.ts$)',
       },
     },
     {
@@ -259,6 +258,131 @@ module.exports = {
       to: {
         path: '^src/features/canvas/tools/inpaint/',
         pathNot: '^src/features/canvas/tools/inpaint/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-tool-deep-imports',
+      severity: 'error',
+      comment:
+        'ADR-0013: consumers outside outpaint must use outpaint/index.ts; outpaint session, core, and ui internals are private. image-tools consumers use image-tools/index.ts or its cycle-safe ui/core narrow sub-barrels where routing through the root barrel would create a mutual-barrel cycle. Spec files are exempt (mocks do not ship; same carve-out as canvas-tool-core-no-i18n-runtime). (Issue: frontend SaaS three-zone migration)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/canvas/tools/outpaint(?:/|$)|\\.spec\\.ts$',
+      },
+      to: {
+        path: '^src/features/canvas/tools/outpaint/',
+        pathNot: '^src/features/canvas/tools/outpaint/(?:index\\.ts|core/index\\.ts)$',
+      },
+    },
+    {
+      name: 'no-cross-screens-controllers-deep-imports',
+      severity: 'error',
+      comment:
+        'Consumers outside screens/controllers must use controllers/index.ts; controller modules are private. Screens-internal modules may import controllers directly.',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/canvas/ui/screens(?:/|$)|\\.spec\\.ts$',
+      },
+      to: {
+        path: '^src/features/canvas/ui/screens/controllers/',
+        pathNot: '^src/features/canvas/ui/screens/controllers/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the credits vertical consumes sibling verticals through their index.ts seams only; models, monitor, prompts, settings, statistics, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/credits(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:models|monitor|prompts|settings|statistics|users)/',
+        pathNot:
+          '^src/features/admin/(?:models|monitor|prompts|settings|statistics|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the models vertical consumes sibling verticals through their index.ts seams only; credits, monitor, prompts, settings, statistics, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/models(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|monitor|prompts|settings|statistics|users)/',
+        pathNot:
+          '^src/features/admin/(?:credits|monitor|prompts|settings|statistics|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the monitor vertical consumes sibling verticals through their index.ts seams only; credits, models, prompts, settings, statistics, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/monitor(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|models|prompts|settings|statistics|users)/',
+        pathNot:
+          '^src/features/admin/(?:credits|models|prompts|settings|statistics|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the prompts vertical consumes sibling verticals through their index.ts seams only; credits, models, monitor, settings, statistics, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/prompts(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|models|monitor|settings|statistics|users)/',
+        pathNot:
+          '^src/features/admin/(?:credits|models|monitor|settings|statistics|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the settings vertical consumes sibling verticals through their index.ts seams only; credits, models, monitor, prompts, statistics, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/settings(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|models|monitor|prompts|statistics|users)/',
+        pathNot:
+          '^src/features/admin/(?:credits|models|monitor|prompts|statistics|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the statistics vertical consumes sibling verticals through their index.ts seams only; credits, models, monitor, prompts, settings, and users internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/statistics(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|models|monitor|prompts|settings|users)/',
+        pathNot:
+          '^src/features/admin/(?:credits|models|monitor|prompts|settings|users)/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-vertical-deep-imports',
+      severity: 'error',
+      comment:
+        'Board-style convergence: the users vertical consumes sibling verticals through their index.ts seams only; credits, models, monitor, prompts, settings, and statistics internals are private. Routes in admin/app keep lazy page imports for chunk splitting and are out of scope.',
+      from: {
+        path: '^src/features/admin/users(?:/|$)',
+      },
+      to: {
+        path: '^src/features/admin/(?:credits|models|monitor|prompts|settings|statistics)/',
+        pathNot: '^src/features/admin/(?:credits|models|monitor|prompts|settings|statistics)/index\\.ts$',
       },
     },
   ],

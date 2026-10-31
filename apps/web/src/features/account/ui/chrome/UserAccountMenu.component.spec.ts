@@ -467,7 +467,7 @@ describe('UserAccountMenu', () => {
   })
 
   it('places configured support channels after language and links the QR code safely', async () => {
-    const supportChannels: import('../../../../core/composables/useSupportChannels').SupportChannel[] =
+    const supportChannels: import('@/api/supportChannels').SupportChannel[] =
       [
         {
           id: 'discord',

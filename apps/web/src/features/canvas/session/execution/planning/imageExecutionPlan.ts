@@ -16,7 +16,7 @@ import {
 import { i18n } from '../../../../../core/i18n'
 import { EXECUTION_FUSION_META } from '../../../core/execution/executionContract'
 import type { ImageTaskAction } from '../../../core/execution/imageActionExecution'
-import { resolveOutpaintIntent, type OutpaintRect } from '../../../tools/outpaint/core/geometry'
+import { resolveOutpaintIntent, type OutpaintRect } from '../../../tools/outpaint/core'
 import {
   resolveImageNodeLayoutAnchor,
   type ImageNodeLayoutAnchor,

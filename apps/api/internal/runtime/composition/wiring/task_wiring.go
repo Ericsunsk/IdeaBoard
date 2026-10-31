@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 	"ideaboard/api/internal/boards"
 	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	"ideaboard/api/internal/events"
@@ -28,6 +27,8 @@ import (
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/memberquotas"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
+	modelregistryinfrastructure "ideaboard/api/internal/modelregistry/infrastructure"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/runtime/domain"
@@ -40,7 +41,7 @@ import (
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	visionbilling "ideaboard/api/internal/runtime/interfaces/worker/visionbilling"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	searchapplication "ideaboard/api/internal/searchcatalog/application"
+	visionapplication "ideaboard/api/internal/searchcatalog/application/vision"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
@@ -246,7 +247,7 @@ func NewAppTaskRuntime(
 	}
 
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.DB, riverpolicy.RiverMaxAttemptsDefault)
-	aiGatewayRepo := aigatewayapplication.NewConfigRepository(repos.systemConfigRepo)
+	aiGatewayRepo := modelregistryinfrastructure.NewConfigRepository(repos.systemConfigRepo)
 	modelRoutes := aiGatewayModelRouteReader{repo: aiGatewayRepo}
 	// Process-shared per-model guards: one breaker/concurrency window set
 	// across all executions so fuses actually trip (per-client instances
@@ -401,7 +402,7 @@ func NewAppTaskRuntime(
 		}
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
-	visionBillingService := searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
+	visionBillingService := visionapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
 	// #946: the member cross-workspace consumption quota joins the Vision
 	// reservation transaction after Quote and before Hold.
 	visionBillingService.SetQuotaChecker(memberquotas.NewStore(dbs.DB))
@@ -536,29 +537,29 @@ func NewAppTaskRuntime(
 	}
 
 	return AppTaskServices{
-		invitationMailQueue: invitationMailQueue, // #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
-		// production River client (workspace_task_execute kind); #825
-		// registers the real consumer on the same client above.
-		workspaceTaskQueue:  workspaceEnqueuer,
-		workspaceTaskStore:  workspaceStore,
-		workspaceTaskHolder: workspaceHolder,
-		workspaceTaskQuoter: workspaceQuoter,
-		workspaceTaskMedia:  workspaceMedia,
-		workspaceTaskAssets: workspaceAssets,
-		workspaceTaskRouter: workspaceRouter,
-		webhooks:            webhookStore,
-		workspaceEvents:     workspaceEvents,
-		workspaceEventBus:   eventBus,
-		userEvents:          userEventHub,
-		taskStatusPublisher: taskStatusPublisher,
-	}, AppWorkerRuntime{
-		riverClient:  riverClient,
-		eventBus:     eventBus,
-		queueName:    riverpolicy.RiverQueueDefault,
-		concurrency:  workerConcurrency,
-		consume:      runWorkers,
-		queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
-	}, nil
+			invitationMailQueue: invitationMailQueue, // #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
+			// production River client (workspace_task_execute kind); #825
+			// registers the real consumer on the same client above.
+			workspaceTaskQueue:  workspaceEnqueuer,
+			workspaceTaskStore:  workspaceStore,
+			workspaceTaskHolder: workspaceHolder,
+			workspaceTaskQuoter: workspaceQuoter,
+			workspaceTaskMedia:  workspaceMedia,
+			workspaceTaskAssets: workspaceAssets,
+			workspaceTaskRouter: workspaceRouter,
+			webhooks:            webhookStore,
+			workspaceEvents:     workspaceEvents,
+			workspaceEventBus:   eventBus,
+			userEvents:          userEventHub,
+			taskStatusPublisher: taskStatusPublisher,
+		}, AppWorkerRuntime{
+			riverClient:  riverClient,
+			eventBus:     eventBus,
+			queueName:    riverpolicy.RiverQueueDefault,
+			concurrency:  workerConcurrency,
+			consume:      runWorkers,
+			queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
+		}, nil
 }
 
 // riverQueueStatsByQueue fans one RiverQueue monitor out to every known
@@ -801,7 +802,7 @@ func workerWorkspaceEventData(typ string, event tasks.TaskEvent) any {
 // model name. Runtime stays independent of the AIGateway business context.
 type aiGatewayModelRouteReader struct {
 	repo interface {
-		ListCatalog(context.Context) ([]aigatewayapplication.CatalogItem, error)
+		ListCatalog(context.Context) ([]modelregistrydomain.CatalogItem, error)
 	}
 }
 

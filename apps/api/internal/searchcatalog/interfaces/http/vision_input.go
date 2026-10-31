@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/searchcatalog/application"
+	visionapplication "ideaboard/api/internal/searchcatalog/application/vision"
 	"ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
@@ -75,7 +75,7 @@ func (r multipartVisionInputReader) Read(request *http.Request, ownerUserID int6
 		return domain.VisionInput{}, err
 	}
 	images = append(images, materialized...)
-	if err := application.ValidateVisionImages(images); err != nil {
+	if err := visionapplication.ValidateVisionImages(images); err != nil {
 		return domain.VisionInput{}, err
 	}
 	return domain.VisionInput{Images: images, UserText: request.FormValue("user_text")}, nil

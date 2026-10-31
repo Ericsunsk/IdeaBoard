@@ -17,6 +17,12 @@ const (
 // Providers lists every configurable web search supplier, in display order.
 var Providers = []Provider{ProviderUnsplash, ProviderPexels}
 
+// QueryMaxRunes is the single canonical bound for search/vision query
+// text (200 runes). Application subpackages and the v1 workspace edge
+// alias it (never redeclare the literal); error copy stays with
+// errorrender.MsgNormalizeQuery.
+const QueryMaxRunes = 200
+
 var ErrProviderUnavailable = errors.New("search provider is not configured or enabled")
 var ErrProviderTestRequired = errors.New("search provider must pass a connection test before enabling")
 

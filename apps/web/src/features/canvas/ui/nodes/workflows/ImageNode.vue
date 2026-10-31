@@ -96,7 +96,7 @@ import {
 } from '../../../../board/ports/canvas'
 import type { ImageNodeAction } from '../../../core/nodes/imageActionRegistry.ts'
 import type { OutputResolution } from '../../../../../core/contracts/generationContract'
-import type { OutpaintDragAnchor } from '../../../tools/outpaint/session/useImageOutpaintOverlay.ts'
+import type { OutpaintDragAnchor } from '../../../tools/outpaint'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../../tools/image-tools'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
 import HomeCanvasImageActionMenu from '../home/ImageActionMenu.vue'

@@ -6,7 +6,7 @@ import { CANVAS_VIEWPORT_MIN_ZOOM } from '../../../session/browser/canvasViewpor
 import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/core'
 import { useRafScheduler } from '../../../session/browser/interaction/useRafScheduler.ts'
 import { waitForNextAnimationFrame } from '../../../session/browser/animationFrame.ts'
-import { containImageRect } from '../../../tools/outpaint/core/geometry.ts'
+import { containImageRect } from '../../outpaint/core'
 import type { RetouchModeState } from './useRetouchMode'
 import type { CanvasFlowViewportControls } from '../../../session/flow-adapter'
 

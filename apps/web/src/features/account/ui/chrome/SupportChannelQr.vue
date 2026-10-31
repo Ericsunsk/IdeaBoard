@@ -65,7 +65,7 @@ import { NavArrowRight } from '@iconoir/vue'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { appOverlayMenuItemClass, appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
-import type { SupportChannel } from '../../../../core/composables/useSupportChannels'
+import type { SupportChannel } from '@/api/supportChannels'
 
 const props = defineProps<{ channel: SupportChannel }>()
 const activeChannelId = defineModel<string | null>('activeChannelId', { default: null })

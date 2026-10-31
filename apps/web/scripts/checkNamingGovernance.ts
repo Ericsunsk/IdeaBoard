@@ -199,8 +199,8 @@ const keptRoleSuffixOwnership: Record<string, string> = {
 
 /** Permanent documented keeps: pre-existing `image/avatar` URL fields (rule 16, warn-only). */
 const keptLegacyUrlFields = new Set([
-  'api/sessionUserType.ts:User.avatar',
-  'api/upload.ts:UploadAvatarMetadata.avatar',
+  'api/http/sessionUserType.ts:User.avatar',
+  'api/media/upload.ts:UploadAvatarMetadata.avatar',
   'features/workspace/selection/workspaceResource.ts:PrincipalSummary.avatar',
   'features/admin/users/session/resource.ts:AdminUserListItem.avatar',
   'test/factories/admin.ts:AdminListItemOverrides.avatar',
@@ -327,6 +327,140 @@ function collectCanvasKeepStale(
   exists: (relativePath: string) => boolean = (relativePath) => existsSync(join(SRC_ROOT, relativePath)),
 ): string[] {
   return [...CANVAS_CORE_GRAPH_STUTTER_KEEP].filter((relativePath) => !exists(relativePath)).sort()
+}
+
+/**
+ * Generic keep staleness (existence + still-hit double assertion).
+ *
+ * Every `kept*` entry must (1) still exist on disk and (2) still need its
+ * keep: without the keep entry the file would still flag under the same
+ * rule. A rename/delete fails on (1); a fixed file fails on (2) with a
+ * cleanup prompt. Predicates below bypass their own keep maps so the
+ * "still hits" half cannot self-exempt.
+ */
+function genericKeepStillHits(relativePath: string): boolean {
+  if (relativePath.includes('/locales/')) return false
+  const fileName = relativePath.split('/').at(-1) ?? ''
+  // keptGenericOwnership holds both directories (`core/utils`) and files
+  // (`lib/utils.ts`): directories judge by their own name, files by stem.
+  const name = fileName.includes('.') ? ((fileName.split('.')[0] ?? '').toLowerCase()) : fileName.toLowerCase()
+  const singular = name.endsWith('s') ? name.slice(0, -1) : name
+  return GENERIC_NAMES.has(name) || GENERIC_NAMES.has(singular)
+}
+
+function roleSuffixKeepStillHits(relativePath: string): boolean {
+  const fileName = relativePath.split('/').at(-1) ?? ''
+  if (fileName.endsWith('.spec.ts') || fileName.endsWith('.d.ts')) return false
+  const stem = fileName.endsWith('.vue')
+    ? basename(fileName, '.vue')
+    : fileName.slice(0, -'.ts'.length)
+  return ROLE_SUFFIXES.some((suffix) => stem.endsWith(suffix))
+}
+
+function composableKeepStillHits(source: string, fileName: string): boolean {
+  if (fileName.endsWith('.shim.ts')) return false
+  if (!/^use[A-Z]/.test(fileName) || fileName.endsWith('.spec.ts')) return false
+  if (source.includes('compatibility shim') && /export\s+\*\s+from/.test(source)) return false
+  const stem = fileName.split('.')[0] ?? ''
+  return !collectExportedSymbols(source).has(stem)
+}
+
+function multiFamilyKeepStillHits(source: string): boolean {
+  return countExportedTypeFamilies(source) >= 2
+}
+
+function barrelKeepStillHits(source: string, relativePath: string): boolean {
+  return checkIndexBarrelBody(relativePath, source) !== null
+}
+
+function legacyUrlKeepStillHits(source: string, identity: string): boolean {
+  const parts = identity.split('.')
+  const owner = parts[0] ?? ''
+  const leaf = parts.at(-1) ?? ''
+  return source.includes(owner) && source.includes(leaf)
+}
+
+function collectKeepStale(
+  exists: (relativePath: string) => boolean = (relativePath) =>
+    existsSync(join(SRC_ROOT, relativePath)),
+  read: (relativePath: string) => string | null = (relativePath) => {
+    try {
+      return readFileSync(join(SRC_ROOT, relativePath), 'utf8')
+    } catch {
+      return null
+    }
+  },
+): string[] {
+  const stale: string[] = []
+  for (const relativePath of Object.keys(keptGenericOwnership)) {
+    if (!exists(relativePath)) {
+      stale.push(`keptGenericOwnership:${relativePath} (missing)`)
+      continue
+    }
+    if (!genericKeepStillHits(relativePath)) {
+      stale.push(`keptGenericOwnership:${relativePath} (unneeded)`)
+    }
+  }
+  for (const relativePath of Object.keys(keptRoleSuffixOwnership)) {
+    if (!exists(relativePath)) {
+      stale.push(`keptRoleSuffixOwnership:${relativePath} (missing)`)
+      continue
+    }
+    if (!roleSuffixKeepStillHits(relativePath)) {
+      stale.push(`keptRoleSuffixOwnership:${relativePath} (unneeded)`)
+    }
+  }
+  for (const relativePath of Object.keys(keptComposableFamilies)) {
+    if (!exists(relativePath)) {
+      stale.push(`keptComposableFamilies:${relativePath} (missing)`)
+      continue
+    }
+    const fileName = relativePath.split('/').at(-1) ?? ''
+    const source = read(relativePath)
+    if (source === null || !composableKeepStillHits(source, fileName)) {
+      stale.push(
+        `keptComposableFamilies:${relativePath} (${source === null ? 'missing' : 'unneeded'})`,
+      )
+    }
+  }
+  for (const relativePath of Object.keys(keptMultiFamilyTypes)) {
+    if (!exists(relativePath)) {
+      stale.push(`keptMultiFamilyTypes:${relativePath} (missing)`)
+      continue
+    }
+    const source = read(relativePath)
+    if (source === null || !multiFamilyKeepStillHits(source)) {
+      stale.push(
+        `keptMultiFamilyTypes:${relativePath} (${source === null ? 'missing' : 'unneeded'})`,
+      )
+    }
+  }
+  for (const relativePath of Object.keys(keptBarrelBoundaries)) {
+    if (!exists(relativePath)) {
+      stale.push(`keptBarrelBoundaries:${relativePath} (missing)`)
+      continue
+    }
+    const source = read(relativePath)
+    if (source === null || !barrelKeepStillHits(source, relativePath)) {
+      stale.push(
+        `keptBarrelBoundaries:${relativePath} (${source === null ? 'missing' : 'unneeded'})`,
+      )
+    }
+  }
+  for (const entry of keptLegacyUrlFields) {
+    const separator = entry.indexOf(':')
+    const relativePath = separator === -1 ? entry : entry.slice(0, separator)
+    const identity = separator === -1 ? '' : entry.slice(separator + 1)
+    if (!exists(relativePath)) {
+      stale.push(`keptLegacyUrlFields:${entry} (missing)`)
+      continue
+    }
+    const source = read(relativePath)
+    if (source === null || !legacyUrlKeepStillHits(source, identity)) {
+      stale.push(`keptLegacyUrlFields:${entry} (${source === null ? 'missing' : 'unneeded'})`)
+    }
+  }
+  return stale.sort()
 }
 
 /** ADR-0013 control-colocated SFC: a `.vue` file directly under `ui/<control>/`. */
@@ -1561,6 +1695,80 @@ function runSelfTest(): void {
       ),
       [],
     ],
+    // --- generic keep staleness (existence + still-hit) ---------------
+    // Every kept* map is pinned by both halves: a deleted file fails the
+    // existence half, a fixed file fails the still-hit half.
+    ['keep-generic-still-hits', genericKeepStillHits('core/utils'), true],
+    ['keep-generic-unneeded', genericKeepStillHits('features/x/coordinator.ts'), false],
+    [
+      'keep-role-still-hits',
+      roleSuffixKeepStillHits('features/admin/models/core/catalogData.ts'),
+      true,
+    ],
+    ['keep-role-unneeded', roleSuffixKeepStillHits('features/x/coordinator.ts'), false],
+    [
+      'keep-composable-still-hits',
+      composableKeepStillHits('export type A = string', 'useSettingsFeedback.ts'),
+      true,
+    ],
+    [
+      'keep-composable-unneeded',
+      composableKeepStillHits('export function useThing() {}', 'useThing.ts'),
+      false,
+    ],
+    [
+      'keep-multifamily-still-hits',
+      multiFamilyKeepStillHits(
+        'export type Alpha = string\nexport interface Beta { value: number }',
+      ),
+      true,
+    ],
+    [
+      'keep-multifamily-unneeded',
+      multiFamilyKeepStillHits('export type Single = string'),
+      false,
+    ],
+    [
+      'keep-barrel-still-hits',
+      barrelKeepStillHits('export const total = (a, b) => a + b\n', 'features/example/index.ts'),
+      true,
+    ],
+    [
+      'keep-barrel-unneeded',
+      barrelKeepStillHits("export { a } from './a'\n", 'features/example/index.ts'),
+      false,
+    ],
+    [
+      'keep-legacy-url-still-hits',
+      legacyUrlKeepStillHits('export interface User { avatar?: string }', 'User.avatar'),
+      true,
+    ],
+    [
+      'keep-legacy-url-unneeded',
+      legacyUrlKeepStillHits('export interface User { name: string }', 'User.avatar'),
+      false,
+    ],
+    [
+      'keep-stale-all-missing',
+      collectKeepStale(
+        () => false,
+        () => null,
+      ).length,
+      Object.keys(keptGenericOwnership).length +
+        Object.keys(keptRoleSuffixOwnership).length +
+        Object.keys(keptComposableFamilies).length +
+        Object.keys(keptMultiFamilyTypes).length +
+        Object.keys(keptBarrelBoundaries).length +
+        keptLegacyUrlFields.size,
+    ],
+    [
+      'keep-stale-clean-probe',
+      collectKeepStale(
+        () => true,
+        () => 'placeholder',
+      ).filter((entry) => entry.includes('(missing)')),
+      [],
+    ],
   ]
   let failed = 0
   for (const [name, actual, expected] of cases) {
@@ -1605,6 +1813,11 @@ function main() {
     console.error(
       `[naming-keep:stale] ${stale} no longer exists; remove it from CANVAS_CORE_GRAPH_STUTTER_KEEP`,
     )
+  }
+
+  for (const stale of collectKeepStale()) {
+    failed = true
+    console.error(`[naming-keep:stale] ${stale}; remove it from the named kept* map`)
   }
 
   for (const warning of urlWarnings) {

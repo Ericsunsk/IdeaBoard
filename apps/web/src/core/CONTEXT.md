@@ -16,6 +16,8 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 | Theme Contract | Single source for standard UI primitives and CSS tokens (`src/components/ui` + `theme`); overlay/dialog/round-control styles must consume tokens; contract specs reverse-check canvas/search/board/library/workspace usage.                                                                                                                                                                            |
 | Locale Parity  | `en` resident, `zh` lazy; `en` / `zh-CN` / `es` / `ko` keys must match (`localeParity` contract); locale switch atomically updates i18n + `<html lang>` + storage, and writes nothing on failure.                                                                                                                                                                                                      |
 
+Canonical terms live in [GLOSSARY.md](../../../../GLOSSARY.md); Billing funds terms follow ADR-0038.
+
 ## Public Seams
 
 - `core/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy. Pure `routePolicy` owns only identity-failure and safe-redirect route invariants; feature `routePaths.ts` re-export those values and own their remaining paths. Auth never imports concrete features.

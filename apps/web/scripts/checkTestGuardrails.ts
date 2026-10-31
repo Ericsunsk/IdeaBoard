@@ -258,6 +258,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies provider status color transitions and absence of row opacity changes while toggles settle.',
     },
   ],
+  'src/features/search/ui/components/SearchLightboxModal.component.spec.ts': [
+    {
+      reason:
+        'Verifies the close button focus-ring classes that keep keyboard focus visible against the dark lightbox backdrop.',
+    },
+  ],
   'src/features/library/ui/LibraryFloatingIsland.component.spec.ts': [
     {
       reason:
@@ -413,12 +419,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies native button class forwarding used by the ImageActionMenu strength control to hide the active trigger while preserving shared button styling.',
     },
   ],
-  'src/features/canvas/ui/nodes/primitives/composer/PromptComposerControls.options.component.spec.ts': [
-    {
-      reason:
-        'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
-    },
-  ],
+  'src/features/canvas/ui/nodes/primitives/composer/PromptComposerControls.options.component.spec.ts':
+    [
+      {
+        reason:
+          'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
+      },
+    ],
   'src/features/canvas/tools/retouch/ui/histogram/HistogramPlot.component.spec.ts': [
     {
       reason:

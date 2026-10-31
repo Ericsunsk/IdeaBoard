@@ -16,14 +16,15 @@ import (
 	"strings"
 	"testing"
 
-	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
+	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/workflow"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )
@@ -138,24 +139,32 @@ func TestControlProxyEmptyCaptureFailsClosed(t *testing.T) {
 
 type proxyEnvelopeFakeGatewayStore struct{}
 
-func (proxyEnvelopeFakeGatewayStore) GetSummary(context.Context) (aigatewayapplication.GatewaySummary, error) {
-	return aigatewayapplication.GatewaySummary{}, nil
+func (proxyEnvelopeFakeGatewayStore) GetSummary(context.Context) (modelregistrydomain.GatewaySummary, error) {
+	return modelregistrydomain.GatewaySummary{}, nil
 }
 
-func (proxyEnvelopeFakeGatewayStore) Update(context.Context, aigatewayapplication.UpdateInput, int64) error {
+func (proxyEnvelopeFakeGatewayStore) Update(context.Context, modelregistrydomain.UpdateInput, int64) error {
 	return nil
 }
 
-func (proxyEnvelopeFakeGatewayStore) ListCatalog(context.Context) ([]aigatewayapplication.CatalogItem, error) {
+func (proxyEnvelopeFakeGatewayStore) ListCatalog(context.Context) ([]modelregistrydomain.CatalogItem, error) {
 	return nil, nil
 }
 
-func (proxyEnvelopeFakeGatewayStore) SaveCatalog(context.Context, []aigatewayapplication.CatalogItem, int64) error {
+func (proxyEnvelopeFakeGatewayStore) SaveCatalog(context.Context, []modelregistrydomain.CatalogItem, int64) error {
 	return nil
 }
 
 func (proxyEnvelopeFakeGatewayStore) ListConfiguredProviders(context.Context) ([]workflow.ProviderEntry, error) {
 	return nil, nil
+}
+
+func (proxyEnvelopeFakeGatewayStore) Resolve(context.Context) (modelregistrydomain.ResolvedGateway, error) {
+	return modelregistrydomain.ResolvedGateway{}, modelregistrydomain.ErrAIGatewayNotConfigured
+}
+
+func (proxyEnvelopeFakeGatewayStore) ResolveVisionModel(context.Context) (string, error) {
+	return "", modelregistrydomain.ErrVisionModelMissing
 }
 
 type proxyEnvelopeFakeStorage struct{}
@@ -219,7 +228,7 @@ func assertControlProxyContractShape(t *testing.T, path string, payload map[stri
 
 func TestControlProxyFamiliesRenderContractEnvelope(t *testing.T) {
 	h := newControlHarness(t, func(deps *ContractControlDeps) {
-		deps.AIGateway = aigatewayapplication.NewHandler(proxyEnvelopeFakeGatewayStore{})
+		deps.AIGateway = modelregistryhttp.NewHandler(proxyEnvelopeFakeGatewayStore{})
 		deps.Storage = storagehttp.NewHandler(proxyEnvelopeFakeStorage{})
 		deps.BrandLogos = adminbranding.NewHandler(proxyEnvelopeFakeBrandLogos{}, func(*gin.Context) bool { return true })
 	})

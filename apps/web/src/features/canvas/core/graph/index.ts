@@ -1,4 +1,6 @@
 export * from './graphStore'
+export { resolveWritableCanvasGraphStore } from './graphStoreWriter'
+export { isSameJsonValue } from './graphValueEquality'
 export type {
   CanvasGraphCommitTelemetry,
   CanvasGraphDraftCounts,

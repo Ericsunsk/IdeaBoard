@@ -640,7 +640,7 @@ func TestPostgresPreviewBackfillAssignsMissingProjections(t *testing.T) {
 	// Canonical document bytes remain intact while the projection is missing.
 	nullOutPreviewColumns(t, db, boardID)
 
-	dry, err := BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, true)
+	dry, err := previewscene.BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -655,7 +655,7 @@ func TestPostgresPreviewBackfillAssignsMissingProjections(t *testing.T) {
 		t.Fatalf("dry run must not write")
 	}
 
-	stats, err := BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
+	stats, err := previewscene.BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -679,7 +679,7 @@ func TestPostgresPreviewBackfillAssignsMissingProjections(t *testing.T) {
 		t.Fatalf("catalog after backfill = %v, %v", catalog, err)
 	}
 
-	again, err := BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
+	again, err := previewscene.BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -699,7 +699,7 @@ func TestPostgresPreviewBackfillNonExtractableKeepsNullScene(t *testing.T) {
 	}
 	nullOutPreviewColumns(t, db, boardID)
 
-	stats, err := BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
+	stats, err := previewscene.BackfillBoardPreviews(ctx, dbsqlc.New(db), 200, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -34,7 +34,7 @@ type Exception = { file: string; reason: string }
 // use `.component.spec.ts` for SFC behavior instead of extending this list.
 const UNIT_VUE_EXCEPTIONS: Exception[] = [
   {
-    file: 'src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts',
+    file: 'src/features/admin/shared/ui/adminControls.unit.spec.ts',
     reason:
       'Renders AdminButton/Input/Badge adapters via @vue/test-utils; migrate to component harness on next touch.',
   },

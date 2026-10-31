@@ -89,7 +89,7 @@ func (f *fakeHolder) Release(ctx context.Context, billingAccountID, actorUserID 
 
 // HoldInTx/CaptureInTx/ReleaseInTx serve the settlement-transaction seams
 // from the same ledger maps. Rollback fidelity lives in the txTestHolder
-// wrapper (settle_tx_fake_test.go), which regulators of atomicity use.
+// wrapper (settle_tx_test.go), which regulators of atomicity use.
 func (f *fakeHolder) HoldInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	return f.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 }

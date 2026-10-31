@@ -56,11 +56,9 @@ import (
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	"ideaboard/api/internal/tenancy"
-	"ideaboard/api/internal/tenancy/funds"
 	"ideaboard/api/internal/tenancy/invitations"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
-	usageports "ideaboard/api/internal/usage/ports"
 
 	"github.com/gin-gonic/gin"
 )
@@ -102,35 +100,9 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 }
 
 // AccountStore resolves the stable funds identity plus financial
-// management. Production uses tenancypg.BillingAccountStore via the deep
-// funds kernel; tests stub this interface.
-// Resolution joins the caller transaction inside the deep module (funds
-// borrow-or-begin); handlers pass only the ws_ public id and receive the
-// ba_ identity, never branching on the workspace/org mapping.
-type AccountStore interface {
-	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
-	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
-	// GetBillingAccountByInternalID resolves the stable ba_ funds identity
-	// for a beneficiary account (#921): reward redemption credits the
-	// caller's initial personal account, and the edge maps it to ba_ so
-	// the UI can name the actual credited account.
-	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error)
-	GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error)
-	ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error)
-	AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error)
-	UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error)
-	// Studio handover invitations (#948, invite-style ownership transfer).
-	InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error)
-	GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error)
-	ListBillingTransferInvitesForAccount(ctx context.Context, billingAccountInternalID, actorUserID, beforeID int64, limit int) ([]*tenancy.BillingTransferInvite, error)
-	AcceptBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error)
-	RejectBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error)
-	CancelBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, initiatorUserID int64) (*tenancy.BillingTransferInvite, error)
-	// RemoveBillingAccountMember detaches one financial manager without
-	// deleting or freezing shared funds (exit path): only the management
-	// row leaves, the Wallet/Ledger/history stay readable.
-	RemoveBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64) error
-}
+// management. Owned by shared (so tenancy and billing depend only on
+// shared+kernel, never on each other); aliased here for compatibility.
+type AccountStore = shared.AccountStore
 
 type billingAccountStore = AccountStore
 
@@ -637,24 +609,6 @@ func renderV1BillingRecordsError(c *gin.Context, err error) {
 	c.Abort()
 }
 
-// renderV1UsageError maps usage read outcomes onto the wire:
-// invalid-input sentinels render 4xx (bad range reuses the 422
-// validation_failed shape the edge uses for query parsing; bad user
-// renders 400 bad_request); every other GetCurrent failure stays 503
-// service_unavailable (transient or store-side).
-func renderV1UsageError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, usagedomain.ErrInvalidRange):
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			runtimehttp.MsgRenderV1UsageError, contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
-	case errors.Is(err, usageports.ErrInvalidBillingAccountID):
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest33)
-	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable40)
-	}
-	c.Abort()
-}
-
 // billingRenderWalletGate maps frozen/restricted wallets to the frozen
 // billing_wallet_restricted code (403). Missing wallets are invisible
 // inside a visible workspace: 404 with the same code family would leak
@@ -849,37 +803,6 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 	})
 }
 
-func (h *contractV1BillingHandler) getUsage(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		workspace := wctx.Workspace
-		if h.deps.Usage == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable40)
-			c.Abort()
-			return
-		}
-		usageRange, err := usagedomain.ParseRange(strings.TrimSpace(c.Query("range")))
-		if err != nil {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				runtimehttp.MsgRenderV1UsageError, contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
-			c.Abort()
-			return
-		}
-		account, ok := h.billingAccountForWorkspace(c, workspace)
-		if !ok {
-			return
-		}
-		filter, _, ok := h.consumptionReadScope(c, wctx, account)
-		if !ok {
-			return
-		}
-		snapshot, err := h.deps.Usage.GetCurrent(c.Request.Context(), account.InternalID, filter, usageRange)
-		if err != nil {
-			renderV1UsageError(c, err)
-			return
-		}
-		contract.RenderSuccess(c, snapshot)
-	})
-}
 
 type v1CreateCheckoutBody struct {
 	Data struct {

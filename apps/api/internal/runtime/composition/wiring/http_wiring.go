@@ -12,8 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	aigatewayapplication "ideaboard/api/internal/aigateway/application"
-	aigatewaydomain "ideaboard/api/internal/aigateway/domain"
 	"ideaboard/api/internal/billingoverview"
 	"ideaboard/api/internal/boards"
 	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
@@ -34,6 +32,9 @@ import (
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/memberquotas"
+	modelregistryapplication "ideaboard/api/internal/modelregistry/application"
+	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
+	modelregistryinfrastructure "ideaboard/api/internal/modelregistry/infrastructure"
 	"ideaboard/api/internal/notifications"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -52,8 +53,14 @@ import (
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/runtime/interfaces/http/control"
 	v1 "ideaboard/api/internal/runtime/interfaces/http/v1"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/billing"
+	v1library "ideaboard/api/internal/runtime/interfaces/http/v1/library"
+	v1media "ideaboard/api/internal/runtime/interfaces/http/v1/media"
+	v1system "ideaboard/api/internal/runtime/interfaces/http/v1/system"
+	v1tasks "ideaboard/api/internal/runtime/interfaces/http/v1/tasks"
+	v1tenancy "ideaboard/api/internal/runtime/interfaces/http/v1/tenancy"
 	"ideaboard/api/internal/runtime/ports"
-	searchapplication "ideaboard/api/internal/searchcatalog/application"
+	searchapplication "ideaboard/api/internal/searchcatalog/application/search"
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
@@ -95,10 +102,10 @@ func NewAppRouter(
 		UserLifecycle:     services.userLifecycle,
 	}
 	searchProviderConfig := searchinfra.NewConfigRepository(repos.systemConfigRepo)
-	aiGatewayRepo := aigatewayapplication.NewConfigRepository(repos.systemConfigRepo)
-	aiGatewayHandler := aigatewayapplication.NewHandler(aiGatewayRepo)
-	aiGatewayHandler.SetObservedService(aigatewaydomain.NewObservedService(
-		aigatewaydomain.NewObservedRepository(repos.db),
+	aiGatewayRepo := modelregistryinfrastructure.NewConfigRepository(repos.systemConfigRepo)
+	aiGatewayHandler := modelregistryhttp.NewHandler(aiGatewayRepo)
+	aiGatewayHandler.SetObservedService(modelregistryapplication.NewObservedService(
+		modelregistryinfrastructure.NewObservedRepository(repos.db),
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
 	// Control audit durability (step 2: atomic where the guard owns the
@@ -165,12 +172,12 @@ func NewAppRouter(
 	notificationCommands := notifications.NewService(notifications.NewPostgresStore(repos.db), &notifications.EventPublisher{
 		Log: taskServices.workspaceEvents, Bus: taskServices.workspaceEventBus, Hub: taskServices.userEvents,
 	})
-	memberDisplay := v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient)
-	memberLookup := v1.NewMemberLookupService(repos.userRepo, services.authServiceClient)
+	memberDisplay := v1tenancy.NewMemberDisplayService(repos.userRepo, services.authServiceClient)
+	memberLookup := v1tenancy.NewMemberLookupService(repos.userRepo, services.authServiceClient)
 	billingAccounts := tenancypg.NewBillingAccountStore(repos.db)
 	collaboration := &invitations.Service{
 		Store: tenancyStore, Transfers: billingAccounts,
-		Identities:  v1.NewInvitationIdentityReader(memberDisplay, memberLookup, userDirectory),
+		Identities:  v1tenancy.NewInvitationIdentityReader(memberDisplay, memberLookup, userDirectory),
 		Events:      tenancyevents.NewCollaborationEventDispatcher(notificationCommands, taskServices.invitationMailQueue),
 		Transaction: invitations.PostgresTransaction(repos.db),
 	}
@@ -184,7 +191,7 @@ func NewAppRouter(
 				// secret as issuance, same X-Internal-Key guard shape as
 				// the identity internal routes.
 				RealtimeHandler: runtimehttp.NewInternalRealtimeHandler(boardStore, tenancyStore, userDirectory, cfg.Realtime.TicketSecret, cfg.Auth.InternalAPIKey,
-					v1.NewBoardDocumentPublisher(taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
+					v1system.NewBoardDocumentPublisher(taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
 			},
 			CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 			RateLimit:      services.runtimeSettings,
@@ -200,7 +207,7 @@ func NewAppRouter(
 			Store:               tenancyStore,
 			Notifications:       notificationCommands,
 			Invitations:         collaboration,
-			InvitationReader:    v1.NewInvitationReader(repos.userRepo, services.authServiceClient),
+			InvitationReader:    v1tenancy.NewInvitationReader(repos.userRepo, services.authServiceClient),
 			Users:               userDirectory,
 			// #944 creation-time account display and authorization: the same
 			// stable billing-account store the billing surface and task
@@ -211,12 +218,12 @@ func NewAppRouter(
 			// emailReader join (users -> AuthUserIDs -> Auth emails) plus
 			// the avatar projection off the same rows; members without
 			// facts omit the fields, never fail the request.
-			Members: v1.ContractV1MemberDeps{
+			Members: v1tenancy.MemberDeps{
 				MemberDisplay: memberDisplay,
 				MemberLookup:  memberLookup,
 			},
-			Avatar: v1.ContractV1AvatarDeps{
-				AvatarUID:     v1.NewV1AvatarDirectory(repos.userRepo),
+			Avatar: v1media.ContractV1AvatarDeps{
+				AvatarUID:     v1media.NewV1AvatarDirectory(repos.userRepo),
 				AvatarObjects: services.storageService,
 			},
 			UserProfile: runtimehttp.NewV1UserProfileDirectory(repos.userRepo),
@@ -233,12 +240,12 @@ func NewAppRouter(
 			// public materialization route or emitter is wired here;
 			// the read-through orchestrator rides the typed
 			// store/materializer/executor seams built above.
-			Library: v1.ContractV1LibraryDeps{
+			Library: v1library.ContractV1LibraryDeps{
 				Store:       libraryStore,
 				ReadThrough: libraryReadThrough,
 				Sources:     librarySources,
 			},
-			Media: v1.ContractV1MediaDeps{
+			Media: v1media.ContractV1MediaDeps{
 				Media:         taskServices.workspaceTaskMedia,
 				MediaObjects:  services.storageService,
 				MediaRenderer: mediaRenderer,
@@ -257,7 +264,7 @@ func NewAppRouter(
 			// transaction-first (Quote->Hold->Insert->Enqueue and
 			// terminal Capture/Release each commit in ONE shared PG
 			// transaction via the required Tx interfaces).
-			Tasks: v1.ContractV1TaskDeps{
+			Tasks: v1tasks.ContractV1TaskDeps{
 				Tasks:                taskServices.workspaceTaskStore,
 				TaskLifecycle:        taskServices.workspaceTaskStore,
 				TaskBilling:          taskServices.workspaceTaskStore,
@@ -315,7 +322,7 @@ func NewAppRouter(
 		// Workspace task submission uses the shared transaction-first
 		// settlement seams wired above; billing reads below remain owned
 		// by the billing services.
-		v1.ContractV1BillingDeps{
+		billing.ContractV1BillingDeps{
 			Tenancy:         tenancyStore,
 			Invitations:     collaboration,
 			Users:           runtimehttp.NewUsersRepositoryDirectory(repos.userRepo),
@@ -328,7 +335,7 @@ func NewAppRouter(
 			// with task-quotes/readiness/submit for ai-image SKUs
 			// (same RoutingResolver instance, never a second lookup).
 			PoolRouter: taskServices.workspaceTaskRouter,
-			Checkout: v1.NewPaymentsCheckoutAdapter(services.paymentService,
+			Checkout: billing.NewPaymentsCheckoutAdapter(services.paymentService,
 				cfg.PublicOrigins.WebURL("/user/boards")),
 			// Gaps batch (#809-close, backend B): the Payments service
 			// implements the full UserCheckoutService seam (purchase
@@ -451,7 +458,7 @@ func controlRequireAdmin(c *gin.Context) bool {
 	return ok
 }
 
-func registerHTTPRoutes(r *gin.Engine, deps runtimehttp.Dependencies, authDeps runtimehttp.AuthDeps, v1Deps v1.ContractV1Deps, billingDeps v1.ContractV1BillingDeps, controlDeps control.ContractControlDeps, frontendOptions runtimehttp.FrontendRouteOptions) {
+func registerHTTPRoutes(r *gin.Engine, deps runtimehttp.Dependencies, authDeps runtimehttp.AuthDeps, v1Deps v1.ContractV1Deps, billingDeps billing.ContractV1BillingDeps, controlDeps control.ContractControlDeps, frontendOptions runtimehttp.FrontendRouteOptions) {
 	frontendFS, err := webdist.DistFS()
 	if err != nil {
 		slog.Warn("failed to load embedded frontend dist", "err", err)
@@ -463,6 +470,6 @@ func registerHTTPRoutes(r *gin.Engine, deps runtimehttp.Dependencies, authDeps r
 	// kernel never imports the planes).
 	runtimehttp.RegisterRoutes(r, deps, frontendFS, frontendOptions)
 	v1.RegisterContractV1RoutesOnEngine(r, authDeps, v1Deps)
-	v1.RegisterContractV1BillingRoutesOnEngine(r, authDeps, billingDeps)
+	billing.RegisterContractV1BillingRoutesOnEngine(r, authDeps, billingDeps)
 	control.RegisterContractControlRoutesOnEngine(r, authDeps, controlDeps)
 }

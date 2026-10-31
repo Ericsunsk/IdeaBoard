@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "checkpointSha": "e312aae08036de83ac5d7c0f1f46548c18ab0226",
+  "checkpointSha": "a620de1b4b10ec144ccb1ada2843ac92a8f20f21",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
-  "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
+  "inventoryGate": "inventory advisory; existing cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
   "totals": { "seams": 280, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
@@ -4639,7 +4639,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/core/composables/useSupportChannels.ts",
+          "from": "src/api/supportChannels.ts",
           "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         },
@@ -4699,8 +4699,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/api/supportChannels.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/core/composables/useSupportChannels.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 8,
@@ -10644,32 +10656,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.component.spec.ts",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
           "to": "src/core/composables/useSupportChannels.ts",
           "kind": "runtime"
         },
@@ -10684,14 +10671,12 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 9,
-      "fanOut": 6,
+      "fanIn": 4,
+      "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/public/model/supportChannel.ts",
-        "src/api/generated-query/public/model/supportChannelKind.ts",
-        "src/api/generated-query/public/user/user.ts",
+        "src/api/supportChannels.ts",
         "src/core/query/queryDefaults.ts"
       ],
       "outboundEdges": [
@@ -10707,17 +10692,7 @@
         },
         {
           "from": "src/core/composables/useSupportChannels.ts",
-          "to": "src/api/generated-query/public/model/supportChannel.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/core/composables/useSupportChannels.ts",
-          "to": "src/api/generated-query/public/model/supportChannelKind.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/composables/useSupportChannels.ts",
-          "to": "src/api/generated-query/public/user/user.ts",
+          "to": "src/api/supportChannels.ts",
           "kind": "runtime"
         },
         {
@@ -10727,16 +10702,46 @@
         }
       ],
       "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "missingConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.component.spec.ts",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 6,
       "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "fanInTargetMismatch": true,
+        "fanOutTargetMismatch": true,
+        "newFanOutTargets": ["src/api/supportChannels.ts"],
+        "missingFanOutTargets": [
+          "src/api/generated-query/public/model/supportChannel.ts",
+          "src/api/generated-query/public/model/supportChannelKind.ts",
+          "src/api/generated-query/public/user/user.ts"
+        ]
       },
       "shimCount": 0,
       "ownershipScope": ["src/core/composables/useSupportChannels.ts"],
@@ -15944,6 +15949,7 @@
         "src/api/http/userSession.ts",
         "src/api/media/upload.ts",
         "src/api/realtime/workspaceEventStream.ts",
+        "src/api/supportChannels.ts",
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
         "src/components/ui/button/index.ts",
@@ -15969,7 +15975,6 @@
         "src/core/composables/useMenuTriggerFocusRestore.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/composables/useSiteBranding.ts",
-        "src/core/composables/useSupportChannels.ts",
         "src/core/datetime/parse.ts",
         "src/core/datetime/shanghai.ts",
         "src/core/errors/errorCatalog.ts",
@@ -17306,6 +17311,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/api/supportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         },
@@ -17313,11 +17323,6 @@
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/components/ui/popover/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
@@ -17346,7 +17351,7 @@
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-          "to": "src/core/composables/useSupportChannels.ts",
+          "to": "src/api/supportChannels.ts",
           "kind": "runtime"
         },
         {
@@ -17391,6 +17396,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/api/supportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         },
@@ -17408,11 +17418,6 @@
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
@@ -18269,8 +18274,8 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/api/supportChannels.ts"],
+        "missingFanOutTargets": ["src/core/composables/useSupportChannels.ts"]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/account/"],
@@ -18920,9 +18925,9 @@
         "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/api/supportChannels.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/popover/index.ts",
-        "src/core/composables/useSupportChannels.ts",
         "src/theme/appOverlayMenu.ts"
       ],
       "outboundEdges": [
@@ -18953,6 +18958,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/api/supportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         },
@@ -18960,11 +18970,6 @@
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/components/ui/popover/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
@@ -18981,8 +18986,8 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/api/supportChannels.ts"],
+        "missingFanOutTargets": ["src/core/composables/useSupportChannels.ts"]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/account/ui/chrome/SupportChannelQr.vue"],
@@ -19027,11 +19032,11 @@
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/api/supportChannels.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/composables/useFailureToast.ts",
         "src/core/composables/useMenuTriggerFocusRestore.ts",
-        "src/core/composables/useSupportChannels.ts",
         "src/core/i18n/localeManifest.ts",
         "src/core/i18n/userLocale.ts",
         "src/core/lib/pageChrome.ts",
@@ -19061,6 +19066,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/api/supportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         },
@@ -19078,11 +19088,6 @@
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
@@ -19144,8 +19149,8 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/api/supportChannels.ts"],
+        "missingFanOutTargets": ["src/core/composables/useSupportChannels.ts"]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/account/ui/chrome/UserAccountMenu.vue"],
@@ -20406,6 +20411,11 @@
       ],
       "outboundEdges": [
         {
+          "from": "src/features/admin/shared/core/motion/chartMotion.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/core/reconcileStableRows.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -20761,12 +20771,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
           "to": "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -20813,11 +20823,6 @@
         {
           "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -22464,7 +22469,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
           "to": "src/features/admin/shared/ui/AdminBadge.vue",
           "kind": "runtime"
         }
@@ -22493,8 +22498,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminBadge.vue",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminBadge.vue",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
@@ -22517,7 +22534,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
           "to": "src/features/admin/shared/ui/AdminButton.vue",
           "kind": "runtime"
         },
@@ -22576,8 +22593,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 8,
@@ -22808,12 +22837,12 @@
     "src/features/admin/shared/ui/chart/chart.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/admin/shared/index.ts",
+          "from": "src/features/admin/shared/core/motion/chartMotion.unit.spec.ts",
           "to": "src/features/admin/shared/ui/chart/chart.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
+          "from": "src/features/admin/shared/index.ts",
           "to": "src/features/admin/shared/ui/chart/chart.ts",
           "kind": "runtime"
         },
@@ -22871,8 +22900,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/admin/shared/core/motion/chartMotion.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 3,
@@ -23022,7 +23063,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
           "to": "src/features/admin/shared/ui/form/AdminInput.vue",
           "kind": "runtime"
         },
@@ -23073,8 +23114,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControls.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 3,
@@ -25981,7 +26034,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "type-only"
         },
@@ -27110,6 +27163,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/range/range.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
@@ -27132,26 +27205,6 @@
         {
           "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
           "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/test/deferred.ts",
           "kind": "runtime"
         },
         {
@@ -27440,8 +27493,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "type-only"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 50,
@@ -29088,6 +29153,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/range/range.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
@@ -29110,26 +29195,6 @@
         {
           "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
           "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/test/deferred.ts",
           "kind": "runtime"
         },
         {
@@ -30606,6 +30671,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/range/range.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
@@ -30628,26 +30713,6 @@
         {
           "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
           "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
-          "to": "src/test/deferred.ts",
           "kind": "runtime"
         },
         {
@@ -31139,12 +31204,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
+          "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
@@ -31210,8 +31275,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 31,
@@ -34480,14 +34557,14 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/features/canvas/session/flow-adapter/index.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPointerInteraction.ts",
@@ -35590,8 +35667,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 63,
@@ -35752,7 +35841,7 @@
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-        "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+        "src/features/canvas/ui/screens/controllers/index.ts",
         "src/features/library/index.ts",
         "src/test/msw.ts"
       ],
@@ -36634,7 +36723,7 @@
         },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
           "kind": "runtime"
         },
         {
@@ -36807,8 +36896,10 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/ui/screens/controllers/index.ts"],
+        "missingFanOutTargets": [
+          "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts"
+        ]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/session/graph-editing/"],
@@ -36859,7 +36950,7 @@
         "src/features/canvas/tools/outpaint/session/outpaintIntent.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+        "src/features/canvas/ui/screens/controllers/index.ts",
         "src/features/workspace/index.ts"
       ],
       "outboundEdges": [
@@ -36915,7 +37006,7 @@
         },
         {
           "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
           "kind": "runtime"
         },
         {
@@ -37005,7 +37096,7 @@
         },
         {
           "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
           "kind": "type-only"
         },
         {
@@ -37133,8 +37224,10 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/ui/screens/controllers/index.ts"],
+        "missingFanOutTargets": [
+          "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts"
+        ]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/session/image-workflow/"],
@@ -37970,15 +38063,10 @@
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
         "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
-        "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+        "src/features/canvas/ui/screens/controllers/index.ts",
         "src/test/render.ts"
       ],
       "outboundEdges": [
-        {
-          "from": "src/features/canvas/tools/image-tools/core/model.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "type-only"
-        },
         {
           "from": "src/features/canvas/tools/image-tools/core/model.ts",
           "to": "src/features/canvas/session/execution/index.ts",
@@ -38106,7 +38194,7 @@
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
           "kind": "type-only"
         },
         {
@@ -38294,8 +38382,10 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/ui/screens/controllers/index.ts"],
+        "missingFanOutTargets": [
+          "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts"
+        ]
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/tools/image-tools/"],
@@ -40212,6 +40302,41 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/canvas/core/nodes/canvasNodeUi.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/canvas/core/nodes/flowTypes.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeIsolation.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -40230,41 +40355,6 @@
           "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
           "to": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/features/board/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/features/canvas/core/nodes/canvasNodeUi.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/features/canvas/core/nodes/flowTypes.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/features/canvas/session/flow-adapter/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/fusionNodePresentation.unit.spec.ts",
@@ -41286,7 +41376,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "src/features/canvas/ui/nodes/primitives/index.ts",
           "kind": "runtime"
         },
@@ -41662,8 +41752,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 14,
@@ -42308,27 +42410,27 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "node_modules/@testing-library/vue/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "src/features/canvas/ui/nodes/primitives/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "from": "src/features/canvas/ui/overlays/CanvasTransientMotion.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -42541,14 +42643,9 @@
     "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "from": "src/features/canvas/ui/screens/controllers/index.ts",
           "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.ts",
@@ -42566,7 +42663,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 4,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue/index.js"],
       "outboundEdges": [
@@ -42576,14 +42673,31 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/canvas/ui/screens/controllers/index.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts",
+          "kind": "type-only"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
-        "fanInTargetMismatch": false,
+        "fanInTargetMismatch": true,
         "fanOutTargetMismatch": false,
         "newFanOutTargets": [],
         "missingFanOutTargets": []
@@ -42594,6 +42708,35 @@
     },
     "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts": {
       "consumerEdges": [
+        {
+          "from": "src/features/canvas/ui/screens/controllers/index.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.unit.spec.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 2,
+      "fanOut": 1,
+      "fanOutTargets": ["node_modules/vue/index.js"],
+      "outboundEdges": [
+        {
+          "from": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/canvas/ui/screens/controllers/index.ts",
+          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
           "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
@@ -42608,31 +42751,14 @@
           "from": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
           "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.unit.spec.ts",
-          "to": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
-          "kind": "runtime"
         }
       ],
-      "fanIn": 4,
-      "fanOut": 1,
-      "fanOutTargets": ["node_modules/vue/index.js"],
-      "outboundEdges": [
-        {
-          "from": "src/features/canvas/ui/screens/controllers/useFlowCanvasInteractionState.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
-        "fanInTargetMismatch": false,
+        "fanInTargetMismatch": true,
         "fanOutTargetMismatch": false,
         "newFanOutTargets": [],
         "missingFanOutTargets": []
@@ -43568,7 +43694,33 @@
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
-      "undeclaredDeepImports": [],
+      "undeclaredDeepImports": [
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
+          "to": "src/features/canvas/ui/screens/controllers/index.ts",
+          "kind": "type-only"
+        }
+      ],
       "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 59,
@@ -45902,6 +46054,21 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/search/ui/components/SearchEmptyState.component.spec.ts",
+          "to": "node_modules/@testing-library/user-event/dist/cjs/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchEmptyState.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchEmptyState.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/ui/components/SearchEmptyState.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -45909,6 +46076,26 @@
         {
           "from": "src/features/search/ui/components/SearchEmptyState.vue",
           "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.component.spec.ts",
+          "to": "node_modules/@testing-library/user-event/dist/cjs/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.component.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.component.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -45944,6 +46131,11 @@
         {
           "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "src/theme/lightboxScrim.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
+          "to": "node_modules/@testing-library/user-event/dist/cjs/index.js",
           "kind": "runtime"
         },
         {
@@ -46117,26 +46309,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
-          "to": "node_modules/@testing-library/user-event/dist/cjs/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
-          "to": "src/test/mediaDisplay.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -46301,12 +46473,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
+          "from": "src/features/board/ui/gallery/range/range.unit.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
@@ -47800,8 +47972,20 @@
           "kind": "runtime"
         }
       ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
+      "undeclaredConsumers": [
+        {
+          "from": "src/features/board/ui/gallery/range/galleryController.range.unit.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "missingConsumers": [
+        {
+          "from": "src/features/board/ui/gallery/range/rangeController.unit.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 32,

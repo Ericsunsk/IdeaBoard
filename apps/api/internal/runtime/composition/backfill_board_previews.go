@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/boards/previewscene"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 
@@ -43,7 +43,7 @@ func runBackfillBoardPreviews(batchSize, maxBoards int, dryRun bool) {
 		fatal("failed to connect to database", "err", err)
 	}
 	defer pool.Close()
-	stats, err := boards.BackfillBoardPreviews(ctx, dbsqlc.New(pool), batchSize, maxBoards, dryRun)
+	stats, err := previewscene.BackfillBoardPreviews(ctx, dbsqlc.New(pool), batchSize, maxBoards, dryRun)
 	if err != nil {
 		fatal("failed to backfill board previews", "err", err)
 	}

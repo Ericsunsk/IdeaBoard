@@ -3,7 +3,7 @@ package providers
 // Asset-kind finalize test: the workspace provider-result materializer
 // ingests bytes before finalize, so CallGatewayAPI must accept outputs
 // that carry a workspace asset id with no URL round-trip. URL outputs keep
-// the existing validation untouched (see gateway_execute_test.go).
+// the existing validation untouched (see execute_test.go).
 
 import (
 	"context"

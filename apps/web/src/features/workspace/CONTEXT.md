@@ -24,7 +24,7 @@ The Workspace Shell is a frontend composition boundary. A tenant Workspace is ow
 - `WorkspaceLayout.vue` — page shell in `layout`: injects `WorkspaceNavigation`, manages viewport height/width and scrollbars; no page-specific business state.
 - `WorkspaceNavigation.vue` — top nav bar in `shell/components`: logo, route highlight, Idea balance widget, avatar and dropdown; collapsed-menu expansion is local interaction state.
 - `useWorkspaceAccountControls.ts` — top-bar user behavior controller in `shell`: `openAccountTab`, `handleSignOut`, `userMenuItems`; aggregates Auth Store and Account Overlay into declarative menu items.
-- `workspace/index.ts` is the default cross-feature entry. Account menu composition uses the exact `ui/settings/WorkspaceSettingsDialog.vue` and `ui/dialogs/workspaceMenu.ts` public subpaths declared in the [Seam inventory](../../../../../docs/frontend-seam-inventory.md), avoiding a cycle through the shell barrel.
+- `workspace/index.ts` is the default cross-feature entry. Account menu composition uses the exact `ui/settings/index.ts` and `ui/dialogs/index.ts` public subpaths declared in the [Seam inventory](../../../../../docs/frontend-seam-inventory.md), avoiding a cycle through the shell barrel.
 - The settings dialog owns the Member and Limits sections, while Workspace creation uses its local dialog. Settings and menu consumers use the explicit UI subpaths above rather than duplicate root-barrel exports.
 - `fetchWorkspaceMembers` / `workspaceMembersQueryOptions` — canonical roster transport, parser and Query options shared by Workspace settings and Board Share. Each entry has one public identity, a strict membership role and optional display-only email/avatar; no consumer owns a second roster parser or cache.
 

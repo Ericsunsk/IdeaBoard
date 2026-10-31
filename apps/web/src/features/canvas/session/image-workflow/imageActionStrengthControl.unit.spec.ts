@@ -65,6 +65,32 @@ describe('useFlowImageActionStrengthControl', () => {
     vi.restoreAllMocks()
   })
 
+  it('accepts component-root refs for range editing and clears them on unmount', () => {
+    const onCommit = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit })
+    const action = IMAGE_NODE_ACTION.variations
+    const { input, trigger } = bindRange(control, action)
+    stubRangeBounds(input, { left: 100, width: 200 })
+    control.setStrengthRangeRef(action, { $el: input })
+    control.setStrengthTriggerRef(action, { $el: trigger })
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
+    vi.advanceTimersByTime(260)
+    expect(control.activeStrengthAction.value).toBe(action)
+    expect(input.value).toBe('25')
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 280 }))
+    expect(onCommit).toHaveBeenCalledWith(action, 90)
+
+    control.setStrengthRangeRef(action, null)
+    control.setStrengthTriggerRef(action, null)
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 8, clientX: 150 }))
+    vi.advanceTimersByTime(260)
+    expect(control.activeStrengthAction.value).toBeNull()
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    control.dispose()
+  })
+
   it('keeps ordinary pointer down as a pending click without committing strength', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })

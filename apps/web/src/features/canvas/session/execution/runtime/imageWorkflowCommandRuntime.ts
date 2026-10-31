@@ -6,7 +6,7 @@ import {
   type ImageExecutionInput,
   type ImageExecutionPlan,
 } from '../planning/imageExecutionPlan'
-import type { OutpaintRect } from '../../../tools/outpaint/core/geometry.ts'
+import type { OutpaintRect } from '../../../tools/outpaint/core'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
 import { i18n } from '../../../../../core/i18n'
 

@@ -167,7 +167,7 @@ import {
   adminTableStyle,
 } from '../../../../shared/index'
 import { newRequestId } from '@/api/http/contractKernel'
-import { SUPPORT_CHANNELS_QUERY_KEY } from '@/core/composables/useSupportChannels'
+import { SUPPORT_CHANNELS_QUERY_KEY } from '@/api/supportChannels'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'
 import { SETTINGS_SECTIONS } from '../../pages/sections'
 import { useSettingsLifecycle } from '../../../session/useSettingsLifecycle'

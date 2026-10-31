@@ -461,6 +461,8 @@ API 在独立 metrics listener 暴露 Prometheus `/metrics`；本地宿主只监
 
 ## Repo Map
 
+> 指针式：目录只列入口，契约与规则看指向的 `CONTEXT.md` / 设计文档，不在此复述。
+
 ```text
 .github/workflows/           # CI / release workflow
 deploy/                      # reverse proxy templates
@@ -469,34 +471,40 @@ docs/agents/                 # agent workflow docs
 docs/runbooks/               # deployment, operations, security runbooks
 scripts/                     # packaging, deployment and release scripts
 
-apps/web/src/
-├── app/                      # app startup, router, theme wiring
-├── api/                      # HTTP exit, transport contracts, generated clients
-├── core/                     # horizontal primitives and infrastructure runtime
+apps/web/src/                # 前端契约见 apps/web/DESIGN.md + 各 CONTEXT.md
+├── app/                      # → app startup/router（路由表见 features/*/routes）
+├── api/                      # → src/api/CONTEXT.md（HTTP exit / generated clients）
+├── core/                     # → src/core/CONTEXT.md（horizontal primitives）
 ├── theme/                    # tokens, atoms and UI presets
 ├── lib/                      # horizontal utilities
 ├── components/               # standard UI primitives
-├── features/                 # business modules
-│   ├── account/              # user account and billing settings
-│   ├── admin/                # Admin vertical contexts
-│   ├── auth/                 # login/register views
-│   ├── board/                # Board bounded context: domain, sync, persistence, catalog
-│   ├── canvas/               # Canvas Workspace
-│   ├── legal/                # legal pages
-│   ├── library/              # asset library
-│   ├── search/               # search features
-│   └── workspace/            # workspace routes, layout, shell (/user/* URLs)
+├── features/                 # 各业务域唯一入口见各自 CONTEXT.md / index.ts
+│   ├── account/              # → features/account/CONTEXT.md
+│   ├── admin/                # → features/admin/CONTEXT.md（control 平面唯一前端入口）
+│   ├── auth/                 # → features/auth/CONTEXT.md
+│   ├── board/                # → features/board/CONTEXT.md
+│   ├── canvas/               # → features/canvas/CONTEXT.md
+│   ├── legal/                # → features/legal/CONTEXT.md
+│   ├── library/              # → features/library/CONTEXT.md
+│   ├── notification/         # → features/notification/index.ts（跨功能通知会话/UI）
+│   ├── search/               # → features/search/CONTEXT.md
+│   └── workspace/            # → features/workspace/CONTEXT.md（/user/* shell）
 
-apps/api/
+apps/api/                    # 后端契约见 DESIGN.md + apps/api/CONTEXT.md
 ├── cmd/                      # service entrypoints
 ├── internal/platform/        # config, database, response, safehttp
 ├── internal/runtime/         # bootstrap, HTTP routes, worker, webdist
 ├── internal/identity/        # auth/users/admin user management
 ├── internal/media/           # storage/assets/media refs/image format
 ├── internal/boards/          # board ownership and management
-├── internal/tasking/         # task model/submission/queue/runtime/stats
+├── internal/tasking/         # → internal/tasking/CONTEXT.md
 ├── internal/workflow/        # feature contract
-└── internal/prompts/         # prompt templates and assembly
+├── internal/prompts/         # prompt templates and assembly
+├── internal/modelregistry/   # → internal/modelregistry/CONTEXT.md（Model Pool/网关）
+├── internal/searchcatalog/   # → internal/searchcatalog/CONTEXT.md（Vision/Search 计费目录）
+├── internal/memberquotas/    # → internal/memberquotas/CONTEXT.md（成员跨空间额度）
+├── internal/notifications/   # 用户通知中心（Preference + 邀请/结算 hints）
+└── control 平面（Admin）     # 无独立目录：各 context 的 control handler + features/admin/CONTEXT.md
 
 apps/auth/
 ├── src/admission/            # registration, Origin/CORS and Rate Limit policy

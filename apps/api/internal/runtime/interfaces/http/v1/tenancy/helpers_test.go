@@ -6,7 +6,7 @@ import (
 
 	domainboards "ideaboard/api/internal/boards"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
-	v1billing "ideaboard/api/internal/runtime/interfaces/http/v1/billing"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	"ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
 	domaintenancy "ideaboard/api/internal/tenancy"
 
@@ -69,7 +69,7 @@ var v1OrganizationWorkspaceFixture = testsupport.OrganizationWorkspaceFixture
 var v1UserAuthMiddleware = testsupport.UserAuthMiddleware
 var v1GapsErrorFields = testsupport.ErrorFields
 
-type billingAccountStore = v1billing.AccountStore
+type billingAccountStore = shared.AccountStore
 
 type ContractV1Deps = Deps
 type ContractV1MemberDeps = MemberDeps

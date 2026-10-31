@@ -13,12 +13,12 @@ import type {
   CanvasGraphReadPort,
   CanvasGraphStore,
 } from '../../../core/graph'
+import { resolveWritableCanvasGraphStore } from '../../../core/graph'
 import type { BoardAttachment } from '../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter'
 import { canvasNodeToFlowNode } from '../../../session/flow-adapter'
 import { createPrefixedId } from '../../../../../core/utils/ids'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
-import { resolveWritableCanvasGraphStore } from '../../../core/graph/graphStoreWriter'
 import {
   readOutputAnchorLayout,
   resolvePendingImageResultPosition,

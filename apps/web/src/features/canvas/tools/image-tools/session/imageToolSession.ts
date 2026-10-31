@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { CanvasNodeItem, ImageNodeItem } from '../../../../board/ports/canvas'
-import type { CanvasInteractionKey } from '../../../ui/screens/controllers/useFlowCanvasInteractionState.ts'
+import type { CanvasInteractionKey } from '../../../ui/screens/controllers'
 import type {
   CanvasFlowViewportControls,
   CanvasVueFlowConnectionAdapter,

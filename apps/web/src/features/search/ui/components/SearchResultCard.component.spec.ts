@@ -1,6 +1,7 @@
 import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { describe, expect, it } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
+import userEvent from '@testing-library/user-event'
 import { render, screen } from '../../../../test/render'
 import SearchResultCard from './SearchResultCard.vue'
 import type { SearchResult } from '../../core/models'
@@ -82,5 +83,92 @@ describe('Search result drag source', () => {
     expect(emitted().useAsReference).toHaveLength(1)
     expect(emitted().toggleSave).toHaveLength(1)
     expect(emitted().retryImage).toHaveLength(1)
+  })
+})
+
+// Ported from searchComponents.unit.spec.ts (deleted): presentation cases for
+// the same SFC, kept verbatim alongside the drag-source cases above.
+const presentationItem: SearchResult = {
+  id: 'img-1',
+  provider: 'unsplash',
+  title: 'Mountain Sunset',
+  author: 'John Doe',
+  author_url: 'https://example.com/author',
+  media_kind: 'image',
+  display: mediaDisplayFixture(),
+  source_url: 'https://example.com/source',
+  thumbnail_url: 'https://example.com/thumb.jpg',
+  preview_url: 'https://example.com/preview.jpg',
+  original_url: 'https://example.com/orig.jpg',
+  width: 800,
+  height: 600,
+}
+
+describe('SearchResultCard presentation', () => {
+  it('renders preview image with aspect ratio and handles lightbox click', async () => {
+    const user = userEvent.setup()
+    let lightboxOpened = false
+    render(SearchResultCard, {
+      props: {
+        result: presentationItem,
+        index: 0,
+        isSelected: false,
+        isUsedAsReference: false,
+        isSaved: false,
+        hasImageError: false,
+        imageRetryCount: 0,
+        onOpenLightbox: () => {
+          lightboxOpened = true
+        },
+      },
+    })
+    const img = screen.getByAltText('Mountain Sunset')
+    expect(img).toHaveAttribute('src', '/api/media/previews/fixture/large-preview')
+    const zoomBtn = screen.getByRole('button', { name: /view|查看/i })
+    await user.click(zoomBtn)
+    expect(lightboxOpened).toBe(true)
+  })
+
+  it('renders retry button when hasImageError is true', () => {
+    render(SearchResultCard, {
+      props: {
+        result: presentationItem,
+        index: 0,
+        isSelected: false,
+        isUsedAsReference: false,
+        isSaved: false,
+        hasImageError: true,
+        imageRetryCount: 1,
+      },
+    })
+    expect(screen.getByRole('button', { name: /重试|Retry/i })).toBeInTheDocument()
+  })
+
+  it('renders selected, saved, and reference states correctly', () => {
+    const { rerender } = render(SearchResultCard, {
+      props: {
+        result: presentationItem,
+        index: 0,
+        isSelected: true,
+        isUsedAsReference: true,
+        isSaved: true,
+        hasImageError: false,
+        imageRetryCount: 0,
+      },
+    })
+
+    const card = screen.getByRole('article')
+    expect(card).toBeInTheDocument()
+
+    rerender({
+      result: presentationItem,
+      index: 0,
+      isSelected: false,
+      isUsedAsReference: false,
+      isSaved: false,
+      hasImageError: false,
+      imageRetryCount: 0,
+    })
+    expect(card).toBeInTheDocument()
   })
 })

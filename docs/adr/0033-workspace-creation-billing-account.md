@@ -1,4 +1,5 @@
 # ADR-0033: Workspace Creation with Explicit Billing Account
+> Superseded（Resolution 部分）：被 [ADR-0038](./0038-personal-organization-billing-model.md) 取代，当前产品合同以 0038 为准。
 
 ## Context
 

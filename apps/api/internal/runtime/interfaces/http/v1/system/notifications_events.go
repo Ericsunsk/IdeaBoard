@@ -4,7 +4,7 @@ package system
 //
 // Browser push for the user notification center reuses the versioned
 // workspace event infrastructure: notification.created/updated are frozen
-// v1 registry members (see internal/events/v1_envelope.go) carrying
+// v1 registry members (see internal/events/envelope.go) carrying
 // refs only (invite_id + notification_type, never titles/bodies/emails).
 // Frames are a "refetch now" prompt: clients invalidate and GET, payloads
 // never write the cache.

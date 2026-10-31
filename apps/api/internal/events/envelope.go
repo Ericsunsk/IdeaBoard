@@ -1,0 +1,594 @@
+package events
+
+// Versioned workspace event envelope (issue #807, events/envelope.go).
+//
+// One envelope is shared by SSE and signed webhooks; transports differ
+// only in delivery. The V1 prefix below is the envelope data-schema
+// version: it versions the event data payload for (type) only and is
+// independent from HTTP API versions.
+//
+// Frozen registry (type -> version). Additive only: new types arrive with
+// a new versioned data schema; existing (type, version) pairs never
+// change shape. Internal DB rows and task structs are NEVER exposed:
+// producers map domain facts to opaque public ids (task_, board_,
+// asset_, lasset_, ws_, usr_) before minting.
+//
+// Publishing rule (exactly-once-from-domain-boundary): domain services
+// stage facts during settlement and emit envelopes ONLY after the commit
+// succeeds (see workspacetasks.Service.StagedEvents + TaskStatusV1Type).
+// Delivery is at-least-once: NATS publishes with MsgID = envelope id
+// (duplicate window), the hot log append is idempotent on id, and webhook
+// dispatch dedups per subscription. Task status transitions additionally
+// persist a durable outbox row in the same transaction as the transition;
+// its replayer reuses the stable envelope id after crashes or publish
+// failures. Other event types use the process-local hot replay window and
+// NATS JetStream (7-day retention per DESIGN) as their transport boundary.
+//
+// Control audit records are never exposed here: the registry contains no
+// audit/control types by construction (see TestV1RegistryExcludesControl).
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"ideaboard/api/internal/platform/contract"
+)
+
+// Frozen workspace event types (type -> data schema version).
+const (
+	EventV1TaskCreated           = "task.created"
+	EventV1TaskRunning           = "task.running"
+	EventV1TaskCompleted         = "task.completed"
+	EventV1TaskFailed            = "task.failed"
+	EventV1TaskCancelled         = "task.cancelled"
+	EventV1MediaAssetReady       = "media.asset_ready"
+	EventV1MediaAssetArchived    = "media.asset_archived"
+	EventV1BoardDocumentReplaced = "board.document_replaced"
+	EventV1BoardAccessChanged    = "board.access_changed"
+	EventV1BillingSettled        = "billing.settled"
+	EventV1NotificationCreated   = "notification.created"
+	EventV1NotificationUpdated   = "notification.updated"
+)
+
+// v1EventVersions freezes the data schema version per event type.
+var v1EventVersions = map[string]int{
+	EventV1TaskCreated:           1,
+	EventV1TaskRunning:           1,
+	EventV1TaskCompleted:         1,
+	EventV1TaskFailed:            1,
+	EventV1TaskCancelled:         1,
+	EventV1MediaAssetReady:       1,
+	EventV1MediaAssetArchived:    1,
+	EventV1BoardDocumentReplaced: 1,
+	EventV1BoardAccessChanged:    1,
+	EventV1BillingSettled:        1,
+	EventV1NotificationCreated:   1,
+	EventV1NotificationUpdated:   1,
+}
+
+// V1EventVersion reports the frozen data schema version for typ.
+func V1EventVersion(typ string) (int, bool) {
+	version, ok := v1EventVersions[strings.TrimSpace(typ)]
+	return version, ok
+}
+
+// IsV1EventType reports whether typ is a frozen registry member.
+func IsV1EventType(typ string) bool {
+	_, ok := V1EventVersion(typ)
+	return ok
+}
+
+// V1EventTypes returns the frozen registry in stable order.
+func V1EventTypes() []string {
+	return []string{
+		EventV1TaskCreated, EventV1TaskRunning, EventV1TaskCompleted,
+		EventV1TaskFailed, EventV1TaskCancelled,
+		EventV1MediaAssetReady, EventV1MediaAssetArchived,
+		EventV1BoardDocumentReplaced, EventV1BoardAccessChanged, EventV1BillingSettled,
+		EventV1NotificationCreated, EventV1NotificationUpdated,
+	}
+}
+
+// Actor types carried by the envelope. Canonical `service` covers
+// service accounts and provider adapters.
+const (
+	V1ActorUser    = "user"
+	V1ActorService = "service"
+	V1ActorSystem  = "system"
+)
+
+// Resource types carried by the envelope. billing.settled rides on the
+// settled entity (task); checkout_session is
+// reserved for the #809 Stripe-convergence mapping and is never emitted
+// today (Stripe inbound webhooks stay distinct integrations that emit
+// internal user events only). invite carries a member-invite identity
+// (wsi_, osi_, or bti_): notification hints are about an invitation, so
+// the invite is their subject; the notification row itself (notif_) stays
+// a server-side read fact, never a delivery identity.
+const (
+	V1ResourceTask            = "task"
+	V1ResourceBoard           = "board"
+	V1ResourceMediaAsset      = "media_asset"
+	V1ResourceCheckoutSession = "checkout_session"
+	V1ResourceInvite          = "invite"
+)
+
+// V1Actor identifies who caused the event. User ids are usr_ opaque
+// ids; service ids are opaque service names; system uses id "system".
+type V1Actor struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// V1Resource identifies what the event is about (public ids only).
+type V1Resource struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// V1Envelope is the shared SSE + webhook envelope.
+type V1Envelope struct {
+	ID          string          `json:"id"`
+	Type        string          `json:"type"`
+	Version     int             `json:"version"`
+	OccurredAt  time.Time       `json:"occurred_at"`
+	Actor       V1Actor         `json:"actor"`
+	Resource    V1Resource      `json:"resource"`
+	WorkspaceID string          `json:"workspace_id"`
+	Data        json.RawMessage `json:"data"`
+}
+
+// Typed data payloads (public ids only, no amounts, no storage URLs).
+
+type V1TaskCreatedData struct {
+	TaskID  string `json:"task_id"`
+	Service string `json:"service"`
+}
+
+type V1TaskRunningData struct {
+	TaskID string `json:"task_id"`
+}
+
+type V1TaskCompletedOutput struct {
+	AssetID      string `json:"asset_id,omitempty"`
+	Role         string `json:"role,omitempty"`
+	URL          string `json:"url,omitempty"`
+	Width        int32  `json:"width,omitempty"`
+	Height       int32  `json:"height,omitempty"`
+	MIMEType     string `json:"mime_type,omitempty"`
+	PreviewReady bool   `json:"preview_ready"`
+}
+
+type V1TaskCompletedData struct {
+	TaskID     string                  `json:"task_id"`
+	OutputsURI string                  `json:"outputs_uri"`
+	Outputs    []V1TaskCompletedOutput `json:"outputs,omitempty"`
+}
+
+type V1TaskFailedData struct {
+	TaskID    string `json:"task_id"`
+	ErrorCode string `json:"error_code"`
+}
+
+type V1TaskCancelledData struct {
+	TaskID       string `json:"task_id"`
+	CancelReason string `json:"cancel_reason,omitempty"`
+}
+
+type V1MediaAssetReadyData struct {
+	AssetID string `json:"asset_id"`
+}
+
+type V1MediaAssetArchivedData struct {
+	AssetID string `json:"asset_id"`
+}
+
+type V1BoardDocumentReplacedData struct {
+	BoardID  string `json:"board_id"`
+	Revision int64  `json:"revision"`
+}
+
+// V1BoardAccessChangedData is the directed access-loss control signal
+// (issue #940). It carries ONLY the recipient's already-known board
+// identity plus the monotonic access version: no roles, no roster, no
+// document bytes, no prompts, no asset identifiers. Servers deliver it
+// exclusively to the named member (recipient == member_id); it never
+// rides webhooks and ordinary replay never returns it to anyone else.
+type V1BoardAccessChangedData struct {
+	BoardID       string `json:"board_id"`
+	MemberID      string `json:"member_id"`
+	AccessVersion int64  `json:"access_version"`
+}
+
+// V1BillingSettledData carries settlement refs only: quote, hold,
+// capture, and release references plus the settled state. Amounts never
+// appear here (balance reads stay on the wallet endpoints).
+type V1BillingSettledData struct {
+	ReferenceType     string `json:"reference_type"`
+	ReferenceID       string `json:"reference_id"`
+	SettlementState   string `json:"settlement_state"`
+	HoldTransactionID string `json:"hold_transaction_id,omitempty"`
+}
+
+// V1NotificationData is the refs-only hint carried by notification.created
+// and notification.updated. It names the invitation subject (invite_id)
+// plus the notification domain type that changed (notification_type), so
+// browsers know which inbox to GET. Titles, bodies, roles, emails, and the
+// notif_ row identity never cross this envelope: clients treat the frame
+// as a "refetch now" prompt and read facts from the notifications endpoints.
+type V1NotificationData struct {
+	InviteID         string `json:"invite_id"`
+	NotificationType string `json:"notification_type"`
+}
+
+// MintV1Envelope mints an envelope with an evt_ id (via
+// contract.MintPublicID), UTC occurred_at, and the frozen version for
+// typ. Unknown types fail closed.
+func MintV1Envelope(typ, workspaceID string, actor V1Actor, resource V1Resource, data any) (V1Envelope, error) {
+	id, err := contract.MintPublicID(contract.PrefixEvent, 12)
+	if err != nil {
+		return V1Envelope{}, err
+	}
+	return MintV1EnvelopeWithID(id, typ, workspaceID, actor, resource, data)
+}
+
+// MintV1EnvelopeWithID builds a workspace envelope using a caller supplied
+// stable event identity. Durable task outbox replay uses this seam so a
+// process crash or a failed transport publish cannot mint a second SSE /
+// webhook cursor for the same committed transition.
+func MintV1EnvelopeWithID(id, typ, workspaceID string, actor V1Actor, resource V1Resource, data any) (V1Envelope, error) {
+	typ = strings.TrimSpace(typ)
+	version, ok := V1EventVersion(typ)
+	if !ok {
+		return V1Envelope{}, fmt.Errorf("events: unknown workspace event type %q", typ)
+	}
+	id = strings.TrimSpace(id)
+	if !contract.IsEventID(id) {
+		return V1Envelope{}, fmt.Errorf("events: event id must be evt_ opaque")
+	}
+	var payload []byte
+	var err error
+	if raw, ok := data.(json.RawMessage); ok {
+		payload = append([]byte(nil), raw...)
+	} else {
+		payload, err = json.Marshal(data)
+	}
+	if err != nil {
+		return V1Envelope{}, fmt.Errorf("events: marshal %s data: %w", typ, err)
+	}
+	envelope := V1Envelope{
+		ID: id, Type: typ, Version: version, OccurredAt: time.Now().UTC(),
+		Actor:       actor,
+		Resource:    resource,
+		WorkspaceID: strings.TrimSpace(workspaceID),
+		Data:        payload,
+	}
+	if err := ValidateV1Envelope(envelope); err != nil {
+		return V1Envelope{}, err
+	}
+	return envelope, nil
+}
+
+// ValidateV1Envelope checks envelope shape: evt_ id, frozen type +
+// version match, RFC3339-capable timestamp, actor/resource/typed ids,
+// ws_ workspace, and non-empty typed data.
+func ValidateV1Envelope(envelope V1Envelope) error {
+	if !contract.IsValidPublicID(contract.PrefixEvent, strings.TrimSpace(envelope.ID)) {
+		return fmt.Errorf("events: envelope id must be evt_ opaque")
+	}
+	version, ok := V1EventVersion(envelope.Type)
+	if !ok {
+		return fmt.Errorf("events: unknown workspace event type %q", envelope.Type)
+	}
+	if envelope.Version != version {
+		return fmt.Errorf("events: %s version=%d, want %d", envelope.Type, envelope.Version, version)
+	}
+	if envelope.OccurredAt.IsZero() {
+		return fmt.Errorf("events: occurred_at is required")
+	}
+	switch strings.TrimSpace(envelope.Actor.Type) {
+	case V1ActorUser, V1ActorService, V1ActorSystem:
+	default:
+		return fmt.Errorf("events: actor type must be user|service|system")
+	}
+	if strings.TrimSpace(envelope.Actor.ID) == "" {
+		return fmt.Errorf("events: actor id is required")
+	}
+	if strings.TrimSpace(envelope.Actor.Type) == V1ActorUser &&
+		!contract.IsValidPublicID(contract.PrefixUser, strings.TrimSpace(envelope.Actor.ID)) {
+		return fmt.Errorf("events: user actor id must be usr_ opaque")
+	}
+	switch strings.TrimSpace(envelope.Resource.Type) {
+	case V1ResourceTask, V1ResourceBoard, V1ResourceMediaAsset,
+		V1ResourceCheckoutSession, V1ResourceInvite:
+	default:
+		return fmt.Errorf("events: unknown resource type %q", envelope.Resource.Type)
+	}
+	if strings.TrimSpace(envelope.Resource.ID) == "" {
+		return fmt.Errorf("events: resource id is required")
+	}
+	if err := validateV1ResourceID(envelope.Resource.Type, strings.TrimSpace(envelope.Resource.ID)); err != nil {
+		return err
+	}
+	if !contract.IsValidPublicID(contract.PrefixWorkspace, strings.TrimSpace(envelope.WorkspaceID)) {
+		return fmt.Errorf("events: workspace_id must be ws_ opaque")
+	}
+	if len(envelope.Data) == 0 || strings.TrimSpace(string(envelope.Data)) == "null" {
+		return fmt.Errorf("events: data payload is required")
+	}
+	var probe map[string]any
+	if err := json.Unmarshal(envelope.Data, &probe); err != nil {
+		return fmt.Errorf("events: data must be a JSON object: %w", err)
+	}
+	if err := validateV1Data(envelope.Type, envelope.Data); err != nil {
+		return err
+	}
+	return validateV1IdentityAgreement(envelope)
+}
+
+// validateV1IdentityAgreement enforces that invite-subject notifications
+// name the same invite as their resource identity, mirroring the task
+// refs-only discipline: the envelope subject and its typed data must agree
+// so producers cannot smuggle a mismatched identity through the hint.
+func validateV1IdentityAgreement(envelope V1Envelope) error {
+	switch envelope.Type {
+	case EventV1NotificationCreated, EventV1NotificationUpdated:
+	default:
+		return nil
+	}
+	var data struct {
+		InviteID string `json:"invite_id"`
+	}
+	if err := json.Unmarshal(envelope.Data, &data); err != nil {
+		return fmt.Errorf("events: %s data must decode: %w", envelope.Type, err)
+	}
+	if strings.TrimSpace(data.InviteID) != strings.TrimSpace(envelope.Resource.ID) {
+		return fmt.Errorf("events: %s invite_id must match the invite resource id", envelope.Type)
+	}
+	if strings.TrimSpace(envelope.Resource.Type) != V1ResourceInvite {
+		return fmt.Errorf("events: %s resource type must be invite", envelope.Type)
+	}
+	return nil
+}
+
+func validateV1ResourceID(resourceType, id string) error {
+	switch resourceType {
+	case V1ResourceTask:
+		if !contract.IsValidPublicID(contract.PrefixTask, id) {
+			return fmt.Errorf("events: task resource id must be task_ opaque")
+		}
+	case V1ResourceBoard:
+		if !contract.IsValidPublicID(contract.PrefixBoard, id) {
+			return fmt.Errorf("events: board resource id must be board_ opaque")
+		}
+	case V1ResourceMediaAsset:
+		if !contract.IsValidPublicID(contract.PrefixAsset, id) {
+			return fmt.Errorf("events: media_asset resource id must be asset_ opaque")
+		}
+	case V1ResourceCheckoutSession:
+		if id == "" {
+			return fmt.Errorf("events: checkout_session resource id is required")
+		}
+	case V1ResourceInvite:
+		if !isInviteResourceID(id) {
+			return fmt.Errorf("events: invite resource id must be wsi_, osi_, or bti_ opaque")
+		}
+	}
+	return nil
+}
+
+// isInviteResourceID reports whether id is a member-invite identity the
+// notification hints may name: workspace (wsi_), organization (osi_), or
+// billing-transfer (bti_) invites.
+func isInviteResourceID(id string) bool {
+	return contract.IsValidPublicID(contract.PrefixWorkspaceInvite, id) ||
+		contract.IsValidPublicID(contract.PrefixOrganizationInvite, id) ||
+		contract.IsValidPublicID(contract.PrefixBillingTransferInvite, id)
+}
+
+func validateV1Data(typ string, raw json.RawMessage) error {
+	require := func(fields map[string]any, names ...string) error {
+		for _, name := range names {
+			value, ok := fields[name]
+			if !ok {
+				return fmt.Errorf("events: %s data requires %q", typ, name)
+			}
+			if str, isStr := value.(string); isStr && strings.TrimSpace(str) == "" {
+				return fmt.Errorf("events: %s data requires non-empty %q", typ, name)
+			}
+		}
+		return nil
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return fmt.Errorf("events: %s data must decode: %w", typ, err)
+	}
+	stringField := func(name string) string {
+		value, _ := fields[name].(string)
+		return strings.TrimSpace(value)
+	}
+	switch typ {
+	case EventV1TaskCreated:
+		if err := require(fields, "task_id", "service"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixTask, stringField("task_id")) {
+			return fmt.Errorf("events: task.created task_id must be task_ opaque")
+		}
+	case EventV1TaskRunning, EventV1TaskCancelled:
+		if err := require(fields, "task_id"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixTask, stringField("task_id")) {
+			return fmt.Errorf("events: %s task_id must be task_ opaque", typ)
+		}
+	case EventV1TaskCompleted:
+		if err := require(fields, "task_id", "outputs_uri"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixTask, stringField("task_id")) {
+			return fmt.Errorf("events: task.completed task_id must be task_ opaque")
+		}
+		uri := stringField("outputs_uri")
+		if !strings.HasPrefix(uri, "/api/v1/workspaces/") {
+			return fmt.Errorf("events: task.completed outputs_uri must be a workspace API URI")
+		}
+		if rawOutputs, exists := fields["outputs"]; exists && rawOutputs != nil {
+			outputsList, ok := rawOutputs.([]any)
+			if !ok {
+				return fmt.Errorf("events: task.completed outputs must be an array")
+			}
+			for i, item := range outputsList {
+				m, ok := item.(map[string]any)
+				if !ok {
+					return fmt.Errorf("events: task.completed output[%d] must be an object", i)
+				}
+				if assetID, ok := m["asset_id"].(string); ok && strings.TrimSpace(assetID) != "" {
+					if !contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(assetID)) {
+						return fmt.Errorf("events: task.completed output[%d] asset_id must be asset_ opaque", i)
+					}
+				}
+			}
+		}
+	case EventV1TaskFailed:
+		if err := require(fields, "task_id", "error_code"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixTask, stringField("task_id")) {
+			return fmt.Errorf("events: task.failed task_id must be task_ opaque")
+		}
+	case EventV1MediaAssetReady, EventV1MediaAssetArchived:
+		if err := require(fields, "asset_id"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixAsset, stringField("asset_id")) {
+			return fmt.Errorf("events: %s asset_id must be asset_ opaque", typ)
+		}
+	case EventV1BoardDocumentReplaced:
+		if err := require(fields, "board_id", "revision"); err != nil {
+			return err
+		}
+		if !contract.IsValidPublicID(contract.PrefixBoard, stringField("board_id")) {
+			return fmt.Errorf("events: board.document_replaced board_id must be board_ opaque")
+		}
+	case EventV1BoardAccessChanged:
+		if err := require(fields, "board_id", "member_id", "access_version"); err != nil {
+			return err
+		}
+		// #940: the directed signal carries identity + version ONLY.
+		// Unlike other types, unknown data keys fail closed here so no
+		// producer can smuggle roles, roster, prompts, or asset
+		// identifiers through the revocation path.
+		for name := range fields {
+			switch name {
+			case "board_id", "member_id", "access_version":
+			default:
+				return fmt.Errorf("events: board.access_changed data forbids %q", name)
+			}
+		}
+		if !contract.IsValidPublicID(contract.PrefixBoard, stringField("board_id")) {
+			return fmt.Errorf("events: board.access_changed board_id must be board_ opaque")
+		}
+		if !contract.IsValidPublicID(contract.PrefixUser, stringField("member_id")) {
+			return fmt.Errorf("events: board.access_changed member_id must be usr_ opaque")
+		}
+		version, hasVersion := fields["access_version"]
+		if !hasVersion {
+			return fmt.Errorf("events: board.access_changed data requires \"access_version\"")
+		}
+		versionNumber, isNumber := version.(float64)
+		if !isNumber || versionNumber < 1 || versionNumber != float64(int64(versionNumber)) {
+			return fmt.Errorf("events: board.access_changed access_version must be a positive integer")
+		}
+	case EventV1BillingSettled:
+		if err := require(fields, "reference_type", "reference_id", "settlement_state"); err != nil {
+			return err
+		}
+		switch stringField("reference_type") {
+		case V1ResourceTask, V1ResourceCheckoutSession:
+		default:
+			return fmt.Errorf("events: billing.settled reference_type must be task|checkout_session")
+		}
+		switch stringField("settlement_state") {
+		case "quoted", "free", "held", "captured", "released":
+		default:
+			return fmt.Errorf("events: billing.settled settlement_state must be quoted|free|held|captured|released")
+		}
+	case EventV1NotificationCreated, EventV1NotificationUpdated:
+		if err := require(fields, "invite_id", "notification_type"); err != nil {
+			return err
+		}
+		if !isInviteResourceID(stringField("invite_id")) {
+			return fmt.Errorf("events: %s invite_id must be wsi_, osi_, or bti_ opaque", typ)
+		}
+	}
+	return nil
+}
+
+// taskStatusToV1 maps workspacetasks staged statuses to v1 types:
+// pending (fresh submit) -> task.created; running -> task.running;
+// completed/failed/cancelled map 1:1. Unknown statuses fail closed.
+func taskStatusToV1(status TaskStatus) (string, bool) {
+	switch strings.TrimSpace(string(status)) {
+	case string(TaskStatusPending):
+		return EventV1TaskCreated, true
+	case string(TaskStatusRunning):
+		return EventV1TaskRunning, true
+	case string(TaskStatusCompleted):
+		return EventV1TaskCompleted, true
+	case string(TaskStatusFailed):
+		return EventV1TaskFailed, true
+	case string(TaskStatusCancelled):
+		return EventV1TaskCancelled, true
+	default:
+		return "", false
+	}
+}
+
+// TaskStatusV1Type maps a staged task status to its v1 event type
+// (exported for the HTTP emission seam and the #809 worker flush; the
+// table itself stays frozen here).
+func TaskStatusV1Type(status TaskStatus) (string, bool) {
+	return taskStatusToV1(status)
+}
+
+// V1Deduper is an evt_-id exactly-once guard for delivery paths:
+// SSE resume, webhook per-subscription dispatch, and log append all
+// consult it so duplicate deliveries collapse to one.
+type V1Deduper struct {
+	seen  map[string]struct{}
+	order []string
+	max   int
+}
+
+// NewV1Deduper builds a deduper retaining up to max ids (oldest evicted).
+func NewV1Deduper(max int) *V1Deduper {
+	if max <= 0 {
+		max = 4096
+	}
+	return &V1Deduper{seen: make(map[string]struct{}), max: max}
+}
+
+// Seen reports whether id was already observed (and records it).
+func (d *V1Deduper) Seen(id string) bool {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return false
+	}
+	if d == nil {
+		return false
+	}
+	if _, ok := d.seen[id]; ok {
+		return true
+	}
+	d.seen[id] = struct{}{}
+	d.order = append(d.order, id)
+	if len(d.order) > d.max {
+		oldest := d.order[0]
+		d.order = append([]string(nil), d.order[1:]...)
+		delete(d.seen, oldest)
+	}
+	return false
+}

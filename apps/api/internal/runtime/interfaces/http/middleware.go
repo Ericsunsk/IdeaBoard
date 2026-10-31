@@ -169,7 +169,7 @@ func PublicContractChain() []gin.HandlerFunc {
 
 // Note (plane split): the v1 engine mount
 // (RegisterContractV1RoutesOnEngine) lives in v1/routes.go, the
-// billing engine mount in v1/billing_wiring.go, and the control
-// engine mount in control/routes.go. The kernel
+// billing engine mount in v1/billing (RegisterRoutesOnEngine), and the
+// control engine mount in control/routes.go. The kernel
 // RegisterRoutes mounts kernel routes only; composition calls all four.
 // This keeps the kernel import-free of v1/control (no import cycle).

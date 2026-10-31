@@ -210,7 +210,7 @@ import {
 import { appOverlayMenuSideOffset } from '../../../../../theme/appOverlayMenu'
 import { createPageChromeRoundControlClass } from '../../../../../core/lib/pageChrome'
 import { Spinner } from '@/components/ui/spinner'
-import { formatCatalogDate, useCatalog, type CatalogSortMode } from '../controllers/useCatalog'
+import { formatCatalogDate, useCatalog, type CatalogSortMode } from '../controllers'
 import ShareDialog from '../../share/ShareDialog.vue'
 import { useSharePanel } from '../../../session/share/useSharePanel'
 import { useUserStore } from '../../../../auth'

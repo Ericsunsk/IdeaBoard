@@ -9,7 +9,6 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
-	v1billing "ideaboard/api/internal/runtime/interfaces/http/v1/billing"
 	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	domaintenancy "ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/invitations"
@@ -27,7 +26,7 @@ type Deps struct {
 	Users                     runtimehttp.V1UserDirectory
 	Idempotency               *contract.IdempotencyStore
 	UserProfile               runtimehttp.V1UserProfileDirectory
-	BillingAccounts           v1billing.AccountStore
+	BillingAccounts           shared.AccountStore
 	Members                   MemberDeps
 	InvitationReader          invitations.Reader
 	Invitations               *invitations.Service

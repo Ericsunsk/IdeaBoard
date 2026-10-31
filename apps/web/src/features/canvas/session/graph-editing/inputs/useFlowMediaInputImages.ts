@@ -17,10 +17,10 @@ import {
   type CanvasGraphReadPort,
   type CanvasGraphStore,
   type CanvasGraphTransactionOptions,
+  resolveWritableCanvasGraphStore,
 } from '../../../core/graph'
 import type { MediaRef } from '../../../../../core/media/mediaRef'
 import { createPrefixedId } from '../../../../../core/utils/ids'
-import { resolveWritableCanvasGraphStore } from '../../../core/graph/graphStoreWriter'
 
 export type MediaInputImage = {
   id: string

@@ -4,7 +4,7 @@ package webhook
 //
 // Three places must stay in sync; a new event type touches all three or the
 // suites below go red:
-//   - apps/api/internal/events/v1_envelope.go (V1EventTypes, the frozen table)
+//   - apps/api/internal/events/envelope.go (V1EventTypes, the frozen table)
 //   - apps/web/src/api/workspaceEventStream.ts (WORKSPACE_EVENT_TYPES)
 //   - this package's webhook allowlist (IsWorkspaceWebhookEventType)
 //
@@ -39,7 +39,7 @@ func findEventParityRepoRoot(t *testing.T) string {
 	}
 	dir := filepath.Dir(filename)
 	for {
-		if fileExists(filepath.Join(dir, "apps", "api", "internal", "events", "v1_envelope.go")) &&
+		if fileExists(filepath.Join(dir, "apps", "api", "internal", "events", "envelope.go")) &&
 			(fileExists(filepath.Join(dir, "apps", "web", "src", "api", "realtime", "workspaceEventStream.ts")) ||
 				fileExists(filepath.Join(dir, "apps", "web", "src", "api", "workspaceEventStream.ts"))) {
 			return dir
@@ -151,7 +151,7 @@ func TestWorkspaceEventRegistryMatchesFrontend(t *testing.T) {
 	}
 	backend := events.V1EventTypes()
 	if len(backend) != 12 {
-		t.Fatalf("backend registry has %d types, want 12 (update v1_envelope.go, workspaceEventStream.ts, and the webhook allowlist together)", len(backend))
+		t.Fatalf("backend registry has %d types, want 12 (update envelope.go, workspaceEventStream.ts, and the webhook allowlist together)", len(backend))
 	}
 	sortedFrontend := append([]string(nil), frontend...)
 	sortedBackend := append([]string(nil), backend...)

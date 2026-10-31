@@ -7,7 +7,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"ideaboard/api/internal/platform/riverpolicy"
-	"ideaboard/api/internal/searchcatalog/application"
+	"ideaboard/api/internal/searchcatalog/application/vision"
 	"ideaboard/api/internal/searchcatalog/domain"
 )
 
@@ -21,10 +21,10 @@ func (visionBillingReconciliationArgs) Kind() string { return "vision_billing_re
 
 type VisionBillingReconciliationWorker struct {
 	river.WorkerDefaults[visionBillingReconciliationArgs]
-	service application.ReconciliationRunner
+	service vision.ReconciliationRunner
 }
 
-func NewVisionBillingReconciliationWorker(service application.ReconciliationRunner) *VisionBillingReconciliationWorker {
+func NewVisionBillingReconciliationWorker(service vision.ReconciliationRunner) *VisionBillingReconciliationWorker {
 	return &VisionBillingReconciliationWorker{service: service}
 }
 

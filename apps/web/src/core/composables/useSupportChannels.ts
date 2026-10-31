@@ -1,16 +1,23 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, unref, type MaybeRef } from 'vue'
 import {
-  getGetSupportChannelsQueryKey,
-  getSupportChannels,
-} from '../../api/generated-query/public/user/user'
+  SUPPORT_CHANNELS_QUERY_KEY,
+  fetchSupportChannels,
+  type SupportChannel,
+} from '@/api/supportChannels'
 import { noRetry, STALE_TIME_MS } from '../query/queryDefaults'
-import { SupportChannelKind } from '../../api/generated-query/public/model/supportChannelKind'
-import type { SupportChannel as GeneratedSupportChannel } from '../../api/generated-query/public/model/supportChannel'
 
-export type SupportChannel = GeneratedSupportChannel
+export type { SupportChannel }
+export { SUPPORT_CHANNELS_QUERY_KEY }
 
-export const SUPPORT_CHANNELS_QUERY_KEY = getGetSupportChannelsQueryKey()
+const SUPPORT_CHANNEL_KINDS = new Set([
+  'discord',
+  'telegram',
+  'whatsapp',
+  'line',
+  'wechat',
+  'custom',
+])
 
 function isSafeSupportUrl(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 2048 || /[\s\\]/.test(value)) return false
@@ -35,7 +42,7 @@ export function normalizeSupportChannels(value: unknown): SupportChannel[] {
         !row.name.trim() ||
         row.enabled !== true ||
         typeof row.kind !== 'string' ||
-        !Object.values(SupportChannelKind).includes(row.kind as SupportChannelKind) ||
+        !SUPPORT_CHANNEL_KINDS.has(row.kind) ||
         !isSafeSupportUrl(row.url) ||
         typeof row.sort_order !== 'number' ||
         !Number.isInteger(row.sort_order)
@@ -49,14 +56,14 @@ export function normalizeSupportChannels(value: unknown): SupportChannel[] {
 export function useSupportChannels(enabled: MaybeRef<boolean> = true) {
   const query = useQuery({
     queryKey: SUPPORT_CHANNELS_QUERY_KEY,
-    queryFn: ({ signal }) => getSupportChannels({ signal, authFailure: 'silent' }),
+    queryFn: ({ signal }) => fetchSupportChannels(signal),
     enabled: computed(() => unref(enabled)),
     staleTime: STALE_TIME_MS.statistics,
     ...noRetry(),
   })
   const channels = computed<SupportChannel[]>(() => {
     if (query.isPending.value || query.isError.value) return []
-    return normalizeSupportChannels(query.data.value?.data?.channels)
+    return normalizeSupportChannels(query.data.value)
   })
   return { channels }
 }

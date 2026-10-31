@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	aigatewayapplication "ideaboard/api/internal/aigateway/application"
+	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	billinghttp "ideaboard/api/internal/billing/interfaces/http"
 	"ideaboard/api/internal/boards"
 	creditsdomain "ideaboard/api/internal/credits/domain"
@@ -157,7 +157,7 @@ type ContractControlDeps struct {
 	// PaymentWebhookURL is the Stripe webhook endpoint recorded into the
 	// provider configuration (composition wires the public API URL).
 	PaymentWebhookURL string
-	AIGateway         *aigatewayapplication.Handler
+	AIGateway         *modelregistryhttp.Handler
 	Storage           *storagehttp.Handler
 	SearchProviders   *searchhttp.Handler
 	FeaturePrompts    *prompts.FeaturePromptHandler

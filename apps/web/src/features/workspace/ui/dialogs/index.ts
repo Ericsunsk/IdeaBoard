@@ -1,0 +1,1 @@
+export { isDefaultWorkspaceItem } from './workspaceMenu'

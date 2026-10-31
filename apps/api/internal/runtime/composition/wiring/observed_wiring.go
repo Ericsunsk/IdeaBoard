@@ -3,14 +3,14 @@ package wiring
 import (
 	"context"
 
-	aigatewaydomain "ideaboard/api/internal/aigateway/domain"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 	"ideaboard/api/internal/billing"
 	billingapplication "ideaboard/api/internal/billing/application"
 )
 
 // billingSKUCatalogAdapter projects BillableItemCatalog cards onto the narrow
 // SKU DTO the gateway observed service needs. It lives in composition (the
-// sole assembly root) so aigateway never imports the billing application
+// sole assembly root) so modelregistry never imports the billing application
 // package. OnSale means the SKU card is active: enabled with at least one
 // configured pricing variant.
 type billingSKUCatalogAdapter struct {
@@ -24,7 +24,7 @@ func newBillingSKUCatalogAdapter(catalog *billingapplication.BillableItemCatalog
 // ListSKUCatalog returns every registered SKU card, including unpriced ones:
 // margin rows for mapped-but-unpriced SKUs degrade to not-on-sale instead of
 // vanishing.
-func (a billingSKUCatalogAdapter) ListSKUCatalog(ctx context.Context) ([]aigatewaydomain.SKUCatalogCard, error) {
+func (a billingSKUCatalogAdapter) ListSKUCatalog(ctx context.Context) ([]modelregistrydomain.SKUCatalogCard, error) {
 	if a.catalog == nil {
 		return nil, billing.ErrServiceUnavailable
 	}
@@ -32,13 +32,13 @@ func (a billingSKUCatalogAdapter) ListSKUCatalog(ctx context.Context) ([]aigatew
 	if err != nil {
 		return nil, err
 	}
-	out := make([]aigatewaydomain.SKUCatalogCard, 0, len(cards))
+	out := make([]modelregistrydomain.SKUCatalogCard, 0, len(cards))
 	for _, card := range cards {
 		prices := make(map[string]int64, len(card.CurrentPrices))
 		for resolution, price := range card.CurrentPrices {
 			prices[string(resolution)] = price.UnitCredits
 		}
-		out = append(out, aigatewaydomain.SKUCatalogCard{
+		out = append(out, modelregistrydomain.SKUCatalogCard{
 			SKU:                  string(card.SKU),
 			DisplayName:          card.DisplayName,
 			OnSale:               card.Status == billing.BillableItemStatusActive,

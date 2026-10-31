@@ -60,6 +60,6 @@ func TestTaskingSubpackagesDoNotDependOnConcreteRepositoryOrWorker(t *testing.T)
 // from application/billing: historical task usage reads persisted billing
 // facts only; live model mappings must never affect it.
 func TestTaskBillingNeverReadsModelMappings(t *testing.T) {
-	archtest.AssertNoForbiddenImports(t, "application/billing", []string{"ideaboard/api/internal/aigateway"})
+	archtest.AssertNoForbiddenImports(t, "application/billing", []string{"ideaboard/api/internal/modelregistry"})
 	archtest.AssertNoForbiddenText(t, "application/billing", []string{"ai_gateway_model_", "ResolveModel", "ModelStore"})
 }

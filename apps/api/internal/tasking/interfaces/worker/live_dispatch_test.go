@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 	"ideaboard/api/internal/media/workspacemedia"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
@@ -30,8 +30,8 @@ import (
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 )
 
@@ -238,7 +238,7 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testin
 	// The real missing-credential sentinel (no secret material, just the
 	// error the config seam returns when unconfigured).
 	factory := func(context.Context) (runtimeports.GatewayClient, error) {
-		return nil, aigatewayapplication.ErrAIGatewayNotConfigured
+		return nil, modelregistrydomain.ErrAIGatewayNotConfigured
 	}
 	worker := env.liveWorker(t, factory)
 

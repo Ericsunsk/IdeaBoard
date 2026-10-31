@@ -4,7 +4,7 @@ import { renderWithUser, screen } from '@/test/render'
 import { mockAppToast } from '@/test/toast'
 import type { SupportChannelsSetting } from '../../../session/support/resource'
 import AdminSupportChannelsEditor from './AdminSupportChannelsEditor.vue'
-import { SUPPORT_CHANNELS_QUERY_KEY } from '@/core/composables/useSupportChannels'
+import { SUPPORT_CHANNELS_QUERY_KEY } from '@/api/supportChannels'
 
 vi.mock('../../../../../../core/composables/useAppToast')
 

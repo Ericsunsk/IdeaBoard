@@ -2,7 +2,7 @@
 
 Generation owns Service Model Pools and routing decisions. `internal/generation/catalog`
 owns their persistence; the sibling `routing` package owns eligibility, selection,
-and immutable Routing Snapshots. Model catalog metadata belongs to AI Gateway.
+and immutable Routing Snapshots. Model catalog metadata belongs to ModelRegistry.
 
 ## Domain language
 

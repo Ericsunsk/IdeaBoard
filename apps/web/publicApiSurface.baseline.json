@@ -3786,11 +3786,13 @@
     "hasPendingLibraryImport",
     "isCanvasGraphNodeId",
     "isSameCanvasConnectionEndpoint",
+    "isSameJsonValue",
     "materializeLibraryImport",
     "noopCanvasGraphStoreTelemetry",
     "readCanvasGraphNodeBounds",
     "resolveCanvasGraphNodeDimensions",
     "resolveCanvasGraphNodesBounds",
+    "resolveWritableCanvasGraphStore",
     "retryLibraryImport",
     "shouldReplaceCanvasConnection",
     "stageCanvasGraphNodeDragIntent",
@@ -4163,6 +4165,13 @@
   ],
   "src/features/canvas/ui/pages/CanvasLandingPage.vue": ["default"],
   "src/features/canvas/ui/pages/CanvasPage.vue": ["default"],
+  "src/features/canvas/ui/screens/controllers/index.ts": [
+    "ACTIVE_NODE_PANEL_KIND",
+    "ActiveNodePanel",
+    "ActiveNodePanelKind",
+    "CanvasInteractionKey",
+    "useFlowCanvasInteractionState"
+  ],
   "src/features/canvas/ui/screens/controllers/useFlowActiveNodePanels.ts": [
     "ACTIVE_NODE_PANEL_KIND",
     "ActiveNodePanel",
@@ -4401,8 +4410,10 @@
     "toWorkspaceSelectionStatus",
     "useWorkspaceSelection"
   ],
+  "src/features/workspace/ui/dialogs/index.ts": ["isDefaultWorkspaceItem"],
   "src/features/workspace/ui/dialogs/workspaceMenu.ts": ["isDefaultWorkspaceItem"],
   "src/features/workspace/ui/settings/WorkspaceSettingsDialog.vue": ["default"],
+  "src/features/workspace/ui/settings/index.ts": ["WorkspaceSettingsDialog"],
   "src/test/factories/index.ts": [
     "AdminCommandTargetOverrides",
     "AdminListItemOverrides",

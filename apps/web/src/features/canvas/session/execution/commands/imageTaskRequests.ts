@@ -10,7 +10,7 @@ import type {
 import {
   resolveOutpaintPixelGeometry,
   type OutpaintRect,
-} from '../../../tools/outpaint/core/geometry.ts'
+} from '../../../tools/outpaint/core'
 import {
   buildExecutionTaskRequest,
   EXECUTION_SERVICE,

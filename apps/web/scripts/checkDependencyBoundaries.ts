@@ -18,7 +18,7 @@ import {
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /** Default fan-in/out report path (overridable with `--report=<path>`). */
-const DEFAULT_REPORT_PATH = path.join(webRoot, 'seam-fan-report.json')
+const DEFAULT_REPORT_PATH = path.join(webRoot, 'node_modules', '.cache', 'seam-fan-report.json')
 
 function reportPathFromArgs(): string {
   const flag = process.argv.find((arg) => arg.startsWith('--report='))
@@ -172,19 +172,6 @@ const routePageFixtureDirs = [
 ] as const
 
 const horizontalRoots = ['shared', 'core', 'api', 'theme', 'lib', 'components']
-const approvedFeatureShims = [
-  'components/UserAccountMenu',
-  'components/UserCreditBalanceButton',
-  'components/userAccountMenu.types',
-  'components/SupportChannelQr',
-  'constants/contacts',
-  'constants/routePaths',
-  'constants/legalLinks',
-  'domain/imageActions',
-  'domain/serviceIcons',
-  'domain/serviceRegistry',
-  'media/preloadImage',
-]
 const fixtureCases: BoundaryFixtureCase[] = [
   ...horizontalRoots.flatMap((root) =>
     ['runtime', 'type-only', 're-export'].map<BoundaryFixtureCase>((kind) => ({
@@ -682,6 +669,7 @@ async function writeFanReport(): Promise<void> {
     ),
   )
   const reportPath = reportPathFromArgs()
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true })
   fs.writeFileSync(
     reportPath,
     await format(JSON.stringify(report), {
@@ -847,13 +835,6 @@ try {
    * Each case expects zero violations of any boundary rule.
    */
   const positiveCases: Array<{ name: string; file: FixtureFile }> = [
-    ...approvedFeatureShims.map((shim) => ({
-      name: `allows the approved ${shim} compatibility shim`,
-      file: {
-        filePath: `src/shared/${shim}.shim.ts`,
-        content: `export { value } from '{target:src/features/legal/index}';`,
-      },
-    })),
     ...['runtime', 'type-only'].map((kind) => ({
       name: `allows feature ${kind} dependency on core route policy`,
       file: {

@@ -310,12 +310,12 @@ import {
   type SupportedLocale,
 } from '../../../../core/i18n/userLocale'
 import { LOCALE_MANIFEST } from '../../../../core/i18n/localeManifest'
-import type { SupportChannel } from '../../../../core/composables/useSupportChannels'
+import type { SupportChannel } from '@/api/supportChannels'
 import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
-import WorkspaceSettingsDialog from '@/features/workspace/ui/settings/WorkspaceSettingsDialog.vue'
-import { isDefaultWorkspaceItem } from '@/features/workspace/ui/dialogs/workspaceMenu'
+import { WorkspaceSettingsDialog } from '@/features/workspace/ui/settings'
+import { isDefaultWorkspaceItem } from '@/features/workspace/ui/dialogs'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,

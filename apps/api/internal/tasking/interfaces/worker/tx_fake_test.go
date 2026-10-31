@@ -2,7 +2,7 @@ package worker
 
 // In-memory single-transaction settlement harness for the worker loop tests.
 //
-// It mirrors workspacetasks/settle_tx_fake_test.go: every seam the
+// It mirrors workspacetasks/settle_tx_test.go: every seam the
 // transactional settlement requires is declared explicitly; every write
 // joins the same transaction:
 //

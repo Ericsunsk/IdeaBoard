@@ -3,7 +3,7 @@ import {
   replaceControlCatalogModelPool,
 } from '@/api/generated-query/control/control-billing/control-billing'
 import { requireContractData } from '@/api/http/contractKernel'
-import { createAdminGatewayResource } from '../../../models/resource'
+import { createAdminGatewayResource } from '../../../models'
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 import { withControlCopy } from '../../../shared'
 import {

@@ -41,8 +41,9 @@ import (
 )
 
 const (
-	// V1MaxQueryRunes mirrors the application search bound (200 runes).
-	V1MaxQueryRunes = 200
+	// V1MaxQueryRunes aliases the canonical domain bound (single source;
+	// never redeclare the literal).
+	V1MaxQueryRunes = domain.QueryMaxRunes
 	// V1MaxVisionAssetRefs bounds one vision query to 4 owned library
 	// references (parity with VisionMaxImages, without client bytes).
 	V1MaxVisionAssetRefs = domain.VisionMaxImages

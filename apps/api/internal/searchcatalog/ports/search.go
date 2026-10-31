@@ -13,6 +13,10 @@ type SearchRequest struct {
 	Limit int
 }
 
+// QueryMaxRunes is the canonical query-text bound, re-exported from domain
+// so application edges program to ports without importing domain directly.
+const QueryMaxRunes = domain.QueryMaxRunes
+
 // SearchProviderPage is one supplier's normalized page.
 type SearchProviderPage struct {
 	Results []domain.Result

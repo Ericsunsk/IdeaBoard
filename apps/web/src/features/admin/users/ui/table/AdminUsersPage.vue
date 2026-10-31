@@ -282,7 +282,7 @@ import {
 import { adminInlineJumpClass } from '../../../shared'
 import { emptyPlaceholder } from '../../../shared'
 import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../../shared'
-import AdminUserWalletDialog from '../../../credits/ui/wallets/AdminUserWalletDialog.vue'
+import { AdminUserWalletDialog } from '../../../credits'
 import AdminUserBanDialog from '../dialog/AdminUserBanDialog.vue'
 import { banDurationOptions } from '../../session/commands'
 import { useAdminUsersContext } from '../../session/context'

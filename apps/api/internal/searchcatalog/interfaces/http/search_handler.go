@@ -10,18 +10,18 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	platformhttp "ideaboard/api/internal/platform/http"
-	"ideaboard/api/internal/searchcatalog/application"
+	"ideaboard/api/internal/searchcatalog/application/search"
 	searchdomain "ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
 )
 
 type SearchHandler struct {
-	service  *application.SearchService
+	service  *search.SearchService
 	previews *preview.Service
 }
 
-func NewSearchHandler(service *application.SearchService, previews *preview.Service) *SearchHandler {
+func NewSearchHandler(service *search.SearchService, previews *preview.Service) *SearchHandler {
 	return &SearchHandler{service: service, previews: previews}
 }
 
@@ -29,7 +29,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	if !platformhttp.RequireDependencyCode(c, h != nil && h.service != nil, string(contract.CodeSearchUnavailable), errorrender.MsgSearchUnavailable) {
 		return
 	}
-	limit := application.DefaultSearchLimit
+	limit := search.DefaultSearchLimit
 	if raw := strings.TrimSpace(c.Query(contract.LimitParam)); raw != "" {
 		parsed, err := contract.ParseSearchLimit(raw)
 		if err != nil {
@@ -42,7 +42,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	if err != nil {
 		msg := err.Error()
 		if strings.Contains(msg, errorrender.MsgSearch) {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(errorrender.MsgSearchQueryInvalid, application.MaxSearchQueryRunes))
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(errorrender.MsgSearchQueryInvalid, search.MaxSearchQueryRunes))
 			return
 		}
 		if strings.Contains(msg, errorrender.MsgSearch2) {

@@ -3,9 +3,9 @@ import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type {
   ActiveNodePanel,
   ActiveNodePanelKind,
-} from '../../ui/screens/controllers/useFlowActiveNodePanels.ts'
-import type { OutpaintDragAnchor } from '../../tools/outpaint/session/useImageOutpaintOverlay'
-import { useImageOutpaintOverlay } from '../../tools/outpaint/session/useImageOutpaintOverlay'
+} from '../../ui/screens/controllers'
+import type { OutpaintDragAnchor } from '../../tools/outpaint'
+import { useImageOutpaintOverlay } from '../../tools/outpaint'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import type { ImageNodeAction } from '../../core/nodes/imageActionRegistry.ts'
 import type { CanvasVueFlowAdapter } from '../../session/flow-adapter'
@@ -14,7 +14,7 @@ import {
   type CanvasImageTools,
   type UseCanvasImageToolsOptions,
 } from '../../tools/image-tools'
-import { useFlowOutpaintInteractionHandlers } from '../../tools/outpaint/session/outpaintIntent'
+import { useFlowOutpaintInteractionHandlers } from '../../tools/outpaint'
 import {
   createImageActionIntentRouter,
   type ImageActionIntentRouterOptions,
