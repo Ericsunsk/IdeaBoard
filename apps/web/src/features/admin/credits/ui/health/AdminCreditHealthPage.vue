@@ -58,7 +58,7 @@
               variant="ghost"
               size="sm"
               :class="adminTextButtonClass"
-              :loading="resource.query.isFetching.value"
+              :is-loading="resource.query.isFetching.value"
               @click="resource.query.refetch()"
             >
               {{ CREDIT_HEALTH_MESSAGES.retryRefresh }}

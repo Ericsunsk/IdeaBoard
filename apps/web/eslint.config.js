@@ -7,7 +7,11 @@ import prettierConfig from 'eslint-config-prettier'
 import { functionLengthRule } from './scripts/eslint-function-length.mjs'
 import { nameReplacementsRule } from './scripts/eslint-name-replacements.mjs'
 import { queryPlacementRule } from './scripts/eslint-query-placement.mjs'
-import { booleanPrefixRule, noBarrelImportRule } from './scripts/eslint-p0-governance.mjs'
+import {
+  booleanPrefixRule,
+  governancePluginMeta,
+  noBarrelImportRule,
+} from './scripts/eslint-p0-governance.mjs'
 
 export default tseslint.config(
   {
@@ -32,6 +36,7 @@ export default tseslint.config(
     files: ['src/**/*.{ts,tsx,vue}'],
     plugins: {
       governance: {
+        meta: governancePluginMeta,
         rules: {
           'function-length': functionLengthRule,
           'name-replacements': nameReplacementsRule,
@@ -295,8 +300,7 @@ export default tseslint.config(
                 '../../../../../../app',
                 '../../../../../../app/**',
               ],
-              message:
-                'Use @/ alias for src-root imports in admin instead of deep relative paths.',
+              message: 'Use @/ alias for src-root imports in admin instead of deep relative paths.',
             },
           ],
         },

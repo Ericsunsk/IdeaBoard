@@ -19,20 +19,20 @@ describe('SearchEmptyState', () => {
 
   it('renders empty feed state and emits actions', async () => {
     const user = userEvent.setup()
-    let clearCalled = false
+    let wasClearCalled = false
     render(SearchEmptyState, {
       props: {
         resultsCount: 0,
         hasActiveSearch: true,
         canAddReference: true,
         onClearSearch: () => {
-          clearCalled = true
+          wasClearCalled = true
         },
       },
     })
     const clearBtn = screen.getByRole('button', { name: /清空搜索|Clear/i })
     expect(clearBtn).toBeInTheDocument()
     await user.click(clearBtn)
-    expect(clearCalled).toBe(true)
+    expect(wasClearCalled).toBe(true)
   })
 })

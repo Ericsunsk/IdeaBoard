@@ -308,7 +308,7 @@
 
     <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 -->
     <SearchLightboxModal
-      :visible="isLightboxVisible"
+      :is-visible="isLightboxVisible"
       :active-result="activeResult"
       @close="closeLightbox"
     />

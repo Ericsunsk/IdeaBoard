@@ -1,5 +1,5 @@
 <template>
-  <Badge :variant="resolvedVariant" :rounded="rounded" :class="computedClasses">
+  <Badge :variant="resolvedVariant" :rounded="isRounded" :class="computedClasses">
     <slot>{{ value }}</slot>
   </Badge>
 </template>
@@ -30,13 +30,13 @@ const props = withDefaults(
   defineProps<{
     variant?: AdminBadgeVariant | undefined
     value?: string | number | null | undefined
-    rounded?: boolean
+    isRounded?: boolean
     class?: HTMLAttributes['class'] | undefined
   }>(),
   {
     variant: 'default',
     value: null,
-    rounded: true,
+    isRounded: true,
     class: undefined,
   },
 )

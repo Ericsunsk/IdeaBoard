@@ -214,7 +214,7 @@ describe('Boards catalog recovery', () => {
       error: new Error('offline'),
     })
     await catalog.commands.initialize()
-    expect(catalog.viewModel.catalogHydrationFailed.value).toBe(true)
+    expect(catalog.viewModel.hasCatalogHydrationFailed.value).toBe(true)
 
     const gated = createDeferred<{ isOk: true }>()
     vi.mocked(repository.commands.hydrate).mockReturnValueOnce(gated.promise)

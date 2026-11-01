@@ -61,7 +61,7 @@ describe.each(['dark', 'light'])('media scrim in %s mode', (mode) => {
 
   it('keeps the lightbox veil and actions readable independently of the app theme', () => {
     document.documentElement.classList.toggle('light', mode === 'light')
-    renderWithUser(h(SearchLightboxModal, { visible: true, activeResult: result }))
+    renderWithUser(h(SearchLightboxModal, { isVisible: true, activeResult: result }))
     expect(getComputedStyle(screen.getByRole('heading')).color).toBe('rgb(255, 255, 255)')
     expect(paint(getComputedStyle(screen.getByRole('dialog')).backgroundColor)).toEqual([
       0, 0, 0, 166,

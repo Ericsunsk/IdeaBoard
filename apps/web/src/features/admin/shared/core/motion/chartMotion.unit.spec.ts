@@ -12,7 +12,7 @@ describe('defineAdminChartOptions', () => {
     document.documentElement.style.setProperty('--motion-enter-duration', '220ms')
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: false })),
+      vi.fn((): Pick<MediaQueryList, 'matches'> => ({ matches: false })),
     )
 
     expect(defineAdminChartOptions({ animation: { duration: 999 } }).animation).toEqual({
@@ -24,7 +24,7 @@ describe('defineAdminChartOptions', () => {
     document.documentElement.style.setProperty('--motion-enter-duration', '220ms')
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: true })),
+      vi.fn((): Pick<MediaQueryList, 'matches'> => ({ matches: true })),
     )
 
     expect(defineAdminChartOptions({}).animation).toBe(false)

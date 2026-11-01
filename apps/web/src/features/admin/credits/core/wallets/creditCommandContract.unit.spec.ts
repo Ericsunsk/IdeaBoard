@@ -10,10 +10,10 @@ describe('Admin Credit command contract', () => {
   it('accepts valid Grant and Deduction inputs', () => {
     expect(
       validateAdminCreditCommand({ kind: 'grant', userPublicId: publicId, amountCredits: 20 }),
-    ).toMatchObject({ valid: true })
+    ).toMatchObject({ isValid: true })
     expect(
       validateAdminCreditCommand({ kind: 'deduction', userPublicId: publicId, amountCredits: 3 }),
-    ).toMatchObject({ valid: true, amountError: '', targetError: '' })
+    ).toMatchObject({ isValid: true, amountError: '', targetError: '' })
   })
 
   it('allows Refund only from a Charge and rejects amounts above remaining refundable Credits', () => {
@@ -26,7 +26,7 @@ describe('Admin Credit command contract', () => {
         chargeTransactionId: 'charge-1',
         remainingRefundableCredits: 5,
       }),
-    ).toMatchObject({ valid: false, amountError: '退款不能超过可退余额 5 Ideas' })
+    ).toMatchObject({ isValid: false, amountError: '退款不能超过可退余额 5 Ideas' })
 
     expect(
       validateAdminCreditCommand({
@@ -36,7 +36,7 @@ describe('Admin Credit command contract', () => {
 
         remainingRefundableCredits: 5,
       }),
-    ).toMatchObject({ valid: false, amountError: '退款必须从原 Charge 流水发起' })
+    ).toMatchObject({ isValid: false, amountError: '退款必须从原 Charge 流水发起' })
 
     expect(
       validateAdminCreditCommand({
@@ -47,7 +47,7 @@ describe('Admin Credit command contract', () => {
         chargeTransactionId: 'charge-1',
         remainingRefundableCredits: 5,
       }),
-    ).toMatchObject({ valid: true })
+    ).toMatchObject({ isValid: true })
   })
 
   it('requires positive integer Credits', () => {
@@ -56,7 +56,7 @@ describe('Admin Credit command contract', () => {
       userPublicId: publicId,
       amountCredits: 1.5,
     })
-    expect(result.valid).toBe(false)
+    expect(result.isValid).toBe(false)
     expect(result.amountError).toBe('请输入大于 0 的整数Idea数量')
     expect(result.targetError).toBe('')
   })
@@ -64,7 +64,7 @@ describe('Admin Credit command contract', () => {
   it('requires exactly one of user or billing account target', () => {
     const accountId = 'ba_orgpool00000000000000000000000001'
     const missing = validateAdminCreditCommand({ kind: 'grant', amountCredits: 5 })
-    expect(missing.valid).toBe(false)
+    expect(missing.isValid).toBe(false)
     expect(missing.targetError).toBe('请选择用户或资金账户中的其一作为操作目标')
     const ambiguous = validateAdminCreditCommand({
       kind: 'grant',
@@ -72,11 +72,11 @@ describe('Admin Credit command contract', () => {
       billingAccountId: accountId,
       amountCredits: 5,
     })
-    expect(ambiguous.valid).toBe(false)
+    expect(ambiguous.isValid).toBe(false)
     expect(ambiguous.targetError).toBe('请选择用户或资金账户中的其一作为操作目标')
     expect(
       validateAdminCreditCommand({ kind: 'grant', billingAccountId: accountId, amountCredits: 5 }),
-    ).toMatchObject({ valid: true })
+    ).toMatchObject({ isValid: true })
   })
 
   it('allows Correction only from an original transaction within its bound', () => {
@@ -87,7 +87,7 @@ describe('Admin Credit command contract', () => {
       originalTransactionId: 'ctxn-1',
       originalAmountCredits: 5,
     })
-    expect(overBound.valid).toBe(false)
+    expect(overBound.isValid).toBe(false)
     expect(overBound.amountError).toBe('修正不能超过原交易金额 5 Ideas')
 
     const unlinked = validateAdminCreditCommand({
@@ -96,7 +96,7 @@ describe('Admin Credit command contract', () => {
       amountCredits: 5,
       originalAmountCredits: 5,
     })
-    expect(unlinked.valid).toBe(false)
+    expect(unlinked.isValid).toBe(false)
     expect(unlinked.amountError).toBe('修正必须从原交易流水发起')
 
     expect(
@@ -107,7 +107,7 @@ describe('Admin Credit command contract', () => {
         originalTransactionId: 'ctxn-1',
         originalAmountCredits: 8,
       }),
-    ).toMatchObject({ valid: true })
+    ).toMatchObject({ isValid: true })
   })
 
   it('classifies refundable and correctable transactions without DTOs', () => {

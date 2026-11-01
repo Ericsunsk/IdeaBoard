@@ -33,7 +33,7 @@
           variant="ghost"
           :class="adminFramedIconButtonClass"
           :aria-label="CREDIT_HEALTH_MESSAGES.queueRefreshAria"
-          :loading="loading"
+          :is-loading="loading"
           :disabled="loading"
           @click="refreshFindings"
         >

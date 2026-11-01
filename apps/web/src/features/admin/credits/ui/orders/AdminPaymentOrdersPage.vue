@@ -57,7 +57,7 @@
         variant="ghost"
         :class="adminFramedIconButtonClass"
         :aria-label="PAYMENT_ORDERS_MESSAGES.refresh"
-        :loading="loading"
+        :is-loading="loading"
         :disabled="loading"
         @click="refreshOrders"
       >

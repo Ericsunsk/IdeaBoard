@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth。
 
-当前包含 283 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 288 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -14814,6 +14814,50 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": ""
     },
     {
+      "path": "src/features/admin/credits/index.ts",
+      "kind": "canonical",
+      "owner": "admin-credits",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.vue",
+          "to": "src/features/admin/credits/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "ownershipScope": ["src/features/admin/credits/index.ts"],
+      "publicExports": ["AdminUserWalletDialog"],
+      "targetFanOutTargets": [
+        "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue"
+      ],
+      "notes": "Sibling Admin verticals use the wallet dialog through this narrow public entry; route composition remains independently owned."
+    },
+    {
+      "path": "src/features/admin/models/index.ts",
+      "kind": "canonical",
+      "owner": "admin-models",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
+          "to": "src/features/admin/models/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "ownershipScope": ["src/features/admin/models/index.ts"],
+      "publicExports": ["createAdminGatewayResource"],
+      "targetFanOutTargets": ["src/features/admin/models/resource.ts"],
+      "notes": "Sibling Admin verticals use the gateway resource through this narrow public entry; route composition remains independently owned."
+    },
+    {
       "path": "src/features/admin/prompts/core/promptVariables.ts",
       "kind": "canonical",
       "owner": "admin",
@@ -20120,6 +20164,29 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": "test-only seam; not re-exported by board root."
     },
     {
+      "path": "src/features/board/ui/gallery/controllers/index.ts",
+      "kind": "canonical",
+      "owner": "board-gallery",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/ui/gallery/views/BoardsPage.vue",
+          "to": "src/features/board/ui/gallery/controllers/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "ownershipScope": ["src/features/board/ui/gallery/controllers/index.ts"],
+      "publicExports": ["CatalogSortMode", "formatCatalogDate", "useCatalog"],
+      "targetFanOutTargets": [
+        "src/features/board/ui/gallery/controllers/useCatalog.ts"
+      ],
+      "notes": "Gallery views consume the catalog controller through this narrow entry."
+    },
+    {
       "path": "src/features/canvas/core/graph/graphStoreWriter.ts",
       "kind": "canonical",
       "owner": "canvas",
@@ -22696,6 +22763,109 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/test/render.ts"
       ],
       "notes": "Tool seam governed by ADR-0013."
+    },
+    {
+      "path": "src/features/canvas/tools/outpaint/core/index.ts",
+      "kind": "canonical",
+      "owner": "canvas-outpaint",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/execution/commands/imageTaskRequests.ts",
+          "to": "src/features/canvas/tools/outpaint/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/planning/imageExecutionPlan.ts",
+          "to": "src/features/canvas/tools/outpaint/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowCommandRuntime.ts",
+          "to": "src/features/canvas/tools/outpaint/core/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/features/canvas/tools/outpaint/core/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 1,
+      "targetFanIn": 4,
+      "targetFanOut": 1,
+      "ownershipScope": ["src/features/canvas/tools/outpaint/core/index.ts"],
+      "publicExports": [
+        "OutpaintRect",
+        "containImageRect",
+        "resolveOutpaintIntent",
+        "resolveOutpaintPixelGeometry"
+      ],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/outpaint/core/geometry.ts"
+      ],
+      "notes": "Cycle-safe Outpaint geometry entry for execution and cross-tool math consumers; it does not load the overlay or session."
+    },
+    {
+      "path": "src/features/canvas/tools/outpaint/index.ts",
+      "kind": "canonical",
+      "owner": "canvas-outpaint",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/useFlowCanvasNodeIntents.ts",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNode.vue",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/features/canvas/tools/outpaint/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 3,
+      "targetFanIn": 5,
+      "targetFanOut": 3,
+      "ownershipScope": ["src/features/canvas/tools/outpaint/index.ts"],
+      "publicExports": [
+        "ImageOutpaintOverlay",
+        "OutpaintDragAnchor",
+        "useFlowOutpaintInteractionHandlers",
+        "useImageOutpaintOverlay"
+      ],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/outpaint/session/outpaintIntent.ts",
+        "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
+        "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue"
+      ],
+      "notes": "Public Outpaint session and overlay entry; execution and cross-tool geometry consumers use the independent core entry to avoid runtime cycles."
     },
     {
       "path": "src/features/canvas/tools/retouch/index.ts",
@@ -25739,6 +25909,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/account/ui/chrome/UserAccountMenu.vue`                          | canonical | account                    | 1       | 6 → 6                    | 18 → 18                   |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                  | canonical | account                    | 1       | 1 → 1                    | 2 → 2                     |
 | `src/features/account/ui/chrome/userAccountMenu.types.ts`                     | canonical | account                    | 9       | 11 → 11                  | 1 → 1                     |
+| `src/features/admin/credits/index.ts`                                         | canonical | admin-credits              | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/admin/models/index.ts`                                          | canonical | admin-models               | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/admin/prompts/core/promptVariables.ts`                          | canonical | admin                      | 3       | 3 → 3                    | 1 → 1                     |
 | `src/features/admin/routePaths.ts`                                            | canonical | admin                      | 14      | 14 → 14                  | 1 → 1                     |
 | `src/features/admin/shared/adapters/controlMutation.ts`                       | canonical | admin                      | 2       | 3 → 3                    | 1 → 1                     |
@@ -25812,6 +25984,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/board/ports/canvasSession.ts`                                   | canonical | board                      | 27      | 11 → 11                  | 68 → 68                   |
 | `src/features/board/ports/testing.ts`                                         | canonical | board                      | 2       | 6 → 6                    | 1 → 1                     |
 | `src/features/board/testing/index.ts`                                         | canonical | board                      | 12      | 31 → 31                  | 5 → 5                     |
+| `src/features/board/ui/gallery/controllers/index.ts`                          | canonical | board-gallery              | 3       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/core/graph/graphStoreWriter.ts`                          | canonical | canvas                     | 1       | 1 → 1                    | 2 → 2                     |
 | `src/features/canvas/core/graph/graphValueEquality.ts`                        | canonical | canvas                     | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/canvas/core/graph/groupGeometry.ts`                             | canonical | canvas                     | 18      | 11 → 11                  | 3 → 3                     |
@@ -25836,6 +26009,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/image-tools/ui/chrome.ts`                          | canonical | canvas                     | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/tools/image-tools/ui/stage.ts`                           | canonical | canvas                     | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/tools/inpaint/index.ts`                                  | canonical | canvas                     | 6       | 8 → 8                    | 16 → 16                   |
+| `src/features/canvas/tools/outpaint/core/index.ts`                            | canonical | canvas-outpaint            | 4       | 4 → 4                    | 1 → 1                     |
+| `src/features/canvas/tools/outpaint/index.ts`                                 | canonical | canvas-outpaint            | 4       | 5 → 5                    | 3 → 3                     |
 | `src/features/canvas/tools/retouch/index.ts`                                  | canonical | canvas                     | 36      | 16 → 16                  | 34 → 34                   |
 | `src/features/canvas/tools/retouch/testing/browser.ts`                        | canonical | canvas                     | 2       | 1 → 1                    | 4 → 4                     |
 | `src/features/canvas/ui/chrome/components/index.ts`                           | canonical | canvas                     | 6       | 1 → 1                    | 16 → 16                   |

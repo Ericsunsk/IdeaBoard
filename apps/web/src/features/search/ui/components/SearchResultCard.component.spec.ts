@@ -107,7 +107,7 @@ const presentationItem: SearchResult = {
 describe('SearchResultCard presentation', () => {
   it('renders preview image with aspect ratio and handles lightbox click', async () => {
     const user = userEvent.setup()
-    let lightboxOpened = false
+    let wasLightboxOpened = false
     render(SearchResultCard, {
       props: {
         result: presentationItem,
@@ -118,7 +118,7 @@ describe('SearchResultCard presentation', () => {
         hasImageError: false,
         imageRetryCount: 0,
         onOpenLightbox: () => {
-          lightboxOpened = true
+          wasLightboxOpened = true
         },
       },
     })
@@ -126,7 +126,7 @@ describe('SearchResultCard presentation', () => {
     expect(img).toHaveAttribute('src', '/api/media/previews/fixture/large-preview')
     const zoomBtn = screen.getByRole('button', { name: /view|查看/i })
     await user.click(zoomBtn)
-    expect(lightboxOpened).toBe(true)
+    expect(wasLightboxOpened).toBe(true)
   })
 
   it('renders retry button when hasImageError is true', () => {

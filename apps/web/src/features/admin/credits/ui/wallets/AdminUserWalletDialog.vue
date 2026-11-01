@@ -418,7 +418,7 @@ function commandLabel(kind: AdminCreditCommandKind) {
 }
 async function requestCommandConfirmation() {
   showErrors.value = true
-  if (!activeCommand.value || !validation.value.valid || amountCredits.value == null) return
+  if (!activeCommand.value || !validation.value.isValid || amountCredits.value == null) return
   const draft = commandDraft.value
   if (draft.amountCredits == null) return
   const targetKey = ledgerTargetKey.value

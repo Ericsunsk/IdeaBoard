@@ -7,7 +7,7 @@
       leave-to-class="opacity-0"
     >
       <div
-        v-if="visible && activeResult"
+        v-if="isVisible && activeResult"
         ref="dialogRef"
         class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-[var(--blur-overlay)] select-none"
         role="dialog"
@@ -94,7 +94,7 @@ import {
 import type { SearchResult } from '../../core/models'
 
 const props = defineProps<{
-  visible: boolean
+  isVisible: boolean
   activeResult: SearchResult | null
 }>()
 
@@ -111,7 +111,7 @@ const displayUrl = useMediaDisplayUrl(
 )
 const dialogRef = ref<HTMLElement | null>(null)
 const closeButtonRef = ref<HTMLButtonElement | null>(null)
-const isOpen = computed(() => props.visible && props.activeResult !== null)
+const isOpen = computed(() => props.isVisible && props.activeResult !== null)
 let wasOpen = false
 let focusReturnTarget: HTMLElement | null = null
 

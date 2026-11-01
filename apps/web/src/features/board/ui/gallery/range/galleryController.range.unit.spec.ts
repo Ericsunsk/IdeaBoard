@@ -2,7 +2,11 @@ import { computed, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createBoardRepository, type BoardRepository } from '../../../session/catalog/repository'
 import type { BoardAccessCapabilities, BoardMeta } from '../../../session/catalog/boards'
-import { makeBoardMeta as makeBoard, makeBoardMeta, primeAuthenticatedWorkspace } from '../../../testing'
+import {
+  makeBoardMeta as makeBoard,
+  makeBoardMeta,
+  primeAuthenticatedWorkspace,
+} from '../../../testing'
 import { createDeferred } from '../../../../../test/deferred'
 import { getWorkspaceSelectionStore } from '../../../../workspace'
 import type { CatalogNavigation } from '../styling/contract'
@@ -291,7 +295,7 @@ describe('gallery focus/hydrate races (ported)', () => {
       error: new Error('no workspace'),
     })
     await harness.controller.commands.initialize()
-    expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
+    expect(harness.controller.viewModel.hasCatalogHydrationFailed.value).toBe(true)
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledTimes(1)
     expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)
 
@@ -304,7 +308,7 @@ describe('gallery focus/hydrate races (ported)', () => {
     await nextTick()
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)
-    expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
+    expect(harness.controller.viewModel.hasCatalogHydrationFailed.value).toBe(false)
 
     harness.controller.dispose()
   })
@@ -325,8 +329,10 @@ describe('gallery focus/hydrate races (ported)', () => {
   test.each(['failure', 'rejection'] as const)(
     'ignores old workspace %s after focus refresh while the repository queues the new workspace hydrate',
     async (completion) => {
-      const oldRefresh = createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
-      const newRefresh = createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+      const oldRefresh =
+        createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+      const newRefresh =
+        createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
       let currentScope = 'workspace-a'
       let changeScope!: (scope: string) => void
       const hydrate = vi
@@ -364,12 +370,12 @@ describe('gallery focus/hydrate races (ported)', () => {
 
       expect(harness.feedback.catalogSyncFailed).not.toHaveBeenCalled()
       expect(harness.warn).not.toHaveBeenCalled()
-      expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
+      expect(harness.controller.viewModel.hasCatalogHydrationFailed.value).toBe(false)
       expect(harness.controller.viewModel.visibleBoards.value[0]?.id).toBe('workspace-b')
 
       newRefresh.resolve({ isOk: true })
       await harness.controller.commands.initialize()
-      expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
+      expect(harness.controller.viewModel.hasCatalogHydrationFailed.value).toBe(false)
       expect(harness.feedback.catalogSyncFailed).not.toHaveBeenCalled()
     },
   )

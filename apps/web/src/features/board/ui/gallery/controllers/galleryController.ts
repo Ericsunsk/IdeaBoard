@@ -59,9 +59,9 @@ function createBoardViews(dependencies: {
 function setupCatalogRefresh(refresh: {
   scope: Ref<string | null>
   isBoardsLoading: Ref<boolean>
-  catalogHydrationFailed: Ref<boolean>
+  hasCatalogHydrationFailed: Ref<boolean>
   catalogRecoveryBoardId: Ref<string | null>
-  initialize: (options?: { force?: boolean }) => Promise<void>
+  initialize: (options?: { shouldForce?: boolean }) => Promise<void>
   reloadCatalog: () => Promise<void>
 }): () => void {
   const FOCUS_RELOAD_THROTTLE_MS = 5_000
@@ -74,11 +74,11 @@ function setupCatalogRefresh(refresh: {
     const now = Date.now()
     if (now - lastVisibleReloadAt < FOCUS_RELOAD_THROTTLE_MS) return
     lastVisibleReloadAt = now
-    if (refresh.catalogHydrationFailed.value || refresh.catalogRecoveryBoardId.value) {
+    if (refresh.hasCatalogHydrationFailed.value || refresh.catalogRecoveryBoardId.value) {
       await refresh.reloadCatalog()
       return
     }
-    await refresh.initialize({ force: true })
+    await refresh.initialize({ shouldForce: true })
   }
 
   function handleVisibilityChange(): void {
@@ -101,9 +101,9 @@ function setupCatalogRefresh(refresh: {
   const stopScopeWatch = watch(refresh.scope, (next, prev) => {
     if (next == null || next === prev) return
     if (prev == null) {
-      if (!refresh.isBoardsLoading.value && !refresh.catalogHydrationFailed.value) return
+      if (!refresh.isBoardsLoading.value && !refresh.hasCatalogHydrationFailed.value) return
     }
-    void refresh.initialize({ force: true })
+    void refresh.initialize({ shouldForce: true })
   })
 
   return () => {
@@ -126,7 +126,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const renameDraft = ref('')
   const catalogRecoveryBoardId = ref<string | null>(null)
   const isCatalogReloadPending = ref(false)
-  const deleteDialogVisible = ref(false)
+  const isDeleteDialogVisible = ref(false)
   const pendingDeleteBoard = ref<CatalogEntry | null>(null)
   const isDeletePending = ref(false)
 
@@ -224,11 +224,11 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   function requestDelete(board: CatalogEntry) {
     activeMenuBoardId.value = null
     pendingDeleteBoard.value = board
-    deleteDialogVisible.value = true
+    isDeleteDialogVisible.value = true
   }
 
   function closeDeleteDialog() {
-    deleteDialogVisible.value = false
+    isDeleteDialogVisible.value = false
   }
 
   function handleDeleteDialogHidden() {
@@ -238,7 +238,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   }
 
   function resetDeleteState() {
-    deleteDialogVisible.value = false
+    isDeleteDialogVisible.value = false
     pendingDeleteBoard.value = null
   }
 
@@ -255,7 +255,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       sceneMap: computed(() => dependencies.scenes.sceneMap.value),
       workspaceId: computed(() => dependencies.scenes.workspaceId.value),
       isBoardsLoading: hydration.viewModel.isBoardsLoading,
-      catalogHydrationFailed: hydration.viewModel.catalogHydrationFailed,
+      hasCatalogHydrationFailed: hydration.viewModel.hasCatalogHydrationFailed,
       searchKeyword: readonly(searchKeyword),
       sortMode: readonly(sortMode),
       range: readonly(galleryRangeState.range),
@@ -265,7 +265,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       renameDraft: readonly(renameDraft),
       catalogRecoveryBoardId: hydration.viewModel.catalogRecoveryBoardId,
       isCatalogReloadPending: hydration.viewModel.isCatalogReloadPending,
-      deleteDialogVisible: readonly(deleteDialogVisible),
+      isDeleteDialogVisible: readonly(isDeleteDialogVisible),
       pendingDeleteBoard: readonly(pendingDeleteBoard),
       isDeletePending: readonly(isDeletePending),
     },

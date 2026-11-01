@@ -39,7 +39,7 @@
         variant="ghost"
         :class="adminFramedIconButtonClass"
         :aria-label="REWARD_CODES_MESSAGES.refresh"
-        :loading="loading"
+        :is-loading="loading"
         :disabled="loading"
         @click="refreshRewardCodes"
       >

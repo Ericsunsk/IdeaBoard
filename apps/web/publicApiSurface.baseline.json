@@ -2880,6 +2880,8 @@
     "UserAccountMenuWorkspaceItem",
     "UserIdeaBalanceControl"
   ],
+  "src/features/admin/credits/index.ts": ["AdminUserWalletDialog"],
+  "src/features/admin/models/index.ts": ["createAdminGatewayResource"],
   "src/features/admin/prompts/core/promptVariables.ts": [
     "ServicePromptVariable",
     "ServicePromptVariableTone",
@@ -3718,6 +3720,11 @@
     "primeAuthenticatedWorkspace",
     "selectWorkspace"
   ],
+  "src/features/board/ui/gallery/controllers/index.ts": [
+    "CatalogSortMode",
+    "formatCatalogDate",
+    "useCatalog"
+  ],
   "src/features/canvas/core/graph/graphStoreWriter.ts": ["resolveWritableCanvasGraphStore"],
   "src/features/canvas/core/graph/graphValueEquality.ts": ["isSameJsonValue"],
   "src/features/canvas/core/graph/groupGeometry.ts": [
@@ -4054,6 +4061,18 @@
     "useImageInpaintOverlay",
     "useInpaintChromeActions",
     "useInpaintChromeState"
+  ],
+  "src/features/canvas/tools/outpaint/core/index.ts": [
+    "OutpaintRect",
+    "containImageRect",
+    "resolveOutpaintIntent",
+    "resolveOutpaintPixelGeometry"
+  ],
+  "src/features/canvas/tools/outpaint/index.ts": [
+    "ImageOutpaintOverlay",
+    "OutpaintDragAnchor",
+    "useFlowOutpaintInteractionHandlers",
+    "useImageOutpaintOverlay"
   ],
   "src/features/canvas/tools/retouch/index.ts": [
     "ImageRetouchKind",

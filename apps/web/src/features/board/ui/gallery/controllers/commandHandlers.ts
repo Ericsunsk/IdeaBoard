@@ -43,7 +43,7 @@ function createCatalogHydration({
   state,
 }: Pick<CatalogCommandDependencies, 'catalog' | 'feedback' | 'warn' | 'state'>) {
   const isBoardsLoading = ref(true)
-  const catalogHydrationFailed = ref(false)
+  const hasCatalogHydrationFailed = ref(false)
   let initializePromise: Promise<void> | null = null
   let generation = 0
   let disposed = false
@@ -69,10 +69,13 @@ function createCatalogHydration({
   }
 
   function initialize(
-    options: { force?: boolean; hydrateOptions?: HydrateBoardsFromServerOptions | undefined } = {},
+    options: {
+      shouldForce?: boolean
+      hydrateOptions?: HydrateBoardsFromServerOptions | undefined
+    } = {},
   ): Promise<void> {
     if (disposed) return Promise.resolve()
-    if (options.force) initializePromise = null
+    if (options.shouldForce) initializePromise = null
     if (initializePromise) return initializePromise
     generation += 1
     state.isCatalogReloadPending.value = false
@@ -87,19 +90,19 @@ function createCatalogHydration({
             })
           : catalog.commands.hydrate({
               shouldIncludeDocuments: false,
-              shouldForce: options.force === true,
+              shouldForce: options.shouldForce === true,
             }))
         if (!isCurrent(token)) return
         if (!result.isOk) {
-          if (!options.hydrateOptions) catalogHydrationFailed.value = true
+          if (!options.hydrateOptions) hasCatalogHydrationFailed.value = true
           feedback.catalogSyncFailed()
           return
         }
-        catalogHydrationFailed.value = false
+        hasCatalogHydrationFailed.value = false
         if (options.hydrateOptions) state.catalogRecoveryBoardId.value = null
       } catch (error) {
         if (!isCurrent(token)) return
-        if (!options.hydrateOptions) catalogHydrationFailed.value = true
+        if (!options.hydrateOptions) hasCatalogHydrationFailed.value = true
         warn(
           options.hydrateOptions
             ? '[boards] failed to reload catalog'
@@ -117,9 +120,9 @@ function createCatalogHydration({
   async function reloadCatalog() {
     const boardId = state.catalogRecoveryBoardId.value
     if (disposed || state.isCatalogReloadPending.value) return
-    if (!catalogHydrationFailed.value && !boardId) return
+    if (!hasCatalogHydrationFailed.value && !boardId) return
     const pending = initialize({
-      force: true,
+      shouldForce: true,
       hydrateOptions: boardId
         ? { shouldPreserveLocalNewer: false, rollbackBoardIds: [boardId] }
         : undefined,
@@ -130,7 +133,7 @@ function createCatalogHydration({
       await pending
       if (
         isCurrent(token) &&
-        !catalogHydrationFailed.value &&
+        !hasCatalogHydrationFailed.value &&
         !state.catalogRecoveryBoardId.value
       ) {
         feedback.catalogReloaded()
@@ -143,7 +146,7 @@ function createCatalogHydration({
   return {
     viewModel: {
       isBoardsLoading: readonly(isBoardsLoading),
-      catalogHydrationFailed: readonly(catalogHydrationFailed),
+      hasCatalogHydrationFailed: readonly(hasCatalogHydrationFailed),
       catalogRecoveryBoardId: readonly(state.catalogRecoveryBoardId),
       isCatalogReloadPending: readonly(state.isCatalogReloadPending),
     },

@@ -22,7 +22,7 @@
               variant="ghost"
               :class="iconButtonClass"
               :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryRefreshAria"
-              :loading="runsLoading"
+              :is-loading="runsLoading"
               @click="refreshRuns"
             >
               <template #icon><Refresh class="size-4" /></template>
@@ -49,7 +49,7 @@
             severity="secondary"
             size="sm"
             variant="ghost"
-            :loading="runsLoading"
+            :is-loading="runsLoading"
             @click="refreshRuns"
           />
         </div>

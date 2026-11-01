@@ -25,7 +25,7 @@ describe('Admin base controls', () => {
 
     it('handles severity and danger variants with disabled/loading states', () => {
       const wrapper = mount(AdminButton, {
-        props: { severity: 'danger', loading: true },
+        props: { severity: 'danger', isLoading: true },
         slots: { default: 'Delete' },
       })
       expect(wrapper.attributes('aria-busy')).toBe('true')
@@ -88,7 +88,7 @@ describe('Admin base controls', () => {
 
     it('supports rounded false for rounded-control', () => {
       const wrapper = mount(AdminBadge, {
-        props: { variant: 'danger', rounded: false },
+        props: { variant: 'danger', isRounded: false },
         slots: { default: 'Banned' },
       })
       expect(wrapper.text()).toBe('Banned')

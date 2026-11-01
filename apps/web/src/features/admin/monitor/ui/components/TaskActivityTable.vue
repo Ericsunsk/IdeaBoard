@@ -136,7 +136,7 @@
               severity="warn"
               :class="adminTextButtonClass"
               :label="MONITOR_MESSAGES.cancelAction"
-              :loading="isCancellingTask(data.task_id)"
+              :is-loading="isCancellingTask(data.task_id)"
               :aria-label="MONITOR_MESSAGES.cancelTaskAria"
               @click="emit('cancelTask', data)"
             />

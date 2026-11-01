@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import ts from 'typescript'
 import { loadSeamInventory } from './seamInventory.ts'
@@ -9,6 +10,14 @@ const canonicalEntries = new Set(
 )
 const baselinePath = new URL('./booleanNaming.baseline.json', import.meta.url)
 const baseline = new Set(JSON.parse(fs.readFileSync(baselinePath, 'utf8')).declarations)
+
+// ESLint caches by source and plugin metadata; these loaded contracts also change rule results.
+export const governancePluginMeta = {
+  name: 'ideaboard-governance',
+  version: createHash('sha256')
+    .update(JSON.stringify({ seams, baseline: [...baseline] }))
+    .digest('hex'),
+}
 
 function relativeFile(context) {
   return path.relative(context.cwd, context.filename).split(path.sep).join('/')

@@ -93,17 +93,17 @@
       </section>
 
       <LoadErrorPanel
-        v-if="catalogRecoveryBoardId || catalogHydrationFailed"
+        v-if="catalogRecoveryBoardId || hasCatalogHydrationFailed"
         class="mb-4"
         :message="
-          catalogHydrationFailed
+          hasCatalogHydrationFailed
             ? t('workspace.catalog.loadFailed')
             : t('workspace.catalog.reloadRequired')
         "
         :retry-label="
           isCatalogReloadPending
             ? t('workspace.catalog.reloading')
-            : catalogHydrationFailed
+            : hasCatalogHydrationFailed
               ? t('common.actions.retry')
               : t('workspace.catalog.reload')
         "
@@ -167,7 +167,7 @@
     <!-- 删除二次确认：统一走 ConfirmDialog surface="user" intent=danger（参考 LibraryFloatingIsland）。Busy 提交时组件内部锁住 mask/Escape/close-control。 -->
     <ConfirmDialog
       surface="user"
-      :is-visible="deleteDialogVisible"
+      :is-visible="isDeleteDialogVisible"
       :title="t('workspace.deleteDialog.title')"
       :message="
         t('workspace.deleteDialog.description', {
@@ -238,7 +238,7 @@ const {
   sceneMap,
   workspaceId,
   isBoardsLoading,
-  catalogHydrationFailed,
+  hasCatalogHydrationFailed,
   searchKeyword,
   sortMode,
   range,
@@ -247,7 +247,7 @@ const {
   renameDraft,
   catalogRecoveryBoardId,
   isCatalogReloadPending,
-  deleteDialogVisible,
+  isDeleteDialogVisible,
   pendingDeleteBoard,
   isDeletePending,
 } = controller.viewModel

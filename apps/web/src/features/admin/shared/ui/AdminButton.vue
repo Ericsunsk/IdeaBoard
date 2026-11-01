@@ -3,8 +3,8 @@
     :as="href ? 'a' : 'button'"
     :variant="baseButtonVariant"
     :size="props.size"
-    :is-disabled="disabled || loading"
-    :is-loading="loading"
+    :is-disabled="disabled || isLoading"
+    :is-loading="isLoading"
     :type="!href ? type : undefined"
     :href="isDisabledOrLoading ? undefined : href"
     :aria-disabled="isDisabledOrLoading ? 'true' : undefined"
@@ -12,7 +12,7 @@
     :rel="rel"
     :class="computedClasses"
   >
-    <slot v-if="!loading" name="icon">
+    <slot v-if="!isLoading" name="icon">
       <component :is="icon" v-if="icon" class="size-4 shrink-0" />
     </slot>
     <span v-if="label">{{ label }}</span>
@@ -45,7 +45,7 @@ const props = withDefaults(
     size?: AdminButtonSize | undefined
     class?: HTMLAttributes['class'] | undefined
     disabled?: boolean | undefined
-    loading?: boolean | undefined
+    isLoading?: boolean | undefined
     type?: ('button' | 'submit' | 'reset') | undefined
     text?: boolean | undefined
     outlined?: boolean | undefined
@@ -62,7 +62,7 @@ const props = withDefaults(
     size: 'default',
     class: undefined,
     disabled: false,
-    loading: false,
+    isLoading: false,
     type: 'button',
     text: false,
     outlined: false,
@@ -84,7 +84,7 @@ function resolveEffectiveVariant(): AdminButtonVariant {
 
 const baseButtonVariant = computed(resolveEffectiveVariant)
 
-const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.loading))
+const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.isLoading))
 
 const computedClasses = computed(() => {
   return cn(

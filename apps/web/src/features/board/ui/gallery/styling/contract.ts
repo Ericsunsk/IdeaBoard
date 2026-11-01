@@ -61,7 +61,7 @@ export type Catalog = {
     sceneMap: Readonly<Ref<Record<string, BoardListSceneEntry>>>
     workspaceId: Readonly<Ref<string | null>>
     isBoardsLoading: Readonly<Ref<boolean>>
-    catalogHydrationFailed: Readonly<Ref<boolean>>
+    hasCatalogHydrationFailed: Readonly<Ref<boolean>>
     searchKeyword: Readonly<Ref<string>>
     sortMode: Readonly<Ref<CatalogSortMode>>
     range: Readonly<Ref<BoardGalleryRange>>
@@ -71,7 +71,7 @@ export type Catalog = {
     renameDraft: Readonly<Ref<string>>
     catalogRecoveryBoardId: Readonly<Ref<string | null>>
     isCatalogReloadPending: Readonly<Ref<boolean>>
-    deleteDialogVisible: Readonly<Ref<boolean>>
+    isDeleteDialogVisible: Readonly<Ref<boolean>>
     pendingDeleteBoard: Readonly<Ref<CatalogEntry | null>>
     isDeletePending: Readonly<Ref<boolean>>
   }

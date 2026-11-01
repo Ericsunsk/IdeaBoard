@@ -32,7 +32,7 @@
               variant="ghost"
               size="icon"
               :class="iconButtonClass"
-              :loading="loading"
+              :is-loading="loading"
               :aria-label="REWARD_CODES_MESSAGES.redemptionsRefreshAria"
               @click="refreshRedemptions"
             >
@@ -49,7 +49,7 @@
             variant="ghost"
             size="sm"
             :class="adminTextButtonClass"
-            :loading="loading"
+            :is-loading="loading"
             @click="refreshRedemptions"
           >
             {{ REWARD_CODES_MESSAGES.redemptionsRefreshRetry }}

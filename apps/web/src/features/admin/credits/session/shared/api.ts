@@ -513,7 +513,7 @@ export function buildAdminCreditCommandRequest(
   idFactory: () => string = () => createUniqueId(),
 ): BuiltAdminCreditCommand {
   const validation = validateAdminCreditCommand(input)
-  if (!validation.valid || input.amountCredits == null) {
+  if (!validation.isValid || input.amountCredits == null) {
     throw new Error(validation.targetError || validation.amountError || 'Idea操作参数无效')
   }
 

@@ -26,7 +26,7 @@ export type AdminCreditCommandInput = AdminCreditCommandDraft & {
 export type CreditCommandValidation = {
   amountError: string
   targetError: string
-  valid: boolean
+  isValid: boolean
 }
 
 const MAX_CREDIT_AMOUNT = 9_000_000_000_000_000
@@ -47,7 +47,7 @@ export function validateAdminCreditCommand(
   const targetError = validateCommandTarget(input)
   const amountError =
     validateCommandAmount(input) || validateCommandLink(input) || validateCorrectionLink(input)
-  return { amountError, targetError, valid: !amountError && !targetError }
+  return { amountError, targetError, isValid: !amountError && !targetError }
 }
 
 function validateCommandAmount(input: AdminCreditCommandInput): string {

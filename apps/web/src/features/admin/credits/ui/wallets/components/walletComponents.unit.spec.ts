@@ -40,7 +40,7 @@ describe('Wallet Subcomponents', () => {
         amountCredits: 100,
 
         showErrors: false,
-        validation: { amountError: '', targetError: '', valid: true },
+        validation: { amountError: '', targetError: '', isValid: true },
         commandPending: false,
         onCancel,
         onSubmit,
@@ -68,7 +68,7 @@ describe('Wallet Subcomponents', () => {
         amountCredits: null,
 
         showErrors: false,
-        validation: { amountError: '', targetError: '', valid: true },
+        validation: { amountError: '', targetError: '', isValid: true },
         commandPending: false,
       },
     })

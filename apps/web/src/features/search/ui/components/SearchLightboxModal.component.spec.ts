@@ -25,7 +25,7 @@ describe('SearchLightboxModal', () => {
   it('renders image, title and author when visible', () => {
     render(SearchLightboxModal, {
       props: {
-        visible: true,
+        isVisible: true,
         activeResult: mockItem,
       },
     })
@@ -40,7 +40,7 @@ describe('SearchLightboxModal', () => {
   it('keeps a visible focus ring on the close button over the dark backdrop', () => {
     render(SearchLightboxModal, {
       props: {
-        visible: true,
+        isVisible: true,
         activeResult: mockItem,
       },
     })
@@ -56,7 +56,7 @@ describe('SearchLightboxModal', () => {
     trigger.focus()
     const { emitted, rerender } = render(SearchLightboxModal, {
       props: {
-        visible: true,
+        isVisible: true,
         activeResult: mockItem,
       },
     })
@@ -72,7 +72,7 @@ describe('SearchLightboxModal', () => {
     await user.keyboard('{Escape}')
     expect(emitted().close).toHaveLength(1)
 
-    await rerender({ visible: false, activeResult: null })
+    await rerender({ isVisible: false, activeResult: null })
     await waitFor(() => expect(trigger).toHaveFocus())
     trigger.remove()
   })

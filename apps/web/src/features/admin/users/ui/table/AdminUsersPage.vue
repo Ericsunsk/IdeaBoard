@@ -55,7 +55,7 @@
         variant="ghost"
         :class="adminFramedIconButtonClass"
         :aria-label="USERS_MESSAGES.refreshUsers"
-        :loading="loading"
+        :is-loading="loading"
         @click="loadUsers"
       >
         <Refresh class="size-4 text-muted-foreground" />
