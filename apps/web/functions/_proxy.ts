@@ -47,9 +47,13 @@ export async function proxyRequest({ request, env }: PagesContext): Promise<Resp
   const response = await fetch(target, {
     method: request.method,
     headers,
-    body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,
+    body: request.method === 'GET' || request.method === 'HEAD' ? null : request.body,
     redirect: 'manual',
   })
+
+  // Cloudflare binds the upgraded socket to this response. Reconstructing it
+  // would discard the WebSocket connection.
+  if (response.status === 101) return response
 
   const responseHeaders = new Headers(response.headers)
   const publicOrigin = incoming.origin

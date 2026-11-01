@@ -44,7 +44,7 @@ setup_fixture() {
   manifest="${trusted_tree}/release-manifest.json"
   commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   tag=v1.2.3
-  mkdir -p "${capture}" "${fixture_root}/tmp" "${trusted_tree}/scripts"
+  mkdir -p "${capture}" "${fixture_root}/tmp" "${trusted_tree}/scripts" "${trusted_tree}/docker/postgres"
   # Deliberate binary NUL tests framing without shell string conversion.
   printf 'signed\000archive\377bytes\n' > "${archive}"
   printf '{"fixture":"signed"}\n' > "${signature}"
@@ -63,6 +63,8 @@ value=dict(schema_version=2,repository=repo,tag='v1.2.3',commit=sys.argv[2],ref=
 pathlib.Path(sys.argv[1]).write_text(json.dumps(value))
 PYTHON
   cp "${script_dir}/release-artifacts.py" "${trusted_tree}/scripts/release-artifacts.py"
+  printf '#!/usr/bin/env bash\nprintf "signed init"\n' > "${trusted_tree}/docker/postgres/init-runtime-roles.sh"
+  chmod 755 "${trusted_tree}/docker/postgres/init-runtime-roles.sh"
   cat > "${trusted_tree}/scripts/deploy-stack.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -73,6 +75,7 @@ cp "$3" "${DEPLOY_CAPTURE_DIR}/manifest-copy"
 printf '%s\n' "${IDEABOARD_STACK_DIR}" > "${DEPLOY_CAPTURE_DIR}/stack-dir"
 printf '%s\n' "${ENV_FILE}" > "${DEPLOY_CAPTURE_DIR}/env-file"
 printf '%s\n' "${COMPOSE_PROJECT_NAME}" > "${DEPLOY_CAPTURE_DIR}/compose-project"
+printf '%s\n' "${IDEABOARD_POSTGRES_INIT_FILE}" > "${DEPLOY_CAPTURE_DIR}/postgres-init-file"
 printf '%s\n' "${IDEABOARD_COMPOSE_OVERRIDE_FILE:-}" "${NPM_NETWORK_NAME:-}" > "${DEPLOY_CAPTURE_DIR}/topology"
 printf '%s\n' "${IMAGE_ENV_FILE}" "${RELEASE_STATE_DIR}" "${BACKUP_DIR}" > "${DEPLOY_CAPTURE_DIR}/state-paths"
 printf '%s\n' "${IDEABOARD_DEPLOYMENT_BUNDLE_DIR}" "${IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST}" "${IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE}" "${IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE}" > "${DEPLOY_CAPTURE_DIR}/bundle"
@@ -100,6 +103,7 @@ export RELEASE_STATE_DIR=/cloud-untrusted BACKUP_DIR=/cloud-untrusted ENV_FILE=/
 export IDEABOARD_DEPLOYMENT_BUNDLE_DIR=/cloud-untrusted IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST=/cloud-untrusted
 export IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE=/cloud-untrusted IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE=/cloud-untrusted
 export IDEABOARD_DEPLOY_RESULT_FILE=/cloud-untrusted COMPOSE_PROJECT_NAME=cloud-untrusted
+export IDEABOARD_POSTGRES_INIT_FILE=/cloud-untrusted
 printf 'prod root+ai-proxy injected\n' > "${DEPLOY_CAPTURE_DIR}/injection"
 shift 7
 exec "$@"
@@ -121,7 +125,7 @@ if pathlib.Path(a.signature).read_bytes() != b'{"fixture":"signed"}\n':
     sys.exit(1)
 if (a.repository, a.tag, a.commit) != ('Ericsunsk/IdeaBoard', os.environ['EXPECTED_TAG'], os.environ['EXPECTED_COMMIT']):
     sys.exit(1)
-shutil.copytree(root, a.output_dir)
+shutil.copytree(root, a.output_dir, symlinks=True)
 PYTHON
   chmod 600 "${fixture_root}/verifier.py"
 }
@@ -157,6 +161,8 @@ deployed_manifest_path="$(cat "${capture}/manifest-path")"
 [[ -f "$deployed_manifest_path" ]] || fail 'signed bundle was not retained for rollback'
 assert_contains "${capture}/env-file" "${fixture_root}/state/owner.env"
 assert_contains "${capture}/compose-project" ideaboard
+assert_contains "${capture}/postgres-init-file" "${stack}/docker/postgres/init-runtime-roles.sh"
+cmp -s "${trusted_tree}/docker/postgres/init-runtime-roles.sh" "${stack}/docker/postgres/init-runtime-roles.sh" || fail 'stable PostgreSQL init file differs from signed input'
 [[ "$(tr -d '\n' < "${capture}/topology")" == "" ]] || fail 'Cloud topology was accepted without host configuration'
 assert_contains "${capture}/state-paths" "${stack}/docker/images.env"
 assert_contains "${capture}/state-paths" "${stack}/docker/releases"
@@ -351,19 +357,78 @@ chmod 666 "${fixture_root}/verifier.py"
 if run_entrypoint >/dev/null 2>&1; then fail 'writable verifier accepted'; fi
 assert_no_deploy
 
+for unsafe_init in missing-source empty-source source-mode source-symlink target-symlink directory-symlink; do
+  setup_fixture "postgres-init-${unsafe_init}"
+  case "$unsafe_init" in
+    missing-source) rm "${trusted_tree}/docker/postgres/init-runtime-roles.sh" ;;
+    empty-source) : > "${trusted_tree}/docker/postgres/init-runtime-roles.sh" ;;
+    source-mode) chmod 644 "${trusted_tree}/docker/postgres/init-runtime-roles.sh" ;;
+    source-symlink)
+      mv "${trusted_tree}/docker/postgres/init-runtime-roles.sh" "${fixture_root}/unsigned-init.sh"
+      ln -s "${fixture_root}/unsigned-init.sh" "${trusted_tree}/docker/postgres/init-runtime-roles.sh"
+      ;;
+    target-symlink)
+      mkdir -p "${stack}/docker/postgres"
+      printf 'operator file\n' > "${fixture_root}/operator-file"
+      ln -s "${fixture_root}/operator-file" "${stack}/docker/postgres/init-runtime-roles.sh"
+      ;;
+    directory-symlink)
+      mkdir -p "${stack}/docker" "${fixture_root}/operator-directory"
+      ln -s "${fixture_root}/operator-directory" "${stack}/docker/postgres"
+      ;;
+  esac
+  if run_entrypoint >/dev/null 2>&1; then fail "unsafe PostgreSQL init accepted: $unsafe_init"; fi
+  assert_no_deploy
+  if [[ "$unsafe_init" == target-symlink ]]; then
+    assert_contains "${fixture_root}/operator-file" 'operator file'
+  fi
+done
+
 setup_fixture retained-state
 mkdir -p "${stack}/docker/releases/history"
 printf 'keep state\n' > "${stack}/docker/releases/history/retained.json"
 printf 'keep image refs\n' > "${stack}/docker/images.env"
 run_entrypoint >/dev/null
 first_manifest="$(cat "${capture}/manifest-path")"
+first_init_inode="$(python3 -c 'import os,sys;print(os.stat(sys.argv[1]).st_ino)' "${stack}/docker/postgres/init-runtime-roles.sh")"
 # Second release uses a different verified input tree and identity.
 tag=v1.2.4; commit=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 jq --arg tag "$tag" --arg commit "$commit" '.tag=$tag|.commit=$commit|.ref=("refs/tags/"+$tag)|.cosign.certificate_identity=("https://github.com/Ericsunsk/IdeaBoard/.github/workflows/docker-images.yml@refs/tags/"+$tag)' "${manifest}" > "${manifest}.new"
 mv "${manifest}.new" "${manifest}"
 run_entrypoint >/dev/null
 [[ -f "$first_manifest" && "$first_manifest" != "$(cat "${capture}/manifest-path")" ]] || fail 'previous verified bundle overwritten'
+[[ "$first_init_inode" == "$(python3 -c 'import os,sys;print(os.stat(sys.argv[1]).st_ino)' "${stack}/docker/postgres/init-runtime-roles.sh")" ]] || fail 'unchanged signed init file was replaced during redeploy'
+assert_contains "${capture}/postgres-init-file" "${stack}/docker/postgres/init-runtime-roles.sh"
 assert_contains "${stack}/docker/releases/history/retained.json" 'keep state'
 assert_contains "${stack}/docker/images.env" 'keep image refs'
 [[ ! -e "${capture}/unexpected-command" && ! -e "${stack}/.git" && ! -e "${stack}/apps" ]] || fail 'repository tools or sources used'
+# Distinct verified bundle directories must keep an identical PostgreSQL config.
+first_root="$(dirname "$first_manifest")"
+second_root="$(dirname "$(cat "${capture}/manifest-path")")"
+for bundle_root in "$first_root" "$second_root"; do
+  mkdir -p "${bundle_root}/docker"
+  cp "${script_dir}/../docker/compose.yml" "${bundle_root}/docker/compose.yml"
+  COMPOSE_PROJECT_NAME=ideaboard \
+    IDEABOARD_POSTGRES_INIT_FILE="${stack}/docker/postgres/init-runtime-roles.sh" \
+    docker compose -f "${bundle_root}/docker/compose.yml" \
+    --env-file "${script_dir}/../docker/.env.example" \
+    --env-file "${script_dir}/../docker/images.env.example" \
+    config --hash postgres > "${bundle_root}/postgres-config-hash"
+  COMPOSE_PROJECT_NAME=ideaboard \
+    IDEABOARD_POSTGRES_INIT_FILE="${stack}/docker/postgres/init-runtime-roles.sh" \
+    docker compose -f "${bundle_root}/docker/compose.yml" \
+    --env-file "${script_dir}/../docker/.env.example" \
+    --env-file "${script_dir}/../docker/images.env.example" \
+    config --format json | jq -e --arg source "${stack}/docker/postgres/init-runtime-roles.sh" \
+    '.services.postgres.volumes | any(.type == "bind" and .source == $source and .target == "/docker-entrypoint-initdb.d/10-runtime-roles.sh" and .read_only)' \
+    >/dev/null || fail 'PostgreSQL does not mount the stable verified script read-only'
+done
+cmp -s "${first_root}/postgres-config-hash" "${second_root}/postgres-config-hash" || fail 'PostgreSQL config changes with bundle directory'
+# Changed verified bytes replace the stable file atomically without retaining a
+# release-relative source or changing the host path consumed by Compose.
+printf '#!/usr/bin/env bash\nprintf "updated signed init"\n' > "${trusted_tree}/docker/postgres/init-runtime-roles.sh"
+run_entrypoint >/dev/null
+cmp -s "${trusted_tree}/docker/postgres/init-runtime-roles.sh" "${stack}/docker/postgres/init-runtime-roles.sh" || fail 'updated signed init file was not promoted'
+[[ "$first_init_inode" != "$(python3 -c 'import os,sys;print(os.stat(sys.argv[1]).st_ino)' "${stack}/docker/postgres/init-runtime-roles.sh")" ]] || fail 'changed signed init file was not atomically replaced'
+assert_contains "${capture}/postgres-init-file" "${stack}/docker/postgres/init-runtime-roles.sh"
 printf 'Production deploy entrypoint contract tests passed\n'

@@ -141,6 +141,50 @@ MANIFEST_FILE="${release_dir}/release-manifest.json"
 (cd "${release_dir}" && python3 scripts/release-artifacts.py validate \
   --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
   --commit "${commit}" --tag "${tag}") >/dev/null 2>&1 || die 'signed component provenance is invalid'
+# A versioned bind source would recreate PostgreSQL even for identical bundles.
+# Promote only the signed init file into stable host-owned deployment state.
+postgres_init_file="${STACK_DIR}/docker/postgres/init-runtime-roles.sh"
+python3 - "${release_dir}/docker/postgres/init-runtime-roles.sh" "${STACK_DIR}" <<'PYTHON' || die 'unsafe PostgreSQL initialization file'
+import os, pathlib, stat, sys, tempfile
+try:
+    source, root = map(pathlib.Path, sys.argv[1:])
+    if not root.is_absolute():
+        raise ValueError()
+    info = source.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o755:
+        raise ValueError()
+    data = source.read_bytes()
+    if not data:
+        raise ValueError()
+    directory = root / "docker" / "postgres"
+    for path in [root, root / "docker", directory]:
+        path.mkdir(mode=0o700, exist_ok=True)
+        info = path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+            raise ValueError()
+    target = directory / "init-runtime-roles.sh"
+    if target.exists() or target.is_symlink():
+        info = target.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+            raise ValueError()
+        unchanged = target.read_bytes() == data and stat.S_IMODE(info.st_mode) == 0o755
+    else:
+        unchanged = False
+    if not unchanged:
+        fd, temporary = tempfile.mkstemp(prefix=".init-runtime-roles.", dir=directory)
+        try:
+            with os.fdopen(fd, "wb") as output:
+                output.write(data)
+                output.flush()
+                os.fsync(output.fileno())
+                os.fchmod(output.fileno(), 0o755)
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+except (OSError, ValueError):
+    sys.exit(1)
+PYTHON
 deploy_command="${release_dir}/scripts/deploy-stack.sh"
 inject_command="${release_dir}/scripts/infisical-run.sh"
 [[ -x "${deploy_command}" && -x "${inject_command}" ]] || die 'signed deployment commands are unavailable'
@@ -169,6 +213,7 @@ DEPLOY_ENV+=(
   "IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE=${bundle_dir}/deployment-bundle.tar"
   "IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE=${bundle_dir}/deployment-bundle.sigstore.json"
   "ENV_FILE=${OWNER_ENV_FILE}"
+  "IDEABOARD_POSTGRES_INIT_FILE=${postgres_init_file}"
   COMPOSE_PROJECT_NAME=ideaboard
   "IDEABOARD_DEPLOY_RESULT_FILE=${DEPLOY_RESULT_FILE}"
 )

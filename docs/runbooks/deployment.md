@@ -299,6 +299,8 @@ docker network inspect npm-nw >/dev/null 2>&1 || docker network create npm-nw
 
 受限 entrypoint 将其转换为 `IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml` 和 `NPM_NETWORK_NAME=npm-nw`，在注入 Infisical 后传给部署进程。这些非 secret 配置不放入 Infisical，也不写进 `/var/lib/ideaboard/owner.env`。手动部署则直接以这两个进程环境变量运行部署命令；仅 encrypted offline 模式可从 `docker/.env` 读取。
 
+PostgreSQL 初始化脚本由受限入口从验签包原子发布到 `/opt/stacks/ideaboard/docker/postgres/init-runtime-roles.sh`，Compose 通过宿主强制设置的 `IDEABOARD_POSTGRES_INIT_FILE` 绑定该稳定路径。相同脚本内容保持原文件，重复部署不会因版本目录变化重建 PostgreSQL；Infisical 无权改变该路径。
+
 随后通过 Deploy Existing Production Release 部署目标签名包。部署脚本会把 `compose.npm.yml` 叠加到 canonical Compose 配置，使 API/Auth/Realtime 同时保留 IdeaBoard 内网并加入 NPM external network。NPM 的 Forward Hostname / IP 与 Forward Port 分别为 `ideaboard-api` / `6000`、`ideaboard-auth` / `6001`、`ideaboard-realtime` / `6002`；Realtime 的 WebSocket 路由需启用 WebSocket Support。不要使用容器自身的 `127.0.0.1`。PostgreSQL 与 NATS 只保留在 IdeaBoard 内网。
 
 旧 stack 重建后，先确认 NPM 容器内可以解析并访问 `ideaboard-api:6000`、`ideaboard-auth:6001` 与 `ideaboard-realtime:6002/health`，再执行 `docker exec npm nginx -t && docker exec npm nginx -s reload`，刷新静态 upstream 的旧容器 IP；最后复验公开 health。
@@ -428,6 +430,7 @@ DEPLOY_ENV=(env -u INFISICAL_TOKEN -u IDEABOARD_COMPOSE_OVERRIDE_FILE -u NPM_NET
   IMAGE_ENV_FILE=/opt/stacks/ideaboard/docker/images.env
   RELEASE_STATE_DIR=/opt/stacks/ideaboard/docker/releases
   BACKUP_DIR=/opt/stacks/ideaboard-backups
+  IDEABOARD_POSTGRES_INIT_FILE=/opt/stacks/ideaboard/docker/postgres/init-runtime-roles.sh
   ENV_FILE=/var/lib/ideaboard/owner.env COMPOSE_PROJECT_NAME=ideaboard)
 if [[ -f /etc/ideaboard/deployment.json ]]; then
   DEPLOY_ENV+=("IDEABOARD_COMPOSE_OVERRIDE_FILE=${BUNDLE_DIR}/docker/compose.npm.yml"
