@@ -19,7 +19,7 @@ processes:
 
   api:
     working_dir: "apps/api"
-    command: "../../scripts/infisical-run.sh --env dev -- go run ./cmd"
+    command: "../../scripts/infisical-run.sh --env dev --path / --path /ai-proxy -- go run ./cmd"
     depends_on:
       migrate:
         condition: process_completed_successfully

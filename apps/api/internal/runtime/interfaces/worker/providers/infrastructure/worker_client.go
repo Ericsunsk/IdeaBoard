@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -57,7 +56,7 @@ type WorkerClientConfig struct {
 // WorkerClient sends image generation requests to the ai-proxy Worker
 // as CanonicalImageRequest. The Worker owns shaping and provider routing.
 type WorkerClient struct {
-	baseURL    string
+	endpoint   safehttp.ConfiguredEndpoint
 	secret     string
 	timeout    time.Duration
 	maxBytes   int64
@@ -76,8 +75,12 @@ func NewWorkerClient(cfg WorkerClientConfig) (*WorkerClient, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("worker base URL is required (WORKER_BASE_URL)")
 	}
-	parsed, err := url.Parse(baseURL)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+	// The Worker base URL is operator configuration (WORKER_BASE_URL), not
+	// user input: validate once here and pin every send to this endpoint
+	// through the configured-egress path (loopback included, no allowlist).
+	// The endpoint keeps the normalized base; no separate copy is stored.
+	endpoint, err := safehttp.ParseConfiguredEndpoint(baseURL)
+	if err != nil {
 		return nil, fmt.Errorf("worker base URL must be an http(s) URL with a host")
 	}
 	if strings.TrimSpace(cfg.Secret) == "" {
@@ -108,7 +111,7 @@ func NewWorkerClient(cfg WorkerClientConfig) (*WorkerClient, error) {
 		resilience = NewWorkerResilience(DefaultWorkerResilienceConfig(), cfg.Metrics)
 	}
 	return &WorkerClient{
-		baseURL:    baseURL,
+		endpoint:   endpoint,
 		secret:     strings.TrimSpace(cfg.Secret),
 		timeout:    timeout,
 		maxBytes:   maxBytes,
@@ -152,7 +155,7 @@ func (c *WorkerClient) Do(ctx context.Context, req runtimeports.WorkerRequest) (
 	if err != nil {
 		return runtimeports.WorkerResponse{}, fmt.Errorf("worker request encode failed: %w", err)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+workerwire.GeneratePath, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint.BaseURL()+workerwire.GeneratePath, bytes.NewReader(body))
 	if err != nil {
 		return runtimeports.WorkerResponse{}, fmt.Errorf("worker request build failed: %w", err)
 	}
@@ -161,7 +164,7 @@ func (c *WorkerClient) Do(ctx context.Context, req runtimeports.WorkerRequest) (
 	resp, err := c.outbound.Do(ctx, httpReq, safehttp.RequestOptions{
 		Timeout:     timeout,
 		MaxAttempts: 1,
-		AllowHosts:  safehttp.AllowHosts(ctx),
+		Configured:  c.endpoint,
 		Target:      c.target,
 	})
 	if err != nil {

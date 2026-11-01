@@ -167,3 +167,4 @@ jobs:
         run: |
           docker compose -f docker/compose.yml --env-file docker/.env.example --env-file docker/images.env.example config
           docker compose -f docker/compose.yml -f docker/compose.npm.yml --env-file docker/.env.example --env-file docker/images.env.example config
+          bash scripts/worker-bindings-test.sh

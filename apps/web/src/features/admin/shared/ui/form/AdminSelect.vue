@@ -44,6 +44,7 @@
             v-for="opt in normalizedOptions"
             :key="String(opt.value)"
             :value="String(opt.value)"
+            :disabled="opt.disabled"
             :class="cn(adminSelectItemClass, size === 'small' && adminSelectItemCompactClass)"
           >
             <span :class="adminSelectItemIndicatorClass">
@@ -99,6 +100,9 @@ import {
 export type SelectOptionItem = {
   label: string
   value: string | number
+  /** Reka `SelectItem` disabled state: greyed out and unpickable. */
+  // eslint-disable-next-line governance/boolean-prefix -- Reka `SelectItem` contract prop.
+  disabled?: boolean | undefined
 }
 
 const props = withDefaults(
@@ -149,7 +153,9 @@ const normalizedOptions = computed(() => {
   return props.options.map((opt) => {
     const label = String((opt as Record<string, unknown>)[props.optionLabel] ?? '')
     const value = (opt as Record<string, unknown>)[props.optionValue] ?? ''
-    return { label, value }
+    const isDisabled = (opt as Record<string, unknown>).disabled === true
+    // eslint-disable-next-line governance/boolean-prefix -- Reka `SelectItem` contract prop.
+    return { label, value, disabled: isDisabled }
   })
 })
 

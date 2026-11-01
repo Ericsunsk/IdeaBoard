@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits/domain"
@@ -10,6 +11,7 @@ import (
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/prompts"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
 	taskservice "ideaboard/api/internal/tasking/application/task"
@@ -822,7 +824,7 @@ func TestV1TaskStoresNilFailsClosed(t *testing.T) {
 // ---- merged from tasks_prompt_mask_test.go ----
 // Prompt/mask submit plane (v1 task creation gap batch). Unlike
 // newV1TaskFixture, this fixture wires the REAL canonical compiler
-// (TaskCanonicalCompiler: taskservice.CompileWorkspaceParams, production
+// (TaskPreparer: taskservice.NewWorkspacePreparer, production
 // parity) so the tests prove submit -> canonical params -> worker input
 // end to end at the handler level.
 type v1PromptMaskFixture struct {
@@ -830,6 +832,10 @@ type v1PromptMaskFixture struct {
 }
 
 func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
+	return newV1PromptMaskFixtureWithPrompts(t, nil)
+}
+
+func newV1PromptMaskFixtureWithPrompts(t *testing.T, reader taskservice.FeaturePromptRuntimeReader) *v1PromptMaskFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -871,7 +877,7 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 		Tasks: ContractV1TaskDeps{
 			Tasks: txTasks, TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
 			TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
-			TaskCanonicalCompiler:    taskservice.CompileWorkspaceParams,
+			TaskPreparer:             taskservice.NewWorkspacePreparer(reader),
 			TaskRouter:               allowTestPoolResolver(),
 			TaskSnapshotSaver:        v1testsupport.TxSnapshotSaver(saved),
 			TaskBillingAccounts:      v1FakeBillingAccounts{},
@@ -1378,5 +1384,49 @@ func TestV1TaskResolverPinsSnapshotAndPreservesIdempotency(t *testing.T) {
 	count, _ := fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
 	if count != 1 {
 		t.Fatalf("tasks = %d, want exactly the one accepted task", count)
+	}
+}
+
+type submitPromptReader struct {
+	template string
+	err      error
+}
+
+func (r *submitPromptReader) GetRuntimeConfig(_ context.Context, feature string) (prompts.FeaturePromptRuntimeConfig, error) {
+	return prompts.FeaturePromptRuntimeConfig{Prompt: r.template, UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(feature)}, r.err
+}
+
+func TestV1TaskPromptPreparationFailurePrecedesAcceptanceAndReplay(t *testing.T) {
+	reader := &submitPromptReader{err: errors.New("prompt store unavailable")}
+	fx := newV1PromptMaskFixtureWithPrompts(t, reader)
+	body := `{"data":{"service":"generation","prompt":"bicycle","params":{}}}`
+	status, payload := fx.postTask(t, "prepared", body)
+	if status < 400 || len(fx.queue.enqueued) != 0 || len(fx.holder.holds) != 0 {
+		t.Fatalf("failed preparation accepted: status=%d payload=%v queue=%d holds=%d", status, payload, len(fx.queue.enqueued), len(fx.holder.holds))
+	}
+	reader.err = nil
+	reader.template = "stored {{user_prompt}}"
+	status, created := fx.postTask(t, "prepared", body)
+	if status != http.StatusAccepted {
+		t.Fatalf("create=%d %v", status, created)
+	}
+	id := v1Data(t, created).(map[string]any)["id"].(string)
+	if got := fx.canonicalParams(t, id).Generation.CompiledPrompt; got != "stored bicycle" {
+		t.Fatalf("compiled=%q", got)
+	}
+	reader.template = "edited {{user_prompt}}"
+	status, replay := fx.postTask(t, "prepared", body)
+	if status != http.StatusAccepted || v1Data(t, replay).(map[string]any)["id"] != id {
+		t.Fatalf("replay=%d %v", status, replay)
+	}
+	if got := fx.canonicalParams(t, id).Generation.CompiledPrompt; got != "stored bicycle" {
+		t.Fatalf("replay rewrote frozen prompt: %q", got)
+	}
+	// Preserve the existing read-before-fast-replay timing: a later storage
+	// failure still fails closed even when this action was accepted earlier.
+	reader.err = errors.New("prompt store unavailable again")
+	status, payload = fx.postTask(t, "prepared", body)
+	if status < 400 || len(fx.queue.enqueued) != 1 {
+		t.Fatalf("read failure replay=%d %v queue=%d", status, payload, len(fx.queue.enqueued))
 	}
 }

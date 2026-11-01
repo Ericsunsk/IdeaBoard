@@ -60,3 +60,41 @@ func TestTemplateFingerprintChangesWhenTemplateChanges(t *testing.T) {
 		t.Fatalf("fingerprints must be stable and content-addressed: a=%q b=%q c=%q", a, b, c)
 	}
 }
+
+func TestCompileGenerationSnapshotFallbackFingerprintCoversSystemTemplate(t *testing.T) {
+	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: workflow.FeatureSlugGeneration,
+		Params:  workflow.FeatureExecutionParams{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compile := func(system string) tasks.GenerationRequestSnapshot {
+		t.Helper()
+		snapshot, err := CompileGenerationSnapshot(GenerationCompilerInput{
+			Plan: plan, UserPrompt: "prompt", SystemPrompt: system,
+			CompiledPrompt: "SYS prompt", Params: nil,
+		})
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		return snapshot
+	}
+	a := compile("SYS-A")
+	b := compile("SYS-B")
+	if a.TemplateFingerprint == "" || a.TemplateFingerprint == b.TemplateFingerprint {
+		t.Fatalf("fallback fingerprints must differ when the template changes: %q vs %q",
+			a.TemplateFingerprint, b.TemplateFingerprint)
+	}
+	without := compile("")
+	with := compile("SYS-A")
+	if without.TemplateFingerprint != TemplateFingerprint("", "SYS prompt") {
+		t.Fatal("template-less fingerprint must preserve the compiled-prompt fingerprint")
+	}
+	if a.TemplateFingerprint != with.TemplateFingerprint || a.Seed != with.Seed {
+		t.Fatal("identical template content must produce a stable snapshot")
+	}
+	if a.Seed == b.Seed {
+		t.Fatal("template changes must change the derived seed")
+	}
+}

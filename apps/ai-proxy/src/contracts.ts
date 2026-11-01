@@ -1,7 +1,8 @@
 // images contains ordinary references and an optional explicitly indexed mask.
 // mask_index is zero-based; absent means every image is an ordinary reference.
 // provider 是 Service Model Pool 条目声明（registry slug，小写），model 是裸 model 名；
-// channel 判定以 provider 声明优先（见 src/providers/index.ts resolveChannel）。
+// channel 判定以 provider 声明优先，唯一例外是旧 slug "workers-ai"：model 为 `@cf/`
+// 开头进 migrated，其余含 `/` 且 vendor 段已知时按 vendor 名直分（见 src/providers/index.ts provider declarations）。
 
 export type ImageProvider =
   | "workers-ai"
@@ -24,6 +25,8 @@ export interface CanonicalImageRequest {
   task_id: string;
   provider: ImageProvider;
   model: string;
+  // prompt 与 images 二选一必填：文生图（无 images）时 prompt 必须非空；
+  // 有 images（cutout/img2img/edit）时 prompt 允许空串并原样透传上游。
   prompt: string;
   negative_prompt?: string;
   width?: number;
@@ -85,4 +88,8 @@ export interface DryRunResponse {
     body: unknown;
   };
   path_source: string;
+}
+
+export interface ProvidersResponse {
+  providers: string[];
 }

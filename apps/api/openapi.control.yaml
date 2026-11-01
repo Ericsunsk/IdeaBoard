@@ -2297,66 +2297,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
-  /platform/ai-gateway:
-    get:
-      tags: [ControlPlatform]
-      operationId: getControlAIGateway
-      summary: Read the AI gateway configuration
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        outcome: read
-      responses:
-        '200':
-          description: AI gateway configuration (contract envelope).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlObjectEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    put:
-      tags: [ControlPlatform]
-      operationId: updateControlAIGateway
-      summary: Update the AI gateway configuration
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        outcome: success
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: AI gateway update payload (admin DTO shape, unchanged).
-      responses:
-        '200':
-          description: AI gateway configuration updated.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlAckEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
   /platform/ai-gateway/catalog:
     get:
       tags: [ControlPlatform]

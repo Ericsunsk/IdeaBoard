@@ -13,8 +13,8 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-// visionMappingKey isolates the vision-search model. Fresh DB: no legacy
-// rows exist.
+// visionMappingKey isolates the vision-search model mapping from catalog and
+// gateway connection rows: it is read and pruned only as a vision mapping.
 const visionMappingKey = "ai_gateway_vision_model"
 
 // ResolveVisionModel returns the admin-configured vision search model.

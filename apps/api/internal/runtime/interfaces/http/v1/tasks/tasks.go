@@ -71,7 +71,7 @@ type ContractV1TaskDeps struct {
 	TaskHolder               WorkspaceTaskHolder
 	TaskQueue                WorkspaceTaskEnqueuer
 	TaskAssets               WorkspaceTaskAssetReader
-	TaskCanonicalCompiler    func(service, userPrompt string, params map[string]interface{}) (string, error)
+	TaskPreparer             *taskservice.WorkspacePreparer
 	TaskAcceptance           taskports.SubmissionAuthorizer
 	TaskRouter               *routing.RoutingResolver
 	TaskSnapshotSaver        WorkspaceTaskSnapshotSaver
@@ -338,7 +338,8 @@ func taskLocation(workspaceID, taskID string) string {
 // Prompt rides the explicit data.prompt field (bound:
 // taskdomain.MaxWorkspaceTaskPromptBytes = 8KB), never
 // params.prompt (still 422 unknown_field): it threads into the canonical
-// Generation snapshot (UserPrompt + CompiledPrompt) that the worker
+// Generation snapshot (UserPrompt + CompiledPrompt, where CompiledPrompt is
+// the system template ⊕ user prompt rendered at submit) that the worker
 // bridges to the provider. The v1 mask rides params.mask_asset_id
 // (workspace public asset_... from the upload-session flow, inpaint only).
 //
@@ -569,7 +570,7 @@ func (h *Handler) createWorkspaceTask(c *gin.Context) {
 		// same task_id; conflict hash -> 409).
 		paramsJSON, _ := json.Marshal(params)
 		canonicalParams := ""
-		if h.deps.Tasks.TaskCanonicalCompiler != nil {
+		if h.deps.Tasks.TaskPreparer != nil {
 			var compileErr error
 			canonicalInput := make(map[string]interface{}, len(params)+1)
 			for key, value := range params {
@@ -578,7 +579,7 @@ func (h *Handler) createWorkspaceTask(c *gin.Context) {
 			if len(assetIDs) > 0 {
 				canonicalInput[taskservice.CompilerWorkspaceMediaAssetIDsParam] = append([]string(nil), assetIDs...)
 			}
-			canonicalParams, compileErr = h.deps.Tasks.TaskCanonicalCompiler(kind, prompt, canonicalInput)
+			canonicalParams, compileErr = h.deps.Tasks.TaskPreparer.Prepare(c.Request.Context(), kind, prompt, canonicalInput)
 			if compileErr != nil {
 				renderTaskError(c, compileErr)
 				return

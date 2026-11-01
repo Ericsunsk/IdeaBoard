@@ -160,4 +160,56 @@ describe('AdminModelAddDialog', () => {
     expect(await within(dialog).findByText('unavailable')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: '重试' })).toBeInTheDocument()
   })
+
+  it('disables providers the Worker cannot adapt and shows the hint', async () => {
+    gatewayFakes.listProviders.mockResolvedValueOnce([
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+      { slug: 'krea', display_name: 'Krea', id_prefix: 'krea/', available: false },
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+      { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/', available: true },
+    ])
+    const { user } = renderDialog({ existingModels: [] })
+
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('OpenAI')
+
+    // The 缺适配器 hint sits next to the dropdown once any row is unadapted.
+    expect(
+      within(dialog).getByText('已在网关启用、但 Worker 暂无适配器的供应商不可选。'),
+    ).toBeInTheDocument()
+
+    // The trigger defaults to the first available provider, skipping krea.
+    expect(within(dialog).getByRole('combobox', { name: '供应商（已配）' })).toHaveTextContent(
+      'OpenAI',
+    )
+
+    await user.click(within(dialog).getByRole('combobox', { name: '供应商（已配）' }))
+    // Reka renders the option list outside the dialog subtree, so options
+    // are queried on the screen, not within the dialog.
+    const kreaOption = await screen.findByRole('option', {
+      name: 'Krea（缺适配器）',
+    })
+    expect(kreaOption).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('option', { name: 'OpenAI' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+  })
+
+  it('blocks import when every provider is unadapted', async () => {
+    gatewayFakes.listProviders.mockResolvedValueOnce([
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+      { slug: 'krea', display_name: 'Krea', id_prefix: 'krea/', available: false },
+    ])
+    const importSpy = vi.fn()
+    const { user } = renderDialog({ existingModels: [], onImport: importSpy })
+
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Krea（缺适配器）')
+
+    const input = within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）')
+    await user.type(input, 'v1')
+    expect(within(dialog).getByRole('button', { name: '导入模型' })).toBeDisabled()
+    expect(importSpy).not.toHaveBeenCalled()
+  })
 })

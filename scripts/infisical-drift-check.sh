@@ -8,8 +8,14 @@
 #
 # Usage (Infisical Cloud export — hits the Cloud API, needs network + auth):
 #   infisical export --domain https://app.infisical.com --projectId <id> \
-#     --env=prod --format=dotenv > /tmp/infisical-prod.env
-#   scripts/infisical-drift-check.sh /tmp/infisical-prod.env [repo-root]
+#     --env=prod --path / --format=dotenv > /tmp/infisical-root.env
+#   infisical export --domain https://app.infisical.com --projectId <id> \
+#     --env=prod --path /ai-proxy --format=dotenv > /tmp/infisical-ai-proxy.env
+#   scripts/infisical-drift-check.sh /tmp/infisical-root.env [repo-root]
+#   scripts/infisical-drift-check.sh /tmp/infisical-root.env [repo-root] \
+#     --worker-export /tmp/infisical-ai-proxy.env
+#   (--worker-export=<file> is accepted too; positional $1=export,
+#   $2=repo-root stay unchanged for backward compatibility.)
 #
 # The checker itself stays offline/hermetic: it only reads the export file
 # you hand it, never the network. CI/VPS can export with a read-only service
@@ -31,12 +37,51 @@ source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=scripts/lib/env-schema.sh
 source "$SCRIPT_DIR/lib/env-schema.sh"
 
-EXPORT_FILE="${1:-}"
-ROOT_DIR="${2:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
-
-if [[ -z "$EXPORT_FILE" || ! -f "$EXPORT_FILE" ]]; then
-  echo "usage: $0 <infisical-export-dotenv-file> [repo-root]" >&2
+usage() {
+  echo "usage: $0 <infisical-export-dotenv-file> [repo-root] [--worker-export <worker-export-dotenv-file>]" >&2
   exit 2
+}
+
+positionals=()
+WORKER_EXPORT=""
+WORKER_EXPORT_GIVEN=0
+while (($# > 0)); do
+  case "$1" in
+    --worker-export=*)
+      WORKER_EXPORT="${1#--worker-export=}"
+      WORKER_EXPORT_GIVEN=1
+      shift
+      ;;
+    --worker-export)
+      WORKER_EXPORT_GIVEN=1
+      (($# >= 2)) || usage
+      WORKER_EXPORT="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      positionals+=("$@")
+      break
+      ;;
+    -*)
+      usage
+      ;;
+    *)
+      positionals+=("$1")
+      shift
+      ;;
+  esac
+done
+(( ${#positionals[@]} >= 1 && ${#positionals[@]} <= 2 )) || usage
+EXPORT_FILE="${positionals[0]}"
+ROOT_DIR="${positionals[1]:-}"
+if [[ -z "$ROOT_DIR" ]]; then
+  ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
+
+[[ -f "$EXPORT_FILE" ]] || usage
+if ((WORKER_EXPORT_GIVEN == 1)) && [[ -z "$WORKER_EXPORT" || ! -f "$WORKER_EXPORT" ]]; then
+  usage
 fi
 
 GO_CONFIG="$ROOT_DIR/apps/api/internal/platform/config/config.go"
@@ -57,7 +102,7 @@ fail() {
   failures=$((failures + 1))
 }
 
-export_keys() { grep -oE '^[[:space:]]*[A-Z][A-Z0-9_]*=' "$EXPORT_FILE" | grep -oE '[A-Z][A-Z0-9_]*' | sort -u || true; }
+export_keys() { grep -oE '^[[:space:]]*[A-Z][A-Z0-9_]*=' "$1" | grep -oE '[A-Z][A-Z0-9_]*' | sort -u || true; }
 
 go_keys="$(go_schema "$GO_CONFIG")"
 go_req="$(go_required "$GO_CONFIG")"
@@ -65,7 +110,8 @@ auth_keys="$(node_schema "$AUTH_ENV")"
 auth_req="$(node_required "$AUTH_ENV")"
 rt_keys="$(node_schema "$RT_ENV")"
 rt_req="$(node_required "$RT_ENV")"
-worker_keys="$(worker_schema "$WORKER_ENV")"
+worker_keys="$(worker_binding_keys "$WORKER_ENV" worker)"
+worker_path="$(worker_binding_source_path)"
 if [[ -z "$worker_keys" ]]; then
   echo "infisical-drift-check: Worker Env binding schema is empty" >&2
   exit 1
@@ -74,7 +120,7 @@ all_app_keys="$(printf '%s\n%s\n%s\n%s\n' "$go_keys" "$auth_keys" "$rt_keys" "$w
 # Worker availability is checked by its local/deployment setup, not by VPS
 # bootstrap. Its bindings are recognized without making them VPS-required.
 all_required="$(printf '%s\n%s\n%s\n' "$go_req" "$auth_req" "$rt_req" | sort -u)"
-exported="$(export_keys)"
+exported="$(export_keys "$EXPORT_FILE")"
 non_infisical="$(printf '%s\n%s\n%s\n' "$(deploy_allowlist)" "$(third_party_allowlist)" "$(command_allowlist)" | sort -u)"
 
 # 1. Every code-required key must exist in Infisical.
@@ -105,8 +151,46 @@ while IFS= read -r key; do
   fail "Infisical export carries unknown key $key (not in code schema)"
 done <<<"$exported"
 
+# Dual-path assertions (only when --worker-export is given; key NAMES only).
+# The /ai-proxy folder is a separate Infisical path, invisible to a root-only
+# export, so without these the Worker bindings would be a blind spot.
+if ((WORKER_EXPORT_GIVEN == 1)); then
+  worker_exported="$(export_keys "$WORKER_EXPORT")"
+
+  # a. Every Worker Env binding must exist in the worker export.
+  while IFS= read -r key; do
+    [[ -z "$key" ]] && continue
+    if ! contains_key "$key" "$worker_exported"; then
+      fail "Worker binding $key is missing from worker export $WORKER_EXPORT"
+    fi
+  done <<<"$worker_keys"
+
+  # b. Every worker-export key must be a Worker binding.
+  while IFS= read -r key; do
+    [[ -z "$key" ]] && continue
+    if ! contains_key "$key" "$worker_keys"; then
+      fail "worker export carries unknown key $key (not a Worker Env binding in $WORKER_ENV)"
+    fi
+  done <<<"$worker_exported"
+
+  # c. Root and worker exports must not overlap (a stale root copy would
+  # drift from the /ai-proxy source of truth). NOTE: root still carries a
+  # WORKER_INTERNAL_SECRET copy today — this check intentionally fails loud
+  # until the dashboard copy is deleted.
+  while IFS= read -r key; do
+    [[ -z "$key" ]] && continue
+    if contains_key "$key" "$worker_exported"; then
+      fail "key $key present in both root export and worker export (root / and $worker_path must not overlap; delete the stale root copy)"
+    fi
+  done <<<"$exported"
+fi
+
 if ((failures > 0)); then
   printf 'infisical-drift-check: %d problem(s) found\n' "$failures" >&2
   exit 1
 fi
-echo "infisical export matches code schema"
+if ((WORKER_EXPORT_GIVEN == 1)); then
+  echo "infisical exports match code schema (root + $worker_path)"
+else
+  echo "infisical export matches code schema"
+fi

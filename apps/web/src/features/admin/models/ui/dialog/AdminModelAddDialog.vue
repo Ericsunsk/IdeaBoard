@@ -52,6 +52,9 @@
               size="small"
               :placeholder="MODELS_MESSAGES.addProviderPlaceholder"
             />
+            <p v-if="hasUnadaptedProvider" class="text-admin-caption text-muted-foreground">
+              {{ MODELS_MESSAGES.addProviderUnadaptedHint }}
+            </p>
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-xs font-medium text-foreground" for="add-model-input">
@@ -141,12 +144,34 @@ const modelId = ref('')
 
 const existingKeySet = computed(() => new Set(props.existingModels.map(modelIdentityKey)))
 
+// Worker has no adapter for this slug when false: the row renders disabled
+// with a 缺适配器 hint and can never be picked. Absent (legacy payloads and
+// catalog-fallback rows) means available.
+function isUnadaptedProvider(p: GatewayProviderOption): boolean {
+  return p.available === false
+}
+
+function firstPickableProviderSlug(rows: GatewayProviderOption[]): string {
+  // Unadapted rows are disabled and can never be picked: default to the
+  // first available one, falling back to the first row so the hint stays
+  // visible even when nothing is pickable.
+  return rows.find((p) => !isUnadaptedProvider(p))?.slug ?? rows[0]!.slug
+}
+
 const providerOptions = computed(() =>
-  providers.value.map((p) => ({
-    label: p.display_name?.trim() ? p.display_name : formatProviderName(p.slug),
-    value: p.slug,
-  })),
+  providers.value.map((p) => {
+    const base = p.display_name?.trim() ? p.display_name : formatProviderName(p.slug)
+    const isUnadapted = isUnadaptedProvider(p)
+    return {
+      label: isUnadapted ? `${base}${MODELS_MESSAGES.addProviderUnadaptedSuffix}` : base,
+      value: p.slug,
+      // eslint-disable-next-line governance/boolean-prefix -- Reka `SelectItem` contract prop.
+      disabled: isUnadapted,
+    }
+  }),
 )
+
+const hasUnadaptedProvider = computed(() => providers.value.some(isUnadaptedProvider))
 
 const selectedProvider = computed(() =>
   providers.value.find((p) => p.slug === selectedProviderSlug.value),
@@ -170,6 +195,9 @@ const duplicateError = computed(() => {
 const canImport = computed(() => {
   if (loading.value || loadError.value) return false
   if (!selectedProvider.value) return false
+  // Unadapted rows are disabled in the dropdown; a stale selection pointing
+  // at one (list refreshed while the dialog stayed open) must not import.
+  if (isUnadaptedProvider(selectedProvider.value)) return false
   const id = modelId.value.trim()
   if (!id) return false
   return duplicateError.value === '' && providerPrefixError.value === ''
@@ -181,7 +209,7 @@ async function loadProviders() {
   try {
     providers.value = await catalogResource.listProviders()
     if (!selectedProviderSlug.value && providers.value.length > 0) {
-      selectedProviderSlug.value = providers.value[0]!.slug
+      selectedProviderSlug.value = firstPickableProviderSlug(providers.value)
     }
   } catch (caughtError) {
     loadError.value =
@@ -205,7 +233,7 @@ watch(
       if (providers.value.length === 0) {
         void loadProviders()
       } else if (!selectedProviderSlug.value && providers.value.length > 0) {
-        selectedProviderSlug.value = providers.value[0]!.slug
+        selectedProviderSlug.value = firstPickableProviderSlug(providers.value)
       }
     }
   },
@@ -219,7 +247,8 @@ function handleClose() {
 function handleImport() {
   const provider = selectedProvider.value
   const id = modelId.value.trim()
-  if (!provider || !id || duplicateError.value || providerPrefixError.value) return
+  if (!provider || isUnadaptedProvider(provider)) return
+  if (!id || duplicateError.value || providerPrefixError.value) return
   emit('import', [buildModelItemFromManual(provider, id)])
 }
 </script>

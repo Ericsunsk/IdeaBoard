@@ -84,14 +84,6 @@ describe('AdminModelsPage', () => {
         storedCatalog = body.items ?? storedCatalog
         return HttpResponse.json({ data: {} })
       }),
-      http.get('/api/control/v1/platform/ai-gateway', () => {
-        return HttpResponse.json({
-          data: { account_id: 'cf-acc-1', gateway_id: 'gw-1', token_configured: true },
-        })
-      }),
-      http.put('/api/control/v1/platform/ai-gateway', () => {
-        return HttpResponse.json({ data: {} })
-      }),
       http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
           data: [
@@ -112,7 +104,6 @@ describe('AdminModelsPage', () => {
     expect(screen.getByRole('combobox', { name: '筛选提供商' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '筛选托管方式' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '刷新模型' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '网关设置' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加模型' })).toBeInTheDocument()
 
     expect(await screen.findByText('我们找到了 2 个模型')).toBeInTheDocument()
@@ -295,64 +286,6 @@ describe('AdminModelsPage', () => {
     renderModelsPage()
     expect(await screen.findByText('92%')).toBeInTheDocument()
     expect(await screen.findByText('11%')).toBeInTheDocument()
-  })
-
-  it('opens gateway dialog when clicking 网关设置 button', async () => {
-    const { user } = renderModelsPage()
-    const gatewayBtn = screen.getByRole('button', { name: '网关设置' })
-    await user.click(gatewayBtn)
-
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: '网关设置' })).toBeInTheDocument()
-    expect(within(dialog).getByLabelText(/网关 Base URL/)).toBeInTheDocument()
-    expect(within(dialog).getByLabelText(/API 密钥/)).toBeInTheDocument()
-  })
-
-  it('keeps single 网关设置 button even when gateway base_url is present and still opens dialog on click', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/platform/ai-gateway', () => {
-        return HttpResponse.json({
-          data: {
-            base_url: 'https://gateway.ai.cloudflare.com/v1/cf-acc-1/gw-1',
-            account_id: 'cf-acc-1',
-            gateway_id: 'gw-1',
-            token_configured: true,
-          },
-        })
-      }),
-    )
-
-    const { user } = renderModelsPage()
-
-    const settingsBtn = await screen.findByRole('button', { name: '网关设置' })
-    expect(settingsBtn).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '新增网关' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '已配置' })).not.toBeInTheDocument()
-
-    await user.click(settingsBtn)
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: '网关设置' })).toBeInTheDocument()
-  })
-
-  it('keeps 网关设置 silently when gateway connection load fails', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/platform/ai-gateway', () => {
-        return HttpResponse.json(
-          { error: { code: 'not_found', message: 'AI 网关配置不存在' } },
-          { status: 404 },
-        )
-      }),
-    )
-
-    renderModelsPage()
-
-    await screen.findByText('我们找到了 2 个模型')
-    // 单态按钮不依赖初始网关读取：加载失败也不影响入口，且不弹 toast 噪音。
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '网关设置' })).toBeInTheDocument()
-    })
-    expect(screen.queryByRole('button', { name: '已配置' })).not.toBeInTheDocument()
-    expect(toast.error).not.toHaveBeenCalled()
   })
 })
 

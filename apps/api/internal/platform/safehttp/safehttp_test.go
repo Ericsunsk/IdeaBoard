@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,6 +89,28 @@ func TestGetRejectsLocalhostWithoutAllowHosts(t *testing.T) {
 
 	if _, err := Get(context.Background(), server.URL, time.Second); err == nil {
 		t.Fatal("expected localhost fetch without allow hosts to fail")
+	}
+}
+
+func TestGetRejectsPrivateHostErrorNamesHostAndPolicy(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	defer server.Close()
+
+	_, err := Get(context.Background(), server.URL, time.Second)
+	if err == nil {
+		t.Fatal("expected loopback fetch without allow hosts to fail")
+	}
+	if !errors.Is(err, ErrPolicyViolation) {
+		t.Fatalf("expected ErrPolicyViolation, got %v", err)
+	}
+	blocked := strings.TrimPrefix(server.URL, "http://")
+	if !strings.Contains(err.Error(), blocked) {
+		t.Fatalf("expected error to name blocked host %q, got %v", blocked, err)
+	}
+	if !strings.Contains(err.Error(), "出站策略") || !strings.Contains(err.Error(), "ai-proxy README") {
+		t.Fatalf("expected error to point at outbound policy docs, got %v", err)
 	}
 }
 

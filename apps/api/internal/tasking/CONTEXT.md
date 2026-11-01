@@ -107,6 +107,7 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
   never disagree about which execution they describe. A retry mints a fresh
   token, which is how stale workers lose the race. There is no account,
   provider endpoint, credential, or gateway-request-ID dimension in the fence.
+- WorkspacePreparer owns current template reads, default merge policy, missing-template passthrough and fail-closed read errors before canonical compilation and idempotency replay. CompileWorkspaceParams remains pure; accepted Tasks freeze the prompt, template fingerprint and seed. Workers never reread current templates.
 - Application packages depend on interfaces/contracts, never on concrete
   infrastructure adapters.
 

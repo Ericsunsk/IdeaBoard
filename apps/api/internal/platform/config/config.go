@@ -157,6 +157,11 @@ type WorkerConfig struct {
 	// Resilience carries the Worker per-model guard knobs (env-only,
 	// fail-closed defaults). These knobs never carry secrets.
 	Resilience WorkerResilienceConfig
+	// Discovery carries the Cloudflare control-plane read inputs used only
+	// for the Admin provider listing (CF_ACCOUNT_ID/CF_GATEWAY_ID topology
+	// plus the shared CF_AIG_TOKEN Gateway token). Empty keeps the listing
+	// on the catalog fallback; it never gates task execution.
+	Discovery GatewayDiscoveryConfig
 }
 
 const (
@@ -180,6 +185,24 @@ type EdgeWorkerConfig struct {
 	BaseURL string
 	// Secret is the WORKER_INTERNAL_SECRET bearer credential. Empty fails closed.
 	Secret string
+}
+
+// GatewayDiscoveryConfig carries the Cloudflare control-plane read inputs
+// for the Admin provider listing. CF_ACCOUNT_ID/CF_GATEWAY_ID are
+// non-secret topology values (same gateway the Worker serves); discovery
+// intentionally reuses the shared CF_AIG_TOKEN Gateway token (also the
+// ai-proxy /ai/run egress credential, injected on VPS via the /ai-proxy
+// path). Any blank field keeps the listing on the catalog fallback
+// instead of failing.
+type GatewayDiscoveryConfig struct {
+	// AccountID is the Cloudflare account owning the gateway (CF_ACCOUNT_ID).
+	AccountID string
+	// GatewayID is the AI Gateway identifier (CF_GATEWAY_ID).
+	GatewayID string
+	// ReadToken is the shared CF_AIG_TOKEN Gateway bearer credential, reused
+	// for control-plane discovery. Empty disables control-plane discovery
+	// (catalog fallback).
+	ReadToken string
 }
 
 const (
@@ -344,6 +367,19 @@ type envConfig struct {
 	// WorkerSecret is the WORKER_INTERNAL_SECRET bearer credential for the Worker.
 	// Empty fails every image task closed.
 	WorkerSecret string `env:"WORKER_INTERNAL_SECRET"`
+	// CFAccountID is the Cloudflare account owning the AI Gateway (CF_ACCOUNT_ID).
+	// Non-secret topology value, same gateway the Worker serves.
+	CFAccountID string `env:"CF_ACCOUNT_ID"`
+	// CFGatewayID is the AI Gateway identifier (CF_GATEWAY_ID).
+	// Non-secret topology value.
+	CFGatewayID string `env:"CF_GATEWAY_ID"`
+	// CFAIGToken is the shared CF_AIG_TOKEN Gateway bearer credential,
+	// intentionally reused for the Cloudflare control-plane
+	// provider_configs read (VPS already holds WORKER_INTERNAL_SECRET, so
+	// no separate read-only token; split again if either side needs
+	// tighter scope). Injected via the /ai-proxy path; never duplicate it
+	// at root / (root + /ai-proxy overlap fails the drift gate).
+	CFAIGToken string `env:"CF_AIG_TOKEN"`
 
 	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
 	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`
@@ -472,6 +508,11 @@ func Load() *Config {
 			Edge: EdgeWorkerConfig{
 				BaseURL: strings.TrimSpace(raw.WorkerBaseURL),
 				Secret:  strings.TrimSpace(raw.WorkerSecret),
+			},
+			Discovery: GatewayDiscoveryConfig{
+				AccountID: strings.TrimSpace(raw.CFAccountID),
+				GatewayID: strings.TrimSpace(raw.CFGatewayID),
+				ReadToken: strings.TrimSpace(raw.CFAIGToken),
 			},
 			Resilience: WorkerResilienceConfig{
 				PerModelLimit:             perModelLimit,

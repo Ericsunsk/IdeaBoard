@@ -438,3 +438,29 @@ BASH
 
 )
 printf 'Infisical wrapper source isolation test passed\n'
+
+(
+  # Exercise the actual documented production update command through the real
+  # wrapper, but stop at a fake CLI: no secrets, Docker actions or deployment.
+  mkdir -p "$fixture_dir/recipe-bin"
+  cat > "$fixture_dir/recipe-bin/infisical" <<'BASH'
+#!/usr/bin/env bash
+set -euo pipefail
+paths=()
+while (($# > 0)); do
+  case "$1" in
+    --path) paths+=("$2"); shift 2 ;;
+    --) shift; break ;;
+    *) shift ;;
+  esac
+done
+[[ "${#paths[@]}" == 2 && "${paths[0]}" == / && "${paths[1]}" == /ai-proxy ]]
+[[ "$*" == 'env -u POSTGRES_PASSWORD -u PG_MIGRATION_USER -u PG_MIGRATION_PASSWORD scripts/deploy-stack.sh update --manifest release-manifest.json' ]]
+BASH
+  chmod +x "$fixture_dir/recipe-bin/infisical"
+  recipe="$(grep '^scripts/infisical-run.sh --env prod .*scripts/deploy-stack.sh update --manifest release-manifest.json$' "$repo_root/docs/runbooks/deployment.md")"
+  [[ -n "$recipe" ]] || fail 'production update recipe is missing'
+  (cd "$repo_root" && PATH="$fixture_dir/recipe-bin:$PATH" bash -c "$recipe") ||
+    fail 'documented production update must read root and /ai-proxy bindings'
+)
+printf 'Production update dual-path recipe test passed\n'

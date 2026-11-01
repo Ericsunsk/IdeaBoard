@@ -19,7 +19,8 @@ namespace 怎么定、业务怎么注入、dotenvx 是什么关系、轮换/上�
 1. 在 `https://app.infisical.com` 注册组织（org），开 SSO（有人就开，见 §4）。
 2. 建单个 project `ideaboard`，建三个 env `dev` / `staging` / `prod`
    （`scripts/infisical-run.sh --env` 必填且只收这三个，与 env 名大小写一致）。
-3. 不建 folder：secret 全放 root path `/`（注入即全集，见 §2）。
+3. 基本不建 folder：secret 全放 root path `/`（注入即全集）；唯一例外是
+   ai-proxy Worker 四件套放 `/ai-proxy` folder（dev/prod 同形，不搞 dev 特例，见 §2）。
 4. prod env 的写权限只给值班/发布人；dev 读权限给全员，prod 读默认不给新人。
 5. CLI 与脚本侧用 `--projectId` 或 `infisical init` 绑定到 `ideaboard`，
    project ID 存在 `INFISICAL_PROJECT_ID`（CI secret / 本机 env，不进 git）。
@@ -30,14 +31,26 @@ namespace 怎么定、业务怎么注入、dotenvx 是什么关系、轮换/上�
 三个 env `dev` / `staging` / `prod`（`scripts/infisical-run.sh --env` 必填且只收这三个），
 secret 全放 root path `/`，注入即全集（union injection，本就把全量 env 给每个 service）。
 
+唯一例外：ai-proxy 的四个 Worker bindings（`CF_ACCOUNT_ID`、`CF_GATEWAY_ID`、
+`CF_AIG_TOKEN`、`WORKER_INTERNAL_SECRET`）放 `/ai-proxy` folder，dev/prod 同形，
+不搞 dev 特例。读它们的注入必须带双 path（`--path / --path /ai-proxy`），见 §3；
+读它们的 service token scope 须同时覆盖 `/` 与 `/ai-proxy`，见 §4。
+
 设计决策：per-service folder 在 union 注入下只是 theater（隔离还得靠 DB role），
-小团队不建 folder；哪天要做按路径收窄 token scope 再分。
+小团队除 ai-proxy 这一处外不建 folder；哪天要做按路径收窄 token scope 再分。
 该设计与后端无关，未来迁回自托管时原样平移（见 §8）。
 
 ### 2.1 Code-owned env 与 bindings 对照
 
 Key 名由 Go `env:"..."` tags、Auth/Realtime 的 Node reads 和 Worker
 `src/contracts.ts` 的 `Env` bindings 拥有；下表记录其 Infisical 分发与消费者。
+
+Worker source path、迁移期 root 副本校验和进程 projection 由
+`scripts/lib/env-schema.sh` 统一维护，key 名仍从真实 `Env` 提取。HTTP `api`
+接收全部 Worker bindings（3 个 CF discovery bindings + internal secret），
+`api-worker` 仅接收 internal secret；其他服务不接收 Worker bindings。
+`env-schema-check.sh` 校验本地 startup paths，`worker-bindings-test.sh` 用
+公开 example 和合成值渲染真实 Compose，校验每个容器的 projection。
 
 | Key | Infisical 路径 | 消费者 | 备注 |
 | --- | -------------- | ------ | ---- |
@@ -51,10 +64,10 @@ Key 名由 Go `env:"..."` tags、Auth/Realtime 的 Node reads 和 Worker
 | `NATS_PASSWORD` | `/` | api/worker | URL-safe 字符约束不变 |
 | `BETTER_AUTH_SECRET` | `/` | auth | 生产 ≥32 高熵 |
 | `RT_TICKET_SECRET` | `/` | api/realtime | 两端同名同值，改一处 |
-| `CF_ACCOUNT_ID`/`CF_GATEWAY_ID` | `/` | ai-proxy | 非 secret；本地 helper 从 dev 写入 `.dev.vars`，线上同步到对应 environment 的 vars；dashboard 配置不进入本地 Wrangler |
-| `CF_AIG_TOKEN` | `/` | ai-proxy | Worker Gateway token；本地仅写入 0600 `.dev.vars`，线上同步到 dashboard Secrets，不进入 VPS Compose |
+| `CF_ACCOUNT_ID`/`CF_GATEWAY_ID` | `/ai-proxy` | ai-proxy + api（VPS 经双 path 注入复用同值做 provider 发现） | 非 secret；本地 helper 从 dev `/ai-proxy` 写入 `.dev.vars`，线上同步到对应 environment 的 vars；dashboard 配置不进入本地 Wrangler；VPS 不在 root `/` 另存同名副本（root + `/ai-proxy` 同名即漂移门交集失败，见 §5） |
+| `CF_AIG_TOKEN` | `/ai-proxy` | ai-proxy + api | Worker Gateway token（出站 `/ai/run`）兼控制面发现 `GET /client/v4/accounts/{aid}/ai-gateway/gateways/{gid}/provider_configs`（gateway-scoped 列表；无 account 级 provider 列表）；VPS 经双 path 注入复用同值做 provider 发现；本地仅写入 0600 `.dev.vars`，线上同步到 dashboard Secrets；root `/` 不另存副本（root + `/ai-proxy` 同名即漂移门交集失败，见 §5）。决策注记：发现与出站共用同一 Gateway Token 是有意为之——VPS 已持 `WORKER_INTERNAL_SECRET`（凭它就能调 Worker 花钱），再拆一把只读钥匙边际收益近零，故不再拆分；若未来任一边需收权限再拆；轮换走 §4（改值 + 同步 Worker Secret + 重启 api/api-worker），换一次两边同生效 |
 | `WORKER_BASE_URL` | `/` | api | Worker 入口地址；拓扑值非 secret，每 env 一份（dev 与 prod 值不同），类比 `PUBLIC_ORIGIN` |
-| `WORKER_INTERNAL_SECRET` | `/` | api（VPS 侧经 Infisical 注入；Worker 侧另走 `wrangler secret put` 同值） | 两端同名同值，改一处（+ Worker 侧一次），类比 `RT_TICKET_SECRET` |
+| `WORKER_INTERNAL_SECRET` | `/ai-proxy`（正源；root `/` 残留副本待用户在 dashboard 手动删除，删除前灌脚本每次以 `/ai-proxy` 为准做哈希一致性校验） | api（VPS 侧经 Infisical 双 path 注入；Worker 侧另走 `wrangler secret put` 同值） | 两端同名同值，改一处（+ Worker 侧一次），类比 `RT_TICKET_SECRET` |
 | `WORKER_PER_MODEL_LIMIT`/`WORKER_BREAKER_COOLDOWN_SECONDS`/`WORKER_BREAKER_FAILURE_RATE` | `/` | api-worker | 非 secret 韧性旋钮，有界默认值，可随注入统一管理，但永不进 dotenvx 加密 `docker/.env`（同 `RIVER_WORKER_CONCURRENCY`） |
 | `REWARDS_CODE_HMAC_KEYS` | `/` | api | JSON keyring；轮换走 two-stage（§4） |
 | `CREDITS_WELCOME_IDENTITY_KEY` | `/` | api | **fingerprint 绑定，误换 fail closed；非事故不轮换** |
@@ -85,7 +98,7 @@ Cloud 模式下没有本地自举变量：以前自托管的 `INFISICAL_*`
 export DOTENV_PRIVATE_KEY='...'
 dotenvx get API_PG_PASSWORD -f docker/.env
 # 2. 在 Cloud dashboard 按上表建 project=ideaboard、env=dev/staging/prod，
-#    secret 全放 root path `/`，逐 key 粘入解密值
+#    secret 按上表路径粘入解密值（ai-proxy 四件套进 `/ai-proxy`，其余放 root `/`）
 # 3. 每 env 跑一遍漂移检查（§5），key 名全绿再切注入
 ```
 
@@ -95,18 +108,21 @@ dotenvx get API_PG_PASSWORD -f docker/.env
 默认连 Cloud `https://app.infisical.com`）：
 
 ```bash
-# 生产 compose（单进程拿 union 全集，各 service 只读自己子集）
+# 生产 compose（单进程拿 union 全集，各 service 只读自己子集；
+# api/api-worker 要读 WORKER_*，必须带双 path）
 scripts/infisical-run.sh --env prod \
+  --path / --path /ai-proxy \
   -- scripts/deploy-stack.sh deploy --manifest /path/to/release-manifest.json
 
 # 只渲染验证（不启动）
 scripts/infisical-run.sh --env prod \
+  --path / --path /ai-proxy \
   -- scripts/deploy-stack.sh config
 
 # 本地直跑（compose.local 只起 postgres/nats/imgproxy，api/auth 是宿主进程）
-scripts/infisical-run.sh --env dev -- go run ./cmd          # apps/api
-scripts/infisical-run.sh --env dev -- npm run dev           # apps/auth
-scripts/infisical-run.sh --env dev -- npm run dev           # apps/realtime
+scripts/infisical-run.sh --env dev --path / --path /ai-proxy -- go run ./cmd   # apps/api（读 WORKER_*，须双 path；process-compose 的 api/docker-deps 同理）
+scripts/infisical-run.sh --env dev -- npm run dev           # apps/auth（只读 /）
+scripts/infisical-run.sh --env dev -- npm run dev           # apps/realtime（只读 /）
 ```
 
 `docker/images.env` 由首次 manifest deploy 自动创建并写入五个 immutable image refs；
@@ -167,11 +183,12 @@ scripts/infisical-run.sh --env dev -- printenv PG_DB
 ### CI / VPS 只读 service token
 
 - 在 Cloud dashboard 为 CI 与 VPS 各建独立 service token：**read-only**，
-  scope 到 `project=ideaboard` + 单 env（prod token 只读 prod），能读 `/`，
-  不能写、不能管成员。
+  scope 到 `project=ideaboard` + 单 env（prod token 只读 prod），能读 `/` 与
+  `/ai-proxy`（api/api-worker 注入带双 path，缺 `/ai-proxy` scope 会取不到
+  `WORKER_INTERNAL_SECRET`），不能写、不能管成员。
 - token 经 CI secret / VPS root-only 文件（0600，如 `/secure/infisical/prod.token`）注入
   `INFISICAL_TOKEN`，永不进 git、永不打进镜像、永不出现在日志（`applog` 脱敏规则同样适用）。
-- 用法：`INFISICAL_TOKEN="$(cat /secure/infisical/prod.token)" scripts/infisical-run.sh --env prod -- …`。
+- 用法：`INFISICAL_TOKEN="$(cat /secure/infisical/prod.token)" scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- …`。
 - 泄露/可疑：直接在 Cloud 侧 revoke 该 token 并重发，服务本身无需改配置；
   prod token 泄露按 secret 事故同时评估是否需要轮换其可见范围内的高敏 key。
 
@@ -220,12 +237,20 @@ Cloud 是运行时分发，存错 key 名只会在启动时爆炸。让 gate 去
 
 ```bash
 infisical export --domain https://app.infisical.com --projectId <id> \
-  --env=prod --format=dotenv > /tmp/infisical-prod.env
-scripts/infisical-drift-check.sh /tmp/infisical-prod.env
+  --env=prod --path / --format=dotenv > /tmp/infisical-root.env
+infisical export --domain https://app.infisical.com --projectId <id> \
+  --env=prod --path /ai-proxy --format=dotenv > /tmp/infisical-ai-proxy.env
+scripts/infisical-drift-check.sh /tmp/infisical-root.env \
+  --worker-export /tmp/infisical-ai-proxy.env
 ```
 
-它断言两条（只看 key 名，不看值）：required key 全在 Cloud 里；
-Cloud 里无未知 key，且部署类 key（`IDEABOARD_*_IMAGE` 等）永不进 Cloud。
+它断言（只看 key 名，不看值）：单文件两条——required key 全在 root 导出里；
+root 导出里无未知 key，且部署类 key（`IDEABOARD_*_IMAGE` 等）永不进 Cloud。
+给出 `--worker-export` 时再加三条 Worker 断言——`contracts.ts` `Env` 的每个
+binding 必须在 worker 导出里（关 blind spot）；worker 导出里的每个 key 必须
+是 Worker binding；两文件不许有交集（防 root 副本与 `/ai-proxy` 分叉）。
+`WORKER_INTERNAL_SECRET` 的 root 残留副本在删除前会让交集断言 loud fail，
+正是设计意图：删掉 dashboard root 副本后门禁才全绿。
 
 ## 6. 备份与可用性（归官方，RPO 信任边界）
 
@@ -270,8 +295,8 @@ Cloud 里无未知 key，且部署类 key（`IDEABOARD_*_IMAGE` 等）永不进 
 | 检查 | 命令 | 通过标准 |
 | ---- | ---- | -------- |
 | Cloud 连通 | `infisical login` 后 `scripts/infisical-run.sh --env dev -- printenv PG_DB` | 输出与 dotenvx 解密值一致（至少一个 service 取值正确） |
-| 注入渲染 | `scripts/infisical-run.sh --env prod -- scripts/deploy-stack.sh config` | 退出 0 |
-| 漂移 | `scripts/infisical-drift-check.sh <Cloud export>` + 旧 `scripts/env-schema-check.sh` | 双绿 |
+| 注入渲染 | `scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh config` | 退出 0 |
+| 漂移 | `scripts/infisical-drift-check.sh /tmp/infisical-root.env --worker-export /tmp/infisical-ai-proxy.env` + 旧 `scripts/env-schema-check.sh` | 双绿（root 残留 `WORKER_INTERNAL_SECRET` 副本未删时交集断言 fail 属预期，先删副本再重跑） |
 | 前端漂移 | `bash scripts/web-frontend-env-check.sh`（CI 在 `web.yml` 自动跑） | 声明/使用点/文档三方一致、无 secret、新 binding 先改 §11 |
 | 无自托管残留 | 全仓 grep 自托管 compose / 自托管 db-redis / 本地自举 key 项 | 零命中（仅 Cloud 通道变量保留，见上） |
 | 文档 | 本文件 | 覆盖组织建法、token、login、上下线、审计、备份边界、费用、迁回 |

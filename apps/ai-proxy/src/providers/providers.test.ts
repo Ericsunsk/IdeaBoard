@@ -313,6 +313,217 @@ describe("airun migrated target (workers-ai legacy)", () => {
   });
 });
 
+describe("workers-ai model-first（真 CF 400 根因修复）", () => {
+  test("workers-ai + google/nano-banana-2-lite 无图走 google builder（CF 文档形态）", () => {
+    const t = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "google/nano-banana-2-lite",
+        prompt: "hi",
+        upload_url: "https://s3/x",
+      },
+      env,
+      [],
+    ).target;
+    assert.equal(t.path_source, "airun:google:text-to-image");
+    assert.ok(t.url.endsWith("/ai/run"));
+    // 无迁移标记、无网关 id 头（非 @cf/ 不带）。
+    assert.ok(!JSON.stringify(t.dryBody).includes("migration_note"));
+    assert.equal(t.headers["cf-aig-gateway-id"], undefined);
+    const body = JSON.parse(t.body as string) as {
+      model: string;
+      input: Record<string, unknown>;
+    };
+    assert.equal(body.model, "google/nano-banana-2-lite");
+    // CF 文档形态：prompt/aspect_ratio/output_format/resolution，无旧 @cf 字段。
+    assert.equal(body.input["prompt"], "hi");
+    assert.equal(body.input["aspect_ratio"], "1:1");
+    assert.equal(body.input["output_format"], "png");
+    assert.equal(body.input["resolution"], "1K");
+    for (const legacy of [
+      "width",
+      "height",
+      "num_steps",
+      "guidance",
+      "image_b64",
+      "mask_b64",
+    ]) {
+      assert.ok(!(legacy in body.input), `must not contain ${legacy}`);
+    }
+    // dry-run Preview 与实际同形（仅占位差异，无图时全等）。
+    assert.deepEqual((t.dryBody as { input: unknown }).input, body.input);
+  });
+
+  test("workers-ai + google/nano-banana-2 有图走 google img2img（image_input）", () => {
+    const t = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "google/nano-banana-2",
+        prompt: "p",
+        upload_url: "https://s3/x",
+      },
+      env,
+      [fakeInput(0)],
+    ).target;
+    assert.equal(t.path_source, "airun:google:img2img");
+    const body = JSON.parse(t.body as string) as {
+      model: string;
+      input: Record<string, unknown>;
+    };
+    assert.equal(body.model, "google/nano-banana-2");
+    assert.equal(body.input["aspect_ratio"], "match_input_image");
+    assert.ok(
+      Array.isArray(body.input["image_input"]) &&
+        (body.input["image_input"] as string[])[0].startsWith("data:image/"),
+    );
+    assert.ok(!("image_b64" in body.input));
+    const dry = JSON.stringify(t.dryBody);
+    assert.ok(!dry.includes("data:image/"));
+    assert.ok(dry.includes("<input-image:0:redacted>"));
+    assert.ok(!dry.includes("migration_note"));
+  });
+
+  test("workers-ai + krea/openai/fal 按 vendor 名直分", () => {
+    const krea = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "krea/krea-3",
+        prompt: "p",
+      },
+      env,
+      [],
+    ).target;
+    assert.equal(krea.path_source, "airun:krea");
+    assert.equal(JSON.parse(krea.body as string).model, "krea/krea-3");
+
+    const gpt = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "openai/gpt-image-1",
+        prompt: "p",
+      },
+      env,
+      [],
+    ).target;
+    assert.equal(gpt.path_source, "airun:openai:gpt-image");
+
+    const dalle = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "openai/dall-e-3",
+        prompt: "p",
+      },
+      env,
+      [],
+    ).target;
+    assert.ok(dalle.url.endsWith("/openai/images/generations"));
+
+    const fal = prepareRoute(
+      {
+        task_id: "t",
+        provider: "workers-ai",
+        model: "fal-ai/flux",
+        prompt: "p",
+      },
+      env,
+      [],
+    ).target;
+    assert.ok(fal.url.includes("/fal/fal-ai/flux"));
+  });
+
+  test("workers-ai gateway migration sends native model IDs and keeps its decoder", async () => {
+    const png = [137, 80, 78, 71, 13, 10, 26, 10];
+    const b64 = Buffer.from(png).toString("base64");
+    const cases = [
+      {
+        model: "openai/dall-e-3",
+        suffix: "/openai/images/generations",
+        nativeModel: "dall-e-3",
+        response: { data: [{ b64_json: b64 }] },
+      },
+      {
+        model: "fal/birefnet",
+        suffix: "/fal/fal-ai/birefnet",
+        response: { image: { url: "https://fixture.test/fal-result.png" } },
+      },
+      {
+        model: "fal/fal-ai/birefnet",
+        suffix: "/fal/fal-ai/birefnet",
+        response: { image: { url: "https://fixture.test/fal-result.png" } },
+      },
+      {
+        model: "fal-ai/birefnet",
+        suffix: "/fal/fal-ai/birefnet",
+        response: { image: { url: "https://fixture.test/fal-result.png" } },
+      },
+      {
+        model: "google-vertex-ai/gemini-2.5-flash-image",
+        suffix: "/models/gemini-2.5-flash-image:generateContent",
+        response: {
+          candidates: [{ content: { parts: [{ inlineData: { data: b64 } }] } }],
+        },
+      },
+    ];
+    for (const c of cases) {
+      const req: CanonicalImageRequest = {
+        task_id: "migration",
+        provider: "workers-ai",
+        model: c.model,
+        prompt: "p",
+        provider_options: { vertex_project: "project" },
+      };
+      const route = prepareRoute(req, env, []);
+      assert.ok(route.target.url.endsWith(c.suffix), route.target.url);
+      if (c.nativeModel)
+        assert.equal(
+          JSON.parse(route.target.body as string).model,
+          c.nativeModel,
+        );
+      assert.equal(
+        req.model,
+        c.model,
+        "routing must not mutate the canonical request",
+      );
+      const image = await route.extractImage(
+        new Response(JSON.stringify(c.response)),
+        async (url) => {
+          assert.equal(url, "https://fixture.test/fal-result.png");
+          return new Response(new Uint8Array(png), {
+            headers: { "Content-Type": "image/png" },
+          });
+        },
+      );
+      assert.deepEqual(new Uint8Array(image.bytes), new Uint8Array(png));
+    }
+  });
+
+  test("workers-ai + 未知裸模型/未知 vendor fail-closed 指引换 provider", () => {
+    for (const model of ["m", "unknown-model", "foo/bar", "workers-ai/foo"]) {
+      assert.throws(
+        () =>
+          prepareRoute(
+            { task_id: "t", provider: "workers-ai", model, prompt: "p" },
+            env,
+            [],
+          ),
+        (err: unknown) => {
+          assert.ok(err instanceof UnsupportedModelError);
+          assert.match(
+            (err as Error).message,
+            /workers-ai only supports @cf\/ legacy models/,
+          );
+          return true;
+        },
+      );
+    }
+  });
+});
+
 describe("gateway regression (behavior unchanged)", () => {
   test("fal sync endpoint only, never queue target", () => {
     const t = prepareRoute(
@@ -373,6 +584,43 @@ describe("gateway regression (behavior unchanged)", () => {
     assert.equal(t.path_source, "openai:images:edits");
     assert.ok(t.body instanceof FormData);
     assert.ok((t.dryBody as { kind: string }).kind.includes("multipart"));
+  });
+});
+
+describe("gateway fal model path 归一化（fal-ai 命名空间）", () => {
+  test("裸 birefnet -> /fal/fal-ai/birefnet", () => {
+    const t = prepareRoute(
+      { task_id: "t", provider: "fal", model: "birefnet", prompt: "p" },
+      env,
+      [],
+    ).target;
+    assert.equal(
+      t.url,
+      "https://gateway.ai.cloudflare.com/v1/acct123/gw1/fal/fal-ai/birefnet",
+    );
+  });
+
+  test("已有 fal-ai/ 前缀 -> 不变（无双前缀）", () => {
+    const t = prepareRoute(
+      { task_id: "t", provider: "fal", model: "fal-ai/birefnet", prompt: "p" },
+      env,
+      [],
+    ).target;
+    assert.equal(
+      t.url,
+      "https://gateway.ai.cloudflare.com/v1/acct123/gw1/fal/fal-ai/birefnet",
+    );
+    assert.ok(!t.url.includes("fal-ai/fal-ai"));
+  });
+
+  test("其它 provider 不受影响（openai 原样）", () => {
+    const t = prepareRoute(
+      { task_id: "t", provider: "openai", model: "dall-e-3", prompt: "p" },
+      env,
+      [],
+    ).target;
+    assert.ok(t.url.endsWith("/openai/images/generations"));
+    assert.ok(!t.url.includes("fal-ai"));
   });
 });
 
@@ -551,6 +799,7 @@ describe("iron rule: vendor files are input-only", () => {
     "src/providers/airun/openai.ts",
     "src/providers/gateway/fal.ts",
     "src/providers/gateway/openai.ts",
+    "src/providers/gateway/vertexai.ts",
   ];
   const banned = [
     "gateway.ai.cloudflare.com",
@@ -712,7 +961,7 @@ describe("prepared route preserves request/response pairing", () => {
       model: "dall-e-3",
       expected: "/openai/images/generations",
     },
-    { provider: "fal", model: "flux", expected: "/fal/flux" },
+    { provider: "fal", model: "flux", expected: "/fal/fal-ai/flux" },
   ]) {
     test(
       c.provider +

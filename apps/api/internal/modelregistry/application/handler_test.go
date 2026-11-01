@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"ideaboard/api/internal/modelregistry/domain"
 	"net/http"
@@ -20,25 +19,10 @@ import (
 )
 
 type fakeGatewayStore struct {
-	summary   domain.GatewaySummary
-	updated   []domain.UpdateInput
-	actors    []int64
-	getErr    error
-	setErr    error
 	saveErr   error
 	catalog   []domain.CatalogItem
 	providers []workflow.ProviderEntry
 	provErr   error
-}
-
-func (f *fakeGatewayStore) GetSummary(context.Context) (domain.GatewaySummary, error) {
-	return f.summary, f.getErr
-}
-
-func (f *fakeGatewayStore) Update(_ context.Context, input domain.UpdateInput, actorID int64) error {
-	f.updated = append(f.updated, input)
-	f.actors = append(f.actors, actorID)
-	return f.setErr
 }
 
 func (f *fakeGatewayStore) ListCatalog(context.Context) ([]domain.CatalogItem, error) {
@@ -63,97 +47,8 @@ func (f *fakeGatewayStore) ListConfiguredProviders(context.Context) ([]workflow.
 	return f.providers, nil
 }
 
-func (f *fakeGatewayStore) Resolve(context.Context) (domain.ResolvedGateway, error) {
-	return domain.ResolvedGateway{}, domain.ErrAIGatewayNotConfigured
-}
-
 func (f *fakeGatewayStore) ResolveVisionModel(context.Context) (string, error) {
 	return "", domain.ErrVisionModelMissing
-}
-
-func TestGatewayHandlerGetMasksSecrets(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	store := &fakeGatewayStore{summary: domain.GatewaySummary{AccountID: "acc", GatewayID: "prod", TokenConfigured: true}}
-	router := gin.New()
-	router.GET("/settings/ai-gateway", NewHandler(store).Get)
-
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings/ai-gateway", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	if strings.Contains(rec.Body.String(), "token-value") {
-		t.Fatalf("response leaks secret material: %s", rec.Body.String())
-	}
-	var payload struct {
-		Data domain.GatewaySummary `json:"data"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("body is not the envelope: %v", err)
-	}
-	if !payload.Data.TokenConfigured || payload.Data.GatewayID != "prod" {
-		t.Fatalf("summary = %+v", payload.Data)
-	}
-}
-
-func TestGatewayHandlerUpdate(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	// Non-admin gating rides the outer Control Plane guard (controlProxy +
-	// guard enforces the operator capability); the handler resolves the
-	// actor from the request principal without re-checking the role, so
-	// there is no in-handler 403 case to pin here. Guard-level denial is
-	// covered by TestControlAuthMatrix in runtime/interfaces/http.
-	t.Run("rejects bad JSON", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-			NewHandler(store).Update(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway", strings.NewReader(`{`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-	})
-
-	t.Run("forwards actor and input", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-			NewHandler(store).Update(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway", strings.NewReader(`{"token":"tok","account_id":"a","gateway_id":"g"}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-		}
-		if len(store.updated) != 1 || store.actors[0] != 9 || store.updated[0].GatewayID != "g" {
-			t.Fatalf("store calls = %+v actors = %v", store.updated, store.actors)
-		}
-	})
-
-	t.Run("surfaces store errors", func(t *testing.T) {
-		store := &fakeGatewayStore{setErr: errors.New("网关 account id 必须是 32 位小写十六进制")}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-			NewHandler(store).Update(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway", strings.NewReader(`{"account_id":"a","gateway_id":"g"}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-	})
 }
 
 func TestGatewayHandlerCatalog(t *testing.T) {
@@ -164,7 +59,7 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 			{ID: "test/model-1", Name: "Model 1", Provider: "Test"},
 		}}
 		router := gin.New()
-		router.GET("/settings/ai-gateway/catalog", NewHandler(store).ListCatalog)
+		router.GET("/settings/ai-gateway/catalog", NewHandler(store, store).ListCatalog)
 
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings/ai-gateway/catalog", nil))
@@ -181,7 +76,7 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 		router := gin.New()
 		router.PUT("/settings/ai-gateway/catalog", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
-			NewHandler(store).SaveCatalog(c)
+			NewHandler(store, store).SaveCatalog(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1","name":"Model 1","provider":"Test"}]}`))
@@ -200,7 +95,7 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 		router := gin.New()
 		router.PUT("/settings/ai-gateway/catalog", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
-			NewHandler(store).SaveCatalog(c)
+			NewHandler(store, store).SaveCatalog(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1","name":"Model 1","provider":"Test","input_cost_per_token":0.0000025}]}`))
@@ -223,7 +118,7 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 		router := gin.New()
 		router.POST("/settings/ai-gateway/route-preview", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 7, role)
-			NewHandler(&fakeGatewayStore{}).PreviewWorkerRoute(c)
+			NewHandler(&fakeGatewayStore{}, nil).PreviewWorkerRoute(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/settings/ai-gateway/route-preview", strings.NewReader(body))
@@ -265,12 +160,12 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 
 func TestGatewayHandlerListProviders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	serve := func(t *testing.T, role principal.Role, store modelregistryports.ConfigRepository) *httptest.ResponseRecorder {
+	serve := func(t *testing.T, role principal.Role, store modelregistryports.ConfiguredProviderReader) *httptest.ResponseRecorder {
 		t.Helper()
 		router := gin.New()
 		router.GET("/settings/ai-gateway/providers", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 9, role)
-			NewHandler(store).ListProviders(c)
+			NewHandler(nil, store).ListProviders(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/settings/ai-gateway/providers", nil)
@@ -325,7 +220,7 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		router := gin.New()
 		router.POST("/settings/ai-gateway/test-connection", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 7, role)
-			NewHandler(&fakeGatewayStore{}).TestConnection(c)
+			NewHandler(&fakeGatewayStore{}, nil).TestConnection(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/settings/ai-gateway/test-connection", strings.NewReader(body))
@@ -338,7 +233,7 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		router := gin.New()
 		router.POST("/settings/ai-gateway/test-connection", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
-			NewHandler(nil).TestConnection(c)
+			NewHandler(nil, nil).TestConnection(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/settings/ai-gateway/test-connection", strings.NewReader(`{"base_url":"http://127.0.0.1:9"}`))

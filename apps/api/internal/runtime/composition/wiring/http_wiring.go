@@ -33,8 +33,8 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/memberquotas"
 	modelregistryapplication "ideaboard/api/internal/modelregistry/application"
-	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	modelregistryinfrastructure "ideaboard/api/internal/modelregistry/infrastructure"
+	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	"ideaboard/api/internal/notifications"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -102,7 +102,18 @@ func NewAppRouter(
 	}
 	searchProviderConfig := searchinfra.NewConfigRepository(repos.systemConfigRepo)
 	aiGatewayRepo := modelregistryinfrastructure.NewConfigRepository(repos.systemConfigRepo)
-	aiGatewayHandler := modelregistryhttp.NewHandler(aiGatewayRepo)
+	// Admin provider listing merges the control-plane provider_configs read
+	// (CF_ACCOUNT_ID/CF_GATEWAY_ID/CF_AIG_TOKEN, shared Gateway token) with the Worker
+	// /v1/providers capability list; any remote failure degrades in place
+	// to the catalog fallback (warn-logged, never a listing error).
+	configuredProviders := modelregistryinfrastructure.NewConfiguredProviders(aiGatewayRepo, modelregistryinfrastructure.DiscoveryConfig{
+		AccountID:     cfg.Worker.Discovery.AccountID,
+		GatewayID:     cfg.Worker.Discovery.GatewayID,
+		ReadToken:     cfg.Worker.Discovery.ReadToken,
+		WorkerBaseURL: cfg.Worker.Edge.BaseURL,
+		WorkerSecret:  cfg.Worker.Edge.Secret,
+	})
+	aiGatewayHandler := modelregistryhttp.NewHandler(aiGatewayRepo, configuredProviders)
 	aiGatewayHandler.SetObservedService(modelregistryapplication.NewObservedService(
 		modelregistryinfrastructure.NewObservedRepository(repos.db),
 		newBillingSKUCatalogAdapter(services.billingCatalog),
@@ -110,6 +121,7 @@ func NewAppRouter(
 	// Admin Preview dry-runs against the sole Worker egress (env config,
 	// never the browser). Empty keeps Preview validation-only.
 	aiGatewayHandler.SetWorkerConfig(cfg.Worker.Edge.BaseURL, cfg.Worker.Edge.Secret)
+
 	// Control audit durability (step 2: atomic where the guard owns the
 	// transaction). The directory is the request-scoped public->internal
 	// resolver the control handlers already use; both sinks reuse that
@@ -294,9 +306,9 @@ func NewAppRouter(
 				// catalog.SaveRoutingSnapshot with the settlement tx's
 				// Queries. The fail-closed fallback for an unset resolver is
 				// the canonical unavailable sentinel (#854: no legacy gate).
-				TaskRouter:            taskServices.workspaceTaskRouter,
-				TaskSnapshotSaver:     newPoolRoutingSnapshotSaver(),
-				TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+				TaskRouter:        taskServices.workspaceTaskRouter,
+				TaskSnapshotSaver: newPoolRoutingSnapshotSaver(),
+				TaskPreparer:      taskservice.NewWorkspacePreparer(repos.featurePromptRepo),
 				// #946: the same transaction enforces the member
 				// cross-workspace quota after Quote and
 				// before Hold (the quote preflight below reports it early).

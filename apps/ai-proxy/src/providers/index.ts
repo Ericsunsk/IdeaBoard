@@ -2,13 +2,18 @@
 //
 // channel 判定规则（写死，providers.test.ts 锁死）：
 //   1. 池条目声明优先：以 CanonicalImageRequest.provider（pool provider slug，小写）为准。
-//      - "workers-ai"（旧 slug，待迁移）一律进 airun，migrated=true，dry-run 标注。
+//      - "workers-ai"（旧 slug，待迁移）例外：model 形态优先——`@cf/` 开头仍进
+//      airun migrated（migrated=true，dry-run 标注）；model 含 `/` 且 vendor 段为已知
+//      airun/gateway 映射（google/krea/openai/fal/google-vertex-ai）时按 vendor 名直分
+//      到对应 channel/vendor（等价于 provider 即该 vendor）；其余裸模型一律 fail-closed
+//      报 UNSUPPORTED_MODEL 并指引改 provider（真 CF 400 根因：workers-ai +
+//      google/nano-banana 系曾误进 migrated 旧 `@cf` 形 body）。
 //      - "google" 进 airun/google；"krea" 进 airun（通用 input）；
 //      - "openai" 看裸 model：gpt-image 系进 airun/openai，其余进 gateway/openai；
-//      - "fal" 进 gateway/fal。
+//      - "fal" 进 gateway/fal；"google-vertex-ai" 精确匹配进 gateway。
 //   2. 其次模型前缀回落（未知/custom-<slug> provider）：对 `${provider}/${model}`
 //      小写全引用做前缀匹配：google/、openai/gpt-image、krea/ 进 airun；
-//      fal/ 进 gateway；workers-ai/、@cf/ 进 airun（migrated）；openai/ 非 gpt-image
+//      fal/、google-vertex-ai/ 进 gateway；workers-ai/、@cf/ 进 airun（migrated）；openai/ 非 gpt-image
 //      进 gateway/openai；都未命中直接 UnsupportedModelError（422）。
 //
 // 每次 prepareRoute 只选择一次 channel/vendor，target 与 decoder 保持配对。
@@ -24,8 +29,10 @@ import { buildAirunTarget, extractAirunImage } from "./airun/index.js";
 import {
   buildFalTarget,
   buildOpenAiTarget,
+  buildVertexAiTarget,
   extractFalImage,
   extractOpenAiImage,
+  extractVertexAiImage,
 } from "./gateway/index.js";
 
 import {
@@ -37,82 +44,19 @@ import {
 
 type FetchFn = typeof fetch;
 
-// channel 判定：先 provider 声明，后模型前缀回落。规则见文件头。
-function resolveChannel(req: {
-  provider: string;
-  model: string;
-}): ChannelResolution {
-  const provider = req.provider.trim().toLowerCase();
-  const model = req.model.trim();
-  const lowerModel = model.toLowerCase();
-
-  // 1. 池条目声明优先。
-  if (provider === "workers-ai") {
-    return { channel: "airun", vendor: "migrated", model, migrated: true };
-  }
-  if (provider === "google") {
-    return {
-      channel: "airun",
-      vendor: "google",
-      model: lowerModel.startsWith("google/") ? model : `google/${model}`,
-    };
-  }
-  if (provider === "krea") {
-    return {
-      channel: "airun",
-      vendor: "krea",
-      model: lowerModel.startsWith("krea/") ? model : `krea/${model}`,
-    };
-  }
-  if (provider === "openai") {
-    const bare = lowerModel.startsWith("openai/")
-      ? lowerModel.slice("openai/".length)
-      : lowerModel;
-    if (bare.startsWith("gpt-image")) {
-      const full = lowerModel.startsWith("openai/") ? model : `openai/${model}`;
-      return { channel: "airun", vendor: "openai", model: full };
-    }
-    return { channel: "gateway", vendor: "openai", model };
-  }
-  if (provider === "fal") {
-    return { channel: "gateway", vendor: "fal", model };
-  }
-
-  // 2. 模型前缀回落（未知/custom-<slug> provider）：看全引用或裸 model 前缀。
-  const ref = `${provider}/${lowerModel}`;
-  const starts = (p: string): boolean =>
-    lowerModel.startsWith(p) || ref.startsWith(p);
-  if (starts("google/") || starts("krea/") || starts("openai/gpt-image")) {
-    const vendor = starts("google/")
-      ? "google"
-      : starts("krea/")
-        ? "krea"
-        : "openai";
-    // model 自带 author 前缀则原样用，否则拼全引用。
-    const full = lowerModel.includes("/") ? model : `${provider}/${model}`;
-    return { channel: "airun", vendor, model: full };
-  }
-  if (starts("fal/")) {
-    return { channel: "gateway", vendor: "fal", model };
-  }
-  if (starts("openai/")) {
-    return { channel: "gateway", vendor: "openai", model };
-  }
-  if (starts("workers-ai/") || starts("@cf/")) {
-    return { channel: "airun", vendor: "migrated", model, migrated: true };
-  }
-  throw new UnsupportedModelError(
-    `unsupported provider/model: ${req.provider}/${req.model}`,
-  );
+// Gateway vendor APIs accept native model IDs, not the routing vendor prefix.
+// fal-ai/ is a model namespace, so it must survive stripping fal/.
+function gatewayResolution(vendor: string, model: string): ChannelResolution {
+  const prefix = `${vendor}/`;
+  return {
+    channel: "gateway",
+    vendor,
+    model: model.toLowerCase().startsWith(prefix)
+      ? model.slice(prefix.length)
+      : model,
+  };
 }
 
-// 分发注册表：key = `${channel}:${vendor}`，value = 该组合的建目标 + 抽图实现。
-// 查表发生在 resolveChannel 之后，因此“池声明优先、模型前缀回落”（含 fal 声明
-// 压过模型前缀）的既有优先级全部由 resolveChannel 保持，本表只做精确命中；
-// 未知组合无表项，一律 UnsupportedModelError（generate 侧 422 / dry-run 侧 400
-// 的语义由 handler 映射，见 handler.ts，本层只抛异常类型与原文案）。
-// airun 通道 transport/回包统一（buildAirunTarget/extractAirunImage），四个 vendor
-// 表项共享同一实现；gateway 按 vendor 各自实现。表内只存函数引用，不含 host/auth/URL。
 type BuildTargetFn = (
   req: CanonicalImageRequest,
   env: Env,
@@ -123,39 +67,156 @@ type ExtractImageFn = (
   res: Response,
   fetchFn?: FetchFn,
 ) => Promise<ExtractedImage>;
-interface ProviderEntry {
-  buildTarget: BuildTargetFn;
-  extractImage: ExtractImageFn;
+
+interface ProviderDeclaration {
+  readonly provider: string;
+  readonly prefixes: readonly string[];
+  readonly acceptsModel?: (model: string) => boolean;
+  readonly resolveModel: (
+    model: string,
+    fallbackProvider?: string,
+  ) => ChannelResolution;
+  readonly buildTarget: BuildTargetFn;
+  readonly extractImage: ExtractImageFn;
 }
-const PROVIDER_REGISTRY: Record<string, ProviderEntry> = {
-  "airun:google": {
+
+function airunResolution(
+  vendor: string,
+  model: string,
+  fallbackProvider?: string,
+): ChannelResolution {
+  // Declared providers supply the vendor prefix; unknown-provider fallback
+  // preserves an explicit model reference, just as the legacy dispatch did.
+  const full =
+    fallbackProvider !== undefined
+      ? model.includes("/")
+        ? model
+        : `${fallbackProvider}/${model}`
+      : model.toLowerCase().startsWith(`${vendor}/`)
+        ? model
+        : `${vendor}/${model}`;
+  return { channel: "airun", vendor, model: full };
+}
+
+// Ordered native declarations own selection, model normalization and transport
+// together. OpenAI's gpt-image exception precedes its native adapter; advertised
+// capabilities are derived from these same executable declarations.
+const providerDeclarations: readonly ProviderDeclaration[] = [
+  {
+    provider: "google",
+    prefixes: ["google/"],
+    resolveModel: (model, fallback) =>
+      airunResolution("google", model, fallback),
     buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
-  "airun:openai": {
+  {
+    provider: "krea",
+    prefixes: ["krea/"],
+    resolveModel: (model, fallback) => airunResolution("krea", model, fallback),
     buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
-  "airun:krea": {
+  {
+    provider: "openai",
+    prefixes: ["openai/gpt-image"],
+    acceptsModel: (model) =>
+      model
+        .toLowerCase()
+        .replace(/^openai\//, "")
+        .startsWith("gpt-image"),
+    resolveModel: (model, fallback) =>
+      airunResolution("openai", model, fallback),
     buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
-  "airun:migrated": {
-    buildTarget: buildAirunTarget,
-    extractImage: extractAirunImage,
-  },
-  "gateway:fal": {
+  {
+    provider: "fal",
+    prefixes: ["fal/"],
+    resolveModel: (model) => gatewayResolution("fal", model),
     buildTarget: buildFalTarget,
     extractImage: extractFalImage,
   },
-  "gateway:openai": {
+  {
+    provider: "google-vertex-ai",
+    prefixes: ["google-vertex-ai/"],
+    resolveModel: (model) => gatewayResolution("google-vertex-ai", model),
+    buildTarget: buildVertexAiTarget,
+    extractImage: extractVertexAiImage,
+  },
+  {
+    provider: "openai",
+    prefixes: ["openai/"],
+    resolveModel: (model) => gatewayResolution("openai", model),
     buildTarget: buildOpenAiTarget,
     extractImage: extractOpenAiImage,
   },
-};
+  {
+    provider: "workers-ai",
+    prefixes: ["workers-ai/", "@cf/"],
+    acceptsModel: (model) => model.toLowerCase().startsWith("@cf/"),
+    resolveModel: (model) => ({
+      channel: "airun",
+      vendor: "migrated",
+      model,
+      migrated: true,
+    }),
+    buildTarget: buildAirunTarget,
+    extractImage: extractAirunImage,
+  },
+];
+
+function selectProvider(req: { provider: string; model: string }): {
+  declaration: ProviderDeclaration;
+  resolved: ChannelResolution;
+} {
+  let provider = req.provider.trim().toLowerCase();
+  const model = req.model.trim();
+  const lowerModel = model.toLowerCase();
+  const legacy = provider === "workers-ai";
+  if (legacy && !lowerModel.startsWith("@cf/")) {
+    const slash = lowerModel.indexOf("/");
+    provider = slash > 0 ? lowerModel.slice(0, slash) : "";
+    // fal-ai is a model namespace, accepted only by this legacy migration.
+    if (provider === "fal-ai") provider = "fal";
+  }
+  const declared = providerDeclarations.find(
+    (entry) =>
+      entry.provider === provider &&
+      (!entry.acceptsModel || entry.acceptsModel(model)),
+  );
+  if (declared)
+    return { declaration: declared, resolved: declared.resolveModel(model) };
+  if (legacy) {
+    throw new UnsupportedModelError(
+      `unsupported provider/model: ${req.provider}/${req.model} (workers-ai only supports @cf/ legacy models; use provider "google"/"krea"/"openai" for "google/*" etc.)`,
+    );
+  }
+  const ref = `${provider}/${lowerModel}`;
+  const fallback = providerDeclarations.find((entry) =>
+    entry.prefixes.some(
+      (prefix) => lowerModel.startsWith(prefix) || ref.startsWith(prefix),
+    ),
+  );
+  if (fallback)
+    return {
+      declaration: fallback,
+      resolved: fallback.resolveModel(model, provider),
+    };
+  throw new UnsupportedModelError(
+    `unsupported provider/model: ${req.provider}/${req.model}`,
+  );
+}
+
 export interface ProviderRoute {
   readonly target: UpstreamTarget;
   readonly extractImage: ExtractImageFn;
+}
+
+export function listProviders(): string[] {
+  return [
+    ...new Set(providerDeclarations.map((entry) => entry.provider)),
+  ].sort();
 }
 
 // A route binds request transport and response interpretation in one selection.
@@ -165,15 +226,14 @@ export function prepareRoute(
   env: Env,
   inputs: FetchedInput[],
 ): ProviderRoute {
-  const resolved = resolveChannel(req);
-  const entry = PROVIDER_REGISTRY[`${resolved.channel}:${resolved.vendor}`];
-  if (!entry) {
-    throw new UnsupportedModelError(
-      `unsupported provider/model: ${req.provider}/${req.model}`,
-    );
-  }
+  const { declaration: entry, resolved } = selectProvider(req);
   return {
-    target: entry.buildTarget(req, env, inputs, resolved),
+    target: entry.buildTarget(
+      { ...req, model: resolved.model },
+      env,
+      inputs,
+      resolved,
+    ),
     extractImage: entry.extractImage,
   };
 }

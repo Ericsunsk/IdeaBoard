@@ -14,6 +14,7 @@ import (
 
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/riverpolicy"
+	"ideaboard/api/internal/prompts"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -731,7 +732,7 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	if _, err := workspaceBridgeTaskPayload(&tasks.WorkspaceTask{}); err == nil {
 		t.Fatal("empty id = nil, want error")
 	}
-	canonical, err := taskservice.CompileWorkspaceParams("generation", "a sunset", nil)
+	canonical, err := taskservice.CompileWorkspaceParams("generation", "a sunset", nil, prompts.FeaturePromptRuntimeConfig{})
 	if err != nil {
 		t.Fatalf("compile canonical params: %v", err)
 	}

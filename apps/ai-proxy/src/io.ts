@@ -161,7 +161,8 @@ export function maskSecrets(value: unknown): unknown {
   return value;
 }
 
-// 安全日志：只允许 task/provider/model/duration/status/code，不含 URL/密钥/body。
+// 安全日志：只允许 task/provider/model/duration/status/code/message，不含 URL/密钥/body。
+// message 仅承载 Worker 自产的校验/状态文案（BAD_REQUEST 等），绝不填上游原文。
 export function safeLog(
   fields: Record<string, string | number | undefined>,
 ): void {
@@ -173,6 +174,7 @@ export function safeLog(
     "upstream_status",
     "duration_ms",
     "code",
+    "message",
     "ok",
   ]);
   const out: Record<string, string | number> = {};

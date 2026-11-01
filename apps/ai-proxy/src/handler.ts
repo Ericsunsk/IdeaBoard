@@ -5,8 +5,13 @@ import type {
   GenerateFailure,
   GenerateSuccess,
   ImageProvider,
+  ProvidersResponse,
 } from "./contracts.js";
-import { prepareRoute, receiptFromUpstream } from "./providers/index.js";
+import {
+  listProviders,
+  prepareRoute,
+  receiptFromUpstream,
+} from "./providers/index.js";
 import { UnsupportedModelError, UpstreamError } from "./providers/shared.js";
 import {
   fetchInputImage,
@@ -19,7 +24,7 @@ import {
 } from "./io.js";
 
 // provider 是 registry slug（任意非空，大小写不敏感）：channel 判定与收敛
-// 由 providers resolveChannel 拥有。generate 侧未知 slug 走 422
+// 由 providers provider declarations 拥有。generate 侧未知 slug 走 422
 // UNSUPPORTED_MODEL；dry-run 侧收敛为 400（见 handleDryRun）。
 
 type FetchFn = typeof fetch;
@@ -34,6 +39,8 @@ function unauthorized(taskId?: string): Response {
 }
 
 function badRequest(taskId: string, message: string): Response {
+  // 所有 400 都在日志留痕（含 JSON 解析失败与字段校验失败），只记安全字段。
+  safeLog({ task_id: taskId, code: "BAD_REQUEST", message });
   const body: GenerateFailure = {
     task_id: taskId,
     status: "failed",
@@ -58,8 +65,10 @@ function validateGenerate(req: CanonicalImageRequest): string | null {
   if (!req.provider || typeof req.provider !== "string")
     return "provider is required";
   if (!req.model || typeof req.model !== "string") return "model is required";
-  if (!req.prompt || typeof req.prompt !== "string")
-    return "prompt is required";
+  // prompt 与 images 二选一必填：文生图（无 images）prompt 必须非空；
+  // 有 images（cutout/img2img/edit）时 prompt 可为空串透传上游。
+  const promptOrImages = validatePromptOrImages(req.prompt, req.images);
+  if (promptOrImages) return promptOrImages;
   if (!req.upload_url || typeof req.upload_url !== "string")
     return "upload_url is required";
   try {
@@ -71,6 +80,18 @@ function validateGenerate(req: CanonicalImageRequest): string | null {
   }
   const invalidImages = validateImages(req);
   if (invalidImages) return invalidImages;
+  return null;
+}
+
+// prompt 与 images 二选一必填（cutout/img2img/edit 允许空 prompt 透传上游）：
+// generate 与 dry-run 共用，文案与顺序保持一致。
+function validatePromptOrImages(
+  prompt: unknown,
+  images: unknown,
+): string | null {
+  if (typeof prompt !== "string") return "prompt is required";
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (!prompt && !hasImages) return "prompt or images is required";
   return null;
 }
 
@@ -325,6 +346,22 @@ export async function handleGenerate(
   }
 }
 
+export async function handleListProviders(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  // 与 generate/dry-run 一致：WORKER_INTERNAL_SECRET bearer 鉴权，缺失即 401。
+  // 无 task 上下文，401 body 不带 task_id。
+  if (!checkAuth(request, env)) {
+    return Response.json(
+      { error: { code: "UNAUTHORIZED", message: "unauthorized" } },
+      { status: 401 },
+    );
+  }
+  const body: ProvidersResponse = { providers: listProviders() };
+  return Response.json(body, { status: 200 });
+}
+
 export async function handleDryRun(
   request: Request,
   env: Env,
@@ -346,8 +383,8 @@ export async function handleDryRun(
     return badRequest(req.task_id, "provider is required");
   if (!req.model || typeof req.model !== "string")
     return badRequest(req.task_id, "model is required");
-  if (!req.prompt || typeof req.prompt !== "string")
-    return badRequest(req.task_id, "prompt is required");
+  const promptOrImages = validatePromptOrImages(req.prompt, req.images);
+  if (promptOrImages) return badRequest(req.task_id, promptOrImages);
   // upload_url 可选：仅校验格式，不外发、不拉取。
   if (req.upload_url !== undefined && typeof req.upload_url !== "string") {
     return badRequest(req.task_id, "upload_url must be a string");

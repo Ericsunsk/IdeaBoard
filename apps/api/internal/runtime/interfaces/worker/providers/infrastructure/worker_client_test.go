@@ -91,6 +91,29 @@ func workerTestRequest() runtimeports.WorkerRequest {
 	}
 }
 
+func TestWorkerClientDoesNotRequireAllowlistPolicy(t *testing.T) {
+	// The Worker base URL is operator configuration: loopback sends must
+	// succeed on the configured-egress path with an empty outbound policy.
+	restore := safehttp.ConfigurePolicyProvider(workerTestOutboundPolicyProvider{})
+	t.Cleanup(restore)
+
+	var capture workerCapture
+	server := newWorkerCaptureServer(t, &capture, http.StatusOK,
+		`{"task_id":"task-1","status":"completed","provider":"openai","model":"gpt-image-1","image_url":"https://media.example/w/uploads/ws/abc/task-1/result-0.png","content_type":"image/png","receipt":{"upstream_status":200,"provider":"openai","model":"gpt-image-1"}}`)
+	defer server.Close()
+
+	client, err := NewWorkerClient(WorkerClientConfig{BaseURL: server.URL, Secret: "s3cr3t"})
+	if err != nil {
+		t.Fatalf("NewWorkerClient() error = %v", err)
+	}
+	if _, err := client.Do(context.Background(), workerTestRequest()); err != nil {
+		t.Fatalf("Do() error = %v, want nil without allowlist", err)
+	}
+	if capture.path != "/v1/generate" || capture.method != http.MethodPost {
+		t.Fatalf("request = %s %q, want POST /v1/generate", capture.method, capture.path)
+	}
+}
+
 func TestWorkerClientPostsCanonicalShape(t *testing.T) {
 	var capture workerCapture
 	server := newWorkerCaptureServer(t, &capture, http.StatusOK,

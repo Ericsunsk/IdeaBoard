@@ -116,4 +116,58 @@ expect_fail_with "$fixture_root/missing.env" "missing required" "API_PG_PASSWORD
 expect_fail_with "$fixture_root/unknown.env" "unknown key" "NOPE_UNKNOWN"
 expect_fail_with "$fixture_root/deploy.env" "deploy-only key" "must not live in Infisical"
 
+# --- dual-export (root / + /ai-proxy) mode --------------------------------
+# Reset the Worker contract to the canonical four bindings: earlier
+# single-file cases intentionally mutated it, dual assertions need a fixed
+# schema here.
+cat >"$fixture_root/apps/ai-proxy/src/contracts.ts" <<'EOF'
+export interface Env {
+  CF_ACCOUNT_ID: string;
+  CF_GATEWAY_ID: string;
+  CF_AIG_TOKEN: string;
+  WORKER_INTERNAL_SECRET: string;
+}
+EOF
+
+expect_pass_dual() {
+  if ! bash "$checker" "$1" "$fixture_root" --worker-export "$2" >/dev/null 2>&1; then
+    echo "infisical-drift-check-test: expected PASS for $3" >&2
+    return 1
+  fi
+}
+
+expect_fail_dual_with() {
+  # Same pipefail-SIGPIPE note as expect_fail_with: capture first, grep after.
+  local out rc
+  set +e
+  out="$(bash "$checker" "$1" "$fixture_root" --worker-export "$2" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "infisical-drift-check-test: expected FAIL for $3" >&2
+    return 1
+  fi
+  if ! grep -q "$4" <<<"$out"; then
+    echo "infisical-drift-check-test: missing marker '$4' for $3" >&2
+    return 1
+  fi
+}
+
+printf 'API_PG_PASSWORD=x\nAUTH_INTERNAL_KEY=x\nPG_DB=x\n' >"$fixture_root/dual-root.env"
+printf 'CF_ACCOUNT_ID=x\nCF_GATEWAY_ID=x\nCF_AIG_TOKEN=x\nWORKER_INTERNAL_SECRET=x\n' >"$fixture_root/dual-worker.env"
+
+expect_pass_dual "$fixture_root/dual-root.env" "$fixture_root/dual-worker.env" "dual happy path (space flag form)"
+# Equals flag form with the flag first: positionals $1=export $2=repo-root keep working.
+if ! bash "$checker" --worker-export="$fixture_root/dual-worker.env" "$fixture_root/dual-root.env" "$fixture_root" >/dev/null 2>&1; then
+  echo "infisical-drift-check-test: expected PASS for dual happy path (equals flag form)" >&2
+  exit 1
+fi
+printf 'CF_ACCOUNT_ID=x\nCF_GATEWAY_ID=x\nWORKER_INTERNAL_SECRET=x\n' >"$fixture_root/dual-worker-missing.env"
+expect_fail_dual_with "$fixture_root/dual-root.env" "$fixture_root/dual-worker-missing.env" "worker missing binding" "CF_AIG_TOKEN.*missing from worker export"
+printf 'CF_ACCOUNT_ID=x\nCF_GATEWAY_ID=x\nCF_AIG_TOKEN=x\nWORKER_INTERNAL_SECRET=x\nNOPE_WORKER=x\n' >"$fixture_root/dual-worker-unknown.env"
+expect_fail_dual_with "$fixture_root/dual-root.env" "$fixture_root/dual-worker-unknown.env" "worker unknown key" "NOPE_WORKER"
+cp "$fixture_root/dual-root.env" "$fixture_root/dual-root-overlap.env"
+printf 'WORKER_INTERNAL_SECRET=x\n' >>"$fixture_root/dual-root-overlap.env"
+expect_fail_dual_with "$fixture_root/dual-root-overlap.env" "$fixture_root/dual-worker.env" "root/worker overlap" "WORKER_INTERNAL_SECRET.*both"
+
 echo "infisical-drift-check self-test passes"

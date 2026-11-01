@@ -213,7 +213,7 @@ image refs 的唯一持久化位置是 `docker/images.env`（gitignored，manife
 image refs 不进 Cloud，由 manifest 写入 `docker/images.env`。
 
 ```bash
-scripts/infisical-run.sh --env prod -- scripts/deploy-stack.sh update --manifest release-manifest.json
+scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh update --manifest release-manifest.json
 ```
 
 Cloud 模式的业务值只消费注入值；本地文件仅提供独立的 owner 口令。
@@ -617,6 +617,6 @@ dotenvx run -f /opt/stacks/ideaboard/docker/.env -- \
 
 VPS 镜像通道之外，`apps/ai-proxy`（唯一的 AI 出口适配器）不走 CI 发版、不跑 `wrangler deploy`：在 CF dashboard 把本仓库连到 Worker `ideaboard-ai-proxy`，Root directory 填 `apps/ai-proxy`，Watch paths 只含 `apps/ai-proxy/**`（改 Go/前端不触发 Worker 重建），production 分支绑 main，PR 自动出 preview 部署（只做 dry-run 验证，永不配给任何 VPS）。
 
-变量在 dashboard 上按 environment 分开配：`[vars]` 非密钥（`CF_ACCOUNT_ID`/`CF_GATEWAY_ID`）toml 明文或 dashboard 二选一；Secrets 只放 dashboard Secrets——production 填 Infisical prod 同名 key 的值（`CF_AIG_TOKEN`、`WORKER_INTERNAL_SECRET`），preview 填 dev 的值。`wrangler secret put` 与 dashboard 写的是同一份，任选其一。
+变量在 dashboard 上按 environment 分开配：`[vars]` 非密钥（`CF_ACCOUNT_ID`/`CF_GATEWAY_ID`）toml 明文或 dashboard 二选一；Secrets 只放 dashboard Secrets——production 填 Infisical prod 同名 key 的值（`CF_AIG_TOKEN`、`WORKER_INTERNAL_SECRET`），preview 填 dev 的值。`wrangler secret put` 与 dashboard 写的是同一份，任选其一。生产推荐走 Infisical 原生 Cloudflare Workers 集成自动同步（project 选 `ideaboard`、env 选 prod、path 只圈 `/ai-proxy`），配好后改值自动推，不再手动。
 
 VPS 侧 prod `WORKER_BASE_URL` 填 production Worker 地址（`https://ideaboard-ai-proxy.<account>.workers.dev` 或自定域名），与 preview 无关。回滚 = CF dashboard 回滚 Worker 版本（无状态，无需数据回滚）。本地 bindings 与启动步骤见 [ai-proxy README](../../apps/ai-proxy/README.md#运行与验证)。

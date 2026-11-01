@@ -2,35 +2,7 @@ package domain
 
 import (
 	"errors"
-	"time"
 )
-
-// GatewaySummary is the masked admin read model. It never carries secrets.
-type GatewaySummary struct {
-	BaseURL         string     `json:"base_url,omitempty"`
-	AccountID       string     `json:"account_id,omitempty"`
-	GatewayID       string     `json:"gateway_id,omitempty"`
-	TokenConfigured bool       `json:"token_configured"`
-	IsFirstParty    bool       `json:"is_first_party"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
-}
-
-// ResolvedGateway is the request-time credential handed to the gateway client.
-type ResolvedGateway struct {
-	BaseURL   string
-	AccountID string
-	GatewayID string
-	Token     string
-}
-
-// UpdateInput carries an admin token rotation. A nil Token keeps the stored
-// secret; there is no clear-token operation (rotation means replacement).
-type UpdateInput struct {
-	BaseURL   string
-	Token     *string
-	AccountID string
-	GatewayID string
-}
 
 // CatalogItem describes one model available in the AI gateway catalog.
 // The catalog carries routing and display metadata only: it holds no
@@ -61,10 +33,6 @@ type CatalogItem struct {
 func DefaultCatalog() []CatalogItem {
 	return []CatalogItem{}
 }
-
-// ErrAIGatewayNotConfigured reports missing gateway configuration. Callers
-// fail closed on it: no fallback to direct provider egress exists.
-var ErrAIGatewayNotConfigured = errors.New("AI gateway is not configured")
 
 // ErrVisionModelMissing reports a vision search model without configuration.
 // Workers fail closed on it: no silent default model exists.

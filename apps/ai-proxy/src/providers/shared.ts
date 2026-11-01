@@ -8,9 +8,9 @@ export type Channel = "airun" | "gateway";
 export interface ChannelResolution {
   channel: Channel;
   // channel 内 vendor：airun 下为 "google" | "openai" | "krea" | "migrated"，
-  // gateway 下为 "fal" | "openai"。
+  // gateway 下为 "fal" | "openai" | "google-vertex-ai"。
   vendor: string;
-  // airun envelope 用的完整 model id（author/model 或 @cf/... 原样）。
+  // Native model: airun uses author/model or @cf/...; gateway removes only its routing prefix.
   model: string;
   // workers-ai 旧 slug 迁移标记：dry-run 必须标注。
   migrated?: boolean;

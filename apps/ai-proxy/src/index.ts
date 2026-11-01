@@ -1,5 +1,9 @@
 import type { Env } from "./contracts.js";
-import { handleDryRun, handleGenerate } from "./handler.js";
+import {
+  handleDryRun,
+  handleGenerate,
+  handleListProviders,
+} from "./handler.js";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -10,6 +14,9 @@ export default {
       }
       if (request.method === "POST" && url.pathname === "/v1/dry-run") {
         return await handleDryRun(request, env);
+      }
+      if (request.method === "GET" && url.pathname === "/v1/providers") {
+        return await handleListProviders(request, env);
       }
       if (request.method === "GET" && url.pathname === "/health") {
         return Response.json({ ok: true });

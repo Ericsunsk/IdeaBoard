@@ -2,104 +2,182 @@ package infrastructure
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
-	"sync"
 	"time"
 
+	"ideaboard/api/internal/modelregistry/ports"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/workflow"
-
-	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
-	modelregistryports "ideaboard/api/internal/modelregistry/ports"
 )
 
-// Configured provider source: control-plane provider_configs (AI Gateway
-// Read token) plus the workers-ai first-party constant. No community
-// catalog, no models.dev, no availability probing.
+// Configured provider source: the Cloudflare control-plane provider_configs
+// list (CF_ACCOUNT_ID/CF_GATEWAY_ID/CF_AIG_TOKEN, shared Gateway token)
+// annotated with the
+// ai-proxy Worker /v1/providers capability list, plus the workers-ai
+// first-party constant (always present and available). Any remote failure
+// (control plane or Worker unreachable) degrades in place to the catalog
+// fallback below: the distinct admin-managed catalog providers plus
+// workers-ai, warn-logged, never failing the listing. Reachability beyond
+// that is a Preview dry-run concern, not a listing concern. The task
+// execution chain never reads this function (it consumes the pinned
+// RoutingSnapshot), so discovery degradation cannot block execution.
 
-// configuredProvidersTTL bounds how long a control-plane provider list is
-// reused: management tokens rarely rotate provider wiring within minutes.
-const configuredProvidersTTL = 10 * time.Minute
-
-// maxConfiguredSlugsEntries bounds the token-hash cache: entries are keyed
-// by gateway token, so rotation without a bound leaks one entry per token.
-const maxConfiguredSlugsEntries = 64
-
-type configuredSlugsEntry struct {
-	slugs   []string
-	expires time.Time
+// DiscoveryConfig carries the provider-discovery inputs: the Cloudflare
+// control-plane identity plus the shared Gateway token, and the Worker egress
+// for the /v1/providers capability read. The zero value keeps catalog fallback.
+type DiscoveryConfig struct {
+	// AccountID is the Cloudflare account owning the gateway (CF_ACCOUNT_ID).
+	AccountID string
+	// GatewayID is the AI Gateway identifier (CF_GATEWAY_ID).
+	GatewayID string
+	// ReadToken is the shared CF_AIG_TOKEN Gateway bearer credential, reused
+	// for control-plane discovery (intentional: VPS already holds
+	// WORKER_INTERNAL_SECRET).
+	ReadToken string
+	// WorkerBaseURL is the ai-proxy Worker service root (WORKER_BASE_URL).
+	WorkerBaseURL string
+	// WorkerSecret is the WORKER_INTERNAL_SECRET bearer credential.
+	WorkerSecret string
 }
 
-var configuredSlugsCache = struct {
-	sync.Mutex
-	byToken map[string]configuredSlugsEntry
-}{byToken: make(map[string]configuredSlugsEntry)}
+// ConfiguredProviders owns remote reads, capability merging and catalog fallback.
+// It is fully initialized at construction and never changes accepted Task routing.
+type ConfiguredProviders struct {
+	catalog             ports.CatalogReader
+	discovery           DiscoveryConfig
+	controlPlaneBaseURL string
+	allowHosts          func(context.Context) []string
+	outbound            *safehttp.Client
+}
 
-// controlPlaneSlugsFetcher is a var for test override of the
-// control-plane provider list call.
-var controlPlaneSlugsFetcher = tryFetchConfiguredProviderSlugs
+func NewConfiguredProviders(catalog ports.CatalogReader, cfg DiscoveryConfig) *ConfiguredProviders {
+	return newConfiguredProviders(catalog, cfg, "https://api.cloudflare.com", safehttp.AllowHosts)
+}
 
-// cachedConfiguredSlugs returns the control-plane provider list, reusing a
-// short-TTL entry keyed by token hash. An error means the configured set is
-// unknown and the caller must fail closed.
-func cachedConfiguredSlugs(ctx context.Context, gateway modelregistrydomain.ResolvedGateway) ([]string, error) {
-	keyBytes := sha256.Sum256([]byte(gateway.Token))
-	key := hex.EncodeToString(keyBytes[:])
-	now := time.Now()
-	configuredSlugsCache.Lock()
-	if entry, ok := configuredSlugsCache.byToken[key]; ok && now.Before(entry.expires) {
-		slugs := append([]string(nil), entry.slugs...)
-		configuredSlugsCache.Unlock()
-		return slugs, nil
+func newConfiguredProviders(catalog ports.CatalogReader, cfg DiscoveryConfig, controlPlaneURL string, allowHosts func(context.Context) []string) *ConfiguredProviders {
+	return &ConfiguredProviders{catalog: catalog, discovery: cfg, controlPlaneBaseURL: controlPlaneURL,
+		allowHosts: allowHosts, outbound: safehttp.NewClient(safehttp.Config{})}
+}
+
+// discoveryTarget names control-plane provider discovery in logs/metrics.
+const discoveryTarget = "ai-gateway-control-plane"
+
+// workerProvidersTarget names the Worker capability read in logs/metrics.
+const workerProvidersTarget = "edge-worker-providers"
+
+// discoveryTimeout bounds one provider-discovery read (all attempts).
+const discoveryTimeout = 4 * time.Second
+
+// discoveryMaxBytes caps one provider-discovery response body.
+const discoveryMaxBytes = 1 << 20
+
+// ListConfiguredProviders resolves the admin-visible provider offering.
+//
+// When control-plane discovery and the Worker capability read both succeed,
+// membership is driven by the control plane: every CF slug is listed, marked
+// available only when the Worker also advertises it (CF ∩ Worker =
+// available; CF without Worker = shown but unadapted); Worker-only slugs
+// are never shown. workers-ai is always admitted as a first-party constant.
+//
+// Either remote failing (or discovery unconfigured) degrades in place to
+// the catalog fallback: the distinct catalog provider set plus workers-ai,
+// all available. Only a catalog load failure surfaces as an error.
+func (r *ConfiguredProviders) ListConfiguredProviders(ctx context.Context) ([]workflow.ProviderEntry, error) {
+	if r == nil {
+		return nil, fmt.Errorf(errorrender.MsgListConfiguredProviders, fmt.Errorf("configured-provider discovery is unavailable"))
 	}
-	configuredSlugsCache.Unlock()
-	slugs, err := controlPlaneSlugsFetcher(ctx, gateway)
+	cfSlugs, err := r.fetchCFProviderSlugs(ctx, r.discovery)
+	reason := "control-plane-unavailable"
+	if err == nil {
+		var workerSlugs []string
+		workerSlugs, err = r.fetchWorkerProviders(ctx, r.discovery)
+		if err == nil {
+			return mergeDiscoveredProviders(cfSlugs, workerSlugs), nil
+		}
+		reason = "worker-unavailable"
+	}
+	slog.WarnContext(ctx, "modelregistry provider discovery degraded to catalog fallback",
+		"reason", reason, "err", err)
+	return r.listCatalogFallback(ctx)
+}
+
+// ensureWorkersAI appends the workers-ai first-party constant unless the
+// caller already listed it. Shared by the discovered merge and the catalog
+// fallback so the constant can never drop out of either path.
+func ensureWorkersAI(providers []workflow.ProviderEntry, seen map[string]struct{}) []workflow.ProviderEntry {
+	if _, dup := seen["workers-ai"]; !dup {
+		if entry, known := workflow.ResolveProvider("workers-ai"); known {
+			providers = append(providers, entry)
+		}
+	}
+	return providers
+}
+
+// mergeDiscoveredProviders annotates CF slugs with Worker capability:
+// CF ∩ Worker = available; CF without Worker = shown but unadapted;
+// Worker-only slugs are dropped; workers-ai is always present.
+func mergeDiscoveredProviders(cfSlugs, workerSlugs []string) []workflow.ProviderEntry {
+	workerSet := make(map[string]struct{}, len(workerSlugs))
+	for _, s := range workerSlugs {
+		if clean := strings.ToLower(strings.TrimSpace(s)); clean != "" {
+			workerSet[clean] = struct{}{}
+		}
+	}
+	seen := make(map[string]struct{}, len(cfSlugs)+1)
+	var providers []workflow.ProviderEntry
+	for _, s := range cfSlugs {
+		entry, known := workflow.ResolveProvider(s)
+		if !known || entry.Slug == "" {
+			continue
+		}
+		if _, dup := seen[entry.Slug]; dup {
+			continue
+		}
+		seen[entry.Slug] = struct{}{}
+		if _, ok := workerSet[entry.Slug]; !ok && entry.Slug != "workers-ai" {
+			entry.Available = false
+		}
+		providers = append(providers, entry)
+	}
+	return ensureWorkersAI(providers, seen)
+}
+
+// listCatalogFallback resolves the pre-discovery offering: the distinct
+// catalog provider set plus the workers-ai first-party constant. Membership
+// is driven by the catalog; the registry only enriches. Unknown slugs
+// resolve to synthetic defaults instead of vanishing silently.
+func (r *ConfiguredProviders) listCatalogFallback(ctx context.Context) ([]workflow.ProviderEntry, error) {
+	items, err := r.catalog.ListCatalog(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(errorrender.MsgListConfiguredProviders, err)
 	}
-	configuredSlugsCache.Lock()
-	configuredSlugsCache.byToken[key] = configuredSlugsEntry{
-		slugs:   append([]string(nil), slugs...),
-		expires: now.Add(configuredProvidersTTL),
+	seen := make(map[string]struct{}, len(items)+1)
+	var providers []workflow.ProviderEntry
+	for _, item := range items {
+		spec, _ := workflow.ResolveProvider(item.Provider)
+		if spec.Slug == "" {
+			continue
+		}
+		if _, dup := seen[spec.Slug]; dup {
+			continue
+		}
+		seen[spec.Slug] = struct{}{}
+		providers = append(providers, spec)
 	}
-	evictConfiguredSlugsLocked(now)
-	configuredSlugsCache.Unlock()
-	return slugs, nil
+	return ensureWorkersAI(providers, seen), nil
 }
 
-// evictConfiguredSlugsLocked keeps the cache bounded: expired entries go
-// first, then arbitrary entries until back under the cap. Caller holds the
-// lock.
-func evictConfiguredSlugsLocked(now time.Time) {
-	for key, entry := range configuredSlugsCache.byToken {
-		if !now.Before(entry.expires) {
-			delete(configuredSlugsCache.byToken, key)
-		}
-	}
-	for key := range configuredSlugsCache.byToken {
-		if len(configuredSlugsCache.byToken) <= maxConfiguredSlugsEntries {
-			break
-		}
-		delete(configuredSlugsCache.byToken, key)
-	}
-}
-
-// Provider identity lives in workflow.ResolveProvider (single registry):
-// canonical slug, display name and gateway namespace. Control-plane slugs
-// are lower-cased here; variant spellings resolve through the registry's
-// aliases at lookup time.
-
-// cfProviderConfigsResponse represents the Cloudflare AI Gateway control-plane provider configuration schema.
+// cfProviderConfigsResponse is the Cloudflare AI Gateway control-plane
+// provider configuration schema (GET
+// /client/v4/accounts/{aid}/ai-gateway/gateways/{gid}/provider_configs):
+// gateway-scoped list; there is no account-level provider list (only a
+// gateway list). Responses carry masked key previews, never key material.
 type cfProviderConfigsResponse struct {
 	Success bool `json:"success"`
 	Result  []struct {
@@ -108,108 +186,61 @@ type cfProviderConfigsResponse struct {
 	} `json:"result"`
 }
 
-var gatewayURLRegex = regexp.MustCompile(`gateway\.ai\.cloudflare\.com/v1/([^/]+)/([^/]+)`)
-
-func extractGatewayIdentity(baseURL string) (accountID, gatewayID string) {
-	matches := gatewayURLRegex.FindStringSubmatch(baseURL)
-	if len(matches) == 3 {
-		return matches[1], matches[2]
-	}
-	return "", ""
+// workerProvidersResponse is the ai-proxy GET /v1/providers schema:
+// WORKER_INTERNAL_SECRET bearer auth (same as generate); success carries
+// {providers: string[]} derived from the Worker provider registry;
+// 401 bodies carry no task_id and surface here as non-200 failures.
+type workerProvidersResponse struct {
+	Providers []string `json:"providers"`
 }
 
-// resolveControlPlaneIdentity prefers the stored account/gateway IDs;
-// URL parsing is only a fallback. Pure for testability: no network.
-func resolveControlPlaneIdentity(gateway modelregistrydomain.ResolvedGateway) (accountID, gatewayID string, err error) {
-	accountID = strings.TrimSpace(gateway.AccountID)
-	gatewayID = strings.TrimSpace(gateway.GatewayID)
-	if accountID == "" || gatewayID == "" {
-		accountID, gatewayID = extractGatewayIdentity(gateway.BaseURL)
+// fetchCFProviderSlugs reads the gateway-scoped provider_configs list with
+// the read-only token through the strict allowlist path (AllowHosts, never
+// the configured endpoint: api.cloudflare.com is public, not operator
+// configuration). Any transport failure, non-2xx status or malformed
+// payload is an error; the caller degrades to the catalog fallback.
+func (r *ConfiguredProviders) fetchCFProviderSlugs(ctx context.Context, cfg DiscoveryConfig) ([]string, error) {
+	accountID := strings.TrimSpace(cfg.AccountID)
+	gatewayID := strings.TrimSpace(cfg.GatewayID)
+	token := strings.TrimSpace(cfg.ReadToken)
+	if accountID == "" || gatewayID == "" || token == "" {
+		return nil, fmt.Errorf("control-plane discovery is not configured")
 	}
-	if accountID == "" || gatewayID == "" || strings.TrimSpace(gateway.Token) == "" {
-		return "", "", errors.New(errorrender.MsgResolveControlPlaneIdentity)
-	}
-	return accountID, gatewayID, nil
-}
-
-// configuredProvidersTarget names provider-config egress in outbound logs/metrics.
-const configuredProvidersTarget = "ai-gateway-control-plane"
-
-// configuredProvidersOutbound is the shared standard outbound client for
-// control-plane provider-config reads.
-var configuredProvidersOutbound interface {
-	Do(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error)
-} = safehttp.NewClient(safehttp.Config{})
-
-// fetchConfiguredProvidersBody performs one bounded GET against the URL's own
-// host through the standard outbound client (SSRF allowlist + bounded
-// retries). Status-to-error mapping stays with the caller: an exhausted
-// retryable status (408/429/5xx) returns its status and body preview with a
-// nil error. Only transport/timeout failures surface as errors.
-func fetchConfiguredProvidersBody(ctx context.Context, rawURL string, headers map[string]string, timeout time.Duration, maxBytes int64, target string, maxAttempts int) (body []byte, statusCode int, err error) {
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Hostname() == "" {
-		return nil, 0, errors.New(errorrender.MsgFetchHTTPBody)
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	rawURL := strings.TrimRight(strings.TrimSpace(r.controlPlaneBaseURL), "/") +
+		"/client/v4/accounts/" + accountID + "/ai-gateway/gateways/" + gatewayID +
+		"/provider_configs?per_page=100"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	for key, value := range headers {
-		httpReq.Header.Set(key, value)
-	}
-	resp, err := configuredProvidersOutbound.Do(ctx, httpReq, safehttp.RequestOptions{
-		Timeout:     timeout,
-		MaxAttempts: maxAttempts,
-		// Never authorize the URL's host implicitly. Control-plane egress
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := r.outbound.Do(ctx, req, safehttp.RequestOptions{
+		Timeout:     discoveryTimeout,
+		MaxAttempts: 1,
+		// Never authorize the control-plane host implicitly: its egress
 		// must be present in the operator-managed outbound policy.
-		AllowHosts: safehttp.AllowHosts(ctx),
-		Target:     target,
+		AllowHosts: r.allowHosts(ctx),
+		Target:     discoveryTarget,
 	})
 	if err != nil {
-		var statusErr *safehttp.HTTPStatusError
-		if errors.As(err, &statusErr) {
-			return []byte(statusErr.Body), statusErr.StatusCode, nil
-		}
-		return nil, 0, err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err = io.ReadAll(io.LimitReader(resp.Body, maxBytes))
-	if err != nil {
-		return nil, 0, err
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, discoveryMaxBytes))
+		return nil, fmt.Errorf("control plane returned %d", resp.StatusCode)
 	}
-	return body, resp.StatusCode, nil
-}
-
-// tryFetchConfiguredProviderSlugs queries Cloudflare AI Gateway Control Plane API
-// to discover configured providers if the token has management permissions.
-func tryFetchConfiguredProviderSlugs(ctx context.Context, gateway modelregistrydomain.ResolvedGateway) ([]string, error) {
-	accountID, gatewayID, err := resolveControlPlaneIdentity(gateway)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, discoveryMaxBytes))
 	if err != nil {
 		return nil, err
 	}
-
-	apiURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/ai-gateway/gateways/%s/provider_configs", accountID, gatewayID)
-	body, statusCode, err := fetchConfiguredProvidersBody(ctx, apiURL, map[string]string{
-		modelregistryports.HeaderAuthorization: "Bearer " + strings.TrimSpace(gateway.Token),
-		"Content-Type":                     "application/json",
-	}, 4*time.Second, 1<<20, configuredProvidersTarget, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("control plane returned %d", statusCode)
-	}
-
-	var cfResp cfProviderConfigsResponse
-	if err := json.Unmarshal(body, &cfResp); err != nil || !cfResp.Success {
+	var decoded cfProviderConfigsResponse
+	if err := json.Unmarshal(body, &decoded); err != nil || !decoded.Success {
 		return nil, fmt.Errorf("invalid control plane response")
 	}
-
-	slugs := make([]string, 0, len(cfResp.Result))
-	for _, item := range cfResp.Result {
-		// 归一化只做大小写/空白；变体拼写由 registry 别名在查询时解析。
+	slugs := make([]string, 0, len(decoded.Result))
+	for _, item := range decoded.Result {
 		if s := strings.ToLower(strings.TrimSpace(item.ProviderSlug)); s != "" {
 			slugs = append(slugs, s)
 		}
@@ -217,36 +248,62 @@ func tryFetchConfiguredProviderSlugs(ctx context.Context, gateway modelregistryd
 	return slugs, nil
 }
 
-// ListConfiguredProviders resolves the admin-visible provider offering as
-// the control-plane configured set plus the workers-ai first-party
-// constant. Membership is driven by the control plane; the registry only
-// enriches. Unknown slugs resolve to synthetic defaults instead of
-// vanishing silently. Workers AI carries no key so it never appears in the
-// control-plane list; it is always admitted as a first-party constant with
-// no availability probing.
-func (r *ConfigRepository) ListConfiguredProviders(ctx context.Context) ([]workflow.ProviderEntry, error) {
-	resolved, err := r.Resolve(ctx)
+// fetchWorkerProviders reads the ai-proxy GET /v1/providers capability list
+// through the configured-endpoint path (the Worker base URL is operator
+// configuration, loopback included, no allowlist). Any transport failure,
+// non-2xx status (including 401, whose body carries no task_id) or
+// malformed payload is an error; the caller degrades to the catalog
+// fallback.
+func (r *ConfiguredProviders) fetchWorkerProviders(ctx context.Context, cfg DiscoveryConfig) ([]string, error) {
+	baseURL := strings.TrimRight(strings.TrimSpace(cfg.WorkerBaseURL), "/")
+	secret := strings.TrimSpace(cfg.WorkerSecret)
+	if baseURL == "" || secret == "" {
+		return nil, fmt.Errorf("worker discovery is not configured")
+	}
+	endpoint, err := safehttp.ParseConfiguredEndpoint(baseURL)
 	if err != nil {
 		return nil, err
 	}
-	configuredSlugs, err := cachedConfiguredSlugs(ctx, resolved)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.BaseURL()+"/v1/providers", nil)
 	if err != nil {
-		return nil, fmt.Errorf(errorrender.MsgListConfiguredProviders, err)
+		return nil, err
 	}
-	seen := make(map[string]struct{}, len(configuredSlugs)+1)
-	var providers []workflow.ProviderEntry
-	for _, s := range configuredSlugs {
-		spec, _ := workflow.ResolveProvider(s)
-		if _, dup := seen[spec.Slug]; dup {
-			continue
+	req.Header.Set("Authorization", "Bearer "+secret)
+	resp, err := r.outbound.Do(ctx, req, safehttp.RequestOptions{
+		Timeout:     discoveryTimeout,
+		MaxAttempts: 1,
+		Configured:  endpoint,
+		Target:      workerProvidersTarget,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, discoveryMaxBytes))
+		return nil, fmt.Errorf("worker providers returned %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, discoveryMaxBytes))
+	if err != nil {
+		return nil, err
+	}
+	var decoded workerProvidersResponse
+	if err := json.Unmarshal(body, &decoded); err != nil || decoded.Providers == nil {
+		return nil, fmt.Errorf("invalid worker providers response")
+	}
+	for i, value := range decoded.Providers {
+		slug := strings.ToLower(strings.TrimSpace(value))
+		if slug == "" {
+			return nil, fmt.Errorf("invalid worker provider slug")
 		}
-		seen[spec.Slug] = struct{}{}
-		providers = append(providers, spec)
-	}
-	if _, dup := seen["workers-ai"]; !dup {
-		if spec, known := workflow.ResolveProvider("workers-ai"); known {
-			providers = append(providers, spec)
+		// Validate registry slug syntax, not membership: a future adapter may
+		// introduce a provider this API version does not know yet.
+		for _, char := range slug {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' && char != '_' {
+				return nil, fmt.Errorf("invalid worker provider slug")
+			}
 		}
+		decoded.Providers[i] = slug
 	}
-	return providers, nil
+	return decoded.Providers, nil
 }

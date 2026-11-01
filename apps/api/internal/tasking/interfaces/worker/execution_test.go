@@ -7,6 +7,7 @@ package worker
 import (
 	"testing"
 
+	"ideaboard/api/internal/prompts"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
@@ -17,7 +18,7 @@ import (
 func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 	raw, err := taskservice.CompileWorkspaceParams("generation", "a red bicycle", map[string]interface{}{
 		"output_count": 1,
-	})
+	}, prompts.FeaturePromptRuntimeConfig{})
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}

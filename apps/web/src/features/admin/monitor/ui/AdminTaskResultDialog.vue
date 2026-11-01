@@ -1,7 +1,7 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    size="slim"
+    size="compact"
     content-layout="scrollable"
     :aria-label="MONITOR_MESSAGES.detailAria"
     :description="MONITOR_MESSAGES.detailDescription"
@@ -32,7 +32,9 @@
               {{ MONITOR_MESSAGES.detailAria }}
             </DialogTitle>
             <div class="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-              <span class="truncate">ID: {{ detailTask?.task_id || taskId || '-' }}</span>
+              <span class="truncate" :title="detailTask?.task_id || taskId || '-'"
+                >ID: {{ detailTask?.task_id || taskId || '-' }}</span
+              >
               <button
                 v-if="detailTask?.task_id || taskId"
                 type="button"
@@ -87,10 +89,13 @@
         <div
           class="flex flex-col divide-y divide-border/60 rounded-panel border border-border bg-card px-3 py-1 text-xs"
         >
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.userLabel }}</span>
-            <div class="flex items-center gap-1">
-              <span class="font-mono text-foreground">
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{ MONITOR_MESSAGES.userLabel }}</span>
+            <div class="flex min-w-0 items-center gap-1">
+              <span
+                class="min-w-0 truncate text-right font-mono text-foreground"
+                :title="detailTask.user_display_name || detailTask.user_public_id"
+              >
                 {{ detailTask.user_display_name || detailTask.user_public_id }}
               </span>
               <button
@@ -107,29 +112,41 @@
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.priorityLabel }}</span>
             <span class="font-medium text-foreground">{{ getTaskPriorityLabel(detailTask) }}</span>
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.providerLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              getDetailExecutionProviderLabel(detailTask)
-            }}</span>
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{ MONITOR_MESSAGES.providerLabel }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="getDetailExecutionProviderLabel(detailTask)"
+              >{{ getDetailExecutionProviderLabel(detailTask) }}</span
+            >
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.modelLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              getDetailExecutionModelLabel(detailTask)
-            }}</span>
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{ MONITOR_MESSAGES.modelLabel }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="getDetailExecutionModelLabel(detailTask)"
+              >{{ getDetailExecutionModelLabel(detailTask) }}</span
+            >
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.createdAtLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              formatDateTime(detailTask.created_at)
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{
+              MONITOR_MESSAGES.createdAtLabel
             }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="formatDateTime(detailTask.created_at)"
+              >{{ formatDateTime(detailTask.created_at) }}</span
+            >
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.completedAtLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              formatDateTime(detailTask.completed_at)
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{
+              MONITOR_MESSAGES.completedAtLabel
             }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="formatDateTime(detailTask.completed_at)"
+              >{{ formatDateTime(detailTask.completed_at) }}</span
+            >
           </div>
         </div>
       </section>
@@ -171,9 +188,15 @@
           v-if="detailTask.routing"
           class="flex flex-col divide-y divide-border/60 rounded-panel border border-border bg-card px-3 py-1 text-xs"
         >
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingServiceLabel }}</span>
-            <span class="font-mono text-foreground">{{ detailTask.routing.service }}</span>
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{
+              MONITOR_MESSAGES.routingServiceLabel
+            }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="detailTask.routing.service"
+              >{{ detailTask.routing.service }}</span
+            >
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingResolutionLabel }}</span>
@@ -187,26 +210,38 @@
             }}</span>
             <span class="font-mono text-foreground">v{{ detailTask.routing.pool_version }}</span>
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingSelectedLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              detailTask.routing.selected_model || '-'
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{
+              MONITOR_MESSAGES.routingSelectedLabel
             }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="detailTask.routing.selected_model || '-'"
+              >{{ detailTask.routing.selected_model || '-' }}</span
+            >
           </div>
-          <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingFinalLabel }}</span>
-            <span class="font-mono font-medium text-foreground">{{
-              getDetailFinalModelLabel(detailTask)
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-muted-foreground">{{
+              MONITOR_MESSAGES.routingFinalLabel
             }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono font-medium text-foreground"
+              :title="getDetailFinalModelLabel(detailTask)"
+              >{{ getDetailFinalModelLabel(detailTask) }}</span
+            >
           </div>
           <div
             v-if="detailTask.routing.retry_candidate"
             class="flex items-center justify-between py-1.5"
           >
-            <span class="text-muted-foreground">{{
+            <span class="shrink-0 text-muted-foreground">{{
               MONITOR_MESSAGES.routingRetryCandidateLabel
             }}</span>
-            <span class="font-mono text-foreground">{{ detailTask.routing.retry_candidate }}</span>
+            <span
+              class="min-w-0 truncate text-right font-mono text-foreground"
+              :title="detailTask.routing.retry_candidate"
+              >{{ detailTask.routing.retry_candidate }}</span
+            >
           </div>
           <div class="flex items-center justify-between gap-3 py-1.5">
             <span class="shrink-0 text-muted-foreground">{{

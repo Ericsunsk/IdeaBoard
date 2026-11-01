@@ -139,14 +139,6 @@ func TestControlProxyEmptyCaptureFailsClosed(t *testing.T) {
 
 type proxyEnvelopeFakeGatewayStore struct{}
 
-func (proxyEnvelopeFakeGatewayStore) GetSummary(context.Context) (modelregistrydomain.GatewaySummary, error) {
-	return modelregistrydomain.GatewaySummary{}, nil
-}
-
-func (proxyEnvelopeFakeGatewayStore) Update(context.Context, modelregistrydomain.UpdateInput, int64) error {
-	return nil
-}
-
 func (proxyEnvelopeFakeGatewayStore) ListCatalog(context.Context) ([]modelregistrydomain.CatalogItem, error) {
 	return nil, nil
 }
@@ -157,10 +149,6 @@ func (proxyEnvelopeFakeGatewayStore) SaveCatalog(context.Context, []modelregistr
 
 func (proxyEnvelopeFakeGatewayStore) ListConfiguredProviders(context.Context) ([]workflow.ProviderEntry, error) {
 	return nil, nil
-}
-
-func (proxyEnvelopeFakeGatewayStore) Resolve(context.Context) (modelregistrydomain.ResolvedGateway, error) {
-	return modelregistrydomain.ResolvedGateway{}, modelregistrydomain.ErrAIGatewayNotConfigured
 }
 
 func (proxyEnvelopeFakeGatewayStore) ResolveVisionModel(context.Context) (string, error) {
@@ -228,13 +216,12 @@ func assertControlProxyContractShape(t *testing.T, path string, payload map[stri
 
 func TestControlProxyFamiliesRenderContractEnvelope(t *testing.T) {
 	h := newControlHarness(t, func(deps *ContractControlDeps) {
-		deps.AIGateway = modelregistryhttp.NewHandler(proxyEnvelopeFakeGatewayStore{})
+		deps.AIGateway = modelregistryhttp.NewHandler(proxyEnvelopeFakeGatewayStore{}, proxyEnvelopeFakeGatewayStore{})
 		deps.Storage = storagehttp.NewHandler(proxyEnvelopeFakeStorage{})
 		deps.BrandLogos = adminbranding.NewHandler(proxyEnvelopeFakeBrandLogos{}, func(*gin.Context) bool { return true })
 	})
 	admin := controlCall{userID: controlOperatorID, role: "admin"}
 	reads := []string{
-		"/api/control/v1/platform/ai-gateway",
 		"/api/control/v1/platform/ai-gateway/catalog",
 		"/api/control/v1/platform/ai-gateway/providers",
 		"/api/control/v1/platform/storage/providers",

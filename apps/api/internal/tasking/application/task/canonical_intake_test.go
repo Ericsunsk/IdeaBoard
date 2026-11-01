@@ -5,15 +5,32 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/prompts"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
 
+// emptyPromptConfig is the template-less runtime config: intake degrades to
+// straight passthrough (compiled = user prompt), preserving pre-template
+// snapshot semantics.
+func emptyPromptConfig() prompts.FeaturePromptRuntimeConfig {
+	return prompts.FeaturePromptRuntimeConfig{}
+}
+
+// promptConfigForFeature builds the runtime config an Admin-saved template
+// would produce: the saved prompt plus the code-owned merge policy.
+func promptConfigForFeature(slug, template string) prompts.FeaturePromptRuntimeConfig {
+	return prompts.FeaturePromptRuntimeConfig{
+		Prompt:                template,
+		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug),
+	}
+}
+
 func TestCompileWorkspaceParamsPersistsDurableExecutionFacts(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "durability probe", map[string]interface{}{
 		"output_count": 2,
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatalf("compile workspace params: %v", err)
 	}
@@ -39,7 +56,7 @@ func TestCompileWorkspaceParamsPersistsDurableExecutionFacts(t *testing.T) {
 func TestCompileWorkspaceParamsCarriesCanonicalWorkspaceMedia(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "", map[string]interface{}{
 		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input123"},
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatalf("compile workspace params: %v", err)
 	}
@@ -258,7 +275,7 @@ func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "draw a chair", map[string]interface{}{
 		"output_count": 2,
 		"image_urls":   []string{"https://example.com/sketch.png"},
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +322,7 @@ func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
 func TestCompileWorkspaceParamsThreadsPrompt(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "a red bicycle", map[string]interface{}{
 		"output_count": 1,
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -324,17 +341,17 @@ func TestCompileWorkspaceParamsThreadsPrompt(t *testing.T) {
 // Prompt-required features (generation, inpaint) reject an empty prompt;
 // the bound is tasks.MaxWorkspaceTaskPromptBytes (8KB).
 func TestCompileWorkspaceParamsRejectsMissingPrompt(t *testing.T) {
-	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "   ", map[string]interface{}{}); err == nil {
+	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "   ", map[string]interface{}{}, emptyPromptConfig()); err == nil {
 		t.Fatal("empty prompt on generation = nil, want error")
 	}
 	if _, err := CompileWorkspaceParams(workflow.FeatureSlugInpaint, "", map[string]interface{}{
 		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
 		"mask_asset_id":                     "asset_mask1",
-	}); err == nil {
+	}, emptyPromptConfig()); err == nil {
 		t.Fatal("empty prompt on inpaint = nil, want error")
 	}
 	over := strings.Repeat("x", tasks.MaxWorkspaceTaskPromptBytes+1)
-	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, over, map[string]interface{}{}); err == nil {
+	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, over, map[string]interface{}{}, emptyPromptConfig()); err == nil {
 		t.Fatal("over-long prompt = nil, want error")
 	}
 }
@@ -345,7 +362,7 @@ func TestCompileWorkspaceParamsDropsPromptWhenIgnored(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugUpscale, "should be dropped", map[string]interface{}{
 		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
 		"upscale":                           map[string]interface{}{"scale": 2.0},
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -368,7 +385,7 @@ func TestCompileWorkspaceParamsCarriesMaskAsset(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugInpaint, "fill the hole", map[string]interface{}{
 		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
 		"mask_asset_id":                     "asset_mask1",
-	})
+	}, emptyPromptConfig())
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -411,18 +428,18 @@ func TestCompileWorkspaceParamsEnforcesMaskPolicy(t *testing.T) {
 		params[CompilerWorkspaceMediaAssetIDsParam] = []string{"asset_input1"}
 		return params
 	}
-	if _, err := CompileWorkspaceParams(workflow.FeatureSlugInpaint, "fill it", withInput(map[string]interface{}{})); err == nil {
+	if _, err := CompileWorkspaceParams(workflow.FeatureSlugInpaint, "fill it", withInput(map[string]interface{}{}), emptyPromptConfig()); err == nil {
 		t.Fatal("inpaint without mask = nil, want error")
 	}
 	if _, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "edit it", withInput(map[string]interface{}{
 		"mask_asset_id": "asset_mask1",
-	})); err == nil {
+	}), emptyPromptConfig()); err == nil {
 		t.Fatal("mask on render = nil, want error")
 	}
 	for _, bad := range []any{"data:image/png;base64,AAAA", "https://cdn.example.com/m.png", "nope", 42, ""} {
 		if _, err := CompileWorkspaceParams(workflow.FeatureSlugInpaint, "fill it", withInput(map[string]interface{}{
 			"mask_asset_id": bad,
-		})); err == nil {
+		}), emptyPromptConfig()); err == nil {
 			t.Fatalf("mask %v = nil, want error", bad)
 		}
 	}
@@ -438,7 +455,7 @@ func TestSubmitParamsAgainstPlanRejectsIllegalPlans(t *testing.T) {
 		raw, err := CompileWorkspaceParams(workflow.FeatureSlugUpscale, "ignored prompt", map[string]interface{}{
 			CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
 			"upscale":                           map[string]interface{}{"scale": 2.0},
-		})
+		}, emptyPromptConfig())
 		if err != nil {
 			t.Fatalf("compile upscale baseline: %v", err)
 		}
@@ -541,4 +558,152 @@ func TestSubmitParamsAgainstPlanRejectsIllegalPlans(t *testing.T) {
 			t.Fatal("diverged fusion weights accepted, want fail-closed")
 		}
 	})
+}
+
+// System template ⊕ user prompt: the configured template renders at intake
+// into CompiledPrompt while UserPrompt keeps the raw user text.
+func TestCompileWorkspaceParamsRendersSystemTemplate(t *testing.T) {
+	decode := func(t *testing.T, raw string) *tasks.WorkflowTaskParams {
+		t.Helper()
+		params, err := tasks.UnmarshalParams(raw)
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if params.Generation == nil {
+			t.Fatal("missing generation snapshot")
+		}
+		return params
+	}
+	t.Run("required renders placeholder template", func(t *testing.T) {
+		raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "a red bicycle", map[string]interface{}{
+			"output_count": 1,
+		}, promptConfigForFeature(workflow.FeatureSlugGeneration, "SYS style {{user_prompt}}"))
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		params := decode(t, raw)
+		if params.Generation.UserPrompt != "a red bicycle" {
+			t.Fatalf("user=%q, want raw user text", params.Generation.UserPrompt)
+		}
+		if params.Generation.CompiledPrompt != "SYS style a red bicycle" {
+			t.Fatalf("compiled=%q, want rendered template", params.Generation.CompiledPrompt)
+		}
+		if params.Generation.SystemPrompt != "SYS style {{user_prompt}}" {
+			t.Fatalf("system=%q, want configured template", params.Generation.SystemPrompt)
+		}
+	})
+	t.Run("non-image feature appends base prompt without placeholder", func(t *testing.T) {
+		raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "a red bicycle", map[string]interface{}{
+			"output_count": 1,
+		}, promptConfigForFeature(workflow.FeatureSlugGeneration, "SYS"))
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		if got := decode(t, raw).Generation.CompiledPrompt; got != "SYS a red bicycle" {
+			t.Fatalf("compiled=%q, want appended base prompt", got)
+		}
+	})
+	t.Run("image node never implicitly appends without placeholder", func(t *testing.T) {
+		raw, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "", map[string]interface{}{
+			CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input123"},
+		}, promptConfigForFeature(workflow.FeatureSlugRender, "SYS"))
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		params := decode(t, raw)
+		if params.Generation.CompiledPrompt != "SYS" {
+			t.Fatalf("compiled=%q, want template only", params.Generation.CompiledPrompt)
+		}
+		if params.Generation.UserPrompt != "" {
+			t.Fatalf("user=%q, want empty", params.Generation.UserPrompt)
+		}
+	})
+	t.Run("empty template degrades to passthrough", func(t *testing.T) {
+		without, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "a red bicycle", map[string]interface{}{
+			"output_count": 1,
+		}, emptyPromptConfig())
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		params := decode(t, without)
+		if params.Generation.CompiledPrompt != "a red bicycle" || params.Generation.SystemPrompt != "" {
+			t.Fatalf("generation=%+v, want passthrough with empty system", params.Generation)
+		}
+	})
+}
+
+// Prompt-ignored features never inject the system template: the snapshot
+// stays double-empty even when a template is configured.
+func TestCompileWorkspaceParamsIgnoresTemplateWhenPromptIgnored(t *testing.T) {
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugUpscale, "should be dropped", map[string]interface{}{
+		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+		"upscale":                           map[string]interface{}{"scale": 2.0},
+	}, promptConfigForFeature(workflow.FeatureSlugUpscale, "SYS {{user_prompt}}"))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	params, err := tasks.UnmarshalParams(raw)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if params.Generation == nil {
+		t.Fatal("missing generation snapshot")
+	}
+	if params.Generation.UserPrompt != "" || params.Generation.CompiledPrompt != "" || params.Generation.SystemPrompt != "" {
+		t.Fatalf("generation=%+v, want empty snapshot", params.Generation)
+	}
+}
+
+// Fingerprint covers template content: the same user prompt with a
+// different template must produce a different fingerprint and seed.
+func TestCompileWorkspaceParamsFingerprintChangesWithTemplate(t *testing.T) {
+	compile := func(t *testing.T, template string) *tasks.WorkflowTaskParams {
+		t.Helper()
+		raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "same prompt", map[string]interface{}{
+			"output_count": 1,
+		}, promptConfigForFeature(workflow.FeatureSlugGeneration, template))
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		params, err := tasks.UnmarshalParams(raw)
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return params
+	}
+	a := compile(t, "SYS-A {{user_prompt}}")
+	b := compile(t, "SYS-B {{user_prompt}}")
+	if a.Generation.TemplateFingerprint == "" || a.Generation.TemplateFingerprint == b.Generation.TemplateFingerprint {
+		t.Fatalf("fingerprints must differ when the template changes: %q vs %q",
+			a.Generation.TemplateFingerprint, b.Generation.TemplateFingerprint)
+	}
+	if a.Generation.Seed == b.Generation.Seed {
+		t.Fatal("seeds must differ when the template changes")
+	}
+}
+
+// End-to-end snapshot assertion: variations (PromptPolicyOptional) with a
+// configured system template and an empty user prompt still compiles to a
+// non-empty provider prompt (the Vertex 422 case).
+func TestCompileWorkspaceParamsVariationsEmptyPromptWithTemplateCompiles(t *testing.T) {
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugVariations, "", map[string]interface{}{
+		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input123"},
+		"variation":                         map[string]interface{}{"strength": 40},
+	}, promptConfigForFeature(workflow.FeatureSlugVariations, "VARIATION_RENDER strength={{variation_strength}} {{user_prompt}}"))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	params, err := tasks.UnmarshalParams(raw)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if params.Generation == nil {
+		t.Fatal("missing generation snapshot")
+	}
+	if params.Generation.UserPrompt != "" {
+		t.Fatalf("user=%q, want empty", params.Generation.UserPrompt)
+	}
+	if params.Generation.CompiledPrompt != "VARIATION_RENDER strength=40" {
+		t.Fatalf("compiled=%q, want rendered template with bound strength", params.Generation.CompiledPrompt)
+	}
 }

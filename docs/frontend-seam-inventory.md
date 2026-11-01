@@ -534,8 +534,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "DeleteControlStorageProfileMutationError",
         "DeleteControlStorageProfileMutationResult",
         "DeleteControlStorageProfileMutationVariables",
-        "GetControlAIGatewayQueryError",
-        "GetControlAIGatewayQueryResult",
         "GetControlBrandingSettingQueryError",
         "GetControlBrandingSettingQueryResult",
         "GetControlFeaturePromptQueryError",
@@ -608,10 +606,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "TestControlStorageProfileMutationError",
         "TestControlStorageProfileMutationResult",
         "TestControlStorageProfileMutationVariables",
-        "UpdateControlAIGatewayMutationBody",
-        "UpdateControlAIGatewayMutationError",
-        "UpdateControlAIGatewayMutationResult",
-        "UpdateControlAIGatewayMutationVariables",
         "UpdateControlBrandingSettingMutationBody",
         "UpdateControlBrandingSettingMutationError",
         "UpdateControlBrandingSettingMutationResult",
@@ -668,7 +662,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getBackfillControlStatisticsMutationKey",
         "getBackfillControlStatisticsMutationOptions",
         "getBackfillControlStatisticsUrl",
-        "getControlAIGateway",
         "getControlBrandingSetting",
         "getControlFeaturePrompt",
         "getControlLoginLockoutSetting",
@@ -693,9 +686,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getDeleteControlStorageProfileMutationKey",
         "getDeleteControlStorageProfileMutationOptions",
         "getDeleteControlStorageProfileUrl",
-        "getGetControlAIGatewayQueryKey",
-        "getGetControlAIGatewayQueryOptions",
-        "getGetControlAIGatewayUrl",
         "getGetControlBrandingSettingQueryKey",
         "getGetControlBrandingSettingQueryOptions",
         "getGetControlBrandingSettingUrl",
@@ -783,9 +773,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getTestControlStorageProfileMutationKey",
         "getTestControlStorageProfileMutationOptions",
         "getTestControlStorageProfileUrl",
-        "getUpdateControlAIGatewayMutationKey",
-        "getUpdateControlAIGatewayMutationOptions",
-        "getUpdateControlAIGatewayUrl",
         "getUpdateControlBrandingSettingMutationKey",
         "getUpdateControlBrandingSettingMutationOptions",
         "getUpdateControlBrandingSettingUrl",
@@ -836,7 +823,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "testControlMailSetting",
         "testControlSearchProvider",
         "testControlStorageProfile",
-        "updateControlAIGateway",
         "updateControlBrandingSetting",
         "updateControlLoginLockoutSetting",
         "updateControlMailSetting",
@@ -854,7 +840,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useDeleteControlBrandLogoOverride",
         "useDeleteControlMailSetting",
         "useDeleteControlStorageProfile",
-        "useGetControlAIGateway",
         "useGetControlBrandingSetting",
         "useGetControlFeaturePrompt",
         "useGetControlLoginLockoutSetting",
@@ -884,7 +869,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useTestControlMailSetting",
         "useTestControlSearchProvider",
         "useTestControlStorageProfile",
-        "useUpdateControlAIGateway",
         "useUpdateControlBrandingSetting",
         "useUpdateControlLoginLockoutSetting",
         "useUpdateControlMailSetting",
@@ -2135,9 +2119,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 18,
-      "measuredFanOut": 170,
+      "measuredFanOut": 169,
       "targetFanIn": 18,
-      "targetFanOut": 170,
+      "targetFanOut": 169,
       "ownershipScope": ["src/api/generated-query/control/model/index.ts"],
       "publicExports": [
         "AuditRecord",
@@ -2301,7 +2285,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "TestControlAIGatewayConnectionBody",
         "UnauthorizedResponse",
         "UnprocessableEntityResponse",
-        "UpdateControlAIGatewayBody",
         "UpdateControlBrandingSettingBody",
         "UpdateControlLoginLockoutSettingBody",
         "UpdateControlMediaUploadSettingBody",
@@ -2473,7 +2456,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/control/model/testControlAIGatewayConnectionBody.ts",
         "src/api/generated-query/control/model/unauthorizedResponse.ts",
         "src/api/generated-query/control/model/unprocessableEntityResponse.ts",
-        "src/api/generated-query/control/model/updateControlAIGatewayBody.ts",
         "src/api/generated-query/control/model/updateControlBrandingSettingBody.ts",
         "src/api/generated-query/control/model/updateControlLoginLockoutSettingBody.ts",
         "src/api/generated-query/control/model/updateControlMediaUploadSettingBody.ts",
@@ -7035,11 +7017,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/components/ui/form/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/AdminModelEditDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
@@ -7060,9 +7037,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 5,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 5,
       "ownershipScope": ["src/components/ui/form/"],
       "publicExports": [
@@ -15492,11 +15469,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/AdminModelAddDialog.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -15862,9 +15834,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 117,
+      "measuredFanIn": 116,
       "measuredFanOut": 59,
-      "targetFanIn": 117,
+      "targetFanIn": 116,
       "targetFanOut": 59,
       "ownershipScope": [
         "src/features/admin/shared/core/",
@@ -16558,11 +16530,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/pages/AdminModelsPage.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -16648,9 +16615,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 27,
+      "measuredFanIn": 26,
       "measuredFanOut": 2,
-      "targetFanIn": 27,
+      "targetFanIn": 26,
       "targetFanOut": 2,
       "ownershipScope": ["src/features/admin/shared/session/feedback/toast.ts"],
       "publicExports": [
@@ -25765,7 +25732,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/control/control-billing/control-billing.ts`          | canonical | api                        | 63      | 4 → 4                    | 4 → 4                     |
 | `src/api/generated-query/control/control-credits/control-credits.ts`          | canonical | api                        | 175     | 4 → 4                    | 4 → 4                     |
 | `src/api/generated-query/control/control-payments/control-payments.ts`        | canonical | api                        | 39      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/control/control-platform/control-platform.ts`        | canonical | api                        | 381     | 13 → 13                  | 4 → 4                     |
+| `src/api/generated-query/control/control-platform/control-platform.ts`        | canonical | api                        | 365     | 13 → 13                  | 4 → 4                     |
 | `src/api/generated-query/control/control-tasks/control-tasks.ts`              | canonical | api                        | 22      | 2 → 2                    | 4 → 4                     |
 | `src/api/generated-query/control/control-users/control-users.ts`              | canonical | api                        | 80      | 4 → 4                    | 4 → 4                     |
 | `src/api/generated-query/control/index.ts`                                    | cascading | api                        | 781     | 0 → 0                    | 7 → 7                     |
@@ -25774,7 +25741,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts`  | canonical | api                        | 1       | 2 → 2                    | 0 → 0                     |
 | `src/api/generated-query/control/model/controlStripeConfigRequest.ts`         | canonical | api                        | 1       | 2 → 2                    | 0 → 0                     |
 | `src/api/generated-query/control/model/controlTaskEnvelope.ts`                | canonical | api                        | 1       | 2 → 2                    | 1 → 1                     |
-| `src/api/generated-query/control/model/index.ts`                              | canonical | api                        | 170     | 18 → 18                  | 170 → 170                 |
+| `src/api/generated-query/control/model/index.ts`                              | canonical | api                        | 169     | 18 → 18                  | 169 → 169                 |
 | `src/api/generated-query/control/model/supportChannelKind.ts`                 | canonical | api                        | 1       | 3 → 3                    | 0 → 0                     |
 | `src/api/generated-query/control/model/supportChannelsSetting.ts`             | canonical | api                        | 1       | 3 → 3                    | 1 → 1                     |
 | `src/api/generated-query/public/boards/boards.ts`                             | canonical | api                        | 109     | 2 → 2                    | 4 → 4                     |
@@ -25809,7 +25776,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/components/ui/card/index.ts`                                             | canonical | design-system              | 6       | 1 → 1                    | 4 → 4                     |
 | `src/components/ui/dialog/index.ts`                                           | canonical | design-system              | 12      | 5 → 5                    | 4 → 4                     |
 | `src/components/ui/dropdown-menu/index.ts`                                    | canonical | design-system              | 14      | 5 → 5                    | 4 → 4                     |
-| `src/components/ui/form/index.ts`                                             | canonical | design-system              | 15      | 6 → 6                    | 5 → 5                     |
+| `src/components/ui/form/index.ts`                                             | canonical | design-system              | 15      | 5 → 5                    | 5 → 5                     |
 | `src/components/ui/input/index.ts`                                            | canonical | design-system              | 4       | 17 → 17                  | 5 → 5                     |
 | `src/components/ui/popover/index.ts`                                          | canonical | design-system              | 4       | 4 → 4                    | 3 → 3                     |
 | `src/components/ui/select/index.ts`                                           | canonical | design-system              | 14      | 4 → 4                    | 6 → 6                     |
@@ -25920,7 +25887,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/reconcileStableRows.ts`                       | canonical | admin                      | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/admin/shared/core/secretSchema.ts`                              | canonical | admin                      | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/admin/shared/core/serviceAdminMeta.ts`                          | canonical | admin                      | 8       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/index.ts`                                          | canonical | admin                      | 224     | 117 → 117                | 59 → 59                   |
+| `src/features/admin/shared/index.ts`                                          | canonical | admin                      | 224     | 116 → 116                | 59 → 59                   |
 | `src/features/admin/shared/session/anomalyRules.ts`                           | canonical | admin                      | 4       | 3 → 3                    | 3 → 3                     |
 | `src/features/admin/shared/session/brand/brandLogos.ts`                       | canonical | admin                      | 13      | 6 → 6                    | 11 → 11                   |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts`            | canonical | admin                      | 1       | 1 → 1                    | 5 → 5                     |
@@ -25931,7 +25898,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/session/collection/useQueryPolling.ts`             | canonical | admin                      | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/admin/shared/session/collection/useRefetchOnClose.ts`           | canonical | admin                      | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/admin/shared/session/feedback/confirmSettingsSave.ts`           | canonical | admin                      | 1       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/session/feedback/toast.ts`                         | canonical | admin                      | 4       | 27 → 27                  | 2 → 2                     |
+| `src/features/admin/shared/session/feedback/toast.ts`                         | canonical | admin                      | 4       | 26 → 26                  | 2 → 2                     |
 | `src/features/admin/shared/session/timeRange.ts`                              | canonical | admin                      | 5       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/session/useAnomalyRadar.ts`                        | canonical | admin                      | 1       | 1 → 1                    | 5 → 5                     |
 | `src/features/admin/shared/ui/AdminBadge.vue`                                 | canonical | admin                      | 2       | 2 → 2                    | 3 → 3                     |

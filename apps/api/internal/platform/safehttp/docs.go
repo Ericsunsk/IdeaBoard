@@ -6,6 +6,12 @@
 //     DoWithAllowHosts, DoRequestWithAllowHosts, DoPublicRequest).
 //   - policy.go: admin-driven egress policy bridge (ConfigurePolicyProvider,
 //     AllowHosts) plus configured-endpoint validation.
+//   - configured.go: operator-trusted endpoints (ConfiguredEndpoint +
+//     RequestOptions.Configured): load-time scheme+host validation only,
+//     fresh per-request DNS with dial pinning (never pooled, so no verdict
+//     is cached), private IPs permitted, request and every redirect hop
+//     pinned to the endpoint host. User-influenced URLs stay on the strict
+//     allowlist path.
 //   - client.go / metrics.go / retry.go: standard retrying outbound client
 //     (Client.Do) with timeout cap, bounded retries, Retry-After respect,
 //     and the shared RED metrics set.

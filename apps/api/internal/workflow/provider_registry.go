@@ -5,10 +5,15 @@ import (
 )
 
 // ProviderEntry is the display and routing metadata for one gateway provider.
+// Available marks whether the ai-proxy Worker has an adapter for the slug:
+// the control-plane/CF merge downgrades it to false for CF-configured slugs
+// the Worker cannot route (shown disabled in Admin); the catalog fallback
+// and ResolveProvider default it to true.
 type ProviderEntry struct {
 	Slug             string
 	DisplayName      string
 	GatewayNamespace string
+	Available        bool
 }
 
 // FormatProviderDisplayName formats a provider slug into a human-readable display name
@@ -48,6 +53,7 @@ func ResolveProvider(slug string) (entry ProviderEntry, known bool) {
 		Slug:             clean,
 		DisplayName:      FormatProviderDisplayName(clean),
 		GatewayNamespace: clean,
+		Available:        true,
 	}, true
 }
 

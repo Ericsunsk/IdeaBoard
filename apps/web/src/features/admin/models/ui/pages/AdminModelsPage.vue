@@ -45,17 +45,6 @@
             @click="handleRefresh"
           />
 
-          <!-- 网关设置按钮：单态常驻入口，点击打开 dialog -->
-          <button
-            type="button"
-            :class="adminToolbarButtonClass"
-            :aria-label="MODELS_MESSAGES.addGateway"
-            @click="gatewayDialogVisible = true"
-          >
-            <Brain class="size-3.5 text-muted-foreground" />
-            <span>{{ MODELS_MESSAGES.addGateway }}</span>
-          </button>
-
           <!-- 主按钮：添加模型 (使用项目品牌紫 Token) -->
           <button
             type="button"
@@ -215,15 +204,11 @@
       :pending="isSaving"
       @submit="handleSaveModel"
     />
-
-    <!-- 6. 新增/配置网关弹窗 -->
-    <AdminGatewayConfigDialog v-model:visible="gatewayDialogVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
 import {
-  Brain,
   Check,
   Copy,
   Cube,
@@ -237,10 +222,8 @@ import {
 import { AdminAlert } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { adminDashboardRootClass } from '../../../shared'
-import { adminToolbarButtonClass } from '../../../shared'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'
 import AdminModelEditDialog from '../dialog/AdminModelEditDialog.vue'
-import AdminGatewayConfigDialog from '../dialog/AdminGatewayConfigDialog.vue'
 import AdminModelFilter from '../controls/AdminModelFilter.vue'
 import AdminModelCardBody from '../controls/AdminModelCardBody.vue'
 import { AdminToolbarSearch } from '../../../shared'
@@ -260,7 +243,6 @@ const {
   addDialogVisible,
   editDialogVisible,
   editingModel,
-  gatewayDialogVisible,
   searchKeyword,
   selectedMode,
   selectedProvider,

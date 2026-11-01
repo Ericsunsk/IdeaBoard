@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/prompts"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
@@ -45,16 +47,53 @@ const (
 // canonical compilation without persisting the HTTP envelope field in Extra.
 const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
 
+// FeaturePromptRuntimeReader supplies only current runtime prompt configuration.
+// The production prompt repository and controlled test readers share this seam.
+type FeaturePromptRuntimeReader interface {
+	GetRuntimeConfig(context.Context, string) (prompts.FeaturePromptRuntimeConfig, error)
+}
+
+// WorkspacePreparer binds current template reads to canonical snapshot compilation.
+// The HTTP adapter calls it before idempotency replay/acceptance, preserving the
+// existing failure timing. Execution consumes the frozen result, never this reader.
+type WorkspacePreparer struct {
+	prompts FeaturePromptRuntimeReader
+}
+
+func NewWorkspacePreparer(reader FeaturePromptRuntimeReader) *WorkspacePreparer {
+	return &WorkspacePreparer{prompts: reader}
+}
+
+func (p *WorkspacePreparer) Prepare(ctx context.Context, feature, userPrompt string, params map[string]interface{}) (string, error) {
+	cfg := prompts.FeaturePromptRuntimeConfig{UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(feature)}
+	if p.prompts != nil {
+		var err error
+		cfg, err = p.prompts.GetRuntimeConfig(ctx, feature)
+		if err != nil {
+			return "", err
+		}
+	}
+	return CompileWorkspaceParams(feature, userPrompt, params, cfg)
+}
+
 // CompileWorkspaceParams applies canonical submit ordering to a workspace v1
 // task envelope and returns the durable typed parameter JSON.
 //
 // Prompt contract (v1 data.prompt, bound: workspacetasks
 // .MaxWorkspaceTaskPromptBytes = 8KB): prompt-required
 // features (generation, inpaint) reject an empty prompt; prompt-ignored
-// features (cutout, upscale) drop user text (binary media operations); the
-// rest carry it into the Generation snapshot
-// (UserPrompt + CompiledPrompt) that the worker bridges to the provider.
-func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
+// features (cutout, upscale) drop user text (binary media operations) and
+// never inject the system template, so their snapshot stays double-empty;
+// the rest carry the user prompt into the Generation snapshot. The final
+// provider prompt is system template ⊕ user prompt: the configured template
+// (promptCfg, bound by WorkspacePreparer) renders
+// through ApplyFeatureSystemPromptWithConfig with the code-owned merge
+// policy (image nodes never implicitly append user text without an explicit
+// {{user_prompt}} placeholder). Intake performs no I/O: a missing/empty
+// template degrades to straight passthrough (compiled = user prompt),
+// following the GetRuntimeConfig convention where a missing prompt is valid
+// runtime state; a load failure fails closed in WorkspacePreparer before intake.
+func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}, promptCfg prompts.FeaturePromptRuntimeConfig) (string, error) {
 	feature = strings.TrimSpace(feature)
 	if feature == "" {
 		return "", errorrender.NewValidationError(errorrender.MsgCompileWorkspaceParams)
@@ -77,16 +116,24 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 	if plan.PromptPolicy() == workflow.PromptPolicyRequired && prompt == "" {
 		return "", errorrender.NewValidationError(errorrender.MsgCompileWorkspaceParams2)
 	}
+	systemPrompt := ""
+	compiled := prompt
 	if plan.PromptPolicy() == workflow.PromptPolicyIgnored {
+		// Pure binary operations: drop user text and never inject the
+		// system template; the snapshot stays double-empty.
 		prompt = ""
+		compiled = ""
+	} else if rendered := strings.TrimSpace(promptCfg.Prompt); rendered != "" {
+		systemPrompt = rendered
+		compiled = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(prompt, prompt, feature, working, promptCfg))
 	}
 	typed, err := finalizeSubmitTypedParams(working, feature, plan)
 	if err != nil {
 		return "", err
 	}
 	snapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
-		Plan: plan, UserPrompt: prompt, CompiledPrompt: prompt,
-		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt), Params: typed,
+		Plan: plan, UserPrompt: prompt, SystemPrompt: systemPrompt, CompiledPrompt: compiled,
+		Params: typed,
 	})
 	if err != nil {
 		return "", err

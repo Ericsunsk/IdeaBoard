@@ -88,9 +88,6 @@ export function useAdminModelCatalogWorkspace(
   const editDialogVisible = ref(false)
   const editingModel = ref<AdminModelItem | null>(null)
 
-  // 新增网关弹窗状态
-  const gatewayDialogVisible = ref(false)
-
   // 过滤状态
   const searchKeyword = ref('')
   const selectedMode = ref('')
@@ -283,7 +280,6 @@ export function useAdminModelCatalogWorkspace(
     addDialogVisible,
     editDialogVisible,
     editingModel,
-    gatewayDialogVisible,
     // filters
     searchKeyword,
     selectedMode,

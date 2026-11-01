@@ -24,6 +24,7 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/prompts"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
@@ -151,7 +152,7 @@ func (e *liveDispatchEnv) submit(t *testing.T, key string) *tasks.WorkspaceTask 
 	t.Helper()
 	canonical, err := taskservice.CompileWorkspaceParams("generation", "a fake test sunset", map[string]interface{}{
 		"output_count": 1,
-	})
+	}, prompts.FeaturePromptRuntimeConfig{})
 	if err != nil {
 		t.Fatalf("CompileWorkspaceParams: %v", err)
 	}

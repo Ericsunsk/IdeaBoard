@@ -52,6 +52,11 @@ services:
       # closed per-task, never at boot.
       WORKER_BASE_URL: ${WORKER_BASE_URL:-}
       WORKER_INTERNAL_SECRET: ${WORKER_INTERNAL_SECRET:-}
+      # HTTP Admin discovery shares the Worker Gateway identity/token.
+      # Empty values preserve catalog fallback; unrelated services do not receive it.
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      CF_GATEWAY_ID: ${CF_GATEWAY_ID:-}
+      CF_AIG_TOKEN: ${CF_AIG_TOKEN:-}
     volumes:
       - api-uploads:/app/uploads
     ports:

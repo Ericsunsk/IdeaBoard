@@ -567,7 +567,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	allowLoopback := allowedHosts["localhost"] || allowedHostPorts[hostPortKey("localhost", port)]
 
 	if strings.EqualFold(host, "localhost") && !hostAllowed {
-		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs, ErrPolicyViolation, blockedHostPort(host, port))
 	}
 
 	allowed := make([]net.IPAddr, 0, len(addrs))
@@ -584,10 +584,21 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	}
 
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs2, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs2, ErrPolicyViolation, blockedHostPort(host, port))
 	}
 
 	return allowed, nil
+}
+
+// blockedHostPort renders the blocked target for SSRF denial copy: host
+// with port when present (IPv6 bracketed). Wording-only helper; it never
+// influences the allow/deny verdict above.
+func blockedHostPort(host string, port string) string {
+	host = strings.TrimSpace(host)
+	if strings.TrimSpace(port) == "" || host == "" {
+		return host
+	}
+	return net.JoinHostPort(host, strings.TrimSpace(port))
 }
 
 func isPrivateOrLocal(ip net.IP) bool {

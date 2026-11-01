@@ -54,7 +54,13 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 
 func validateGenerationPrompts(input *GenerationCompilerInput) error {
 	if strings.TrimSpace(input.TemplateFingerprint) == "" {
-		input.TemplateFingerprint = TemplateFingerprint(input.TemplateVersion, input.CompiledPrompt)
+		// Bind template edits even when the compiled prompt stays unchanged.
+		// Without a template, preserve the template-less fingerprint.
+		material := input.CompiledPrompt
+		if strings.TrimSpace(input.SystemPrompt) != "" {
+			material = input.SystemPrompt + "\x00" + material
+		}
+		input.TemplateFingerprint = TemplateFingerprint(input.TemplateVersion, material)
 	}
 	if input.TemplateFingerprint == "" {
 		return fmt.Errorf("generation compiler template fingerprint is required")

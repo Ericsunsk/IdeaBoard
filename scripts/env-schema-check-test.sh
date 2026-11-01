@@ -24,6 +24,19 @@ write_tree() {
   mkdir -p "$root/apps/realtime/src/infrastructure"
   mkdir -p "$root/docker/postgres"
   mkdir -p "$root/apps/ai-proxy/src"
+  cat >"$root/process-compose.yml" <<'EOF'
+processes:
+  docker-deps:
+    command: "scripts/infisical-run.sh --env dev -- docker compose up"
+  api:
+    command: "scripts/infisical-run.sh --env dev --path / --path /ai-proxy -- go run ./cmd"
+  auth:
+    command: "scripts/infisical-run.sh --env dev -- npm run dev"
+  realtime:
+    command: "scripts/infisical-run.sh --env dev -- npm run dev"
+  web:
+    command: "scripts/infisical-run.sh --env dev -- npm run dev"
+EOF
   cat >"$root/apps/ai-proxy/src/contracts.ts" <<'EOF'
 export interface Env {
   CF_ACCOUNT_ID: string;
@@ -172,6 +185,24 @@ expect_fail() {
 valid="$fixture_root/valid"
 write_tree "$valid"
 expect_pass "in-sync tree passes" "$valid"
+
+worker_shared="$fixture_root/worker-shared"
+write_tree "$worker_shared"
+cat >>"$worker_shared/apps/api/internal/platform/config/config.go" <<'EOF'
+type DiscoveryConfig struct {
+  AccountID string `env:"CF_ACCOUNT_ID"`
+  GatewayID string `env:"CF_GATEWAY_ID"`
+  Token string `env:"CF_AIG_TOKEN"`
+}
+EOF
+printf '# CF_ACCOUNT_ID=\n# CF_GATEWAY_ID=\n# CF_AIG_TOKEN=\n' >>"$worker_shared/apps/api/.env.example"
+printf '# CF_ACCOUNT_ID=\n# CF_GATEWAY_ID=\n# CF_AIG_TOKEN=\n' >>"$worker_shared/docker/.env.example"
+cat >>"$worker_shared/docker/compose.yml" <<'EOF'
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      CF_GATEWAY_ID: ${CF_GATEWAY_ID:-}
+      CF_AIG_TOKEN: ${CF_AIG_TOKEN:-}
+EOF
+expect_pass "Worker bindings shared by Go discovery are backed VPS inputs" "$worker_shared"
 
 worker_missing="$fixture_root/worker-missing"
 write_tree "$worker_missing"

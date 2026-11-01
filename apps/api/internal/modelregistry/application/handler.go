@@ -20,7 +20,8 @@ import (
 // SetWorkerConfig and never leave the server (dry-run auth stays
 // server-side, browsers only see reachable/status).
 type Handler struct {
-	store modelregistryports.ConfigRepository
+	store     modelregistryports.ConfigRepository
+	providers modelregistryports.ConfiguredProviderReader
 	// observed is the read-only 7-day model observation seam, attached
 	// once at composition time via SetObservedService. Nil keeps
 	// ListModelsObserved fail-closed.
@@ -32,59 +33,8 @@ type Handler struct {
 }
 
 // NewHandler builds the admin handler over the config seam.
-func NewHandler(store modelregistryports.ConfigRepository) *Handler {
-	return &Handler{store: store}
-}
-
-type updateGatewayRequest struct {
-	BaseURL   string  `json:"base_url"`
-	Token     *string `json:"token"`
-	AccountID string  `json:"account_id"`
-	GatewayID string  `json:"gateway_id"`
-}
-
-// Get returns the masked gateway configuration.
-func (h *Handler) Get(c *gin.Context) {
-	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
-		return
-	}
-	summary, err := h.store.GetSummary(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgGet2, err)
-		return
-	}
-	response.SuccessDTO(c, summary)
-}
-
-// Update rotates the gateway token and identity. A missing token keeps the
-// stored secret; base URL or account and gateway IDs are required.
-// Authorization rides the outer Control Plane guard (controlProxy + guard
-// enforces the operator capability); the handler resolves the actor from
-// the request principal without re-checking the admin role.
-func (h *Handler) Update(c *gin.Context) {
-	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
-		return
-	}
-	var req updateGatewayRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, errorrender.MsgAigatewayApplicationUpdate)
-		return
-	}
-	identity, ok := principal.Require(c)
-	if !ok {
-		return
-	}
-	err := h.store.Update(c.Request.Context(), domain.UpdateInput{
-		BaseURL:   strings.TrimSpace(req.BaseURL),
-		Token:     req.Token,
-		AccountID: strings.TrimSpace(req.AccountID),
-		GatewayID: strings.TrimSpace(req.GatewayID),
-	}, identity.UserID())
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	response.Success(c, nil)
+func NewHandler(store modelregistryports.ConfigRepository, providers modelregistryports.ConfiguredProviderReader) *Handler {
+	return &Handler{store: store, providers: providers}
 }
 
 type previewWorkerRouteRequest struct {
@@ -162,7 +112,7 @@ type saveCatalogRequest struct {
 
 // SaveCatalog updates the full model catalog in system settings.
 // Decoding is strict: unknown fields are rejected instead of silently
-// ignored, so legacy writers fail loudly.
+// ignored, so unknown-field writers fail loudly.
 // Authorization rides the outer Control Plane guard; the actor is resolved
 // from the request principal.
 func (h *Handler) SaveCatalog(c *gin.Context) {
@@ -192,22 +142,27 @@ func (h *Handler) SaveCatalog(c *gin.Context) {
 }
 
 // ProviderOption is one registry row surfaced for provider quick-pick UIs:
-// canonical slug, display name and the ID input hint (native key shape).
+// canonical slug, display name, the ID input hint (native key shape), and
+// whether the Worker has an adapter for it. Unadapted rows (CF-configured
+// but Worker-unknown) render disabled with a 缺适配器 hint and can never
+// be picked.
 type ProviderOption struct {
 	Slug        string `json:"slug"`
 	DisplayName string `json:"display_name"`
 	IDPrefix    string `json:"id_prefix"`
+	Available   bool   `json:"available"`
 }
 
 // ListProviders serves the configured providers (control-plane
-// provider_configs plus the workers-ai first-party constant) for provider
-// quick-pick UIs: canonical slug, display name and the ID input hint.
+// provider_configs annotated with Worker capability, plus the workers-ai
+// first-party constant) for provider quick-pick UIs: canonical slug,
+// display name, the ID input hint and the availability flag.
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) ListProviders(c *gin.Context) {
-	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
+	if !platformhttp.RequireDependency(c, h != nil && h.providers != nil, errorrender.MsgAigatewayApplicationGet) {
 		return
 	}
-	entries, err := h.store.ListConfiguredProviders(c.Request.Context())
+	entries, err := h.providers.ListConfiguredProviders(c.Request.Context())
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -218,6 +173,7 @@ func (h *Handler) ListProviders(c *gin.Context) {
 			Slug:        entry.Slug,
 			DisplayName: entry.DisplayName,
 			IDPrefix:    entry.IDPrefix(),
+			Available:   entry.Available,
 		})
 	}
 	response.SuccessDTO(c, options)

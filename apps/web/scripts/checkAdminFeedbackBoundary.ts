@@ -400,14 +400,6 @@ function runToastCopySelfTest(): void {
 function runDialogAlertSelfTest(): void {
   const cases: SelfTestCase[] = [
     [
-      'field-level form.errors stays exempt',
-      validateDialogAlertSources({
-        'features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue':
-          '<AdminAlert v-if="form.errors.value.base_url" severity="error">',
-      }),
-      true,
-    ],
-    [
       'field-level firstValidationError stays exempt',
       validateDialogAlertSources({
         'features/admin/x/AdminMailDialog.vue':

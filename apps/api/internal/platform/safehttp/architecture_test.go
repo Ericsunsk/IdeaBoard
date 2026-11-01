@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-// Every outbound call must declare private-egress allowances or a stricter public-host restriction.
+// Every outbound call must declare private-egress allowances, a stricter
+// public-host restriction, or one operator-trusted configured endpoint.
 func TestOutboundCallsPinAllowHosts(t *testing.T) {
 	root := "../../.."
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -26,7 +27,7 @@ func TestOutboundCallsPinAllowHosts(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		for _, literal := range extractRequestOptionsLiterals(string(raw)) {
-			if !strings.Contains(literal, "AllowHosts") && !strings.Contains(literal, "PublicHosts") {
+			if !strings.Contains(literal, "AllowHosts") && !strings.Contains(literal, "PublicHosts") && !strings.Contains(literal, "Configured") {
 				t.Errorf("production file %s builds RequestOptions without an explicit egress policy", path)
 			}
 		}

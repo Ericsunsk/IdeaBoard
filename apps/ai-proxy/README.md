@@ -6,10 +6,12 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 ## 冻结合同（唯一出口）
 
 - `POST /v1/generate`，`Authorization: Bearer WORKER_INTERNAL_SECRET`。
-  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai`、`model`、`prompt`、
+  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai|google-vertex-ai`、`model`、`prompt`、
   `negative_prompt?`、`width?`、`height?`、`steps?`、`guidance_scale?`、`seed?`、
   `images?: string[]`（presigned GET URL）与可选 `mask_index?: number`（显式零基 mask 索引）、`provider_options?`、
   `upload_url`（必填）、`public_url?`。
+  `prompt` 与 `images` 二选一必填：文生图（无 `images`）时 `prompt` 必须非空；
+  有 `images`（cutout/img2img/edit）时 `prompt` 允许空串并原样透传上游。
 - 成功：`{task_id,status:completed,provider,model,image_url,content_type,seed?,duration_ms,receipt:{upstream_status,provider,model,log_id?,cache_status?}}`。
 - 失败：`{task_id,status:failed,error:{code,message,upstream_status?}}`。
   queue 型（202 / `request_id` + queue status）fail-closed 报 `UNSUPPORTED_MODEL`（422），绝不轮询。
@@ -19,8 +21,9 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 - presigned PUT 直传输出：exact key，原样 PUT，不改写 URL；失败 `UPLOAD_FAILED`（502）。Go 输出槽的 HMAC 绑定 `worker-image-v1` 固定策略（仅 PNG/JPEG/WebP），同时绑定 method/key/expiry；上传 header 必须与真实图片字节一致，API 校验 image config、大小和尺寸后按真实 MIME 存储，ingestion 再核对 Worker 回包、存储 MIME 与图片字节。槽 key 的 `.png` 后缀仅是 opaque Object Key，不决定 MIME。
 - Go Worker 输出 URL 始终经 API HMAC route；Local/S3 后端共用同一验证后再写入对象，S3 读取走独立 presigned GET 并使用对象真实 MIME。未放宽浏览器 upload 的 S3 签名合同。
 - 所有 Gateway transport（Fal/OpenAI 与携带 gateway id 的 `@cf/` Airun）强制 `cf-aig-skip-cache: true`、`cf-aig-collect-log-payload: false`，`provider_options` 无权覆盖。
-- S3/网关密钥永不进 Worker 日志；`safeLog` 只记 `task_id/provider/model/path_source/upstream_status/duration_ms/code`。
+- S3/网关密钥永不进 Worker 日志；`safeLog` 只记 `task_id/provider/model/path_source/upstream_status/duration_ms/code/message`（`message` 仅为 Worker 自产校验文案，不含上游原文/密钥）。所有 400（含校验失败）都经 `badRequest` 留痕。
 - `WORKER_INTERNAL_SECRET` 缺失即 fail-closed：任何请求都 401。
+- `GET /v1/providers`（需 `Authorization: Bearer WORKER_INTERNAL_SECRET`，与 generate/dry-run 一致；无 task 上下文，401 body 为 `{error:{code,message}}` 不带 `task_id`）：回 `{providers: string[]}`，例如 `{"providers":["fal","google","google-vertex-ai","krea","openai","workers-ai"]}`。列表从 `src/providers/index.ts` 的 `PROVIDER_REGISTRY` key（`${channel}:${vendor}`）派生 vendor 去重排序，内部 vendor `migrated` 对外为 `workers-ai`，新增 vendor 加表项即自动出现（见 `listProviders`；VPS 侧不硬编码名单）。
 
 ## Endpoint slug（置顶常量，见 `src/providers/airun/index.ts` 与 `src/providers/gateway/index.ts`）
 
@@ -36,7 +39,12 @@ channel 决定 transport（host/auth/envelope/回包），vendor 只做 input �
 - gateway（`https://gateway.ai.cloudflare.com/v1/{account}/{gateway}` +
   `cf-aig-authorization` + provider 原生 path）：`fal/{model}`（仅同步；绝不设
   `x-fal-target-url` 指向 `queue.*`）、`openai/images/generations`（无图 JSON）/
-  `openai/images/edits`（有图 multipart）。
+  `openai/images/edits`（有图 multipart）、`google-vertex-ai/v1/projects/{project}/locations/{region}/publishers/google/models/{model}:{resource}`
+  （Vertex 原生端点；`project/region/resource` 来自 `provider_options`
+  `vertex_project`（必填）/`vertex_region`（缺省 `us-central1`）/`vertex_resource`
+  （缺省 `generateContent`，仅接受 `generateContent` 或 `predict` 前缀族）；
+  网关鉴权恒为 `cf-aig-authorization: Bearer CF_AIG_TOKEN`，
+  BYOK/直连 Google `Authorization` 场景首单待确认，默认不带）。
 
 GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言，必须首单真生成确认。
 
@@ -55,15 +63,25 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
   有图转 data URI（不透传 presigned URL）：`image_url` = 首张，`image_urls` = 全部普通参考图，`mask_url` 仅来自显式 `mask_index`。
 - gateway/openai：无图 `images/generations {model,prompt,size,response_format:b64_json}`；
   有图 `images/edits` multipart（只支持一张普通 `image` 加可选显式 `mask`，`size/response_format` 同带）。
+- gateway/google-vertex-ai（Vertex 原生，provider slug 精确匹配 `google-vertex-ai`，
+  禁止 `google-vertex` 等变体）：`generateContent` 走
+  `{contents:[{role:"user",parts:[{text}, ...inlineData]}]}`（`prompt` 必填，
+  无 `prompt` 即使有图也 fail-closed；图片为已拉取字节的 `inlineData{mimeType,data}`，
+  绝不透传 presigned URL）；`predict`（Imagen）走 `{instances:[{prompt,...}],parameters}`
+  （`parameters` 全部来自显式 `provider_options`，不猜缺省；canonical `seed/width/height`
+  如有则透传；`vertex_project/region/resource` 保留键不进 `parameters`）。
+  回包：`generateContent` 取 `candidates[0].content.parts` 内首个 `inlineData` 图片
+  （纯文本无图即 `UPSTREAM_ERROR`）；`predict` 取 `predictions[0]` 的顶层/嵌套
+  `bytesBase64Encoded`（取不到即 `UPSTREAM_ERROR`，绝不猜）。
 
 ## 环境变量
 
-| 变量                     | 说明                                                                   |
-| ------------------------ | ---------------------------------------------------------------------- |
-| `CF_ACCOUNT_ID`          | Gateway account id（线上 vars；本地从 Infisical dev 写入 `.dev.vars`） |
-| `CF_GATEWAY_ID`          | Gateway id（线上 vars；本地从 Infisical dev 写入 `.dev.vars`）         |
-| `CF_AIG_TOKEN`           | Gateway token（线上 Secret；本地仅 `.dev.vars`）                       |
-| `WORKER_INTERNAL_SECRET` | 后端→Worker 鉴权（线上 Secret；本地仅 `.dev.vars`；缺失即 401）        |
+| 变量                     | 说明                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `CF_ACCOUNT_ID`          | Gateway account id（线上 vars；本地从 Infisical dev `/ai-proxy` 写入 `.dev.vars`）    |
+| `CF_GATEWAY_ID`          | Gateway id（线上 vars；本地从 Infisical dev `/ai-proxy` 写入 `.dev.vars`）            |
+| `CF_AIG_TOKEN`           | Gateway token（线上 Secret；本地仅 `.dev.vars`，源为 dev `/ai-proxy`）                |
+| `WORKER_INTERNAL_SECRET` | 后端→Worker 鉴权（线上 Secret；本地仅 `.dev.vars`，源为 dev `/ai-proxy`；缺失即 401） |
 
 ## 运行与验证
 
@@ -78,14 +96,20 @@ npm run dev     # wrangler dev（需先配 vars + secrets）
 
 本地 dev：先安装此目录的 npm dependencies，再在仓库根目录运行
 `scripts/ai-proxy-dev-vars.sh`。它按 `src/contracts.ts` 的 `Env` 从 Infisical dev
-读取全部四个 bindings（两个 IDs、两个 secrets），原子写入 0600 的
+`/ai-proxy` folder 读取全部四个 bindings（两个 IDs、两个 secrets），原子写入 0600 的
 `apps/ai-proxy/.dev.vars`。任一值缺失、重复或为空则拒绝覆盖旧文件。
-这四项都需在 Infisical dev root 配齐；dashboard vars 和普通进程 env 不会自动成为本地 bindings。
+这四项都需在 Infisical dev `/ai-proxy` 配齐（root `/` 不再是来源；root 残留的
+`WORKER_INTERNAL_SECRET` 副本待用户在 dashboard 手动删除，删除前灌脚本每次以
+`/ai-proxy` 为准做哈希一致性校验，不一致则拒绝写入）；dashboard vars 和普通进程 env 不会自动成为本地 bindings。
 模板见 `.dev.vars.example`；真实文件和写入临时文件都被 Git 忽略。
 
 随后在仓库根目录 `process-compose up`，或 `cd apps/ai-proxy && npm run dev -- --port 8787`；
 两者都使用项目内安装的 Wrangler。Infisical dev 的 `WORKER_BASE_URL` 填
 `http://localhost:8787`。不需要把本机 IDs 或 secrets 写入 tracked `wrangler.toml`。
+
+dev 无需加白：VPS→Worker 走 Configured 端点直通（`ParseConfiguredEndpoint` +
+`RequestOptions.Configured`，loopback 直接放行），不经过出站 allowlist；
+`api_outbound_allow_hosts` 为空即正常工作，出站策略只管用户可影响的 URL。
 
 Go wire 定义统一由 `apps/api/internal/platform/workerwire` 拥有；Runtime 的 timeout、metrics 与本地 metadata 不进入 wire。`test:contract` 使用该目录的共享 request fixture，严格检查 JSON 往返不丢字段，再通过真实 Edge entry 验证 generate、零值数字、显式 mask、无图片/上传的 dry-run、实际 MIME、receipt 和全部 failure code；所有 HTTP(S) fetch 及 PUT 均使用本地 mock。普通 `go test` 不依赖 Node。
 
@@ -108,6 +132,11 @@ Cloudflare Git 直连、production/preview 隔离、环境变量同步及回滚�
 8. `gateway/openai images/edits` 经 Gateway 的 multipart 映射是否生效；`response_format: b64_json` 在 edits 下是否返回 `b64_json`。
 9. `receipt.log_id`（`cf-aig-log-id` / `cf-aig-request-id`）与 `cache_status`（`cf-aig-cache-status`）
    在真实网关头是否存在（`/ai/run` 回包可能无此头）。
+10. `gateway/google-vertex-ai` 首单真生成确认：`predict` 回包形态（顶层 vs
+    `image.bytesBase64Encoded` 嵌套以实测为准，当前双兼容）；`vertex_region` 缺省
+    `us-central1` 对目标模型的可用性；直连 Google `Authorization`（BYOK）场景是否需要、
+    与 `cf-aig-authorization` 并存时的头优先级；`generateContent` 是否需
+    `generationConfig.responseModalities` 等额外字段（当前为最小 `contents`，未猜）。
 
 ## Residual risk
 

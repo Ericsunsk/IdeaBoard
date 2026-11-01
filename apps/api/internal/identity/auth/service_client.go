@@ -59,13 +59,19 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 	if parsed, err := url.Parse(baseURL); err == nil {
 		authHost = parsed.Hostname()
 	}
+	// The Auth base URL is operator configuration (AUTH_INTERNAL_URL), not
+	// user input: validate once here so every send pins to this endpoint
+	// through the configured-egress path. A zero endpoint keeps the legacy
+	// allowlist path below (fail-closed, behavior unchanged).
+	endpoint, _ := safehttp.ParseConfiguredEndpoint(baseURL)
 
 	internalKey := strings.TrimSpace(cfg.InternalAPIKey)
 	httpClient := &http.Client{
 		Timeout: timeout,
 		Transport: &authOutboundRoundTripper{
-			timeout: timeout,
-			host:    authHost,
+			timeout:  timeout,
+			host:     authHost,
+			endpoint: endpoint,
 		},
 	}
 	client, err := internalcontract.NewClientWithResponses(
@@ -1026,8 +1032,9 @@ const authServiceTarget = "auth-service"
 // shape so the generated client's status/body contract keeps working;
 // only transport/timeout failures surface as errors.
 type authOutboundRoundTripper struct {
-	timeout time.Duration
-	host    string
+	timeout  time.Duration
+	host     string
+	endpoint safehttp.ConfiguredEndpoint
 }
 
 func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -1039,18 +1046,29 @@ func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	if req != nil && req.Context() != nil {
 		ctx = req.Context()
 	}
-	allowHosts := safehttp.AllowHosts(ctx)
-	if t != nil {
-		if host := strings.TrimSpace(t.host); host != "" {
-			allowHosts = append(allowHosts, host)
+	var opts safehttp.RequestOptions
+	if t != nil && t.endpoint.Valid() {
+		opts = safehttp.RequestOptions{
+			Timeout:     timeout,
+			MaxAttempts: 1,
+			Configured:  t.endpoint,
+			Target:      authServiceTarget,
+		}
+	} else {
+		allowHosts := safehttp.AllowHosts(ctx)
+		if t != nil {
+			if host := strings.TrimSpace(t.host); host != "" {
+				allowHosts = append(allowHosts, host)
+			}
+		}
+		opts = safehttp.RequestOptions{
+			Timeout:     timeout,
+			MaxAttempts: 1,
+			AllowHosts:  allowHosts,
+			Target:      authServiceTarget,
 		}
 	}
-	resp, err := authServiceOutbound.Do(ctx, req, safehttp.RequestOptions{
-		Timeout:     timeout,
-		MaxAttempts: 1,
-		AllowHosts:  allowHosts,
-		Target:      authServiceTarget,
-	})
+	resp, err := authServiceOutbound.Do(ctx, req, opts)
 	if err != nil {
 		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {

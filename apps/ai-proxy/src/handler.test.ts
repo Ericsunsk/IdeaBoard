@@ -257,6 +257,28 @@ describe("dry-run 自测", () => {
     assert.ok(s.includes("***"));
   });
 
+  test("dry-run 裸 birefnet Preview 同样归一化为 /fal/fal-ai/birefnet", async () => {
+    const res = await handleDryRun(
+      req("/v1/dry-run", {
+        task_id: "d-bare",
+        provider: "fal",
+        model: "birefnet",
+        prompt: "",
+        images: ["https://cdn.example/fake-input"],
+      }),
+      env,
+    );
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as {
+      target: { url: string };
+    };
+    assert.ok(
+      body.target.url.includes("/fal/fal-ai/birefnet"),
+      body.target.url,
+    );
+    assert.ok(!body.target.url.includes("fal-ai/fal-ai"));
+  });
+
   test("dry-run 不需要 upload_url", async () => {
     const res = await handleDryRun(
       req("/v1/dry-run", {
@@ -565,4 +587,126 @@ test("invalid upstream image bytes never upload", async () => {
   );
   assert.equal(res.status, 500);
   assert.equal(puts, 0);
+});
+
+describe("prompt/images 二选一必填（cutout 空 prompt 放行）", () => {
+  test("generate 空 prompt + 有图 -> 通过校验（走到 INPUT_FETCH_FAILED）", async () => {
+    const res = await handleGenerate(
+      req("/v1/generate", {
+        task_id: "cutout",
+        provider: "fal",
+        model: "fal-ai/birefnet",
+        prompt: "",
+        images: ["https://cdn.example/fake-input"],
+        upload_url: "https://s3/x",
+      }),
+      env,
+      async () => new Response("no such key", { status: 403 }),
+    );
+    assert.equal(res.status, 400);
+    const body = (await res.json()) as {
+      error: { code: string; message: string };
+    };
+    assert.equal(body.error.code, "INPUT_FETCH_FAILED");
+    assert.ok(!body.error.message.includes("prompt"));
+  });
+
+  test("generate 空 prompt + 无图 -> 400 prompt or images is required", async () => {
+    for (const body of [
+      {
+        task_id: "t-empty",
+        provider: "fal",
+        model: "m",
+        prompt: "",
+        upload_url: "https://s3/x",
+      },
+      {
+        task_id: "t-missing",
+        provider: "fal",
+        model: "m",
+        upload_url: "https://s3/x",
+      },
+    ]) {
+      const res = await handleGenerate(
+        req("/v1/generate", body),
+        env,
+        async () => {
+          throw new Error("must not fetch");
+        },
+      );
+      assert.equal(res.status, 400);
+      const parsed = (await res.json()) as {
+        error: { code: string; message: string };
+      };
+      assert.equal(parsed.error.code, "BAD_REQUEST");
+      assert.ok(parsed.error.message.includes("prompt"));
+    }
+  });
+
+  test("generate 校验失败 -> safeLog 留痕（含 task_id/code/message）", async () => {
+    const logs: string[] = [];
+    const previousLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.join(" "));
+    };
+    try {
+      const res = await handleGenerate(
+        req("/v1/generate", {
+          task_id: "logged-400",
+          provider: "fal",
+          model: "m",
+          prompt: "",
+          upload_url: "https://s3/x",
+        }),
+        env,
+        async () => {
+          throw new Error("must not fetch");
+        },
+      );
+      assert.equal(res.status, 400);
+      const entry = logs
+        .map((l) => {
+          try {
+            return JSON.parse(l);
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e && e.code === "BAD_REQUEST");
+      assert.ok(entry, "expected a BAD_REQUEST safeLog line");
+      assert.equal(entry.task_id, "logged-400");
+      assert.ok(String(entry.message).includes("prompt"));
+    } finally {
+      console.log = previousLog;
+    }
+  });
+
+  test("dry-run 空 prompt + 有图放行，无图仍 400", async () => {
+    const okRes = await handleDryRun(
+      req("/v1/dry-run", {
+        task_id: "d-cutout",
+        provider: "fal",
+        model: "fal-ai/birefnet",
+        prompt: "",
+        images: ["https://cdn.example/fake-input"],
+      }),
+      env,
+    );
+    assert.equal(okRes.status, 200);
+    const badRes = await handleDryRun(
+      req("/v1/dry-run", {
+        task_id: "d-empty",
+        provider: "fal",
+        model: "fal-ai/birefnet",
+        prompt: "",
+      }),
+      env,
+    );
+    assert.equal(badRes.status, 400);
+    const body = (await badRes.json()) as {
+      error: { code: string; message: string };
+    };
+    assert.equal(body.error.code, "BAD_REQUEST");
+    assert.ok(body.error.message.includes("prompt"));
+  });
 });

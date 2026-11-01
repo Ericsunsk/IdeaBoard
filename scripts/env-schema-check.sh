@@ -47,6 +47,7 @@ DOCKER_ENV="$ROOT_DIR/docker/.env"
 MIGRATION_EXAMPLE="$ROOT_DIR/docker/migration.env.example"
 COMPOSE="$ROOT_DIR/docker/compose.yml"
 COMPOSE_LOCAL="$ROOT_DIR/docker/compose.local.yml"
+PROCESS_COMPOSE="$ROOT_DIR/process-compose.yml"
 INIT_ROLES="$ROOT_DIR/docker/postgres/init-runtime-roles.sh"
 
 failures=0
@@ -153,7 +154,7 @@ check_no_legacy() {
   # Untracked-but-canonical example files (e.g. a newly added .env.example
   # awaiting git add) are scanned directly since git grep skips them.
   local doc
-  for doc in "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
+  for doc in "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL" "$PROCESS_COMPOSE"; do
     [[ -f "$doc" ]] || continue
     while IFS= read -r hit; do
       [[ -z "$hit" ]] && continue
@@ -193,7 +194,7 @@ check_no_weak_example_values() {
 check_compose_backed() {
   local known="$1"
   local file
-  for file in "$COMPOSE" "$COMPOSE_LOCAL"; do
+  for file in "$COMPOSE" "$COMPOSE_LOCAL" "$PROCESS_COMPOSE"; do
     local name
     while IFS= read -r name; do
       [[ -z "$name" ]] && continue
@@ -237,7 +238,7 @@ check_encrypted_env_keys() {
 
 main() {
   local file
-  for file in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV" "$WORKER_ENV" "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
+  for file in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV" "$WORKER_ENV" "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL" "$PROCESS_COMPOSE"; do
     [[ -f "$file" ]] || fail "missing input $file"
   done
   (( failures > 0 )) && return 1
@@ -250,12 +251,16 @@ main() {
   auth_req="$(node_required "$AUTH_ENV")"
   rt_keys="$(node_schema "$RT_ENV")"
   rt_req="$(node_required "$RT_ENV")"
-  worker_keys="$(worker_schema "$WORKER_ENV")"
+  worker_keys="$(worker_binding_keys "$WORKER_ENV" worker)"
   [[ -n "$worker_keys" ]] || fail "Worker Env binding schema is empty"
   deploy_keys="$(deploy_allowlist)"
   third_party="$(third_party_allowlist)"
   command_keys="$(command_allowlist)"
   all_known="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$go_keys" "$auth_keys" "$rt_keys" "$deploy_keys" "$third_party" "$command_keys" | sort -u)"
+
+  if ! worker_binding_check_startup "$PROCESS_COMPOSE"; then
+    fail "Worker startup source paths differ from binding policy"
+  fi
 
   # A: required schema keys documented in the owning example.
   check_required_documented "go ValidateRequired" "$API_EXAMPLE" "$go_req"

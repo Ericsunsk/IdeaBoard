@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 	"ideaboard/api/internal/identity/principal"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -53,14 +53,14 @@ func TestObservedHandlerGatingAndEnvelope(t *testing.T) {
 	// guard); the handler performs no role check. Guard-level denial is
 	// covered by TestControlAuthMatrix in runtime/interfaces/http.
 	t.Run("fails closed without service", func(t *testing.T) {
-		rec := serveModelsObserved(t, principal.RoleAdmin, NewHandler(&fakeGatewayStore{}))
+		rec := serveModelsObserved(t, principal.RoleAdmin, NewHandler(&fakeGatewayStore{}, nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
 		}
 	})
 
 	t.Run("returns envelope with rows", func(t *testing.T) {
-		handler := NewHandler(&fakeGatewayStore{})
+		handler := NewHandler(&fakeGatewayStore{}, nil)
 		handler.SetObservedService(NewObservedService(
 			&observedFakeAttemptStore{obs: modelregistrydomain.AttemptObservation{
 				Aggregates: []modelregistrydomain.ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Service: "generation", Total: 4, Completed: 3, Failed: 1, CacheHits: 1}},

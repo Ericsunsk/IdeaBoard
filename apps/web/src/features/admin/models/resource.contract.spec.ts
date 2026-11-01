@@ -122,7 +122,10 @@ describe('Admin gateway resource', () => {
       http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
           data: [
-            { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+            // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+            { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/', available: true },
+            // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+            { slug: 'krea', display_name: 'Krea', id_prefix: 'krea/', available: false },
             { slug: 'workers-ai', display_name: 'Workers AI', id_prefix: 'workers-ai/' },
           ],
         }),
@@ -148,74 +151,11 @@ describe('Admin gateway resource', () => {
     expect(seen[1]?.body).toEqual({ model_id: 'openai/gpt-image-1' })
 
     await expect(resource.catalog.listProviders()).resolves.toMatchObject([
-      { slug: 'openai', display_name: 'OpenAI' },
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+      { slug: 'openai', display_name: 'OpenAI', available: true },
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+      { slug: 'krea', display_name: 'Krea', available: false },
       { slug: 'workers-ai', display_name: 'Workers AI' },
     ])
-  })
-
-  it('passes custom domain update payload with explicit identity through', async () => {
-    // 自定义域名透传显式身份。
-    let requestBody: unknown
-    useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway', async ({ request }) => {
-        requestBody = await request.json()
-        return HttpResponse.json({ data: {} })
-      }),
-    )
-
-    await expect(
-      createAdminGatewayResource().connection.update(
-        {
-          base_url: 'https://gateway.example.com',
-          token: 'tok',
-          account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
-          gateway_id: 'my-gateway',
-        },
-        options,
-      ),
-    ).resolves.toBeUndefined()
-    expect(requestBody).toMatchObject({
-      base_url: 'https://gateway.example.com',
-      token: 'tok',
-      account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
-      gateway_id: 'my-gateway',
-    })
-  })
-
-  it('rejects gateway config updates when the envelope reports an error', async () => {
-    useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway', () =>
-        HttpResponse.json(
-          {
-            error: {
-              code: 'bad_request',
-              message: '网关配置校验失败',
-              request_id: 'req-gateway-400',
-            },
-          },
-          { status: 400 },
-        ),
-      ),
-    )
-
-    await expect(
-      createAdminGatewayResource().connection.update(
-        { base_url: 'https://gateway.example.com' },
-        options,
-      ),
-    ).rejects.toThrow()
-  })
-
-  it('resolves gateway config updates when the envelope reports success', async () => {
-    useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway', () => HttpResponse.json({ data: {} })),
-    )
-
-    await expect(
-      createAdminGatewayResource().connection.update(
-        { base_url: 'https://gateway.example.com' },
-        options,
-      ),
-    ).resolves.toBeUndefined()
   })
 })

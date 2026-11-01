@@ -1,5 +1,6 @@
-h1:7QAv3x7WGBRCknv8rwdelQmY1eoXs2k0EeVs+t7D4Go=
+h1:Fh+iNOqdFdvgngE9qXc30v7Q2goDNDZAy+r+eVAMZ/U=
 20261108000000_baseline.sql h1:pEG5btCW1W7xNE2SXoQBHQKROyk815oJl6EEwsLi6rY=
 20261109000000_free_terminal_settlement.sql h1:xB4Jm5HfQCaEllzgMMG9xm+WTh5HDe6l/DeAQ2RR5Dc=
 20261110000000_library_identity_precheck.sql h1:q1zDwzEzY4Vom7QD84qMIMgpsahPZ93G0U9xrvbbyns=
 20261111000000_model_pool_provider_split.sql h1:3somWhDWdjuRJ3XVa4kTBHnC88nEcg0O8Bm4jwy3gD8=
+20261112000000_drop_ai_gateway_connection_keys.sql h1:QgEay/si6c13R/0JaxOpWewXFUITp0FT1d9fTGcZBDI=

@@ -1,11 +1,9 @@
 import {
-  getControlAIGateway,
   listControlAIGatewayModelsObserved,
   listControlAIGatewayCatalog,
   listControlAIGatewayProviders,
   previewControlAIGatewayRoute,
   saveControlAIGatewayCatalog,
-  updateControlAIGateway,
 } from '@/api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '@/api/http/contractKernel'
 import {
@@ -21,16 +19,6 @@ import type {
   ModelObservedSnapshot,
 } from './core/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from './core/catalogData'
-
-/** @externalContract AI Gateway configuration summary wire response. */
-export type GatewayConnectionSummary = {
-  base_url?: string
-  account_id?: string
-  gateway_id?: string
-  token_configured: boolean
-  is_first_party?: boolean
-  updated_at?: string | null
-}
 
 /** @externalContract AI Gateway model catalog item wire payload. */
 type GatewayModelCatalogItem = {
@@ -54,6 +42,11 @@ export type GatewayProviderOption = {
   slug: string
   display_name: string
   id_prefix: string
+  // Worker has no adapter for this slug when false: the Admin dropdown
+  // renders it disabled with a 缺适配器 hint. Absent (legacy payloads and
+  // catalog-fallback rows) means available.
+  // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (provider availability).
+  available?: boolean | undefined
 }
 
 type WorkerRoutePreview = {
@@ -68,13 +61,6 @@ type WorkerRoutePreview = {
   message: string
 }
 
-type UpdateGatewayConfigRequest = {
-  base_url?: string
-  token?: string
-  account_id?: string
-  gateway_id?: string
-}
-
 export interface AdminGatewayCatalog {
   list: () => Promise<AdminModelItem[]>
   save: (items: AdminModelItem[], options?: ControlMutationOptions) => Promise<void>
@@ -87,18 +73,11 @@ export interface AdminGatewayCatalog {
   listObserved: () => Promise<ModelObservedSnapshot[]>
 }
 
-export interface AdminGatewayConnection {
-  get: () => Promise<GatewayConnectionSummary>
-  update: (input: UpdateGatewayConfigRequest, options?: ControlMutationOptions) => Promise<void>
-}
-
 export interface AdminGatewayResource {
   catalog: AdminGatewayCatalog
-  connection: AdminGatewayConnection
 }
 
-// AI 网关设置面唯一出口：目录、连接两组共享 adapter 与归一，
-// 调用方按组取用（catalog / connection），不得直调 generated client。
+// AI 网关设置面唯一出口：目录 adapter，调用方按组取用（catalog），不得直调 generated client.
 export function createAdminGatewayResource(): AdminGatewayResource {
   return {
     catalog: {
@@ -107,10 +86,6 @@ export function createAdminGatewayResource(): AdminGatewayResource {
       previewRoute: previewModelRoute,
       listProviders: listGatewayProviders,
       listObserved: listModelsObserved,
-    },
-    connection: {
-      get: getGatewayConnection,
-      update: updateGatewayConnection,
     },
   }
 }
@@ -286,29 +261,4 @@ async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
   const rows = requireContractData<unknown>(body, '观测数据加载失败')
   if (!Array.isArray(rows)) throw createControlError('control_failed', '观测数据加载失败')
   return rows.map(toModelObservedSnapshot)
-}
-
-async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
-  try {
-    const body = await getControlAIGateway()
-    const data = requireContractData<GatewayConnectionSummary>(body, 'AI 网关配置不存在')
-    if (!data) throw new Error('AI 网关配置不存在')
-    return data
-  } catch (error) {
-    throw withControlCopy(error, 'AI 网关配置不存在')
-  }
-}
-
-async function updateGatewayConnection(
-  input: UpdateGatewayConfigRequest,
-  options: ControlMutationOptions = {},
-): Promise<void> {
-  try {
-    const body = await updateControlAIGateway(input, {
-      headers: buildControlMutationHeaders(options),
-    })
-    requireContractData<Record<string, unknown>>(body, '保存 AI 网关配置失败')
-  } catch (error) {
-    throw withControlCopy(error, '保存 AI 网关配置失败')
-  }
 }

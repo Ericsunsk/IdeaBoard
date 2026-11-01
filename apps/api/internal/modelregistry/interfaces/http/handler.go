@@ -15,6 +15,6 @@ import (
 type Handler = application.Handler
 
 // NewHandler builds the admin handler over the config seam.
-func NewHandler(store ports.ConfigRepository) *Handler {
-	return application.NewHandler(store)
+func NewHandler(store ports.ConfigRepository, providers ports.ConfiguredProviderReader) *Handler {
+	return application.NewHandler(store, providers)
 }

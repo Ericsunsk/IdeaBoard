@@ -14682,7 +14682,7 @@
       ]
     },
     "src/api/generated-query/control/control-platform/control-platform.ts": {
-      "sha256": "475a0e1cf79b47d12ea884e02edb2a137268a0b7e03f2ec11442f6835ddd55fb",
+      "sha256": "d5daaba691ef88378387de7a0bd84e238d36c76cd76c5831fc244dd5e5b13c26",
       "exports": [
         "ApplyControlStorageProfileMutationError",
         "ApplyControlStorageProfileMutationResult",
@@ -14703,8 +14703,6 @@
         "DeleteControlStorageProfileMutationError",
         "DeleteControlStorageProfileMutationResult",
         "DeleteControlStorageProfileMutationVariables",
-        "GetControlAIGatewayQueryError",
-        "GetControlAIGatewayQueryResult",
         "GetControlBrandingSettingQueryError",
         "GetControlBrandingSettingQueryResult",
         "GetControlFeaturePromptQueryError",
@@ -14777,10 +14775,6 @@
         "TestControlStorageProfileMutationError",
         "TestControlStorageProfileMutationResult",
         "TestControlStorageProfileMutationVariables",
-        "UpdateControlAIGatewayMutationBody",
-        "UpdateControlAIGatewayMutationError",
-        "UpdateControlAIGatewayMutationResult",
-        "UpdateControlAIGatewayMutationVariables",
         "UpdateControlBrandingSettingMutationBody",
         "UpdateControlBrandingSettingMutationError",
         "UpdateControlBrandingSettingMutationResult",
@@ -14837,7 +14831,6 @@
         "getBackfillControlStatisticsMutationKey",
         "getBackfillControlStatisticsMutationOptions",
         "getBackfillControlStatisticsUrl",
-        "getControlAIGateway",
         "getControlBrandingSetting",
         "getControlFeaturePrompt",
         "getControlLoginLockoutSetting",
@@ -14862,9 +14855,6 @@
         "getDeleteControlStorageProfileMutationKey",
         "getDeleteControlStorageProfileMutationOptions",
         "getDeleteControlStorageProfileUrl",
-        "getGetControlAIGatewayQueryKey",
-        "getGetControlAIGatewayQueryOptions",
-        "getGetControlAIGatewayUrl",
         "getGetControlBrandingSettingQueryKey",
         "getGetControlBrandingSettingQueryOptions",
         "getGetControlBrandingSettingUrl",
@@ -14952,9 +14942,6 @@
         "getTestControlStorageProfileMutationKey",
         "getTestControlStorageProfileMutationOptions",
         "getTestControlStorageProfileUrl",
-        "getUpdateControlAIGatewayMutationKey",
-        "getUpdateControlAIGatewayMutationOptions",
-        "getUpdateControlAIGatewayUrl",
         "getUpdateControlBrandingSettingMutationKey",
         "getUpdateControlBrandingSettingMutationOptions",
         "getUpdateControlBrandingSettingUrl",
@@ -15005,7 +14992,6 @@
         "testControlMailSetting",
         "testControlSearchProvider",
         "testControlStorageProfile",
-        "updateControlAIGateway",
         "updateControlBrandingSetting",
         "updateControlLoginLockoutSetting",
         "updateControlMailSetting",
@@ -15023,7 +15009,6 @@
         "useDeleteControlBrandLogoOverride",
         "useDeleteControlMailSetting",
         "useDeleteControlStorageProfile",
-        "useGetControlAIGateway",
         "useGetControlBrandingSetting",
         "useGetControlFeaturePrompt",
         "useGetControlLoginLockoutSetting",
@@ -15053,7 +15038,6 @@
         "useTestControlMailSetting",
         "useTestControlSearchProvider",
         "useTestControlStorageProfile",
-        "useUpdateControlAIGateway",
         "useUpdateControlBrandingSetting",
         "useUpdateControlLoginLockoutSetting",
         "useUpdateControlMailSetting",
@@ -15757,7 +15741,7 @@
       "exports": ["IdempotencyKeyParameter"]
     },
     "src/api/generated-query/control/model/index.ts": {
-      "sha256": "6fd803dbef17d9bcf1d3e69542bb9ea036f9bba4849374166b6d04d0ca6720de",
+      "sha256": "f761e41513b901e8a45f560ac2cd8dd4da17db07e0e350f251ccc68a8c80aa42",
       "exports": []
     },
     "src/api/generated-query/control/model/listControlBillingAccountLedgerParams.ts": {
@@ -15875,10 +15859,6 @@
     "src/api/generated-query/control/model/unprocessableEntityResponse.ts": {
       "sha256": "fb1e69ed938bf9644b19f0180756cf5d67438fb0570ae850d65114ccb9ae7db9",
       "exports": ["UnprocessableEntityResponse"]
-    },
-    "src/api/generated-query/control/model/updateControlAIGatewayBody.ts": {
-      "sha256": "51294d50034e3b586496a3641b4818b5f6de52721ead74b16648a696091d364f",
-      "exports": ["UpdateControlAIGatewayBody"]
     },
     "src/api/generated-query/control/model/updateControlBrandingSettingBody.ts": {
       "sha256": "ed790b246d3969f2cb9bbe840db0609d9625c53bd7c8db129673d07ac7fbb85b",

@@ -16,13 +16,6 @@ export type AdminModelCatalogFeedback = {
   copyFailed: () => void
 }
 
-export type AdminGatewayConfigFeedback = {
-  loadFailed: (error: unknown) => void
-  saveFailed: (error: unknown) => void
-  rereadFailed: (error: unknown) => void
-  saved: () => void
-}
-
 const ADMIN_MODEL_CATALOG_COPY = {
   catalogSynced: { success: '模型库已更新至最新' },
   syncFailed: { error: '同步模型库失败' },
@@ -39,17 +32,6 @@ const ADMIN_MODEL_CATALOG_COPY = {
   copyFailed: { errorText: '复制失败，请手动复制模型标识' },
 }
 
-const ADMIN_GATEWAY_CONFIG_COPY = {
-  loadFailed: { error: '读取网关配置失败' },
-  saveFailed: { error: '保存网关配置失败' },
-  rereadFailed: { error: '配置已保存，但重读网关状态失败，请重试' },
-  saved: { success: 'AI 网关配置已保存' },
-}
-
 export function useAdminModelCatalogFeedback(): AdminModelCatalogFeedback {
   return defineFeedback<AdminModelCatalogFeedback>(ADMIN_MODEL_CATALOG_COPY)
-}
-
-export function useAdminGatewayConfigFeedback(): AdminGatewayConfigFeedback {
-  return defineFeedback<AdminGatewayConfigFeedback>(ADMIN_GATEWAY_CONFIG_COPY)
 }

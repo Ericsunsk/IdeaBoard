@@ -94,6 +94,12 @@ type RequestOptions struct {
 	MaxAttempts int
 	// AllowHosts pins egress through the safehttp SSRF allowlist.
 	AllowHosts []string
+	// Configured pins egress to one operator-trusted endpoint validated at
+	// load time (ParseConfiguredEndpoint). It must not combine with
+	// AllowHosts or PublicHosts: mixing fails closed. The request and every
+	// redirect hop must stay inside the endpoint host; private/loopback IPs
+	// are permitted there. User-influenced URLs must never use this field.
+	Configured ConfiguredEndpoint
 	// Target names this egress in logs/metrics; empty defaults to the
 	// request host.
 	Target string
@@ -239,7 +245,7 @@ func (c *Client) Do(ctx context.Context, req *http.Request, opts RequestOptions)
 			cancel()
 			return nil, c.finishWithLatency(target, attemptExhaustedError(callCtx, ctx, err), time.Since(startedAt))
 		}
-		resp, err := c.sendOnce(callCtx, req, body, timeout, opts.AllowHosts, opts.PublicHosts)
+		resp, err := c.sendOnce(callCtx, req, body, timeout, opts)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 				cancel()
@@ -406,25 +412,20 @@ func readStatusBodyPreview(body io.Reader) string {
 // sendOnce issues one attempt with a replayable body and a per-attempt
 // client timeout. The parent callCtx already bounds the whole call; the
 // per-attempt http.Client timeout keeps a single hung socket from eating
-// the full budget silently.
-func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, attemptTimeout time.Duration, allowHosts, publicHosts []string) (*http.Response, error) {
-	attempt := req.Clone(ctx)
-	if body != nil {
-		attempt.Body = io.NopCloser(bytes.NewReader(body))
-		attempt.GetBody = func() (io.ReadCloser, error) {
-			return io.NopCloser(bytes.NewReader(body)), nil
+// the full budget silently. A Configured endpoint takes the operator-trust
+// path; anything else stays on the strict allowlist path.
+func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, attemptTimeout time.Duration, opts RequestOptions) (*http.Response, error) {
+	if opts.Configured.Valid() {
+		if len(opts.AllowHosts) > 0 || len(opts.PublicHosts) > 0 {
+			return nil, fmt.Errorf("outbound egress policy is ambiguous: %w", ErrPolicyViolation)
 		}
-		attempt.ContentLength = int64(len(body))
-	} else if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-		// Clone keeps Body shallow, so a request supplied with GetBody would be
-		// consumed by the first attempt and replayed as an empty body. Ask the
-		// caller's replay hook for a fresh reader on every attempt.
-		freshBody, err := req.GetBody()
-		if err != nil {
-			return nil, fmt.Errorf("outbound request body replay failed: %w", err)
-		}
-		attempt.Body = freshBody
+		return c.sendConfiguredOnce(ctx, req, body, attemptTimeout, opts.Configured)
 	}
+	attempt := req.Clone(ctx)
+	if err := replayRequestBody(attempt, req, body); err != nil {
+		return nil, err
+	}
+	allowHosts, publicHosts := opts.AllowHosts, opts.PublicHosts
 	if len(publicHosts) > 0 {
 		response, err := DoPublicRequest(ctx, attempt, attemptTimeout, publicHosts)
 		if err != nil {

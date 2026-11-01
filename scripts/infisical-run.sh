@@ -5,13 +5,15 @@
 # `infisical run` (process-env injection, no files). This is the ONLY
 # supported Infisical injection shape for the business stack:
 #
-#   scripts/infisical-run.sh --env prod -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
-#   scripts/infisical-run.sh --env dev --path / -- scripts/deploy-stack.sh config
+#   scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
+#   scripts/infisical-run.sh --env dev --path / --path /ai-proxy -- scripts/deploy-stack.sh config
 #
 # Namespace: single project (`ideaboard`, --projectId or .infisical.yaml),
 # three envs (dev/staging/prod, REQUIRED --env), secrets live at root path
-# `/` (repeatable --path, default `/`; per-service folders dropped: union
-# injection hands every service the full set anyway).
+# `/` (repeatable --path, default `/`), with ONE exception: the ai-proxy
+# Worker bindings live in folder `/ai-proxy` (dev/prod 同形；api/api-worker
+# consumers pass `--path / --path /ai-proxy` for the union; the root copy of
+# WORKER_INTERNAL_SECRET is pending manual dashboard deletion, see runbook §2).
 # Full mapping: docs/runbooks/secrets-infisical.md.
 #
 # Two tiers, never merged (see runbook):
@@ -44,7 +46,7 @@ PATHS=()
 usage() {
   cat >&2 <<'EOF'
 usage: scripts/infisical-run.sh --env <dev|staging|prod> [--path / ...] [--project-id <id>] [--domain <url>] -- <command...>
-example: scripts/infisical-run.sh --env prod -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
+example: scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
 EOF
   exit 2
 }
