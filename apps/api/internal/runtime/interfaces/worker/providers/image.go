@@ -15,22 +15,18 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/imageformat"
-	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/safehttp"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
 )
 
-func trustedRuntimeAssetHosts(publicOrigins config.PublicOriginsConfig) []string {
-	base := publicOrigins.APIParsedURL()
-	if base == nil || strings.TrimSpace(base.Host) == "" {
-		return nil
-	}
-	return []string{base.Host}
-}
-
-func trustedImageDownloadHosts(ctx context.Context, publicOrigins config.PublicOriginsConfig) []string {
+// trustedImageDownloadHosts pins Worker result egress to the
+// executor-supplied allowlist (exact host, or exact host:port). The
+// transport SSRF guard still applies underneath, but on its own it permits
+// any public host; this closed-world gate keeps result downloads on the
+// deployment egress policy. Worker data URLs never reach the fetcher.
+func trustedImageDownloadHosts(ctx context.Context) []string {
 	hosts := map[string]struct{}{}
 	appendHost := func(raw string) {
 		parsed, err := url.Parse(strings.TrimSpace(raw))
@@ -44,12 +40,9 @@ func trustedImageDownloadHosts(ctx context.Context, publicOrigins config.PublicO
 		}
 	}
 
-	// Provider image URLs point at public CDNs; the default safehttp policy
-	// already rejects private targets. Explicit entries cover our own
-	// origins plus the deployment egress policy.
-	for _, host := range trustedRuntimeAssetHosts(publicOrigins) {
-		appendHost(host)
-	}
+	// Worker result URLs point at the presigned slot hosts; the default
+	// safehttp policy already rejects private targets. Explicit entries
+	// cover the deployment egress policy.
 	for _, host := range safehttp.AllowHosts(ctx) {
 		appendHost(host)
 	}

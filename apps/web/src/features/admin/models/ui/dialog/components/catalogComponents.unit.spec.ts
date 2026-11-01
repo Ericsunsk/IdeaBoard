@@ -61,7 +61,6 @@ describe('AdminModelEditDialog subcomponents', () => {
       const onUpdateParams = vi.fn()
       render(CatalogGatewayPanel, {
         props: {
-          customPath: '',
           customParams: '{"a":1}',
           initiallyOpen: true,
           'onUpdate:customParams': onUpdateParams,
@@ -94,19 +93,19 @@ describe('AdminModelEditDialog subcomponents', () => {
           model: sampleModel,
           modelId: 'fal/flux-dev',
           routePreview: {
-            providerSlug: 'fal',
-            isFirstParty: true,
-            targetPath: 'fal-ai/flux-dev',
-            protocol: '原生第一方',
+            provider: 'fal',
+            model: 'fal/flux-dev',
+            isValid: true,
+            isReachable: true,
+            message: 'Worker 干跑正常',
           },
         },
       })
 
       expect(screen.getByText('卡片效果实时预览')).toBeInTheDocument()
       expect(screen.getByText('ID: fal/flux-dev')).toBeInTheDocument()
-      expect(screen.getByText('Cloudflare AI Gateway 路由透视')).toBeInTheDocument()
-      expect(screen.getAllByText('原生第一方').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByText('fal-ai/flux-dev')).toBeInTheDocument()
+      expect(screen.getByText('Edge Worker 干跑透视')).toBeInTheDocument()
+      expect(screen.getByText('Worker 干跑正常')).toBeInTheDocument()
     })
   })
 

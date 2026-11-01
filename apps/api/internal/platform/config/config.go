@@ -151,10 +151,12 @@ func (c PublicOriginsConfig) APIParsedURL() *url.URL {
 
 type WorkerConfig struct {
 	Concurrency int
-	// Gateway carries the AI Gateway resilience knobs. Secrets and
-	// gateway identity stay in Admin settings (no env); these knobs only
-	// tune the per-model guards (fail-closed defaults).
-	Gateway GatewayConfig
+	// Edge carries the sole ai-proxy Worker egress (base URL + secret).
+	// Missing values fail every image task closed before any send.
+	Edge EdgeWorkerConfig
+	// Resilience carries the Worker per-model guard knobs (env-only,
+	// fail-closed defaults). These knobs never carry secrets.
+	Resilience WorkerResilienceConfig
 }
 
 const (
@@ -170,11 +172,32 @@ func (c WorkerConfig) EffectiveConcurrency() int {
 	return c.Concurrency
 }
 
-// GatewayConfig carries the AI Gateway resilience knobs (env-only,
-// fail-closed defaults). The gateway token and gateway identity stay in
-// Admin settings; these knobs never carry secrets.
-type GatewayConfig struct {
-	// PerModelLimit caps concurrent in-flight gateway sends per model.
+// EdgeWorkerConfig carries the sole ai-proxy Worker egress (env-only,
+// required). A missing base URL or secret fails every image task closed
+// with a clear message before any network I/O.
+type EdgeWorkerConfig struct {
+	// BaseURL is the Worker service root (WORKER_BASE_URL).
+	BaseURL string
+	// Secret is the INTERNAL_SECRET bearer credential. Empty fails closed.
+	Secret string
+}
+
+const (
+	DefaultWorkerPerModelLimit             = 8
+	minWorkerPerModelLimit                 = 1
+	maxWorkerPerModelLimit                 = 64
+	DefaultWorkerBreakerCooldownSeconds    = 30
+	minWorkerBreakerCooldownSeconds        = 5
+	maxWorkerBreakerCooldownSeconds        = 300
+	DefaultWorkerBreakerFailureRatePercent = 50
+	minWorkerBreakerFailureRatePercent     = 1
+	maxWorkerBreakerFailureRatePercent     = 100
+)
+
+// WorkerResilienceConfig carries the Worker per-model guard knobs (env-only,
+// fail-closed defaults). These knobs never carry secrets.
+type WorkerResilienceConfig struct {
+	// PerModelLimit caps concurrent in-flight Worker sends per model.
 	// Default conservative; range 1-64.
 	PerModelLimit int
 	// BreakerCooldownSeconds bounds how long an open per-model breaker
@@ -184,18 +207,6 @@ type GatewayConfig struct {
 	// (1-100) that opens the per-model breaker. Default 50.
 	BreakerFailureRatePercent int
 }
-
-const (
-	DefaultGatewayPerModelLimit             = 8
-	minGatewayPerModelLimit                 = 1
-	maxGatewayPerModelLimit                 = 64
-	DefaultGatewayBreakerCooldownSeconds    = 30
-	minGatewayBreakerCooldownSeconds        = 5
-	maxGatewayBreakerCooldownSeconds        = 300
-	DefaultGatewayBreakerFailureRatePercent = 50
-	minGatewayBreakerFailureRatePercent     = 1
-	maxGatewayBreakerFailureRatePercent     = 100
-)
 
 // ProcessMode selects the runtime role of the API process (ADR-0021). It is
 // deploy-level topology, not business policy: the same binary and database
@@ -325,9 +336,14 @@ type envConfig struct {
 	RealtimeTicketSecret      string `env:"RT_TICKET_SECRET"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
-	GatewayPerModelLimit      string `env:"AI_GATEWAY_PER_MODEL_LIMIT"`
-	GatewayBreakerCooldown    string `env:"AI_GATEWAY_BREAKER_COOLDOWN_SECONDS"`
-	GatewayBreakerFailureRate string `env:"AI_GATEWAY_BREAKER_FAILURE_RATE"`
+	WorkerPerModelLimit        string `env:"WORKER_PER_MODEL_LIMIT"`
+	WorkerBreakerCooldown      string `env:"WORKER_BREAKER_COOLDOWN_SECONDS"`
+	WorkerBreakerFailureRate   string `env:"WORKER_BREAKER_FAILURE_RATE"`
+	// WorkerBaseURL is the ai-proxy Worker service root.
+	WorkerBaseURL string `env:"WORKER_BASE_URL"`
+	// WorkerSecret is the INTERNAL_SECRET bearer credential for the Worker.
+	// Empty fails every image task closed.
+	WorkerSecret string `env:"INTERNAL_SECRET"`
 
 	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
 	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`
@@ -407,22 +423,22 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "RT_TICKET_SECRET")
 		slog.Warn("realtime ticket secret is not set; the realtime-ticket endpoint stays fail-closed with 500", "key", "RT_TICKET_SECRET")
 	}
-	// AI gateway resilience knobs (fail-closed defaults; invalid
+	// Worker resilience knobs (fail-closed defaults; invalid
 	// values fall back and are reported like every other typed knob).
-	perModelLimit, perModelValid := boundedIntEnv(raw.GatewayPerModelLimit, DefaultGatewayPerModelLimit, minGatewayPerModelLimit, maxGatewayPerModelLimit)
+	perModelLimit, perModelValid := boundedIntEnv(raw.WorkerPerModelLimit, DefaultWorkerPerModelLimit, minWorkerPerModelLimit, maxWorkerPerModelLimit)
 	if !perModelValid {
-		invalidEnv = append(invalidEnv, "AI_GATEWAY_PER_MODEL_LIMIT")
-		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_PER_MODEL_LIMIT", "value", strings.TrimSpace(raw.GatewayPerModelLimit), "default", DefaultGatewayPerModelLimit)
+		invalidEnv = append(invalidEnv, "WORKER_PER_MODEL_LIMIT")
+		slog.Warn("invalid integer env; fallback to default", "key", "WORKER_PER_MODEL_LIMIT", "value", strings.TrimSpace(raw.WorkerPerModelLimit), "default", DefaultWorkerPerModelLimit)
 	}
-	breakerCooldown, breakerCooldownValid := boundedIntEnv(raw.GatewayBreakerCooldown, DefaultGatewayBreakerCooldownSeconds, minGatewayBreakerCooldownSeconds, maxGatewayBreakerCooldownSeconds)
+	breakerCooldown, breakerCooldownValid := boundedIntEnv(raw.WorkerBreakerCooldown, DefaultWorkerBreakerCooldownSeconds, minWorkerBreakerCooldownSeconds, maxWorkerBreakerCooldownSeconds)
 	if !breakerCooldownValid {
-		invalidEnv = append(invalidEnv, "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS")
-		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "value", strings.TrimSpace(raw.GatewayBreakerCooldown), "default", DefaultGatewayBreakerCooldownSeconds)
+		invalidEnv = append(invalidEnv, "WORKER_BREAKER_COOLDOWN_SECONDS")
+		slog.Warn("invalid integer env; fallback to default", "key", "WORKER_BREAKER_COOLDOWN_SECONDS", "value", strings.TrimSpace(raw.WorkerBreakerCooldown), "default", DefaultWorkerBreakerCooldownSeconds)
 	}
-	breakerFailureRate, breakerFailureRateValid := boundedIntEnv(raw.GatewayBreakerFailureRate, DefaultGatewayBreakerFailureRatePercent, minGatewayBreakerFailureRatePercent, maxGatewayBreakerFailureRatePercent)
+	breakerFailureRate, breakerFailureRateValid := boundedIntEnv(raw.WorkerBreakerFailureRate, DefaultWorkerBreakerFailureRatePercent, minWorkerBreakerFailureRatePercent, maxWorkerBreakerFailureRatePercent)
 	if !breakerFailureRateValid {
-		invalidEnv = append(invalidEnv, "AI_GATEWAY_BREAKER_FAILURE_RATE")
-		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_BREAKER_FAILURE_RATE", "value", strings.TrimSpace(raw.GatewayBreakerFailureRate), "default", DefaultGatewayBreakerFailureRatePercent)
+		invalidEnv = append(invalidEnv, "WORKER_BREAKER_FAILURE_RATE")
+		slog.Warn("invalid integer env; fallback to default", "key", "WORKER_BREAKER_FAILURE_RATE", "value", strings.TrimSpace(raw.WorkerBreakerFailureRate), "default", DefaultWorkerBreakerFailureRatePercent)
 	}
 
 	return &Config{
@@ -453,7 +469,11 @@ func Load() *Config {
 		},
 		Worker: WorkerConfig{
 			Concurrency: workerConcurrency,
-			Gateway: GatewayConfig{
+			Edge: EdgeWorkerConfig{
+				BaseURL: strings.TrimSpace(raw.WorkerBaseURL),
+				Secret:  strings.TrimSpace(raw.WorkerSecret),
+			},
+			Resilience: WorkerResilienceConfig{
 				PerModelLimit:             perModelLimit,
 				BreakerCooldownSeconds:    breakerCooldown,
 				BreakerFailureRatePercent: breakerFailureRate,

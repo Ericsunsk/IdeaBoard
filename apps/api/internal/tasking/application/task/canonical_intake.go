@@ -92,6 +92,15 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 		return "", err
 	}
 	typed.Generation = &snapshot
+	// Fail-closed plan-consistency mirror (moved off the providers-side
+	// request.go逐字段镜像): generation snapshot fields, output count,
+	// media facts, media-vs-snapshot binding, and canonical control
+	// presence + values must agree with the compiled plan. Construction
+	// above already stamps these facts; this assertion keeps any future
+	// sequencing drift fail-closed at submit instead of at execution.
+	if err := validateSubmitParamsAgainstPlan(typed, plan); err != nil {
+		return "", err
+	}
 	return marshalWorkflowTaskParams(typed, working)
 }
 
@@ -161,6 +170,191 @@ func finalizeSubmitTypedParams(params map[string]interface{}, featureSlug string
 	}
 	typedParams.ExecutionPlan = executionPlanJSON
 	return typedParams, nil
+}
+
+// validateSubmitParamsAgainstPlan is the submit-side fail-closed mirror of
+// the former providers-side plan-consistency checks: the typed params and
+// their generation snapshot must agree with the compiled plan field by
+// field. Value ranges reuse the same predicates the execution side used to
+// enforce (variation/outpaint/upscale/fusion); presence must match the
+// plan's RuntimeControlContract exactly.
+func validateSubmitParamsAgainstPlan(typed *tasks.WorkflowTaskParams, plan workflow.FeatureExecutionPlan) error {
+	if typed == nil {
+		return fmt.Errorf("submit params are required")
+	}
+	runtimeInputs := plan.RuntimeInputs()
+	snapshot := typed.Generation
+	if snapshot == nil {
+		if runtimeInputs.ImageInputCount() != 0 || runtimeInputs.HasMaskInput() {
+			return fmt.Errorf("submit generation snapshot does not match execution plan")
+		}
+	} else {
+		if snapshot.SchemaVersion != tasks.CurrentParamsSchemaVersion ||
+			snapshot.Service != plan.Feature() ||
+			snapshot.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
+			snapshot.RequestedOutputCount != plan.RequestedOutputCount().Int() {
+			return fmt.Errorf("submit generation snapshot does not match execution plan")
+		}
+		if err := validateSubmitMediaMatchesSnapshot(typed.Media, snapshot.Media); err != nil {
+			return err
+		}
+	}
+	if typed.Controls == nil || typed.Controls.OutputCount != plan.RequestedOutputCount().Int() {
+		return fmt.Errorf("submit output controls do not match execution plan")
+	}
+	if count, hasMask := submitMediaFacts(typed.Media); count != runtimeInputs.ImageInputCount() || hasMask != runtimeInputs.HasMaskInput() {
+		return fmt.Errorf("submit media facts do not match execution plan")
+	}
+	return validateSubmitRuntimeControls(typed, runtimeInputs.ControlContract())
+}
+
+// submitMediaFacts counts submit-stage media identities (Source URLs are
+// still unresolved here; execution counts AssetID/PublicAssetID only).
+func submitMediaFacts(media *tasks.MediaInputs) (int, bool) {
+	if media == nil {
+		return 0, false
+	}
+	hasIdentity := func(ref tasks.MediaRef) bool {
+		return ref.AssetID > 0 || strings.TrimSpace(ref.PublicAssetID) != "" || strings.TrimSpace(ref.Source) != ""
+	}
+	count := 0
+	for _, ref := range media.Inputs {
+		if hasIdentity(ref) {
+			count++
+		}
+	}
+	for _, ref := range media.References {
+		if hasIdentity(ref) {
+			count++
+		}
+	}
+	if media.Original != nil && hasIdentity(*media.Original) {
+		count++
+	}
+	hasMask := media.Mask != nil && hasIdentity(*media.Mask)
+	return count, hasMask
+}
+
+// validateSubmitMediaMatchesSnapshot binds the typed media refs to the
+// generation snapshot intents in canonical order (inputs, references,
+// original, mask last), mirroring the former providers-side check with
+// submit-stage identity (Source allowed before resolution).
+func validateSubmitMediaMatchesSnapshot(media *tasks.MediaInputs, snapshot []tasks.GenerationMediaIntent) error {
+	refs := make([]tasks.MediaRef, 0, len(snapshot))
+	hasIdentity := func(ref tasks.MediaRef) bool {
+		return ref.AssetID > 0 || strings.TrimSpace(ref.PublicAssetID) != "" || strings.TrimSpace(ref.Source) != ""
+	}
+	if media != nil {
+		for _, ref := range media.Inputs {
+			if hasIdentity(ref) {
+				refs = append(refs, ref)
+			}
+		}
+		for _, ref := range media.References {
+			if hasIdentity(ref) {
+				refs = append(refs, ref)
+			}
+		}
+		if media.Original != nil && hasIdentity(*media.Original) {
+			refs = append(refs, *media.Original)
+		}
+		if media.Mask != nil && hasIdentity(*media.Mask) {
+			refs = append(refs, *media.Mask)
+		}
+	}
+	if len(refs) != len(snapshot) {
+		return fmt.Errorf("submit media facts do not match generation snapshot")
+	}
+	for index, ref := range refs {
+		intent := snapshot[index]
+		if intent.InputIndex != index || intent.Role != ref.Role || !tasks.IsGenerationMediaRole(intent.Role) {
+			return fmt.Errorf("submit media fact %d does not match generation snapshot", index)
+		}
+		if ref.AssetID != intent.AssetID ||
+			strings.TrimSpace(ref.PublicAssetID) != strings.TrimSpace(intent.PublicAssetID) ||
+			strings.TrimSpace(ref.Source) != strings.TrimSpace(intent.Source) {
+			return fmt.Errorf("submit media fact %d does not match generation snapshot", index)
+		}
+	}
+	return nil
+}
+
+func validateSubmitRuntimeControls(typed *tasks.WorkflowTaskParams, contract workflow.RuntimeControlContract) error {
+	if typed == nil {
+		return fmt.Errorf("submit params are required")
+	}
+	variation, outpaint, upscale, fusion := false, false, false, false
+	switch contract {
+	case workflow.RuntimeControlsNone:
+	case workflow.RuntimeControlsVariation:
+		variation = true
+	case workflow.RuntimeControlsOutpaint:
+		outpaint = true
+	case workflow.RuntimeControlsUpscale:
+		upscale = true
+	case workflow.RuntimeControlsFusion:
+		fusion = true
+	default:
+		return fmt.Errorf("unsupported runtime control contract %q", contract)
+	}
+	if (typed.Variation != nil) != variation ||
+		(typed.Outpaint != nil) != outpaint ||
+		(typed.Upscale != nil) != upscale ||
+		(typed.Fusion != nil) != fusion {
+		return fmt.Errorf("submit canonical controls do not match execution plan: expected %s", contract)
+	}
+	switch contract {
+	case workflow.RuntimeControlsNone:
+		return nil
+	case workflow.RuntimeControlsVariation:
+		return validateSubmitVariationControls(typed.Variation)
+	case workflow.RuntimeControlsOutpaint:
+		return validateSubmitOutpaintControls(typed.Outpaint)
+	case workflow.RuntimeControlsUpscale:
+		return validateSubmitUpscaleControls(typed.Upscale)
+	case workflow.RuntimeControlsFusion:
+		return validateSubmitFusionControls(typed)
+	default:
+		return fmt.Errorf("unsupported runtime control contract %q", contract)
+	}
+}
+
+func validateSubmitVariationControls(variation *tasks.VariationsParams) error {
+	strength := variation.Strength
+	if math.IsNaN(strength) || math.IsInf(strength, 0) || strength < 0 || strength > 100 || strength != math.Round(strength) {
+		return fmt.Errorf("submit variation controls are invalid")
+	}
+	return nil
+}
+
+func validateSubmitOutpaintControls(outpaint *tasks.OutpaintParams) error {
+	if outpaint.TargetWidth <= 0 || outpaint.TargetHeight <= 0 || outpaint.ImageOffsetX < 0 || outpaint.ImageOffsetY < 0 {
+		return fmt.Errorf("submit image outpaint controls are invalid")
+	}
+	return nil
+}
+
+func validateSubmitUpscaleControls(upscale *tasks.UpscaleParams) error {
+	scale := upscale.Scale
+	if math.IsNaN(scale) || math.IsInf(scale, 0) || scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
+		return fmt.Errorf("submit upscale controls are invalid")
+	}
+	return nil
+}
+
+func validateSubmitFusionControls(typed *tasks.WorkflowTaskParams) error {
+	if strings.TrimSpace(typed.Fusion.Mode) != "weighted_reference" || len(typed.Fusion.InputWeights) == 0 {
+		return fmt.Errorf("submit fusion controls are invalid")
+	}
+	if typed.Media == nil || len(typed.Fusion.InputWeights) != len(typed.Media.Inputs) {
+		return fmt.Errorf("submit fusion controls do not match input media")
+	}
+	for _, weight := range typed.Fusion.InputWeights {
+		if math.IsNaN(weight) || math.IsInf(weight, 0) {
+			return fmt.Errorf("submit fusion controls are invalid")
+		}
+	}
+	return nil
 }
 
 func compileFeatureExecutionParams(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionParams, error) {

@@ -7,114 +7,37 @@ import (
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
+	"math"
 	"net/url"
+	"strconv"
 	"strings"
 
-	"ideaboard/api/internal/platform/config"
-	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
-var _ runtimeports.GatewayCaller = (*Executor)(nil)
+var _ runtimeports.WorkerCaller = (*Executor)(nil)
 
 const (
 	// maxProviderRawOutputPreviewLen keeps task result envelopes inspectable without
-	// storing full image payloads or oversized provider responses.
+	// storing full image payloads or oversized Worker responses.
 	maxProviderRawOutputPreviewLen = 2000
-	maxProviderRawOutputStringLen  = 300
-	maxProviderRawOutputDepth      = 4
-	maxProviderRawOutputArrayItems = 5
 )
 
 const (
 	parsedOutputStatusValid = "valid"
 )
 
-func providerRawOutputPreview(raw []byte) string {
-	trimmed := strings.TrimSpace(string(raw))
+func providerRawOutputPreview(raw string) string {
+	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return ""
 	}
-
-	var parsed interface{}
-	if err := json.Unmarshal(raw, &parsed); err == nil {
-		sanitized := sanitizeProviderRawOutputValue("", parsed, 0)
-		if preview, err := json.Marshal(sanitized); err == nil {
-			return truncateProviderRawOutputPreview(string(preview))
-		}
-	}
 	return truncateProviderRawOutputPreview(trimmed)
-}
-
-func sanitizeProviderRawOutputValue(key string, value interface{}, depth int) interface{} {
-	if depth >= maxProviderRawOutputDepth {
-		switch typed := value.(type) {
-		case map[string]interface{}:
-			return fmt.Sprintf("[object:%d keys]", len(typed))
-		case []interface{}:
-			return fmt.Sprintf("[array:%d items]", len(typed))
-		}
-	}
-
-	switch typed := value.(type) {
-	case map[string]interface{}:
-		sanitized := make(map[string]interface{}, len(typed))
-		for nestedKey, nestedValue := range typed {
-			sanitized[nestedKey] = sanitizeProviderRawOutputValue(nestedKey, nestedValue, depth+1)
-		}
-		return sanitized
-	case []interface{}:
-		limit := len(typed)
-		if limit > maxProviderRawOutputArrayItems {
-			limit = maxProviderRawOutputArrayItems
-		}
-		sanitized := make([]interface{}, 0, limit+1)
-		for i := 0; i < limit; i++ {
-			sanitized = append(sanitized, sanitizeProviderRawOutputValue(key, typed[i], depth+1))
-		}
-		if len(typed) > limit {
-			sanitized = append(sanitized, fmt.Sprintf("...(+%d items)", len(typed)-limit))
-		}
-		return sanitized
-	case string:
-		return sanitizeProviderRawOutputString(key, typed)
-	case float64, bool, nil:
-		return typed
-	default:
-		return fmt.Sprint(typed)
-	}
-}
-
-func sanitizeProviderRawOutputString(key string, value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return trimmed
-	}
-	if isProviderRawOutputImagePayloadKey(key) {
-		return fmt.Sprintf("[redacted:%d chars]", len(value))
-	}
-	if isInlineDataImageURL(trimmed) {
-		return redactLogURL(trimmed)
-	}
-	if parsed, err := url.Parse(trimmed); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		return redactLogURL(trimmed)
-	}
-	if len(trimmed) > maxProviderRawOutputStringLen {
-		return trimmed[:maxProviderRawOutputStringLen] + fmt.Sprintf("...(+%d chars)", len(trimmed)-maxProviderRawOutputStringLen)
-	}
-	return trimmed
-}
-
-func isProviderRawOutputImagePayloadKey(key string) bool {
-	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(key), "-", "_"))
-	switch normalized {
-	case "b64_json", "bytesbase64encoded", "data":
-		return true
-	}
-	return strings.Contains(normalized, "base64")
 }
 
 func truncateProviderRawOutputPreview(value string) string {
@@ -125,44 +48,38 @@ func truncateProviderRawOutputPreview(value string) string {
 }
 
 type Executor struct {
-	mediaReader        taskmedia.UploadReader
-	mediaResolver      taskmedia.RuntimeMediaResolver
 	resultMaterializer taskmedia.ResultMaterializer
-	publicOrigins      config.PublicOriginsConfig
-	gatewayFactory     runtimeports.GatewayClientFactory
-	modelRoutes        runtimeports.ModelRouteOverrideReader
+	workerFactory      runtimeports.WorkerClientFactory
+	customParams       runtimeports.ModelCustomParamsReader
+	transfer           providerinfra.WorkerTransfer
 }
 
 // ProviderExecutor is the internal name used by provider adapter files.
 type ProviderExecutor = Executor
 
-// NewExecutor constructs a new provider execution engine. A nil
-// modelRoutes disables catalog route-override lookup (mapping @path only).
+// NewExecutor constructs the sole Worker execution engine. A nil
+// customParams disables catalog custom-params lookup (Worker defaults;
+// tests, minimal wiring). Transfer is required: nil fails every execution
+// closed before any Worker send.
 func NewExecutor(
-	mediaReader taskmedia.UploadReader,
 	resultMaterializer taskmedia.ResultMaterializer,
-	publicOrigins config.PublicOriginsConfig,
-	gatewayFactory runtimeports.GatewayClientFactory,
-	modelRoutes runtimeports.ModelRouteOverrideReader,
+	workerFactory runtimeports.WorkerClientFactory,
+	customParams runtimeports.ModelCustomParamsReader,
+	transfer providerinfra.WorkerTransfer,
 ) *Executor {
-	executor := &Executor{
-		mediaReader:        mediaReader,
+	return &Executor{
 		resultMaterializer: resultMaterializer,
-		publicOrigins:      publicOrigins,
-		gatewayFactory:     gatewayFactory,
-		modelRoutes:        modelRoutes,
+		workerFactory:      workerFactory,
+		customParams:       customParams,
+		transfer:           transfer,
 	}
-	if resolver, ok := mediaReader.(taskmedia.RuntimeMediaResolver); ok {
-		executor.mediaResolver = resolver
-	}
-	return executor
 }
 
 type providerCallResult struct {
 	ImageURL          string
 	ImageURLs         []string
 	Model             string
-	Receipt           runtimeports.GatewayReceipt
+	Receipt           runtimeports.WorkerReceipt
 	RawOutputPreview  string
 	ParsedOutputKind  string
 	ParsedOutputCount int
@@ -170,9 +87,6 @@ type providerCallResult struct {
 
 type ProviderCallTimeline = runtimeports.ProviderCallTimeline
 type ProviderCallOutput = runtimeports.ProviderCallOutput
-
-// Adapter identity lives in providerdomain (single enum); this package switches on
-// providerdomain.ProviderRuntimeAdapter* directly instead of converting.
 
 // CallDrawingAPIWithAssignment executes drawing operation for an assigned account.
 
@@ -205,32 +119,109 @@ func (c *Executor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.
 		if plan.Feature() != feature {
 			return providerTaskParams{}, fmt.Errorf("task execution plan service does not match params service")
 		}
-		if validateErr := validateProviderTaskContract(typedParams, plan); validateErr != nil {
-			return providerTaskParams{}, validateErr
-		}
+		// Plan-consistency is owned fail-closed by tasking submit
+		// (validateSubmitParamsAgainstPlan + submission compiler); the
+		// execution side keeps only the Worker wire最小形状 (task_id /
+		// provider / model presence in CallWorkerAPI, images上限/顺序 in
+		// WorkerRequest.Validate + workerInputRefs, provider_options via
+		// workflow.ParseProviderOptions).
 		executionPlan = &plan
 	} else if len(typedParams.ExecutionPlan) > 0 && string(typedParams.ExecutionPlan) != "null" {
 		return providerTaskParams{}, fmt.Errorf("non-image task must not carry execution plan")
 	}
-	params := newProviderTaskParams(typedParams, nil)
+	params := newProviderTaskParams(typedParams)
 	params.ExecutionPlan = executionPlan
 	return params, nil
 }
 
-func (c *Executor) resolveRuntimeProviderTaskParams(ctx context.Context, params providerTaskParams) (providerTaskParams, error) {
+func workerWorkspaceID(params providerTaskParams) string {
+	if params.Canonical == nil || params.Canonical.Extra == nil {
+		return ""
+	}
+	if ws, ok := params.Canonical.Extra[paramkeys.WorkspaceID].(string); ok {
+		return strings.TrimSpace(ws)
+	}
+	return ""
+}
+
+// workerInputRefs flattens canonical media refs in Worker order (inputs,
+// references, original, mask last). The Worker maps images[0] to the edit
+// input and images[1] to the mask.
+func workerInputRefs(params providerTaskParams) []tasks.MediaRef {
 	if params.Canonical == nil || params.Canonical.Media == nil {
-		return params, nil
+		return nil
 	}
-	if c == nil || c.mediaResolver == nil {
-		return providerTaskParams{}, fmt.Errorf("runtime media resolver is unavailable")
+	media := params.Canonical.Media
+	refs := make([]tasks.MediaRef, 0, len(media.Inputs)+len(media.References)+2)
+	refs = append(refs, media.Inputs...)
+	refs = append(refs, media.References...)
+	if media.Original != nil {
+		refs = append(refs, *media.Original)
 	}
-	runtimeMedia, err := c.mediaResolver.ResolveRuntimeMedia(ctx, params.Canonical)
-	if err != nil {
-		return providerTaskParams{}, fmt.Errorf("resolve task media: %w", err)
+	if media.Mask != nil {
+		refs = append(refs, *media.Mask)
 	}
-	resolved := newProviderTaskParams(params.Canonical, runtimeMedia)
-	resolved.ExecutionPlan = params.ExecutionPlan
-	return resolved, nil
+	out := make([]tasks.MediaRef, 0, len(refs))
+	for _, ref := range refs {
+		if ref.AssetID <= 0 && strings.TrimSpace(ref.PublicAssetID) == "" {
+			continue
+		}
+		out = append(out, ref)
+	}
+	return out
+}
+
+// workerImageSize derives the planned output pixels from canonical controls:
+// explicit custom dimensions win (scaled by quality tier), else ratio plus
+// quality tier snapped to 64px.
+func workerImageSize(controls *tasks.GenerationControls) (width, height int) {
+	var customWidth, customHeight int
+	var ratio, quality string
+	if controls != nil {
+		customWidth, customHeight = int(controls.CustomWidth), int(controls.CustomHeight)
+		ratio, quality = controls.Ratio, controls.Quality
+	}
+	if customWidth > 0 && customHeight > 0 {
+		w, h := customWidth, customHeight
+		switch strings.ToLower(strings.TrimSpace(quality)) {
+		case "2k":
+			w, h = w*2, h*2
+		case "4k":
+			w, h = w*4, h*4
+		}
+		return w, h
+	}
+	wr, hr := 1.0, 1.0
+	if trimmed := strings.TrimSpace(ratio); trimmed != "" {
+		parts := strings.Split(trimmed, ":")
+		if len(parts) == 2 {
+			wVal, errW := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+			hVal, errH := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			if errW == nil && errH == nil && wVal > 0 && hVal > 0 {
+				wr, hr = wVal, hVal
+			}
+		}
+	}
+	k := 1
+	switch strings.ToLower(strings.TrimSpace(quality)) {
+	case "2k":
+		k = 2
+	case "4k":
+		k = 4
+	}
+	baseLength := float64(1024 * k)
+	r := wr / hr
+	var wFloat, hFloat float64
+	if r >= 1.0 {
+		wFloat = baseLength
+		hFloat = math.Round(baseLength / r)
+	} else {
+		hFloat = baseLength
+		wFloat = math.Round(baseLength * r)
+	}
+	w := int(math.Max(64, math.Round(wFloat/64.0)*64.0))
+	h := int(math.Max(64, math.Round(hFloat/64.0)*64.0))
+	return w, h
 }
 
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {
@@ -264,7 +255,7 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 	slog.Info("provider result materialization started", "task_id", taskID, "correlation_id", correlationID, "image_count", len(imageURLs))
 
 	materialized, storeErr := c.resultMaterializer.MaterializeRemoteResults(ctx, userID, taskID, imageURLs, taskmedia.ResultMaterializeOptions{
-		AllowHosts: trustedImageDownloadHosts(ctx, c.publicOrigins),
+		AllowHosts: trustedImageDownloadHosts(ctx),
 	})
 	if storeErr != nil {
 		if errors.Is(storeErr, context.Canceled) {
@@ -335,9 +326,4 @@ func normalizeProviderResultImageURLs(result providerCallResult) []string {
 		urls = append(urls, url)
 	}
 	return urls
-}
-
-func resolveProviderPublicImageURL(c *Executor, ref, label string) (string, error) {
-	var baseParsedURL = c.publicOrigins.APIParsedURL()
-	return providerdomain.ResolveProviderPublicImageURL(baseParsedURL, ref, label)
 }

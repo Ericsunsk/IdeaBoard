@@ -130,9 +130,15 @@ func compileGenerationMedia(snapshot *tasks.GenerationRequestSnapshot, media *ta
 func validateGenerationMedia(snapshot tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan) error {
 	imageInputCount := 0
 	hasMaskInput := false
-	for _, media := range snapshot.Media {
-		if !tasks.IsGenerationMediaRole(media.Role) {
-			return fmt.Errorf("generation compiler media role is invalid")
+	for index, media := range snapshot.Media {
+		// Submit-stage identity: Source URLs are still unresolved here
+		// (execution binds them to AssetIDs later), so Source counts as
+		// identity alongside AssetID/PublicAssetID. InputIndex must be
+		// dense and ordered; the execution-side mirror is owned here.
+		if media.InputIndex != index ||
+			(media.AssetID <= 0 && strings.TrimSpace(media.PublicAssetID) == "" && strings.TrimSpace(media.Source) == "") ||
+			!tasks.IsGenerationMediaRole(media.Role) {
+			return fmt.Errorf("generation compiler media is invalid")
 		}
 		if media.Role == tasks.MediaRoleMask {
 			hasMaskInput = true

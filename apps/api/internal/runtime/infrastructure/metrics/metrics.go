@@ -1,6 +1,6 @@
 // Package metrics is the RED minimal metric set for the API process
 // (issue #765): per-route HTTP latency/error counts, River queue depth and
-// head lag, and AI gateway request/retry counts. All collectors are exposed
+// head lag, and Worker egress request/retry counts. All collectors are exposed
 // on the dedicated /metrics endpoint through the default Prometheus
 // registry; tests build an isolated Set with NewSet(prometheus.NewRegistry()).
 //
@@ -30,7 +30,7 @@ import (
 // paths.
 const UnmatchedRoute = "unmatched"
 
-// UnknownService labels gateway observations whose service slug is missing.
+// UnknownService labels Worker egress observations whose service slug is missing.
 const UnknownService = "unknown"
 
 // DefaultRefreshInterval paces the River queue refresher: fresh enough for
@@ -47,23 +47,23 @@ const RefreshTimeout = 5 * time.Second
 type Set struct {
 	httpRequestsTotal *prometheus.CounterVec
 	httpRequestTime   *prometheus.HistogramVec
-	gatewayRequests   *prometheus.CounterVec
-	gatewayRetries    *prometheus.CounterVec
-	// gatewayPerModelLimited counts sends rejected before egress by the
+	workerRequests   *prometheus.CounterVec
+	workerRetries    *prometheus.CounterVec
+	// workerPerModelLimited counts sends rejected before egress by the
 	// per-model guards (reason=concurrency_limited|breaker_open). Rejections
 	// surface as retryable 429s so the worker requeues with backoff.
-	gatewayPerModelLimited *prometheus.CounterVec
-	// gatewayBreakerOpen reports the per-model breaker state (1=open,
+	workerPerModelLimited *prometheus.CounterVec
+	// workerBreakerOpen reports the per-model breaker state (1=open,
 	// 0=closed/half-open probe admitted). Model labels stay bounded: models
 	// come from the admin catalog/mapping, never from user input.
-	gatewayBreakerOpen *prometheus.GaugeVec
+	workerBreakerOpen *prometheus.GaugeVec
 	// modelFallbacks counts bounded model-fallback sends (#852,
 	// ADR-0012 rule 6): exactly one retry-candidate send per task after
-	// a retryable upstream failure. Labels mirror gatewayRequests
+	// a retryable upstream failure. Labels mirror workerRequests
 	// ({service, outcome}) so fallback success/error splits stay
-	// comparable with gateway outcomes; retry_layer stays out of the
+	// comparable with worker outcomes; retry_layer stays out of the
 	// labels (one counter per layer would triple series for no new
-	// signal: gatewayRetries and this counter already separate them).
+	// signal: workerRetries and this counter already separate them).
 	modelFallbacks  *prometheus.CounterVec
 	riverQueueDepth *prometheus.GaugeVec
 	riverQueueLag   *prometheus.GaugeVec
@@ -82,21 +82,21 @@ func NewSet(reg prometheus.Registerer) *Set {
 			Help:    "HTTP request latency by method, route template and status code.",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"method", "route", "status"}),
-		gatewayRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
+		workerRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_gateway_requests_total",
-			Help: "Cloudflare AI gateway calls by service and final outcome (success/error).",
+			Help: "Worker egress calls by service and final outcome (success/error).",
 		}, []string{"service", "outcome"}),
-		gatewayRetries: prometheus.NewCounterVec(prometheus.CounterOpts{
+		workerRetries: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_gateway_retries_total",
-			Help: "Worker-level task requeues after retryable gateway failures, by service.",
+			Help: "Worker-level task requeues after retryable worker failures, by service.",
 		}, []string{"service"}),
-		gatewayPerModelLimited: prometheus.NewCounterVec(prometheus.CounterOpts{
+		workerPerModelLimited: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_gateway_per_model_limited_total",
-			Help: "Gateway sends rejected before egress by per-model guards, by model and reason (concurrency_limited|breaker_open).",
+			Help: "Worker sends rejected before egress by per-model guards, by model and reason (concurrency_limited|breaker_open).",
 		}, []string{"model", "reason"}),
-		gatewayBreakerOpen: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		workerBreakerOpen: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "ideaboard_gateway_breaker_open",
-			Help: "Per-model gateway breaker state by model (1=open, 0=closed).",
+			Help: "Per-model worker breaker state by model (1=open, 0=closed).",
 		}, []string{"model"}),
 		modelFallbacks: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_model_fallback_total",
@@ -114,10 +114,10 @@ func NewSet(reg prometheus.Registerer) *Set {
 	if reg != nil {
 		s.httpRequestsTotal = registerCounterVec(reg, s.httpRequestsTotal)
 		s.httpRequestTime = registerHistogramVec(reg, s.httpRequestTime)
-		s.gatewayRequests = registerCounterVec(reg, s.gatewayRequests)
-		s.gatewayRetries = registerCounterVec(reg, s.gatewayRetries)
-		s.gatewayPerModelLimited = registerCounterVec(reg, s.gatewayPerModelLimited)
-		s.gatewayBreakerOpen = registerGaugeVec(reg, s.gatewayBreakerOpen)
+		s.workerRequests = registerCounterVec(reg, s.workerRequests)
+		s.workerRetries = registerCounterVec(reg, s.workerRetries)
+		s.workerPerModelLimited = registerCounterVec(reg, s.workerPerModelLimited)
+		s.workerBreakerOpen = registerGaugeVec(reg, s.workerBreakerOpen)
 		s.modelFallbacks = registerCounterVec(reg, s.modelFallbacks)
 		s.riverQueueDepth = registerGaugeVec(reg, s.riverQueueDepth)
 		s.riverQueueLag = registerGaugeVec(reg, s.riverQueueLag)
@@ -208,9 +208,11 @@ func (s *Set) ObserveHTTP(method, route string, status int, latency time.Duratio
 	s.httpRequestTime.WithLabelValues(labels...).Observe(latency.Seconds())
 }
 
-// ObserveGatewayRequest records one finished gateway call. err == nil means
-// success; any error means outcome "error".
-func (s *Set) ObserveGatewayRequest(service string, err error) {
+// ObserveWorkerRequest records one finished Worker egress call. err == nil means
+// success; non-nil errors (including guard rejections) count as failures in
+// RED. The Prometheus metric name stays gateway-dimensioned for dashboard
+// continuity.
+func (s *Set) ObserveWorkerRequest(service string, err error) {
 	if s == nil {
 		return
 	}
@@ -218,50 +220,50 @@ func (s *Set) ObserveGatewayRequest(service string, err error) {
 	if err != nil {
 		outcome = "error"
 	}
-	s.gatewayRequests.WithLabelValues(normalizeService(service), outcome).Inc()
+	s.workerRequests.WithLabelValues(normalizeService(service), outcome).Inc()
 }
 
-// IncGatewayRetry records one worker-level requeue after a retryable
-// gateway failure under River backoff.
-func (s *Set) IncGatewayRetry(service string) {
+// IncWorkerRetry records one worker-level requeue after a retryable
+// worker failure under River backoff.
+func (s *Set) IncWorkerRetry(service string) {
 	if s == nil {
 		return
 	}
-	s.gatewayRetries.WithLabelValues(normalizeService(service)).Inc()
+	s.workerRetries.WithLabelValues(normalizeService(service)).Inc()
 }
 
-// Gateway per-model guard rejection reasons (closed label set).
+// Worker per-model guard rejection reasons (closed label set).
 const (
-	GatewayLimitedConcurrency = "concurrency_limited"
-	GatewayLimitedBreakerOpen = "breaker_open"
+	WorkerLimitedConcurrency = "concurrency_limited"
+	WorkerLimitedBreakerOpen = "breaker_open"
 )
 
-// normalizeGatewayModel keeps the breaker/limiter model label closed to
+// normalizeWorkerModel keeps the breaker/limiter model label closed to
 // admin-controlled values: empty reads as unknown, case folds.
-func normalizeGatewayModel(model string) string {
+func normalizeWorkerModel(model string) string {
 	if trimmed := strings.ToLower(strings.TrimSpace(model)); trimmed != "" {
 		return trimmed
 	}
 	return UnknownService
 }
 
-// IncGatewayPerModelLimited records one send rejected before egress by the
+// IncWorkerPerModelLimited records one send rejected before egress by the
 // per-model guards. A nil Set is a no-op. Reason must be one of the
-// GatewayLimited* constants; anything else reads as concurrency_limited so
+// WorkerLimited* constants; anything else reads as concurrency_limited so
 // the label set stays closed.
-func (s *Set) IncGatewayPerModelLimited(model, reason string) {
+func (s *Set) IncWorkerPerModelLimited(model, reason string) {
 	if s == nil {
 		return
 	}
-	if reason != GatewayLimitedConcurrency && reason != GatewayLimitedBreakerOpen {
-		reason = GatewayLimitedConcurrency
+	if reason != WorkerLimitedConcurrency && reason != WorkerLimitedBreakerOpen {
+		reason = WorkerLimitedConcurrency
 	}
-	s.gatewayPerModelLimited.WithLabelValues(normalizeGatewayModel(model), reason).Inc()
+	s.workerPerModelLimited.WithLabelValues(normalizeWorkerModel(model), reason).Inc()
 }
 
-// SetGatewayBreakerOpen publishes the per-model breaker state (1=open,
+// SetWorkerBreakerOpen publishes the per-model breaker state (1=open,
 // 0=closed). A nil Set is a no-op.
-func (s *Set) SetGatewayBreakerOpen(model string, open bool) {
+func (s *Set) SetWorkerBreakerOpen(model string, open bool) {
 	if s == nil {
 		return
 	}
@@ -269,7 +271,7 @@ func (s *Set) SetGatewayBreakerOpen(model string, open bool) {
 	if open {
 		value = 1.0
 	}
-	s.gatewayBreakerOpen.WithLabelValues(normalizeGatewayModel(model)).Set(value)
+	s.workerBreakerOpen.WithLabelValues(normalizeWorkerModel(model)).Set(value)
 }
 
 // IncModelFallback records one bounded model-fallback send to the

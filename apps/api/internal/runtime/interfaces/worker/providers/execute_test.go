@@ -8,14 +8,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	modelregistryports "ideaboard/api/internal/modelregistry/ports"
-	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
+	"github.com/gin-gonic/gin"
+
+	storageports "ideaboard/api/internal/media/storage/ports"
+	platformworkermedia "ideaboard/api/internal/platform/workermedia"
+	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -23,14 +24,209 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func gatewayTestFactory(serverURL string) runtimeports.GatewayClientFactory {
-	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
+// fakeWorkerTransfer is the test double for the presigned-media seam: HMAC
+// URLs minted against the test server origin, asset keys resolved from a
+// static map, landed bytes kept in memory.
+type fakeWorkerTransfer struct {
+	origin string
+	secret string
+	assets map[string]fakeWorkerAsset
+	puts   map[string][]byte
+	putCT  map[string]string
+}
+
+type fakeWorkerAsset struct {
+	key  string
+	mime string
+}
+
+func newFakeWorkerTransfer(origin string) *fakeWorkerTransfer {
+	return &fakeWorkerTransfer{
+		origin: origin,
+		secret: "test-secret",
+		assets: map[string]fakeWorkerAsset{
+			"asset_input1": {key: "uploads/ws/test/asset_input1/input.png", mime: "image/png"},
+			"asset_mask1":  {key: "uploads/ws/test/asset_mask1/mask.png", mime: "image/png"},
+		},
+		puts:  map[string][]byte{},
+		putCT: map[string]string{},
 	}
 }
 
-type stubRouteOverrideReader struct {
-	path   string
+func (f *fakeWorkerTransfer) PresignInputGET(_ context.Context, _, publicAssetID string) (string, string, error) {
+	// Test simplification: inputs resolve by public asset id alone (the
+	// production transfer scopes by workspace too).
+	asset, ok := f.assets[strings.TrimSpace(publicAssetID)]
+	if !ok {
+		return "", "", errors.New("fake: unknown input asset")
+	}
+	signed := platformworkermedia.SignURL(f.origin, f.secret, http.MethodGet, asset.key, asset.mime, time.Now().UTC().Add(5*time.Minute))
+	return signed, asset.key, nil
+}
+
+func (f *fakeWorkerTransfer) MintOutputKey(workspaceID, taskID string) string {
+	return providerinfra.MintWorkerOutputKey(workspaceID, taskID)
+}
+
+func (f *fakeWorkerTransfer) PresignOutputPUT(key, contentType string) (string, time.Time, error) {
+	expiresAt := time.Now().UTC().Add(5 * time.Minute)
+	return platformworkermedia.SignURL(f.origin, f.secret, http.MethodPut, key, contentType, expiresAt), expiresAt, nil
+}
+
+func (f *fakeWorkerTransfer) ImageKeyFromURL(rawURL string) (string, error) {
+	return platformworkermedia.ParseKey(rawURL)
+}
+
+func (f *fakeWorkerTransfer) VerifyLandedKey(rawURL, expectedKey string) (string, error) {
+	return providerinfra.VerifyLandedKey(rawURL, expectedKey)
+}
+
+func (f *fakeWorkerTransfer) ReadLandedObject(_ context.Context, key string) ([]byte, string, error) {
+	raw, ok := f.puts[key]
+	if !ok {
+		return nil, "", errors.New("fake: landed object missing")
+	}
+	return raw, f.putCT[key], nil
+}
+
+// fakeWorkerHTTPObjects backs the real media HTTP handler in tests.
+type fakeWorkerHTTPObjects struct {
+	data map[string][]byte
+	ct   map[string]string
+}
+
+func (f *fakeWorkerHTTPObjects) ReadObjectAtProfile(_ context.Context, _ string, key string, _ int64) (*storageports.StoredUploadObject, error) {
+	raw, ok := f.data[key]
+	if !ok {
+		return nil, errors.New("fake: object not found")
+	}
+	return &storageports.StoredUploadObject{ObjectKey: key, ContentType: f.ct[key], Data: raw}, nil
+}
+
+func (f *fakeWorkerHTTPObjects) PutObjectAtProfile(_ context.Context, _ string, key string, data []byte, contentType string) error {
+	if f.data == nil {
+		f.data = map[string][]byte{}
+	}
+	if f.ct == nil {
+		f.ct = map[string]string{}
+	}
+	f.data[key] = append([]byte(nil), data...)
+	f.ct[key] = contentType
+	return nil
+}
+
+// fakeWorkerServer serves the real Worker contract plus the real media
+// handlers on one loopback origin: POST /v1/generate validates the
+// CanonicalImageRequest, fetches presigned inputs, PUTs outputs, and
+// returns GenerateSuccess. It is the httptest stand-in for the
+// ai-proxy during independent verification.
+type fakeWorkerServer struct {
+	t             *testing.T
+	server        *httptest.Server
+	transfer      *fakeWorkerTransfer
+	capturedBody  map[string]interface{}
+	capturedAuth  string
+	fetchedInputs int
+	respond       func(taskID, uploadURL string) (int, string)
+	rawPNG        []byte
+}
+
+func newFakeWorkerServer(t *testing.T, inputPNG []byte) *fakeWorkerServer {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	fw := &fakeWorkerServer{t: t, rawPNG: inputPNG, capturedBody: map[string]interface{}{}}
+	objects := &fakeWorkerHTTPObjects{
+		data: map[string][]byte{
+			"uploads/ws/test/asset_input1/input.png": inputPNG,
+			"uploads/ws/test/asset_mask1/mask.png":   inputPNG,
+		},
+		ct: map[string]string{
+			"uploads/ws/test/asset_input1/input.png": "image/png",
+			"uploads/ws/test/asset_mask1/mask.png":   "image/png",
+		},
+	}
+	engine := gin.New()
+	engine.POST("/v1/generate", fw.serveGenerate)
+	h := runtimehttp.NewWorkerMediaHandler("test-secret", objects)
+	engine.GET("/api/v1/worker/media/*key", h.ServeGET)
+	engine.PUT("/api/v1/worker/media/*key", h.ServePUT)
+	fw.server = httptest.NewServer(engine)
+	fw.transfer = newFakeWorkerTransfer(fw.server.URL)
+	// Seed the transfer's landed map with the handler's store so reads
+	// observe real PUTs.
+	fw.transfer.puts = objects.data
+	fw.transfer.putCT = objects.ct
+	return fw
+}
+
+func (fw *fakeWorkerServer) serveGenerate(c *gin.Context) {
+	raw, _ := io.ReadAll(c.Request.Body)
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		c.String(http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	fw.capturedBody = decoded
+	fw.capturedAuth = c.GetHeader("Authorization")
+	taskID, _ := decoded["task_id"].(string)
+	uploadURL, _ := decoded["upload_url"].(string)
+	if fw.respond != nil {
+		status, body := fw.respond(taskID, uploadURL)
+		c.Header("Content-Type", "application/json")
+		c.String(status, body)
+		return
+	}
+	// Default success path: fetch every presigned input, PUT the output,
+	// echo the landed URL.
+	if fw.capturedAuth != "Bearer test-secret" {
+		c.String(http.StatusUnauthorized, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UNAUTHORIZED","message":"unauthorized"}}`)
+		return
+	}
+	images, _ := decoded["images"].([]interface{})
+	for _, item := range images {
+		rawURL, _ := item.(string)
+		resp, err := http.Get(rawURL)
+		if err != nil {
+			c.String(http.StatusBadRequest, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"INPUT_FETCH_FAILED","message":"fetch failed"}}`)
+			return
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		fw.fetchedInputs++
+		if resp.StatusCode != http.StatusOK || len(body) == 0 {
+			c.String(http.StatusBadRequest, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"INPUT_FETCH_FAILED","message":"fetch failed"}}`)
+			return
+		}
+	}
+	if strings.TrimSpace(uploadURL) == "" {
+		c.String(http.StatusBadRequest, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"BAD_REQUEST","message":"upload_url is required"}}`)
+		return
+	}
+	putReq, err := http.NewRequest(http.MethodPut, uploadURL, strings.NewReader("PNG:"+base64.StdEncoding.EncodeToString(fw.rawPNG)))
+	if err != nil {
+		c.String(http.StatusBadGateway, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put build failed"}}`)
+		return
+	}
+	putReq.Header.Set("Content-Type", "image/png")
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		c.String(http.StatusBadGateway, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put failed"}}`)
+		return
+	}
+	putResp.Body.Close()
+	if putResp.StatusCode != http.StatusOK {
+		c.String(http.StatusBadGateway, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put rejected"}}`)
+		return
+	}
+	imageURL := uploadURL
+	if idx := strings.Index(imageURL, "?"); idx >= 0 {
+		imageURL = imageURL[:idx]
+	}
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, `{"task_id":"`+taskID+`","status":"completed","provider":"openai","model":"gpt-image-1","image_url":"`+imageURL+`","content_type":"image/png","receipt":{"upstream_status":200,"provider":"openai","model":"gpt-image-1"}}`)
+}
+
+type stubCustomParamsReader struct {
 	params string
 	found  bool
 	err    error
@@ -41,138 +237,22 @@ type stubRouteOverrideReader struct {
 	gotModel    string
 }
 
-func (s *stubRouteOverrideReader) LookupRouteOverride(_ context.Context, provider, model string) (string, string, bool, error) {
+func (s *stubCustomParamsReader) LookupCustomParams(_ context.Context, provider, model string) (string, bool, error) {
 	s.called = true
 	s.gotProvider, s.gotModel = provider, model
-	return s.path, s.params, s.found, s.err
+	return s.params, s.found, s.err
 }
 
-func TestCallGatewayAPIAppliesCatalogRouteOverride(t *testing.T) {
-	// C2 回归：目录 custom_path/custom_params 必须到达执行，且 customParams
-	// 参与 chat 判定（旧分裂：预览 chat、执行 generations）。
-	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
-	var gotPath string
-	var gotBody []byte
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotBody, _ = io.ReadAll(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
-	}))
-	defer server.Close()
-
-	materializer := &captureResultMaterializer{
-		remoteResult: taskmedia.MaterializedResults{
-			Items: []taskmedia.MaterializedResult{{
-				ImageURL: "/uploads/tasks/42/task-catalog/result.png",
-				Output: tasks.TaskOutput{
-					TaskID: "task-catalog",
-					Role:   "image",
-					URL:    "/uploads/tasks/42/task-catalog/result.png",
-				},
-			}},
-		},
-	}
-	reader := &stubRouteOverrideReader{path: "custom/endpoint/v2", params: `{"type":"chat"}`, found: true}
-	executor := &ProviderExecutor{
-		resultMaterializer: materializer,
-		gatewayFactory:     gatewayTestFactory(server.URL),
-		modelRoutes:        reader,
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-catalog",
-		UserID: 42,
-		Prompt: "catalog override",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-		}),
-	}
-
-	_, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "openai/dall-e-3", ExecutionToken: "tok-1", AttemptNo: 1,
-	})
-	if err != nil {
-		t.Fatalf("CallGatewayAPI returned error: %v", err)
-	}
-	if !reader.called {
-		t.Fatal("catalog route override reader was not consulted")
-	}
-	if reader.gotProvider != "openai" || reader.gotModel != "dall-e-3" {
-		t.Fatalf("override lookup key = %q/%q, want structured openai/dall-e-3", reader.gotProvider, reader.gotModel)
-	}
-	if gotPath != "/openai/custom/endpoint/v2" {
-		t.Fatalf("gateway path = %q, want catalog override route", gotPath)
-	}
-	var chatBody struct {
-		Modalities []string `json:"modalities"`
-	}
-	if err := json.Unmarshal(gotBody, &chatBody); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if len(chatBody.Modalities) != 2 {
-		t.Fatalf("expected chat payload via catalog customParams, body = %s", gotBody)
+func workerTestFactory(transfer *fakeWorkerTransfer) runtimeports.WorkerClientFactory {
+	return func(context.Context) (runtimeports.WorkerClient, error) {
+		return providerinfra.NewWorkerClient(providerinfra.WorkerClientConfig{BaseURL: transfer.origin, Secret: "test-secret"})
 	}
 }
 
-func TestCallGatewayAPIFailsClosedOnRouteOverrideError(t *testing.T) {
-	reader := &stubRouteOverrideReader{err: errors.New("catalog down")}
-	executor := &ProviderExecutor{
-		gatewayFactory: gatewayTestFactory("http://127.0.0.1:1"),
-		modelRoutes:    reader,
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-route-err",
-		UserID: 42,
-		Prompt: "x",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-		}),
-	}
-	_, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "openai/dall-e-3", ExecutionToken: "tok-1", AttemptNo: 1,
-	})
-	if err == nil || !strings.Contains(err.Error(), "读取模型路由配置失败") {
-		t.Fatalf("expected route-config failure, got %v", err)
-	}
-}
-
-func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
-	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
-	var gotPath string
-	var gotBody []byte
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotBody, _ = io.ReadAll(r.Body)
-		w.Header().Set(modelregistryports.GatewayHeaderModel, "openrouter/google/actual-image-model")
-		w.Header().Set(modelregistryports.GatewayHeaderStep, "provider-1")
-		w.Header().Set(modelregistryports.GatewayHeaderCacheStatus, "HIT")
-		w.Header().Set(modelregistryports.GatewayHeaderLogID, "log-1")
-		w.Header().Set(modelregistryports.GatewayHeaderEventID, "event-1")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
-	}))
-	defer server.Close()
-
-	materializer := &captureResultMaterializer{
-		remoteResult: taskmedia.MaterializedResults{
-			Items: []taskmedia.MaterializedResult{{
-				ImageURL: "/uploads/tasks/42/task-prompt/result.png",
-				Output: tasks.TaskOutput{
-					TaskID: "task-prompt",
-					Role:   "image",
-					URL:    "/uploads/tasks/42/task-prompt/result.png",
-				},
-			}},
-		},
-	}
-	executor := &ProviderExecutor{
-		resultMaterializer: materializer,
-		gatewayFactory:     gatewayTestFactory(server.URL),
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-prompt",
+func generationTaskForTest(t *testing.T, taskID string) *tasks.TaskPayload {
+	t.Helper()
+	return &tasks.TaskPayload{
+		TaskID: taskID,
 		UserID: 42,
 		Prompt: "repeatable textile pattern",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
@@ -180,40 +260,71 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
+}
 
-	output, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "openrouter/google/gemini-3.1-flash-lite-image", ExecutionToken: "tok-1", AttemptNo: 1,
+func workerTestExecutor(fw *fakeWorkerServer, customParams runtimeports.ModelCustomParamsReader) *ProviderExecutor {
+	return &ProviderExecutor{
+		resultMaterializer: &captureResultMaterializer{
+			remoteResult: taskmedia.MaterializedResults{
+				Items: []taskmedia.MaterializedResult{{
+					ImageURL: "/uploads/tasks/42/task-x/result.png",
+					Output: tasks.TaskOutput{
+						TaskID: "task-x",
+						Role:   "image",
+						URL:    "/uploads/tasks/42/task-x/result.png",
+					},
+				}},
+			},
+		},
+		workerFactory: workerTestFactory(fw.transfer),
+		customParams:  customParams,
+		transfer:      fw.transfer,
+	}
+}
+
+func TestCallWorkerAPISuccess(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	executor := workerTestExecutor(fw, nil)
+	task := generationTaskForTest(t, "task-prompt")
+
+	output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
 	})
 	if err != nil {
-		t.Fatalf("CallGatewayAPI returned error: %v", err)
+		t.Fatalf("CallWorkerAPI returned error: %v", err)
 	}
-	if gotPath != "/openrouter/api/v1/chat/completions" {
-		t.Fatalf("gateway path = %q, want openrouter chat route", gotPath)
+	// Single Worker exit: split provider/model facts, no path branching.
+	if fw.capturedBody["provider"] != "openai" || fw.capturedBody["model"] != "dall-e-3" {
+		t.Fatalf("provider/model = %v/%v, want split openai + dall-e-3", fw.capturedBody["provider"], fw.capturedBody["model"])
 	}
-	var chatBody struct {
-		Model      string   `json:"model"`
-		Modalities []string `json:"modalities"`
+	if fw.capturedBody["prompt"] != "repeatable textile pattern" {
+		t.Fatalf("prompt = %v", fw.capturedBody["prompt"])
 	}
-	if err := json.Unmarshal(gotBody, &chatBody); err != nil {
-		t.Fatalf("decode chat body: %v", err)
+	for _, banned := range []string{"outputs", "custom_params", "operation", "dry_run", "execution_token", "service", "feature"} {
+		if _, ok := fw.capturedBody[banned]; ok {
+			t.Fatalf("wire body carries legacy %q: %v", banned, fw.capturedBody)
+		}
 	}
-	if chatBody.Model != "google/gemini-3.1-flash-lite-image" {
-		t.Fatalf("chat model = %q", chatBody.Model)
+	// Exact-key presigned PUT: key aligns with future Media scheme,
+	// content-type bound, short TTL.
+	uploadURL, _ := fw.capturedBody["upload_url"].(string)
+	wantKey := providerinfra.MintWorkerOutputKey("", "task-prompt")
+	for _, want := range []string{"/api/v1/worker/media/" + wantKey, "ct=image%2Fpng", "exp=", "sig="} {
+		if !strings.Contains(uploadURL, want) {
+			t.Fatalf("upload_url = %q, want %q", uploadURL, want)
+		}
 	}
-	if len(chatBody.Modalities) != 2 || chatBody.Modalities[1] != "image" {
-		t.Fatalf("modalities = %q", chatBody.Modalities)
+	// The fake Worker really PUT through the presigned URL: landed bytes
+	// carry the bound content-type.
+	if got := fw.transfer.putCT[wantKey]; got != "image/png" {
+		t.Fatalf("landed content-type = %q, want image/png", got)
+	}
+	if output.ResolvedModel != "gpt-image-1" {
+		t.Fatalf("resolved model = %q, want gpt-image-1", output.ResolvedModel)
 	}
 	if len(output.Outputs) != 1 {
 		t.Fatalf("outputs len = %d, want 1", len(output.Outputs))
-	}
-	if output.ResolvedModel != "openrouter/google/actual-image-model" {
-		t.Fatalf("resolved model = %q", output.ResolvedModel)
-	}
-	if output.GatewayStep != "provider-1" || !output.CacheHit || output.ReceiptLogID != "log-1" || output.ReceiptEventID != "event-1" {
-		t.Fatalf("gateway receipt = %+v", output)
-	}
-	if len(materializer.remoteSourceURLs) != 1 || !strings.HasPrefix(materializer.remoteSourceURLs[0], "data:image/png;base64,") {
-		t.Fatalf("unexpected materializer source URLs: %#v", materializer.remoteSourceURLs)
 	}
 
 	var result map[string]interface{}
@@ -226,274 +337,210 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 	if result["parsed_output_status"] != parsedOutputStatusValid {
 		t.Fatalf("parsed_output_status = %#v, want valid", result["parsed_output_status"])
 	}
-	if result["image_url"] != "/uploads/tasks/42/task-prompt/result.png" {
+	if result["image_url"] != "/uploads/tasks/42/task-x/result.png" {
 		t.Fatalf("image_url = %#v", result["image_url"])
 	}
-	if result["model"] != "openrouter/google/gemini-3.1-flash-lite-image" {
+	if result["model"] != "openai/dall-e-3" {
 		t.Fatalf("model = %#v", result["model"])
 	}
 	rawPreview, _ := result["raw_provider_output_preview"].(string)
 	if rawPreview == "" {
 		t.Fatal("raw_provider_output_preview should be present")
 	}
-	if strings.Contains(rawPreview, rawImagePayload) {
+	if strings.Contains(rawPreview, "base64,") {
 		t.Fatalf("raw preview should redact image payload, got %s", rawPreview)
 	}
 }
 
-func TestCallGatewayAPIOpenRouterResolvesRelativeUploads(t *testing.T) {
-	executor := newTestProviderExecutorWithLocalStorage(t)
-	executor.publicOrigins = config.PublicOriginsConfig{Web: "https://api.example.com"}
-	executor.gatewayFactory = gatewayTestFactory("http://127.0.0.1:1")
-	source := buildTinyPNGBytes(t)
-	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
-	relativeRef := "/" + filepath.ToSlash(sourcePath)
-	executor.mediaResolver = testRuntimeMediaResolver{urls: map[int64]string{1: relativeRef, 2: relativeRef}}
-	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
-		t.Fatalf("mkdir upload dir: %v", err)
-	}
-	if err := os.WriteFile(sourcePath, source, 0o600); err != nil {
-		t.Fatalf("write source upload: %v", err)
+func TestCallWorkerAPIWithInputsAndMask(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	executor := workerTestExecutor(fw, nil)
+	task := &tasks.TaskPayload{
+		TaskID: "task-inpaint",
+		UserID: 42,
+		Prompt: "fill the mask",
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Service:       workflow.FeatureSlugInpaint,
+			Media: &tasks.MediaInputs{
+				Inputs: []tasks.MediaRef{{PublicAssetID: "asset_input1", Role: "input"}},
+				Mask:   &tasks.MediaRef{PublicAssetID: "asset_mask1", Role: "mask"},
+			},
+		}),
 	}
 
-	rawParams := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Service:       "variations",
-		Media: &tasks.MediaInputs{
-			Inputs:   []tasks.MediaRef{{AssetID: 1, Role: "input"}},
-			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
-		},
-		Variation: &tasks.VariationsParams{Strength: 40},
-	})
-	task := &tasks.TaskPayload{TaskID: "task-openrouter-storage-input", Prompt: "prompt", Params: rawParams}
-	parsedParams, err := executor.parseAndNormalizeTaskParams(context.Background(), task)
-	if err != nil {
-		t.Fatal(err)
+	if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/gpt-image-1", AttemptNo: 1,
+	}); err != nil {
+		t.Fatalf("CallWorkerAPI returned error: %v", err)
 	}
-	parsedParams, err = executor.resolveRuntimeProviderTaskParams(context.Background(), parsedParams)
-	if err != nil {
-		t.Fatal(err)
+	// Inputs first, mask last; the fake Worker fetched every presigned GET.
+	images, _ := fw.capturedBody["images"].([]interface{})
+	if len(images) != 2 {
+		t.Fatalf("images = %v, want 2 presigned GETs", fw.capturedBody["images"])
 	}
-	providerReq, err := parsedParams.providerRequest(task.Prompt, "google/gemini-3.1-flash-lite-image")
-	if err != nil {
-		t.Fatal(err)
+	if fw.fetchedInputs != 2 {
+		t.Fatalf("fetched inputs = %d, want 2", fw.fetchedInputs)
 	}
-	imageURLs, err := resolveDialectImageURLs(executor, providerReq)
-	if err != nil {
-		t.Fatalf("resolveDialectImageURLs returned error: %v", err)
-	}
-	route, err := dialects.Resolve(workflow.RuntimeOperationRender, "openrouter", "google/gemini-3.1-flash-lite-image", "", "")
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	dialect := route.Dialect
-	body, err := dialect.Encode(dialects.Request{
-		Prompt:    task.Prompt,
-		Model:     "google/gemini-3.1-flash-lite-image",
-		Operation: workflow.RuntimeOperationRender,
-		Images:    imageURLs,
-	})
-	if err != nil {
-		t.Fatalf("dialect Encode returned error: %v", err)
-	}
-	var gotRequest struct {
-		Model    string `json:"model"`
-		Messages []struct {
-			Role    string `json:"role"`
-			Content []struct {
-				Type     string `json:"type"`
-				Text     string `json:"text"`
-				ImageURL *struct {
-					URL string `json:"url"`
-				} `json:"image_url"`
-			} `json:"content"`
-		} `json:"messages"`
-		Modalities []string `json:"modalities"`
-	}
-	if err := json.Unmarshal(body, &gotRequest); err != nil {
-		t.Fatalf("decode payload: %v", err)
-	}
-	if gotRequest.Model != "google/gemini-3.1-flash-lite-image" {
-		t.Fatalf("model = %q", gotRequest.Model)
-	}
-	if len(gotRequest.Modalities) != 2 || gotRequest.Modalities[1] != "image" {
-		t.Fatalf("modalities = %q", gotRequest.Modalities)
-	}
-	if len(gotRequest.Messages) != 1 || len(gotRequest.Messages[0].Content) < 2 {
-		t.Fatalf("expected text plus image_url parts, got %#v", gotRequest.Messages)
-	}
-	if gotRequest.Messages[0].Content[0].Type != "text" || gotRequest.Messages[0].Content[0].Text != "prompt" {
-		t.Fatalf("text part = %#v", gotRequest.Messages[0].Content[0])
-	}
-	imagePart := gotRequest.Messages[0].Content[1]
-	if imagePart.Type != "image_url" || imagePart.ImageURL == nil {
-		t.Fatalf("image part = %#v", imagePart)
-	}
-	if !strings.HasPrefix(imagePart.ImageURL.URL, "https://api.example.com/uploads/") {
-		t.Fatalf("image url = %q, want public uploads URL", imagePart.ImageURL.URL)
+	first, _ := images[0].(string)
+	last, _ := images[1].(string)
+	if !strings.Contains(first, "asset_input1") || !strings.Contains(last, "asset_mask1") {
+		t.Fatalf("images order = %v, want input then mask", images)
 	}
 }
 
-func TestCallGatewayAPIRejectsUnknownModel(t *testing.T) {
-	executor := &ProviderExecutor{gatewayFactory: gatewayTestFactory("http://127.0.0.1:1")}
-	task := &tasks.TaskPayload{
-		TaskID: "task-bad-model",
-		Prompt: "x",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-		}),
+func TestCallWorkerAPIAppliesCatalogCustomParams(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	reader := &stubCustomParamsReader{params: `{"quality":"high"}`, found: true}
+	executor := workerTestExecutor(fw, reader)
+	task := generationTaskForTest(t, "task-catalog")
+
+	if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+	}); err != nil {
+		t.Fatalf("CallWorkerAPI returned error: %v", err)
 	}
-	_, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "no-slash-model", ExecutionToken: "tok", AttemptNo: 1,
+	if !reader.called {
+		t.Fatal("catalog custom params reader was not consulted")
+	}
+	if reader.gotProvider != "openai" || reader.gotModel != "dall-e-3" {
+		t.Fatalf("custom params lookup key = %q/%q, want structured openai/dall-e-3", reader.gotProvider, reader.gotModel)
+	}
+	options, _ := fw.capturedBody["provider_options"].(map[string]interface{})
+	if options["quality"] != "high" {
+		t.Fatalf("provider_options = %v, want catalog quality", fw.capturedBody["provider_options"])
+	}
+}
+
+func TestCallWorkerAPIFailsClosedOnCustomParamsError(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	reader := &stubCustomParamsReader{err: errors.New("catalog down")}
+	transfer := newFakeWorkerTransfer(fw.server.URL)
+	executor := &ProviderExecutor{
+		workerFactory: workerTestFactory(transfer),
+		customParams:  reader,
+		transfer:      transfer,
+	}
+	task := generationTaskForTest(t, "task-route-err")
+	_, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "读取模型路由配置失败") {
+		t.Fatalf("expected route-config failure, got %v", err)
+	}
+}
+
+func TestCallWorkerAPIRejectsUnknownModel(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	executor := workerTestExecutor(fw, nil)
+	task := generationTaskForTest(t, "task-bad-model")
+	_, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "no-slash-model", AttemptNo: 1,
 	})
 	if err == nil {
 		t.Fatal("unqualified model accepted, want error")
 	}
 }
 
-func TestCallGatewayAPIUnknownSlugUsesCustomNamespace(t *testing.T) {
-	// Unknown registry slugs keep the synthetic custom-<slug> namespace
-	// (Control API contract); the native body carries the bare model.
-	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
-	var gotPath string
-	var gotBody struct {
-		Model string `json:"model"`
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &gotBody)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
-	}))
-	defer server.Close()
-
-	executor := &ProviderExecutor{
-		resultMaterializer: &captureResultMaterializer{
-			remoteResult: taskmedia.MaterializedResults{
-				Items: []taskmedia.MaterializedResult{{
-					ImageURL: "/uploads/tasks/42/task-custom/result.png",
-					Output: tasks.TaskOutput{
-						TaskID: "task-custom",
-						Role:   "image",
-						URL:    "/uploads/tasks/42/task-custom/result.png",
-					},
-				}},
-			},
-		},
-		gatewayFactory: gatewayTestFactory(server.URL),
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-custom",
-		UserID: 42,
-		Prompt: "unknown provider model",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-		}),
-	}
-	if _, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "custom-myco/custom-model", ExecutionToken: "tok-custom", AttemptNo: 1,
-	}); err != nil {
-		t.Fatalf("CallGatewayAPI returned error: %v", err)
-	}
-	if gotPath != "/custom-myco/v1/images/generations" {
-		t.Fatalf("gateway path = %q, want /custom-myco/v1/images/generations", gotPath)
-	}
-	if gotBody.Model != "custom-model" {
-		t.Fatalf("native body model = %q, want bare custom-model", gotBody.Model)
+func TestCallWorkerAPIRejectsPathOverride(t *testing.T) {
+	// Legacy @path overrides have no Worker target: fail closed.
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	executor := workerTestExecutor(fw, nil)
+	task := generationTaskForTest(t, "task-override")
+	_, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3@v1/custom", AttemptNo: 1,
+	})
+	if err == nil {
+		t.Fatal("path override accepted, want fail-closed")
 	}
 }
 
-func TestCallGatewayAPICutoutSupportsJSONAndBinary(t *testing.T) {
-	// 1. Test JSON response for cutout
-	serverJSON := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"image": {"url": "https://example.com/cutout_result.png"}}`))
-	}))
-	defer serverJSON.Close()
+func TestCallWorkerAPIRejectsKeyMismatch(t *testing.T) {
+	// The Worker must echo the exact presigned slot key.
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	fw.respond = func(taskID, uploadURL string) (int, string) {
+		return http.StatusOK, `{"task_id":"` + taskID + `","status":"completed","provider":"openai","model":"gpt-image-1","image_url":"https://media.example/w/uploads/ws/unknown/` + taskID + `/evil.png","content_type":"image/png","receipt":{"upstream_status":200,"provider":"openai","model":"gpt-image-1"}}`
+	}
+	executor := workerTestExecutor(fw, nil)
+	task := generationTaskForTest(t, "task-mismatch")
+	_, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "presigned") {
+		t.Fatalf("expected presigned key-mismatch failure, got %v", err)
+	}
+}
 
-	materializer := &captureResultMaterializer{
-		remoteResult: taskmedia.MaterializedResults{
-			Items: []taskmedia.MaterializedResult{{
-				ImageURL: "/uploads/tasks/42/task-cutout/result.png",
-				Output: tasks.TaskOutput{
-					TaskID: "task-cutout",
-					Role:   "image",
-					URL:    "/uploads/tasks/42/task-cutout/result.png",
-				},
-			}},
-		},
+func TestCallWorkerAPISurfacesUpstreamErrors(t *testing.T) {
+	cases := []struct {
+		name     string
+		status   int
+		body     string
+		category string
+	}{
+		{"bad request", 400, `{"task_id":"t","status":"failed","error":{"code":"BAD_REQUEST","message":"upload_url is required"}}`, tasks.FailureCategoryInputInvalid},
+		{"unauthorized", 401, `{"task_id":"t","status":"failed","error":{"code":"UNAUTHORIZED","message":"unauthorized"}}`, tasks.FailureCategoryAuth},
+		{"unsupported", 422, `{"task_id":"t","status":"failed","error":{"code":"UNSUPPORTED_MODEL","message":"queue/async"}}`, tasks.FailureCategoryInputInvalid},
+		{"rate limited", 429, `{"task_id":"t","status":"failed","error":{"code":"UPSTREAM_ERROR","message":"busy","upstream_status":429}}`, tasks.FailureCategoryTimeout},
+		{"server error", 500, `{"task_id":"t","status":"failed","error":{"code":"UPSTREAM_ERROR","message":"boom","upstream_status":500}}`, tasks.FailureCategoryProviderError},
+		{"input fetch", 400, `{"task_id":"t","status":"failed","error":{"code":"INPUT_FETCH_FAILED","message":"fetch failed"}}`, tasks.FailureCategoryProviderError},
+		{"upload", 502, `{"task_id":"t","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put failed"}}`, tasks.FailureCategoryProviderError},
 	}
-	resolver := testRuntimeMediaResolver{urls: map[int64]string{1: "https://example.com/input.png"}}
-	executorJSON := &ProviderExecutor{
-		mediaResolver:      resolver,
-		resultMaterializer: materializer,
-		gatewayFactory:     gatewayTestFactory(serverJSON.URL),
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+			defer fw.server.Close()
+			fw.respond = func(taskID, uploadURL string) (int, string) {
+				return tc.status, tc.body
+			}
+			executor := workerTestExecutor(fw, nil)
+			task := generationTaskForTest(t, "task-err")
+			_, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+				Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+			})
+			if err == nil {
+				t.Fatalf("status %d accepted, want error", tc.status)
+			}
+			stage, category, ok := runtimeports.ExecutionFailureDetails(err)
+			if !ok {
+				t.Fatalf("expected execution failure details, got %T (%v)", err, err)
+			}
+			if stage != tasks.ExecutionStageProvider || category != tc.category {
+				t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageProvider, tc.category)
+			}
+		})
 	}
-	taskJSON := &tasks.TaskPayload{
-		TaskID: "task-cutout",
+}
+
+func TestCallWorkerAPISendsPlannedSize(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	executor := workerTestExecutor(fw, nil)
+	task := &tasks.TaskPayload{
+		TaskID: "task-size",
 		UserID: 42,
+		Prompt: "wide banner",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugCutout,
-			Media: &tasks.MediaInputs{
-				Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
+			Service:       workflow.FeatureSlugGeneration,
+			Controls: &tasks.GenerationControls{
+				CustomWidth: 512, CustomHeight: 256, Quality: "2k",
 			},
 		}),
 	}
-
-	result, err := executorJSON.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task:           taskJSON,
-		Model:          "fal/birefnet@fal-ai/birefnet",
-		ExecutionToken: "tok-2",
-		AttemptNo:      1,
-	})
-	if err != nil {
-		t.Fatalf("JSON cutout failed: %v", err)
+	if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+	}); err != nil {
+		t.Fatalf("CallWorkerAPI returned error: %v", err)
 	}
-	if len(result.Outputs) != 1 || result.Outputs[0].URL != "/uploads/tasks/42/task-cutout/result.png" {
-		t.Fatalf("expected materialized cutout output, got %#v", result.Outputs)
-	}
-
-	// 2. Test binary stream response for upscale
-	tinyPNG := buildTinyPNGBytes(t)
-	serverBinary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write(tinyPNG)
-	}))
-	defer serverBinary.Close()
-
-	executorBinary := &ProviderExecutor{
-		mediaResolver:      resolver,
-		resultMaterializer: materializer,
-		gatewayFactory:     gatewayTestFactory(serverBinary.URL),
-	}
-	taskUpscale := &tasks.TaskPayload{
-		TaskID: "task-upscale",
-		UserID: 42,
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugUpscale,
-			Media: &tasks.MediaInputs{
-				Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
-			},
-			Upscale: &tasks.UpscaleParams{
-				Scale: 2.0,
-			},
-		}),
-	}
-	resultBinary, err := executorBinary.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task:           taskUpscale,
-		Model:          "fal/aura-sr@fal-ai/aura-sr",
-		ExecutionToken: "tok-3",
-		AttemptNo:      1,
-	})
-	if err != nil {
-		t.Fatalf("Binary upscale failed: %v", err)
-	}
-	if len(resultBinary.Outputs) != 1 || resultBinary.Outputs[0].URL != "/uploads/tasks/42/task-cutout/result.png" {
-		t.Fatalf("expected materialized upscale output, got %#v", resultBinary.Outputs)
+	// 512x256 custom at 2k quality scales to 1024x512.
+	if fw.capturedBody["width"] != float64(1024) || fw.capturedBody["height"] != float64(512) {
+		t.Fatalf("size = %v/%v, want 1024/512", fw.capturedBody["width"], fw.capturedBody["height"])
 	}
 }

@@ -8,13 +8,13 @@ import (
 )
 
 // TestWorkspaceBudgetLayeringIsFrozen pins the timeout layering the budget
-// table documents (ADR-0010 rule 4): gateway 300s nests inside the 360s
+// table documents (ADR-0010 rule 4): Worker 300s nests inside the 360s
 // worker execution budget, which nests inside the 17min River outer bound.
 // Values are frozen: this test only converges the layers into one assertion,
 // never retunes them.
 func TestWorkspaceBudgetLayeringIsFrozen(t *testing.T) {
-	if ports.GatewayDefaultTimeout != 300*time.Second {
-		t.Fatalf("ports.GatewayDefaultTimeout = %s, want 300s (frozen canvas budget table)", ports.GatewayDefaultTimeout)
+	if ports.WorkerDefaultTimeout != 300*time.Second {
+		t.Fatalf("ports.WorkerDefaultTimeout = %s, want 300s (frozen canvas budget table)", ports.WorkerDefaultTimeout)
 	}
 	if got := WorkspaceExecutionBudget(); got != 6*time.Minute {
 		t.Fatalf("WorkspaceExecutionBudget() = %s, want 360s (frozen slow-task cap)", got)
@@ -22,8 +22,8 @@ func TestWorkspaceBudgetLayeringIsFrozen(t *testing.T) {
 	if RiverJobTimeoutDrawing != 17*time.Minute {
 		t.Fatalf("RiverJobTimeoutDrawing = %s, want 17m (900s MaxTimeout + 2min overhead)", RiverJobTimeoutDrawing)
 	}
-	if ports.GatewayDefaultTimeout >= WorkspaceExecutionBudget() {
-		t.Fatalf("layering broken: gateway %s must nest inside execution %s", ports.GatewayDefaultTimeout, WorkspaceExecutionBudget())
+	if ports.WorkerDefaultTimeout >= WorkspaceExecutionBudget() {
+		t.Fatalf("layering broken: worker %s must nest inside execution %s", ports.WorkerDefaultTimeout, WorkspaceExecutionBudget())
 	}
 	if WorkspaceExecutionBudget() >= RiverJobTimeoutDrawing {
 		t.Fatalf("layering broken: execution %s must nest inside River %s", WorkspaceExecutionBudget(), RiverJobTimeoutDrawing)

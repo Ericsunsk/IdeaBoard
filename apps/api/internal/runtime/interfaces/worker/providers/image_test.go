@@ -7,19 +7,13 @@ import (
 	"hash/crc32"
 	"strings"
 	"testing"
-
-	"ideaboard/api/internal/platform/config"
 )
 
 func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T) {
 	setTestOutboundAllowHosts(t, "cdn.example.com", "media.example.org:8443")
 
-	got := trustedImageDownloadHosts(
-		context.Background(),
-		config.PublicOriginsConfig{Web: "https://assets.example.com"},
-	)
+	got := trustedImageDownloadHosts(context.Background())
 	want := map[string]bool{
-		"assets.example.com":     true,
 		"cdn.example.com":        true,
 		"media.example.org:8443": true,
 	}

@@ -71,10 +71,11 @@ SET name = EXCLUDED.name,
     config = EXCLUDED.config,
     updated_by = EXCLUDED.updated_by,
     deleted_at = CASE WHEN EXCLUDED.status = 'deleted' THEN COALESCE(storage_profiles.deleted_at, now()) ELSE NULL END
--- #809 hard cut: the locator-immutability guard used to consult
--- media_assets.storage_profile_id, which no longer exists in the
--- workspace model (the prevent_referenced_storage_profile_locator_change
--- trigger was removed with it). Only same-locator updates may proceed.
+-- Only same-locator updates may proceed: the locator-immutability guard
+-- consults storage_profiles only (no media_assets.storage_profile_id
+-- column exists in the workspace model; the
+-- prevent_referenced_storage_profile_locator_change trigger was removed
+-- with it).
 WHERE
     storage_profiles.provider = EXCLUDED.provider
     AND COALESCE(storage_profiles.config->>'endpoint', '') = COALESCE(EXCLUDED.config->>'endpoint', '')

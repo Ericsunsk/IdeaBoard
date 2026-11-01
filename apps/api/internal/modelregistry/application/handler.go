@@ -14,13 +14,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler serves the Admin AI gateway settings endpoints.
+// Handler serves the Admin AI settings endpoints. The workerBaseURL and
+// workerSecret carry the ai-proxy Worker egress (env config) for
+// Preview dry-runs; they are set once at composition time via
+// SetWorkerConfig and never leave the server (dry-run auth stays
+// server-side, browsers only see reachable/status).
 type Handler struct {
 	store modelregistryports.ConfigRepository
 	// observed is the read-only 7-day model observation seam, attached
 	// once at composition time via SetObservedService. Nil keeps
 	// ListModelsObserved fail-closed.
 	observed modelregistryports.ObservedReader
+	// workerBaseURL/workerSecret power Preview dry-runs. Empty keeps
+	// Preview validation-only (reachable false, never an error).
+	workerBaseURL string
+	workerSecret  string
 }
 
 // NewHandler builds the admin handler over the config seam.
@@ -79,40 +87,44 @@ func (h *Handler) Update(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-type previewGatewayRouteRequest struct {
+type previewWorkerRouteRequest struct {
 	ModelID      string `json:"model_id"`
-	CustomPath   string `json:"custom_path"`
 	CustomParams string `json:"custom_params"`
 }
 
-// PreviewGatewayRoute resolves routing facts for a model identifier without
-// touching configuration. Pure function of the request; no store access.
+// PreviewWorkerRoute validates one model identifier and dry-runs it
+// against the Worker when Worker credentials are configured (no billing,
+// no storage writes). Validation-only when unconfigured. The route name
+// stays for Admin compatibility; the logic is Worker-only.
 // Authorization rides the outer Control Plane guard (controlProxy + guard).
-func (h *Handler) PreviewGatewayRoute(c *gin.Context) {
-	var req previewGatewayRouteRequest
+func (h *Handler) PreviewWorkerRoute(c *gin.Context) {
+	var req previewWorkerRouteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, errorrender.MsgAigatewayApplicationUpdate)
 		return
 	}
 	if strings.TrimSpace(req.ModelID) == "" {
-		response.Error(c, http.StatusBadRequest, errorrender.MsgPreviewGatewayRoute)
+		response.Error(c, http.StatusBadRequest, errorrender.MsgPreviewWorkerRoute)
 		return
 	}
-	preview := PreviewGatewayRoute(req.ModelID, req.CustomPath, req.CustomParams)
+	var baseURL, secret string
+	if h != nil {
+		baseURL, secret = h.workerBaseURL, h.workerSecret
+	}
+	preview := PreviewWorkerRoute(c.Request.Context(), baseURL, secret, req.ModelID, req.CustomParams)
 	response.SuccessDTO(c, preview)
 }
 
 type testGatewayConnectionRequest struct {
-	BaseURL  string `json:"base_url"`
-	Token    string `json:"token"`
-	Provider string `json:"provider"`
-	Model    string `json:"model"`
-	Path     string `json:"path"`
+	BaseURL string `json:"base_url"`
+	Secret  string `json:"secret"`
+	Model   string `json:"model"`
 }
 
-// TestConnection probes gateway reachability server-side (browsers cannot
-// read cross-origin status). The token is used for this probe only and never
-// persisted. Pure diagnosis: no configuration is read or written.
+// TestConnection dry-runs one model against the Worker server-side
+// (browsers cannot read cross-origin status). The secret is used for this
+// probe only and never persisted. Pure diagnosis: no configuration is read
+// or written.
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) TestConnection(c *gin.Context) {
 	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
@@ -123,12 +135,11 @@ func (h *Handler) TestConnection(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, errorrender.MsgAigatewayApplicationUpdate)
 		return
 	}
-	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.Trim(strings.TrimSpace(req.Path), "/")
-	if (provider == "") != (path == "") {
-		response.Error(c, http.StatusBadRequest, errorrender.MsgTestConnection)
+	if strings.TrimSpace(req.Model) == "" {
+		response.Error(c, http.StatusBadRequest, errorrender.MsgPreviewWorkerRoute)
 		return
 	}
-	result := ProbeGatewayConnection(c.Request.Context(), req.BaseURL, req.Token, provider, model, path)
+	result := ProbeWorkerConnection(c.Request.Context(), req.BaseURL, req.Secret, req.Model)
 	response.SuccessDTO(c, result)
 }
 
@@ -220,6 +231,17 @@ func (h *Handler) SetObservedService(svc modelregistryports.ObservedReader) {
 		return
 	}
 	h.observed = svc
+}
+
+// SetWorkerConfig attaches the ai-proxy Worker egress (env config) for
+// Preview dry-runs. It is set once at composition time; empty keeps Preview
+// validation-only (reachable false, never an error).
+func (h *Handler) SetWorkerConfig(baseURL, secret string) {
+	if h == nil {
+		return
+	}
+	h.workerBaseURL = strings.TrimSpace(baseURL)
+	h.workerSecret = secret
 }
 
 // ListModelsObserved serves the admin read-only 7-day first-party model

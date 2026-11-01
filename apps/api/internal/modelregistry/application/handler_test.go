@@ -223,7 +223,7 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 		router := gin.New()
 		router.POST("/settings/ai-gateway/route-preview", func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 7, role)
-			NewHandler(&fakeGatewayStore{}).PreviewGatewayRoute(c)
+			NewHandler(&fakeGatewayStore{}).PreviewWorkerRoute(c)
 		})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/settings/ai-gateway/route-preview", strings.NewReader(body))
@@ -232,29 +232,26 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 		return rec
 	}
 
-	t.Run("preview resolves first-party namespace and default path", func(t *testing.T) {
+	t.Run("preview validates the Worker model ref", func(t *testing.T) {
 		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"openai/gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
 		body := rec.Body.String()
-		for _, want := range []string{`"provider_slug":"openai"`, `"is_first_party":true`, `"target_path":"v1/images/generations"`, `"path_source":"generations"`} {
+		for _, want := range []string{`"provider":"openai"`, `"valid":true`, `"reachable":false`} {
 			if !strings.Contains(body, want) {
 				t.Fatalf("body missing %s: %s", want, body)
 			}
 		}
 	})
 
-	t.Run("preview honors path override and custom namespace", func(t *testing.T) {
-		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"custom-myco/my-model","custom_path":"v1/custom/go","custom_params":"{\"type\":\"chat\"}"}`)
+	t.Run("preview rejects bare models", func(t *testing.T) {
+		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
-		body := rec.Body.String()
-		for _, want := range []string{`"provider_slug":"custom-myco"`, `"is_first_party":false`, `"target_path":"v1/custom/go"`, `"path_source":"override"`} {
-			if !strings.Contains(body, want) {
-				t.Fatalf("body missing %s: %s", want, body)
-			}
+		if !strings.Contains(rec.Body.String(), `"valid":false`) {
+			t.Fatalf("body missing invalid verdict: %s", rec.Body.String())
 		}
 	})
 
@@ -354,7 +351,7 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 
 	t.Run("unreachable host reports failure", func(t *testing.T) {
 		// The probe reports transport failure as reachable:false with HTTP 200.
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9"}`)
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9","secret":"s","model":"openai/gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
@@ -363,41 +360,55 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		}
 	})
 
-	t.Run("partial provider or path is rejected", func(t *testing.T) {
-		for _, body := range []string{
-			`{"base_url":"http://127.0.0.1:9","provider":"openai"}`,
-			`{"base_url":"http://127.0.0.1:9","path":"v1/models"}`,
-		} {
-			rec := serveTest(t, principal.RoleAdmin, body)
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
-			}
+	t.Run("missing model is rejected", func(t *testing.T) {
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9","secret":"s"}`)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
 		}
 	})
 
-	t.Run("empty provider and path probe the gateway root", func(t *testing.T) {
+	t.Run("dry-run probes the Worker endpoint", func(t *testing.T) {
 		var capturedPath string
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			capturedPath = r.URL.Path
-			w.WriteHeader(http.StatusNotFound)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"provider":"openai","model":"gpt-image-1","target":{"url":"https://up.example/v1","method":"POST","body":{}},"path_source":"openai:images:generations"}`))
 		}))
 		defer upstream.Close()
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"`+upstream.URL+`"}`)
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"`+upstream.URL+`","secret":"s","model":"openai/gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
-		for _, want := range []string{`"reachable":true`, `"status_code":404`} {
+		// Reachable requires dry-run 200 with a non-empty path_source.
+		for _, want := range []string{`"reachable":true`, `"status_code":200`} {
 			if !strings.Contains(rec.Body.String(), want) {
 				t.Fatalf("body missing %s: %s", want, rec.Body.String())
 			}
 		}
-		if capturedPath != "/" {
-			t.Fatalf("root probe path = %q, want /", capturedPath)
+		if capturedPath != "/v1/dry-run" {
+			t.Fatalf("dry-run path = %q, want /v1/dry-run", capturedPath)
+		}
+	})
+
+	t.Run("dry-run non-200 is unreachable", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		defer upstream.Close()
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"`+upstream.URL+`","secret":"s","model":"openai/gpt-image-1"}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		for _, want := range []string{`"reachable":false`, `"status_code":401`} {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Fatalf("body missing %s: %s", want, rec.Body.String())
+			}
 		}
 	})
 
 	t.Run("non-http URL is rejected", func(t *testing.T) {
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"ftp://example.com/x"}`)
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"ftp://example.com/x","secret":"s","model":"openai/gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}

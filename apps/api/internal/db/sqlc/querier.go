@@ -814,10 +814,11 @@ type Querier interface {
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomerByAccount(ctx context.Context, arg UpsertPaymentCustomerByAccountParams) (PaymentCustomer, error)
 	UpsertServiceModelPoolVersion(ctx context.Context, arg UpsertServiceModelPoolVersionParams) (int64, error)
-	// #809 hard cut: the locator-immutability guard used to consult
-	// media_assets.storage_profile_id, which no longer exists in the
-	// workspace model (the prevent_referenced_storage_profile_locator_change
-	// trigger was removed with it). Only same-locator updates may proceed.
+	// Only same-locator updates may proceed: the locator-immutability guard
+	// consults storage_profiles only (no media_assets.storage_profile_id
+	// column exists in the workspace model; the
+	// prevent_referenced_storage_profile_locator_change trigger was removed
+	// with it).
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertWorkspaceMembership(ctx context.Context, arg UpsertWorkspaceMembershipParams) error

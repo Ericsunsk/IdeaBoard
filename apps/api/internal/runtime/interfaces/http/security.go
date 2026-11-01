@@ -59,9 +59,8 @@ func isTimeoutExemptRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
-	// The legacy /api/user/events SSE stream and /api/user/download
-	// exemptions were deleted with the #809 hard cut. The v1 workspace
-	// event stream honors the standard request timeout like every other
+	// No timeout exemptions exist for event/download streams. The v1
+	// workspace event stream honors the standard request timeout like every other
 	// JSON route (clients resume with Last-Event-ID).
 	if path == RoutePaymentStripeWebhook {
 		return true

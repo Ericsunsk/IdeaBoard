@@ -33,9 +33,9 @@ func TestObserveHTTPLabelsRouteAndStatus(t *testing.T) {
 func TestNilSetObserversNeverCrash(t *testing.T) {
 	var set *Set
 	set.ObserveHTTP("GET", "/x", 200, time.Millisecond)
-	set.ObserveGatewayRequest("render", nil)
-	set.ObserveGatewayRequest("render", errors.New("boom"))
-	set.IncGatewayRetry("render")
+	set.ObserveWorkerRequest("render", nil)
+	set.ObserveWorkerRequest("render", errors.New("boom"))
+	set.IncWorkerRetry("render")
 	set.IncModelFallback("render", nil)
 	set.IncModelFallback("render", errors.New("boom"))
 	set.SetRiverQueue("drawing_default", 3, 1.5)
@@ -46,27 +46,27 @@ func TestNilSetObserversNeverCrash(t *testing.T) {
 
 }
 
-func TestGatewayCountersSplitByFeatureAndOutcome(t *testing.T) {
+func TestWorkerCountersSplitByFeatureAndOutcome(t *testing.T) {
 	set := NewSet(prometheus.NewRegistry())
-	set.ObserveGatewayRequest("render", nil)
-	set.ObserveGatewayRequest("render", errors.New("transport failed"))
-	set.ObserveGatewayRequest("", errors.New("transport failed"))
-	set.IncGatewayRetry("render")
-	set.IncGatewayRetry("")
+	set.ObserveWorkerRequest("render", nil)
+	set.ObserveWorkerRequest("render", errors.New("transport failed"))
+	set.ObserveWorkerRequest("", errors.New("transport failed"))
+	set.IncWorkerRetry("render")
+	set.IncWorkerRetry("")
 
-	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues("render", "success")); got != 1 {
+	if got := testutil.ToFloat64(set.workerRequests.WithLabelValues("render", "success")); got != 1 {
 		t.Fatalf("gateway success = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues("render", "error")); got != 1 {
+	if got := testutil.ToFloat64(set.workerRequests.WithLabelValues("render", "error")); got != 1 {
 		t.Fatalf("gateway error = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues(UnknownService, "error")); got != 1 {
+	if got := testutil.ToFloat64(set.workerRequests.WithLabelValues(UnknownService, "error")); got != 1 {
 		t.Fatalf("gateway unknown error = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues("render")); got != 1 {
+	if got := testutil.ToFloat64(set.workerRetries.WithLabelValues("render")); got != 1 {
 		t.Fatalf("gateway retries = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues(UnknownService)); got != 1 {
+	if got := testutil.ToFloat64(set.workerRetries.WithLabelValues(UnknownService)); got != 1 {
 		t.Fatalf("gateway unknown retries = %v, want 1", got)
 	}
 }

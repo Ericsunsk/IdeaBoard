@@ -2442,8 +2442,8 @@ export const getPreviewControlAIGatewayRouteUrl = () => {
 }
 
 /**
- * Pure routing dry-run (no configuration read or write), so it registers as a POST read-guard without idempotency requirements.
- * @summary Dry-run gateway routing for a model identifier
+ * Worker dry-run validation (no billing, no storage writes): validates the model ref and, when the Worker is configured, dry-runs it server-side. Registers as a POST read-guard without idempotency requirements.
+ * @summary Dry-run Worker validation for a model identifier
  */
 export const previewControlAIGatewayRoute = async (
   previewControlAIGatewayRouteBody: PreviewControlAIGatewayRouteBody,
@@ -2526,7 +2526,7 @@ export type PreviewControlAIGatewayRouteMutationVariables = {
 }
 
 /**
- * @summary Dry-run gateway routing for a model identifier
+ * @summary Dry-run Worker validation for a model identifier
  */
 export const usePreviewControlAIGatewayRoute = <
   TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
@@ -2555,8 +2555,8 @@ export const getTestControlAIGatewayConnectionUrl = () => {
 }
 
 /**
- * The token is used for this probe only and never persisted. Pure diagnosis: no configuration is read or written.
- * @summary Probe gateway reachability server-side
+ * The secret is used for this dry-run only and never persisted. Pure diagnosis: no configuration is read or written.
+ * @summary Dry-run a model against the Worker server-side
  */
 export const testControlAIGatewayConnection = async (
   testControlAIGatewayConnectionBody: TestControlAIGatewayConnectionBody,
@@ -2640,7 +2640,7 @@ export type TestControlAIGatewayConnectionMutationVariables = {
 }
 
 /**
- * @summary Probe gateway reachability server-side
+ * @summary Dry-run a model against the Worker server-side
  */
 export const useTestControlAIGatewayConnection = <
   TError =

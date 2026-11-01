@@ -34,9 +34,9 @@ var configEnvKeys = []string{
 	"INIT_ADMIN_DISPLAY_NAME",
 	"ATLAS_CLEAN_BREAK_ALLOW_RESET",
 	"APP_SECRETS_ENCRYPTION_KEY",
-	"AI_GATEWAY_PER_MODEL_LIMIT",
-	"AI_GATEWAY_BREAKER_COOLDOWN_SECONDS",
-	"AI_GATEWAY_BREAKER_FAILURE_RATE",
+	"WORKER_PER_MODEL_LIMIT",
+	"WORKER_BREAKER_COOLDOWN_SECONDS",
+	"WORKER_BREAKER_FAILURE_RATE",
 }
 
 func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
@@ -175,36 +175,36 @@ func TestLoadRiverWorkerConcurrency(t *testing.T) {
 	}
 }
 
-func TestLoadGatewaySafetySwitches(t *testing.T) {
+func TestLoadWorkerSafetySwitches(t *testing.T) {
 	resetConfigEnv(t)
-	got := Load().Worker.Gateway
-	if got.PerModelLimit != DefaultGatewayPerModelLimit {
-		t.Fatalf("default PerModelLimit = %d, want %d", got.PerModelLimit, DefaultGatewayPerModelLimit)
+	got := Load().Worker.Resilience
+	if got.PerModelLimit != DefaultWorkerPerModelLimit {
+		t.Fatalf("default PerModelLimit = %d, want %d", got.PerModelLimit, DefaultWorkerPerModelLimit)
 	}
-	if got.BreakerCooldownSeconds != DefaultGatewayBreakerCooldownSeconds {
-		t.Fatalf("default BreakerCooldownSeconds = %d, want %d", got.BreakerCooldownSeconds, DefaultGatewayBreakerCooldownSeconds)
+	if got.BreakerCooldownSeconds != DefaultWorkerBreakerCooldownSeconds {
+		t.Fatalf("default BreakerCooldownSeconds = %d, want %d", got.BreakerCooldownSeconds, DefaultWorkerBreakerCooldownSeconds)
 	}
-	if got.BreakerFailureRatePercent != DefaultGatewayBreakerFailureRatePercent {
-		t.Fatalf("default BreakerFailureRatePercent = %d, want %d", got.BreakerFailureRatePercent, DefaultGatewayBreakerFailureRatePercent)
+	if got.BreakerFailureRatePercent != DefaultWorkerBreakerFailureRatePercent {
+		t.Fatalf("default BreakerFailureRatePercent = %d, want %d", got.BreakerFailureRatePercent, DefaultWorkerBreakerFailureRatePercent)
 	}
 
 	resetConfigEnv(t)
-	t.Setenv("AI_GATEWAY_PER_MODEL_LIMIT", "4")
-	t.Setenv("AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "60")
-	t.Setenv("AI_GATEWAY_BREAKER_FAILURE_RATE", "25")
-	got = Load().Worker.Gateway
+	t.Setenv("WORKER_PER_MODEL_LIMIT", "4")
+	t.Setenv("WORKER_BREAKER_COOLDOWN_SECONDS", "60")
+	t.Setenv("WORKER_BREAKER_FAILURE_RATE", "25")
+	got = Load().Worker.Resilience
 	if got.PerModelLimit != 4 || got.BreakerCooldownSeconds != 60 || got.BreakerFailureRatePercent != 25 {
-		t.Fatalf("configured gateway switches = %+v, want opt-in values", got)
+		t.Fatalf("configured worker switches = %+v, want opt-in values", got)
 	}
 
-	for _, env := range []string{"AI_GATEWAY_PER_MODEL_LIMIT", "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "AI_GATEWAY_BREAKER_FAILURE_RATE"} {
+	for _, env := range []string{"WORKER_PER_MODEL_LIMIT", "WORKER_BREAKER_COOLDOWN_SECONDS", "WORKER_BREAKER_FAILURE_RATE"} {
 		resetConfigEnv(t)
 		t.Setenv(env, "bogus")
 		cfg := Load()
-		if cfg.Worker.Gateway.PerModelLimit != DefaultGatewayPerModelLimit ||
-			cfg.Worker.Gateway.BreakerCooldownSeconds != DefaultGatewayBreakerCooldownSeconds ||
-			cfg.Worker.Gateway.BreakerFailureRatePercent != DefaultGatewayBreakerFailureRatePercent {
-			t.Fatalf("invalid %s did not fall back to defaults: %+v", env, cfg.Worker.Gateway)
+		if cfg.Worker.Resilience.PerModelLimit != DefaultWorkerPerModelLimit ||
+			cfg.Worker.Resilience.BreakerCooldownSeconds != DefaultWorkerBreakerCooldownSeconds ||
+			cfg.Worker.Resilience.BreakerFailureRatePercent != DefaultWorkerBreakerFailureRatePercent {
+			t.Fatalf("invalid %s did not fall back to defaults: %+v", env, cfg.Worker.Resilience)
 		}
 		found := false
 		for _, key := range cfg.InvalidEnv {

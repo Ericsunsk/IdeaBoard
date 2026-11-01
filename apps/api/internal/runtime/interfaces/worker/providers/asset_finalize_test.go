@@ -1,16 +1,11 @@
 package providers
 
 // Asset-kind finalize test: the workspace provider-result materializer
-// ingests bytes before finalize, so CallGatewayAPI must accept outputs
-// that carry a workspace asset id with no URL round-trip. URL outputs keep
-// the existing validation untouched (see execute_test.go).
+// ingests bytes before finalize, so CallWorkerAPI must accept outputs
+// that carry a workspace asset id with no URL round-trip.
 
 import (
 	"context"
-	"encoding/base64"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -41,18 +36,14 @@ func (m *assetKindResultMaterializer) MaterializeRemoteResults(_ context.Context
 	return taskmedia.MaterializedResults{Items: items}, nil
 }
 
-func TestCallGatewayAPIAcceptsAssetKindOutputs(t *testing.T) {
-	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.ReadAll(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
-	}))
-	defer server.Close()
+func TestCallWorkerAPIAcceptsAssetKindOutputs(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
 
 	executor := &ProviderExecutor{
 		resultMaterializer: &assetKindResultMaterializer{prefix: "asset_faketest000"},
-		gatewayFactory:     gatewayTestFactory(server.URL),
+		workerFactory:      workerTestFactory(fw.transfer),
+		transfer:           fw.transfer,
 	}
 	task := &tasks.TaskPayload{
 		TaskID: "task-asset-finalize",
@@ -64,11 +55,11 @@ func TestCallGatewayAPIAcceptsAssetKindOutputs(t *testing.T) {
 		}),
 	}
 
-	output, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
-		Task: task, Model: "openrouter/fake-test-image", ExecutionToken: "tok-asset", AttemptNo: 1,
+	output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task: task, Model: "openai/fake-test-image", AttemptNo: 1,
 	})
 	if err != nil {
-		t.Fatalf("CallGatewayAPI with asset-kind outputs: %v", err)
+		t.Fatalf("CallWorkerAPI with asset-kind outputs: %v", err)
 	}
 	if len(output.Outputs) != 1 {
 		t.Fatalf("outputs len = %d, want 1", len(output.Outputs))

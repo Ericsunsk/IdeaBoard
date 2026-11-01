@@ -1,30 +1,30 @@
 package worker
 
 // Live dispatch proof: the worker Generate consumes the canonical plan
-// through the REAL gateway executor against a fake gateway, the workspace
-// materializer ingests provider bytes, the renderer verifies, and
+// through the REAL Worker executor against a fake Worker, the workspace
+// materializer ingests landed bytes, the renderer verifies, and
 // settlement completes atomically. The fail-closed twins prove missing
-// gateway credentials and missing pool routes converge deterministically
+// Worker configuration and missing pool routes converge deterministically
 // (failed, no requeue, hold released).
 //
-// No secrets anywhere: the fake gateway runs on httptest with an
-// obviously-fake placeholder token, and all image bytes are local fixtures.
+// No secrets anywhere: the fake Worker runs on httptest with an
+// obviously-fake placeholder secret, and all image bytes are local fixtures.
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/media/workspacemedia"
-	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
-	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
+	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -35,40 +35,109 @@ import (
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 )
 
-// liveDispatchGatewayServer serves one canned chat-completions image
-// result (inline data: PNG, the common generation path).
-func liveDispatchGatewayServer(t *testing.T) *httptest.Server {
+// liveDispatchTransfer is the test double for the presigned-media seam:
+// fake HMAC URLs, static input keys, canned landed bytes.
+type liveDispatchTransfer struct {
+	secret string
+	puts   map[string][]byte
+}
+
+func newLiveDispatchTransfer() *liveDispatchTransfer {
+	return &liveDispatchTransfer{secret: "test-secret", puts: map[string][]byte{}}
+}
+
+func (f *liveDispatchTransfer) PresignInputGET(_ context.Context, _, _ string) (string, string, error) {
+	return "", "", errors.New("live dispatch has no media inputs")
+}
+
+func (f *liveDispatchTransfer) MintOutputKey(workspaceID, taskID string) string {
+	return platformworkermedia.MintOutputKey(workspaceID, taskID)
+}
+
+func (f *liveDispatchTransfer) PresignOutputPUT(key, contentType string) (string, time.Time, error) {
+	expiresAt := time.Now().UTC().Add(5 * time.Minute)
+	return platformworkermedia.SignURL("https://worker.example.test", f.secret, http.MethodPut, key, contentType, expiresAt), expiresAt, nil
+}
+
+func (f *liveDispatchTransfer) ImageKeyFromURL(rawURL string) (string, error) {
+	return platformworkermedia.ParseKey(rawURL)
+}
+
+func (f *liveDispatchTransfer) VerifyLandedKey(rawURL, expectedKey string) (string, error) {
+	return providerinfra.VerifyLandedKey(rawURL, expectedKey)
+}
+
+func (f *liveDispatchTransfer) ReadLandedObject(_ context.Context, key string) ([]byte, string, error) {
+	raw, ok := f.puts[key]
+	if !ok {
+		return nil, "", errors.New("live dispatch: landed object missing")
+	}
+	return raw, "image/png", nil
+}
+
+// liveDispatchWorkerServer serves one canned Worker result in the real
+// contract shape: it records the CanonicalImageRequest, lands canned PNG
+// bytes for the requested upload slot, and echoes the landed URL.
+func liveDispatchWorkerServer(t *testing.T, transfer *liveDispatchTransfer) *httptest.Server {
 	t.Helper()
-	payload := base64.StdEncoding.EncodeToString(fixturePNGBytes(t))
+	png := fixturePNGBytes(t)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.ReadAll(r.Body)
+		if r.URL.Path != "/v1/generate" {
+			t.Errorf("worker path = %q, want /v1/generate", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-secret" {
+			t.Errorf("worker auth = %q, want Bearer test-secret", got)
+		}
+		raw, _ := io.ReadAll(r.Body)
+		var decoded struct {
+			TaskID    string `json:"task_id"`
+			Provider  string `json:"provider"`
+			Model     string `json:"model"`
+			UploadURL string `json:"upload_url"`
+		}
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			t.Errorf("decode worker request: %v", err)
+		}
+		if decoded.Provider == "" || decoded.Model == "" || decoded.UploadURL == "" {
+			t.Errorf("worker request missing provider/model/upload_url: %s", raw)
+		}
+		slotKey, err := platformworkermedia.ParseKey(decoded.UploadURL)
+		if err != nil || strings.TrimSpace(slotKey) == "" {
+			t.Errorf("upload url has no exact key: %q", decoded.UploadURL)
+		} else {
+			transfer.puts[slotKey] = append([]byte(nil), png...)
+		}
+		imageURL := decoded.UploadURL
+		if idx := strings.Index(imageURL, "?"); idx >= 0 {
+			imageURL = imageURL[:idx]
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + payload + `"}}]}}]}`))
+		_, _ = w.Write([]byte(`{"task_id":"` + decoded.TaskID + `","status":"completed","provider":"` + decoded.Provider + `","model":"` + decoded.Model + `","image_url":"` + imageURL + `","content_type":"image/png","receipt":{"upstream_status":200,"provider":"` + decoded.Provider + `","model":"` + decoded.Model + `"}}`))
 	}))
 }
 
-// liveDispatchGatewayCallerAdapter bridges the real runtime gateway
-// executor to the worker seam under test. Test-local (test files may
-// import runtime; the worker itself may not), mirroring the production
-// workspaceGatewayCallerAdapter in runtime/composition/wiring.
-type liveDispatchGatewayCallerAdapter struct {
-	executor *providers.Executor
+// liveDispatchWorkerCall is the test-only Worker seam: it adapts the REAL
+// providers.Executor (fake Worker server + fake transfer) to the worker
+// under test. The canonical translation is workspaceWorkerCallerAdapter in
+// runtime/composition/wiring/workspace_worker_adapter.go — the sole
+// implementation. This func seam exists only because the worker package (and
+// its internal tests) cannot import the composition layer without an import
+// cycle while the production type stays unexported; keep the field-for-field
+// mapping below in sync with it. Deliberate difference: no nil fail-closed
+// guard (the harness always injects an executor; nil coverage lives in
+// wiring's workspace_worker_adapter_test.go).
+type liveDispatchWorkerCall func(ctx context.Context, input WorkspaceWorkerCallInput) (WorkspaceWorkerCallOutput, error)
+
+func (f liveDispatchWorkerCall) CallWorkerAPI(ctx context.Context, input WorkspaceWorkerCallInput) (WorkspaceWorkerCallOutput, error) {
+	return f(ctx, input)
 }
 
-func (a *liveDispatchGatewayCallerAdapter) CallGatewayAPI(ctx context.Context, input WorkspaceGatewayCallInput) (WorkspaceGatewayCallOutput, error) {
-	output, err := a.executor.CallGatewayAPI(ctx, runtimeports.GatewayCallInput{
-		Task: input.Task, Model: input.Model, ExecutionToken: input.ExecutionToken,
-	})
-	if err != nil {
-		return WorkspaceGatewayCallOutput{}, err
-	}
-	return WorkspaceGatewayCallOutput{Outputs: output.Outputs}, nil
-}
+var _ WorkspaceWorkerCaller = liveDispatchWorkerCall(nil)
 
-func liveDispatchGatewayFactory(serverURL string) runtimeports.GatewayClientFactory {
-	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{
-			BaseURL: serverURL, Token: "test-token",
+func liveDispatchWorkerFactory(serverURL string) runtimeports.WorkerClientFactory {
+	return func(context.Context) (runtimeports.WorkerClient, error) {
+		return providerinfra.NewWorkerClient(providerinfra.WorkerClientConfig{
+			BaseURL: serverURL, Secret: "test-secret",
 		})
 	}
 }
@@ -118,7 +187,7 @@ func (e *liveDispatchEnv) submit(t *testing.T, key string) *tasks.WorkspaceTask 
 	return created
 }
 
-func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayClientFactory) *WorkspaceTaskWorker {
+func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.WorkerClientFactory, transfer *liveDispatchTransfer) *WorkspaceTaskWorker {
 	t.Helper()
 	materializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: e.media, Objects: e.objects,
@@ -129,7 +198,7 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayC
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceProviderResultMaterializer: %v", err)
 	}
-	executor := providers.NewExecutor(nil, materializer, config.PublicOriginsConfig{}, factory, nil)
+	executor := providers.NewExecutor(materializer, factory, nil, transfer)
 	assets := &workspacemedia.TaskAssetAdapter{Store: e.media}
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
 		Media: e.media, Assets: assets,
@@ -139,7 +208,15 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayC
 	}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: e.store, Settler: e.service, Assets: assets,
-		Provider: NewWorkspaceGatewayProvider(&liveDispatchGatewayCallerAdapter{executor: executor}),
+		Provider: NewWorkspaceWorkerProvider(liveDispatchWorkerCall(func(ctx context.Context, input WorkspaceWorkerCallInput) (WorkspaceWorkerCallOutput, error) {
+			output, err := executor.CallWorkerAPI(ctx, runtimeports.WorkerCallInput{
+				Task: input.Task, Model: input.Model,
+			})
+			if err != nil {
+				return WorkspaceWorkerCallOutput{}, err
+			}
+			return WorkspaceWorkerCallOutput{Outputs: output.Outputs}, nil
+		})),
 		Renderer: renderer,
 	})
 	if err != nil {
@@ -149,7 +226,7 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayC
 }
 
 // liveDispatchLoopbackPolicy mirrors the providers package TestMain: the
-// fake gateway runs on httptest loopback, which the SSRF guard denies by
+// fake Worker runs on httptest loopback, which the SSRF guard denies by
 // default. Scoped per test (restore on cleanup) so no other test in this
 // package observes the widened egress.
 type liveDispatchLoopbackPolicy struct{}
@@ -174,7 +251,7 @@ func pinLiveDispatchSnapshot(t *testing.T, env *liveDispatchEnv, created *tasks.
 	return pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "generation", []string{model}))
 }
 
-// Submit persists the plan, the fake gateway serves bytes, the materializer
+// Submit persists the plan, the fake Worker serves bytes, the materializer
 // ingests them, the renderer verifies, and settlement captures atomically.
 // The execution model comes from the pinned RoutingSnapshot: the bridge
 // consumes only the snapshot selection, never a live lookup.
@@ -182,17 +259,18 @@ func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	allowLiveDispatchLoopback(t)
 	env := newLiveDispatchEnv()
-	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-key"), "openrouter/fake-test-image")
+	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-key"), "openai/fake-test-image")
 
 	if !strings.Contains(created.CanonicalParams, "execution_plan") {
 		t.Fatalf("canonical params lack the execution plan: %.120s", created.CanonicalParams)
 	}
 
-	server := liveDispatchGatewayServer(t)
+	transfer := newLiveDispatchTransfer()
+	server := liveDispatchWorkerServer(t, transfer)
 	defer server.Close()
 	// The bridge must NOT consult the live mapping: the durable plan
 	// model wins, so this stub fails the test if it is ever called.
-	worker := env.liveWorker(t, liveDispatchGatewayFactory(server.URL))
+	worker := env.liveWorker(t, liveDispatchWorkerFactory(server.URL), transfer)
 
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
 		t.Fatalf("Work: %v", err)
@@ -226,21 +304,21 @@ func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 	}
 }
 
-// Missing gateway credentials fail closed deterministically: the task
-// converges to failed with the gateway reason, consumes no retry budget,
+// Missing Worker configuration fails closed deterministically: the task
+// converges to failed with the Worker reason, consumes no retry budget,
 // and releases the full hold. The plan IS minted (model mapped); only the
-// credential seam is absent.
-func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testing.T) {
+// Worker egress seam is absent.
+func TestWorkspaceTaskLiveDispatchFailsClosedWithoutWorkerConfig(t *testing.T) {
 	ctx := context.Background()
 	env := newLiveDispatchEnv()
-	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-no-creds"), "openrouter/fake-test-image")
+	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-no-creds"), "openai/fake-test-image")
 
-	// The real missing-credential sentinel (no secret material, just the
-	// error the config seam returns when unconfigured).
-	factory := func(context.Context) (runtimeports.GatewayClient, error) {
-		return nil, modelregistrydomain.ErrAIGatewayNotConfigured
+	// The real missing-configuration sentinel (no secret material, just the
+	// error the Worker factory returns when unconfigured).
+	factory := func(context.Context) (runtimeports.WorkerClient, error) {
+		return nil, errors.New("worker base URL is required (WORKER_BASE_URL)")
 	}
-	worker := env.liveWorker(t, factory)
+	worker := env.liveWorker(t, factory, newLiveDispatchTransfer())
 
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
 		t.Fatalf("Work must converge (nil), got: %v", err)
@@ -255,8 +333,8 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testin
 	if got.RetryCount != 0 {
 		t.Fatalf("retry_count = %d, want 0 (deterministic, no requeue)", got.RetryCount)
 	}
-	if !strings.Contains(got.ErrorMsg, "AI gateway is not configured") {
-		t.Fatalf("error_msg = %q, want the gateway reason", got.ErrorMsg)
+	if !strings.Contains(got.ErrorMsg, "WORKER_BASE_URL") {
+		t.Fatalf("error_msg = %q, want the Worker configuration reason", got.ErrorMsg)
 	}
 	env.holder.mu.Lock()
 	released := env.holder.releases["hold_"+created.ID]
@@ -280,7 +358,7 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutRoutingSnapshot(t *testing.T
 	if created.ResolvedModel != "" {
 		t.Fatalf("resolved_model = %q, want empty (no model is minted at submit)", created.ResolvedModel)
 	}
-	worker := env.liveWorker(t, liveDispatchGatewayFactory("http://127.0.0.1:1"))
+	worker := env.liveWorker(t, liveDispatchWorkerFactory("http://127.0.0.1:1"), newLiveDispatchTransfer())
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
 		t.Fatalf("Work must converge (nil), got: %v", err)
 	}

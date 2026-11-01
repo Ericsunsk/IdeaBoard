@@ -57,12 +57,16 @@ export type GatewayProviderOption = {
   id_prefix: string
 }
 
-type GatewayRoutePreview = {
-  provider_slug: string
-  is_first_party: boolean
-  target_path: string
-  path_source: string
-  path_source_label: string
+type WorkerRoutePreview = {
+  provider: string
+  model: string
+  // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (Worker dry-run preview).
+  valid: boolean
+  // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (Worker dry-run preview).
+  reachable: boolean
+  status_code: number
+  latency_ms: number
+  message: string
 }
 
 type UpdateGatewayConfigRequest = {
@@ -78,9 +82,8 @@ export interface AdminGatewayCatalog {
   previewRoute: (input: {
     modelId: string
     provider?: string | undefined
-    customPath?: string | undefined
     customParams?: string | undefined
-  }) => Promise<GatewayRoutePreview>
+  }) => Promise<WorkerRoutePreview>
   listProviders: () => Promise<GatewayProviderOption[]>
   listObserved: () => Promise<ModelObservedSnapshot[]>
 }
@@ -91,10 +94,8 @@ export interface AdminGatewayConnection {
   testConnection: (
     input: {
       base_url: string
-      token?: string | undefined
-      provider?: string | undefined
-      model?: string | undefined
-      path?: string | undefined
+      secret?: string | undefined
+      model: string
     },
     options?: ControlMutationOptions,
   ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
@@ -268,17 +269,15 @@ async function saveModelCatalog(
 async function previewModelRoute(input: {
   modelId: string
   provider?: string | undefined
-  customPath?: string | undefined
   customParams?: string | undefined
-}): Promise<GatewayRoutePreview> {
+}): Promise<WorkerRoutePreview> {
   const bare = input.modelId.trim()
   const provider = (input.provider ?? '').trim()
   const body = await previewControlAIGatewayRoute({
     model_id: provider ? `${provider}/${bare}` : bare,
-    ...(input.customPath != null ? { custom_path: input.customPath } : {}),
     ...(input.customParams != null ? { custom_params: input.customParams } : {}),
   })
-  return requireContractData<GatewayRoutePreview>(body, '路由透视失败')
+  return requireContractData<WorkerRoutePreview>(body, '路由透视失败')
 }
 
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
@@ -327,10 +326,8 @@ async function updateGatewayConnection(
 async function testGatewayConnection(
   input: {
     base_url: string
-    token?: string | undefined
-    provider?: string | undefined
-    model?: string | undefined
-    path?: string | undefined
+    secret?: string | undefined
+    model: string
   },
   options: ControlMutationOptions = {},
 ): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
@@ -339,10 +336,8 @@ async function testGatewayConnection(
     body = await testControlAIGatewayConnection(
       {
         base_url: input.base_url,
-        provider: input.provider ?? '',
-        path: input.path ?? '',
-        ...(input.token != null ? { token: input.token } : {}),
-        ...(input.model != null ? { model: input.model } : {}),
+        ...(input.secret != null ? { secret: input.secret } : {}),
+        model: input.model,
       },
       { headers: buildControlMutationHeaders(options) },
     )

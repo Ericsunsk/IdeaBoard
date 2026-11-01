@@ -45,14 +45,17 @@ describe('Admin gateway resource', () => {
   })
 
   it.each([
-    ['openrouter', 'google/gemini-3-flash'],
-    ['fal', 'fal-ai/flux-pro/v1.1'],
+    ['openai', 'gpt-image-1'],
+    ['fal', 'fal-ai/flux-pro'],
   ])('previews %s nested names with the explicit provider', async (provider, modelId) => {
     let payload: unknown
     useMswHandlers(
       http.post('/api/control/v1/platform/ai-gateway/route-preview', async ({ request }) => {
         payload = await request.json()
-        return HttpResponse.json({ data: { provider_slug: provider } })
+        return HttpResponse.json({
+          // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+          data: { provider, valid: true },
+        })
       }),
     )
     await createAdminGatewayResource().catalog.previewRoute({ provider, modelId })
@@ -105,11 +108,14 @@ describe('Admin gateway resource', () => {
         })
         return HttpResponse.json({
           data: {
-            provider_slug: 'openai',
-            is_first_party: false,
-            target_path: '/v1/chat/completions',
-            path_source: 'default',
-            path_source_label: '默认路由',
+            provider: 'openai',
+            model: 'openai/gpt-image-1',
+            // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+            valid: true,
+            reachable: true,
+            status_code: 200,
+            latency_ms: 38,
+            message: 'Worker 干跑正常 (38ms, HTTP 200)',
           },
         })
       }),
@@ -127,22 +133,33 @@ describe('Admin gateway resource', () => {
           body: await request.json(),
         })
         return HttpResponse.json({
-          data: { reachable: true, status_code: 200, latency_ms: 38, message: 'ok' },
+          data: {
+            // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+            reachable: true,
+            status_code: 200,
+            latency_ms: 38,
+            message: 'ok',
+          },
         })
       }),
     )
     const resource = createAdminGatewayResource()
 
     await expect(resource.catalog.previewRoute({ modelId: 'm' })).resolves.toMatchObject({
-      provider_slug: 'openai',
-      target_path: '/v1/chat/completions',
+      provider: 'openai',
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+      valid: true,
     })
     expect(seen[0]?.body).toEqual({ model_id: 'm' })
 
     // 裸名在此拼接 provider（仅传输）：后端仍消费组合 model_id。
     await expect(
       resource.catalog.previewRoute({ modelId: 'gpt-image-1', provider: 'openai' }),
-    ).resolves.toMatchObject({ provider_slug: 'openai' })
+    ).resolves.toMatchObject({
+      provider: 'openai',
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+      valid: true,
+    })
     expect(seen[1]?.body).toEqual({ model_id: 'openai/gpt-image-1' })
 
     await expect(resource.catalog.listProviders()).resolves.toMatchObject([
@@ -152,14 +169,14 @@ describe('Admin gateway resource', () => {
 
     await expect(
       resource.connection.testConnection(
-        { base_url: 'https://gateway.example.com', provider: 'openai', path: 'v1/models' },
+        { base_url: 'https://worker.example.com', secret: 's3cr3t', model: 'openai/gpt-image-1' },
         options,
       ),
     ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
     expect(seen[2]?.body).toMatchObject({
-      base_url: 'https://gateway.example.com',
-      provider: 'openai',
-      path: 'v1/models',
+      base_url: 'https://worker.example.com',
+      secret: 's3cr3t',
+      model: 'openai/gpt-image-1',
     })
   })
 

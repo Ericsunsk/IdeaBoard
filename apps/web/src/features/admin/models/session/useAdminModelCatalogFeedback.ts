@@ -17,8 +17,6 @@ export type AdminModelCatalogFeedback = {
 }
 
 export type AdminGatewayConfigFeedback = {
-  testPassed: (message: string | null | undefined) => void
-  testFailed: (message: string | null | undefined) => void
   loadFailed: (error: unknown) => void
   saveFailed: (error: unknown) => void
   rereadFailed: (error: unknown) => void
@@ -42,8 +40,6 @@ const ADMIN_MODEL_CATALOG_COPY = {
 }
 
 const ADMIN_GATEWAY_CONFIG_COPY = {
-  testPassed: { successMessage: '网关连接测试成功' },
-  testFailed: { errorMessage: '网关连接测试失败' },
   loadFailed: { error: '读取网关配置失败' },
   saveFailed: { error: '保存网关配置失败' },
   rereadFailed: { error: '配置已保存，但重读网关状态失败，请重试' },

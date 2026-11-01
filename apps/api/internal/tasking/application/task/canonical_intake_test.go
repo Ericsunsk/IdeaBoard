@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
@@ -425,4 +426,119 @@ func TestCompileWorkspaceParamsEnforcesMaskPolicy(t *testing.T) {
 			t.Fatalf("mask %v = nil, want error", bad)
 		}
 	}
+}
+
+// Plan-consistency is submit-owned (C4): tampered durable facts must fail
+// closed in validateSubmitParamsAgainstPlan. Each case starts from a valid
+// CompileWorkspaceParams baseline, tampers one plan-bound fact, and requires
+// the submit-side validator to reject it.
+func TestSubmitParamsAgainstPlanRejectsIllegalPlans(t *testing.T) {
+	upscaleBaseline := func(t *testing.T) (*tasks.WorkflowTaskParams, workflow.FeatureExecutionPlan) {
+		t.Helper()
+		raw, err := CompileWorkspaceParams(workflow.FeatureSlugUpscale, "ignored prompt", map[string]interface{}{
+			CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+			"upscale":                           map[string]interface{}{"scale": 2.0},
+		})
+		if err != nil {
+			t.Fatalf("compile upscale baseline: %v", err)
+		}
+		typed, err := tasks.UnmarshalParams(raw)
+		if err != nil {
+			t.Fatalf("decode upscale baseline: %v", err)
+		}
+		plan, err := workflow.DecodeFeatureExecutionPlan(typed.ExecutionPlan)
+		if err != nil {
+			t.Fatalf("decode upscale plan: %v", err)
+		}
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err != nil {
+			t.Fatalf("valid baseline rejected: %v", err)
+		}
+		return typed, plan
+	}
+	t.Run("output count mismatch", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Controls.OutputCount++
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("tampered output count accepted, want fail-closed")
+		}
+	})
+	t.Run("generation snapshot service mismatch", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Generation.Service = workflow.FeatureSlugRender
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("tampered snapshot service accepted, want fail-closed")
+		}
+	})
+	t.Run("generation snapshot primitive mismatch", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Generation.Primitive = string(workflow.GenerationPrimitiveTextToImage)
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("tampered snapshot primitive accepted, want fail-closed")
+		}
+	})
+	t.Run("media dropped below plan", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Media.Inputs = nil
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("dropped media accepted, want fail-closed")
+		}
+	})
+	t.Run("foreign control presence", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Variation = &tasks.VariationsParams{Strength: 50}
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("foreign variation on upscale accepted, want fail-closed")
+		}
+	})
+	t.Run("missing required control", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Upscale = nil
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("missing upscale control accepted, want fail-closed")
+		}
+	})
+	t.Run("upscale scale out of range", func(t *testing.T) {
+		typed, plan := upscaleBaseline(t)
+		typed.Upscale.Scale = 8
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("out-of-range scale accepted, want fail-closed")
+		}
+	})
+	t.Run("fusion weights diverge from inputs", func(t *testing.T) {
+		// URL-source media lose Source on JSON round-trip (json:"-"), so
+		// build the baseline in-memory through the canonical stages and
+		// validate pre-marshal, exactly where CompileWorkspaceParams calls
+		// the validator.
+		params := map[string]interface{}{
+			"service":    workflow.FeatureSlugFusion,
+			"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+			"fusion":     map[string]interface{}{"input_weights": []interface{}{3.0, 1.0}},
+		}
+		if err := normalizeSubmitExecutionMap(params, workflow.FeatureSlugFusion); err != nil {
+			t.Fatalf("normalize fusion baseline: %v", err)
+		}
+		plan, err := compileSubmitExecutionPlan(params, workflow.FeatureSlugFusion)
+		if err != nil {
+			t.Fatalf("compile fusion plan: %v", err)
+		}
+		typed, err := finalizeSubmitTypedParams(params, workflow.FeatureSlugFusion, plan)
+		if err != nil {
+			t.Fatalf("finalize fusion baseline: %v", err)
+		}
+		snapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
+			Plan: plan, UserPrompt: "fuse", CompiledPrompt: "fuse",
+			TemplateFingerprint: tasksubmission.TemplateFingerprint("", "fuse"), Params: typed,
+		})
+		if err != nil {
+			t.Fatalf("compile fusion snapshot: %v", err)
+		}
+		typed.Generation = &snapshot
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err != nil {
+			t.Fatalf("valid fusion baseline rejected: %v", err)
+		}
+		typed.Fusion.InputWeights = append(typed.Fusion.InputWeights, 0.1)
+		if err := validateSubmitParamsAgainstPlan(typed, plan); err == nil {
+			t.Fatal("diverged fusion weights accepted, want fail-closed")
+		}
+	})
 }

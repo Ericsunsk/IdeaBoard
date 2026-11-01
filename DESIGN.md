@@ -21,7 +21,7 @@
 
 ## 系统形态
 
-IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、AI Gateway 出口和 Media Storage 协作。AccountPool 已退役，见 [ADR-0009](./docs/adr/0009-accountpool-retirement.md)。
+IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、Worker 出口（ai-proxy）和 Media Storage 协作。AccountPool 已退役，见 [ADR-0009](./docs/adr/0009-accountpool-retirement.md)。
 
 ```mermaid
 flowchart TB
@@ -35,7 +35,7 @@ flowchart TB
     API --> Worker["Runtime Worker"]
 
     Worker --> Postgres
-    Worker --> AI["Cloudflare AI Gateway<br>sole egress"]
+    Worker --> EdgeWorker["Edge Worker<br>sole image egress"]
     Worker --> Storage["Local / S3-compatible Storage"]
     Worker --> NATS
     API --> Storage
@@ -104,13 +104,13 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 ### 4. Worker 是 runtime adapter
 
-workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它消费 Tasking、Workflow、Prompts 和 Media 的接口，经 `internal/runtime/interfaces/worker/providers` 做 Cloudflare AI Gateway provider calls，并收敛运行时错误。River worker execution 与周期性后台 job（credit reconciliation、payment、vision billing）由 `internal/runtime/interfaces/worker` 的 `river`/`billing`/`visionbilling` 子包拥有。
+workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它消费 Tasking、Workflow、Prompts 和 Media 的接口，经 `internal/runtime/interfaces/worker/providers` 调 sole Worker egress（ai-proxy），并收敛运行时错误。River worker execution 与周期性后台 job（credit reconciliation、payment、vision billing）由 `internal/runtime/interfaces/worker` 的 `river`/`billing`/`visionbilling` 子包拥有。
 
-重试分三层，各自有独立事实（`ExecutionAttempt.retry_layer` 与 `gateway_retry_count`）：网关内部重试（同 Model，有界 HTTP policy，归 gateway adapter）、Model fallback（最多一次，只用快照里的 `retry_candidate`，归 worker）、River 整任务重投（transient 失败后按 `MaxProviderRequeues` 整任务 requeue，reset + River backoff + 新 execution token，以 `tasks.retry_count` 为界，归 task lifecycle）。确定性失败（参数非法、额度不足、内容安全拒绝、鉴权失败、not-found、成功但 payload 不可用）直接终态，绝不消耗 fallback 预算；无标记的未知结果同样 fail closed 到终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md)、[ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md) 与 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。
+重试分三层，各自有独立事实（`ExecutionAttempt.retry_layer` 与 `gateway_retry_count` 列名冻结）：Worker 内部重试（同 Model，有界单次发送，归 Worker）、Model fallback（最多一次，只用快照里的 `retry_candidate`，归 worker）、River 整任务重投（transient 失败后按 `MaxProviderRequeues` 整任务 requeue，reset + River backoff + 新 execution token，以 `tasks.retry_count` 为界，归 task lifecycle）。确定性失败（参数非法、额度不足、内容安全拒绝、鉴权失败、not-found、成功但 payload 不可用）直接终态，绝不消耗 fallback 预算；无标记的未知结果同样 fail closed 到终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md)、[ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md) 与 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。
 
-不要把 provider execution 和后台 job adapter 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义，其 `interfaces/worker` 拥有 workspace task 的执行编排（快照消费、attempt 事实、重试分层）；provider 方言与网关调用、River worker execution 和后台 job 仍属 Runtime。
+不要把 provider execution 和后台 job adapter 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义，其 `interfaces/worker` 拥有 workspace task 的执行编排（快照消费、attempt 事实、重试分层）；Worker 调用、River worker execution 和后台 job 仍属 Runtime。
 
-模型图片请求的 vendor 方言收敛在 `internal/runtime/interfaces/worker/providers/dialects`：按 `(provider, model, customParams)` 一次分发（chat 判定优先、Fal 专表、其余 generic），shaping 与解析纯函数无网络。路径推断仍归 `workflow.ResolveRoute`（execution 与 preview 共用单 seam），membership 与别名归 `workflow.ResolveProvider`，custom 参数由 worker 在 Encode 后合并一次，重试/缓存/超时归网关（ADR-0008/0010）。claim 与 attempt 行在同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态。
+模型图片请求的 shaping 与 provider 路由收敛在 Worker 内：API 只发送 canonical task facts（snapshot-selected model、prompt、operation、inputs、presigned output slots）与 opaque custom params，不做 vendor 分发与 path 推断；membership 与别名归 `workflow.ResolveProvider`，重试/超时归 Worker（ADR-0010 超时分层不变）。claim 与 attempt 行在同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态。
 
 ### 5. Feature Prompt 只保存当前模板
 
@@ -193,7 +193,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Identity                                                      | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                                   |
 | Tenancy                                                       | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、Billing Account 稳定解析（Personal / Organization scope 内共享、创建后归属不变、fail closed）与财务 Owner/Admin 权限；Personal Default 私有不可邀请（#952），非 Default Personal 空间 Owner/Admin 直接邀请/移除协作者（无需持有人逐次批准）；不拥有账务写入                                          |
 | MemberQuotas                                                | `internal/memberquotas`                             | 成员跨空间消费额度（#946，日／周／月 UTC 窗口、固定累计或不限额，累计上限非钱包）：同一事务 Quote 后 Hold 前检查（Owner 短路 + 额度行锁串行化并发提交）、按 Billing Account + User 跨空间按真实操作人累计、在途按原事实收敛、linked 退款修正原窗口；新 Org Member / Personal 协作者默认 unlimited、邀请永放行（#947 默认表/门已退役，无双实现）；Org 按 org 池 + user 汇总、Owner 恒 unlimited、Owner 设 Admin、Owner/Admin 设 Member、Admin 不可改 Owner/Admin（403），Personal 按 holder 池 + user 汇总、持有人管理；调额/成员变化不清零，成员可见自身用量与阻止原因 |
-| [ModelRegistry](./apps/api/internal/modelregistry/CONTEXT.md)  | `internal/modelregistry`                              | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
+| [ModelRegistry](./apps/api/internal/modelregistry/CONTEXT.md)  | `internal/modelregistry`                              | Admin 模型面：model catalog、Vision mapping、Worker route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
 | Boards                                                        | `internal/boards`                                     | board ownership、access checks、board management API                                                                                              |
 | Media                                                         | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                                 |
 | Library                                                       | `internal/library`                                    | 按 source 区分的收藏引用（外部灵感素材与受管 Media 保存）、Folder、按来源幂等保存与 cursor 分页；外部行保存 provider URL 和 source metadata，Media 行只存 Media 身份并按需投射尺寸 |

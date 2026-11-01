@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"strings"
 	"testing"
 
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -85,7 +86,7 @@ func generationMediaFromParamsForTest(media *tasks.MediaInputs) []tasks.Generati
 	}
 	result := make([]tasks.GenerationMediaIntent, 0, len(media.Inputs)+len(media.References)+2)
 	appendRef := func(ref tasks.MediaRef, fallbackRole string) {
-		if ref.AssetID <= 0 {
+		if ref.AssetID <= 0 && strings.TrimSpace(ref.PublicAssetID) == "" {
 			return
 		}
 		role := ref.Role
@@ -93,7 +94,7 @@ func generationMediaFromParamsForTest(media *tasks.MediaInputs) []tasks.Generati
 			role = fallbackRole
 		}
 		result = append(result, tasks.GenerationMediaIntent{
-			InputIndex: len(result), Role: role, AssetID: ref.AssetID, Weight: ref.Weight,
+			InputIndex: len(result), Role: role, AssetID: ref.AssetID, PublicAssetID: strings.TrimSpace(ref.PublicAssetID), Weight: ref.Weight,
 		})
 	}
 	for _, ref := range media.Inputs {

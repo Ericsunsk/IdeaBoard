@@ -16,28 +16,7 @@
     </button>
 
     <div v-if="isOpen" class="mt-3 flex flex-col gap-3.5 border-t border-border pt-3">
-      <!-- 自定义网关路径 (Path Override) -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex items-center justify-between">
-          <label
-            class="text-admin-caption font-semibold text-foreground"
-            for="model-custom-path-input"
-          >
-            {{ MODELS_MESSAGES.gatewayPathLabel }}
-          </label>
-          <span class="text-admin-caption text-muted-foreground">{{
-            MODELS_MESSAGES.gatewayPathHint
-          }}</span>
-        </div>
-        <AdminInput
-          id="model-custom-path-input"
-          :model-value="customPath"
-          :placeholder="MODELS_MESSAGES.gatewayPathPlaceholder"
-          @update:model-value="emit('update:customPath', String($event))"
-        />
-      </div>
-
-      <!-- 额外自定义参数 (JSON) -->
+      <!-- 额外自定义参数 (JSON)：Worker 在默认参数之后展开合并 -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label
@@ -77,19 +56,16 @@ import { MODELS_MESSAGES } from '../../pages/messages'
 
 const props = withDefaults(
   defineProps<{
-    customPath?: string | undefined
     customParams?: string | undefined
     initiallyOpen?: boolean
   }>(),
   {
-    customPath: '',
     customParams: '',
     initiallyOpen: false,
   },
 )
 
 const emit = defineEmits<{
-  'update:customPath': [value: string]
   'update:customParams': [value: string]
 }>()
 

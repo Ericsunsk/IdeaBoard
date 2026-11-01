@@ -33,9 +33,11 @@
 export type TestControlAIGatewayConnectionBody = {
   /** @minLength 1 */
   base_url: string
-  token?: string
-  provider?: string
-  model?: string
-  /** Optional provider-native path. Leave provider and path both empty to probe the gateway root URL for liveness; filling both probes the provider route. Exactly one empty is rejected as ambiguous. */
-  path?: string
+  /** Worker secret used for this dry-run only; never persisted. */
+  secret?: string
+  /**
+   * Model identifier (provider/bare-model) to dry-run.
+   * @minLength 1
+   */
+  model: string
 }

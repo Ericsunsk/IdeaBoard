@@ -33,6 +33,5 @@
 export type PreviewControlAIGatewayRouteBody = {
   /** @minLength 1 */
   model_id: string
-  custom_path?: string
   custom_params?: string
 }

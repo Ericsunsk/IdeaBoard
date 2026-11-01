@@ -333,11 +333,12 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.list_ai_gateway_providers", Route: "GET /platform/ai-gateway/providers"}, ControlCapabilityPlatform, gatewayAvailable, h.ListProviders))
 		control.GET("/platform/ai-gateway/models-observed", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_models_observed", Route: "GET /platform/ai-gateway/models-observed"}, ControlCapabilityPlatform, gatewayAvailable, h.ListModelsObserved))
-		// Route preview and connection test are pure routing/connectivity
-		// dry-runs (no configuration read or write), so they register as
-		// POST read-guards without idempotency requirements.
+		// Worker preview and connection test are dry-runs (no billing, no
+		// storage writes; preview skips network when Worker is
+		// unconfigured), so they register as POST read-guards without
+		// idempotency requirements.
 		control.POST("/platform/ai-gateway/route-preview", d.controlProxy(
-			controlRoute{Operation: "platform.preview_ai_gateway_route", Route: "POST /platform/ai-gateway/route-preview"}, ControlCapabilityPlatform, gatewayAvailable, h.PreviewGatewayRoute))
+			controlRoute{Operation: "platform.preview_ai_gateway_route", Route: "POST /platform/ai-gateway/route-preview"}, ControlCapabilityPlatform, gatewayAvailable, h.PreviewWorkerRoute))
 		control.POST("/platform/ai-gateway/test-connection", d.controlProxy(
 			controlRoute{Operation: "platform.test_ai_gateway_connection", Route: "POST /platform/ai-gateway/test-connection"}, ControlCapabilityPlatform, gatewayAvailable, h.TestConnection))
 	}

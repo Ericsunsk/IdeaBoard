@@ -1,0 +1,21 @@
+{
+  "name": "ideaboard-ai-proxy",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "lint": "prettier . --check"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "@types/node": "^22.20.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.48.0"
+  }
+}

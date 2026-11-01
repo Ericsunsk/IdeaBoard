@@ -605,10 +605,11 @@ type UpsertStorageProfileParams struct {
 	UpdatedBy pgtype.Int8 `json:"updated_by"`
 }
 
-// #809 hard cut: the locator-immutability guard used to consult
-// media_assets.storage_profile_id, which no longer exists in the
-// workspace model (the prevent_referenced_storage_profile_locator_change
-// trigger was removed with it). Only same-locator updates may proceed.
+// Only same-locator updates may proceed: the locator-immutability guard
+// consults storage_profiles only (no media_assets.storage_profile_id
+// column exists in the workspace model; the
+// prevent_referenced_storage_profile_locator_change trigger was removed
+// with it).
 func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertStorageProfile,
 		arg.ProfileID,

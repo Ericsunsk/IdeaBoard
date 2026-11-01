@@ -32,7 +32,7 @@
       </div>
     </div>
 
-    <!-- 网关路由透视卡 (Cloudflare AI Gateway Route Inspector) -->
+    <!-- Worker 干跑透视卡 (Edge Worker Dry-run Inspector) -->
     <div class="flex flex-col gap-2.5 rounded-panel border border-border bg-card p-4 shadow-raised">
       <div class="flex items-center gap-2">
         <Globe class="size-4 text-primary" />
@@ -43,33 +43,27 @@
         <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.routeProviderLabel }}</span>
           <span class="font-mono font-medium text-foreground">
-            {{ routePreview.providerSlug }}
-            <span
-              v-if="routePreview.isFirstParty"
-              class="ml-1 inline-flex rounded-control bg-success-soft px-1 text-admin-micro font-medium text-success"
-            >
-              {{ MODELS_MESSAGES.routeFirstParty }}
-            </span>
-            <span
-              v-else
-              class="ml-1 inline-flex rounded-control bg-muted px-1 text-admin-micro font-medium text-muted-foreground"
-            >
-              {{ MODELS_MESSAGES.routeCustomNamespace }}
+            {{ routePreview.provider || MODELS_MESSAGES.editRouteUnspecified }}
+            <span class="ml-1 font-mono text-admin-caption text-muted-foreground">
+              {{ routePreview.model }}
             </span>
           </span>
         </div>
 
         <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
-          <span class="text-muted-foreground">{{ MODELS_MESSAGES.routePathLabel }}</span>
-          <span class="font-mono text-foreground text-admin-caption">
-            {{ routePreview.targetPath }}
+          <span class="text-muted-foreground">{{ MODELS_MESSAGES.routeValidityLabel }}</span>
+          <span
+            class="inline-flex rounded-control px-1 text-admin-micro font-medium"
+            :class="routePreview.isValid ? 'bg-success-soft text-success' : 'bg-destructive-soft text-destructive'"
+          >
+            {{ routePreview.isValid ? MODELS_MESSAGES.routeValid : MODELS_MESSAGES.routeInvalid }}
           </span>
         </div>
 
         <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
-          <span class="text-muted-foreground">{{ MODELS_MESSAGES.routeProtocolLabel }}</span>
+          <span class="text-muted-foreground">{{ MODELS_MESSAGES.routeDryRunLabel }}</span>
           <span class="font-medium text-foreground">
-            {{ routePreview.protocol }}
+            {{ routePreview.message }}
           </span>
         </div>
 
@@ -89,16 +83,17 @@ import AdminModelCardBody from '../../controls/AdminModelCardBody.vue'
 import type { AdminModelItem } from '../../../core/catalogData'
 import { MODELS_MESSAGES } from '../../pages/messages'
 
-export interface GatewayRoutePreviewState {
-  providerSlug: string
-  isFirstParty: boolean
-  targetPath: string
-  protocol: string
+export interface WorkerPreviewState {
+  provider: string
+  model: string
+  isValid: boolean
+  isReachable: boolean
+  message: string
 }
 
 defineProps<{
   model: AdminModelItem
   modelId: string
-  routePreview: GatewayRoutePreviewState
+  routePreview: WorkerPreviewState
 }>()
 </script>

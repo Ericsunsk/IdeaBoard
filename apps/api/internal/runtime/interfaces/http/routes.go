@@ -30,6 +30,10 @@ type Dependencies struct {
 	// v1 owns the workspace media surface. Composition wires the same
 	// instance to both Dependencies.MediaPreviews and the v1 deps.
 	MediaPreviews *preview.Service
+	// WorkerMedia serves the HMAC presigned media handoff for the sole
+	// Worker egress (presigned GET inputs, one presigned PUT output).
+	// Nil keeps the handoff fail-closed (every URL 503s at verification).
+	WorkerMedia *WorkerMediaHandler
 	// REDMetrics feeds the per-route latency/error middleware. Nil keeps the
 	// middleware a pass-through; production wires the Prometheus set.
 	REDMetrics *redmetrics.Set
@@ -74,6 +78,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerGlobalMiddleware(r, deps)
 	registerPublicRoutes(r, deps.ReadyChecker)
 	registerPublicMediaRoutes(r, deps.MediaPreviews)
+	registerWorkerMediaRoutes(r, deps.WorkerMedia)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
 	// Plane split: the /api/v1 Public Data Plane (v1.RegisterContractV1RoutesOnEngine +
@@ -81,8 +86,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	// Control Plane (control.RegisterContractControlRoutesOnEngine) are
 	// mounted by composition (registerHTTPRoutes), not here, so the kernel
 	// never imports v1/control (no import cycle: planes import the kernel).
-	// Legacy /api/user and /api/admin routes were deleted by the #809
-	// hard cut (no compatibility aliases, no dual-read/dual-write).
+	// No /api/user or /api/admin routes exist here (no compatibility
+	// aliases, no dual-read/dual-write).
 	// Registered before the SPA fallback so explicit contract routes
 	// win over NoRoute.
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)

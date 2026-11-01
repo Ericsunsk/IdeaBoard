@@ -4,10 +4,10 @@
 // recovery). Both guards reject fail-closed with a retryable 429 before any
 // network I/O so the worker requeues with River backoff instead of burning
 // the upstream or stranding the task. Thresholds are code-owned conservative
-// defaults overridable through GatewayResilienceConfig (env-backed in
+// defaults overridable through WorkerResilienceConfig (env-backed in
 // wiring); nil metrics keeps unit paths uninstrumented.
 //
-// Timeout layering (ADR-0010): gateway 300s per attempt (runtimeports.GatewayDefaultTimeout)
+// Timeout layering (ADR-0010): Worker 300s per attempt (runtimeports.WorkerDefaultTimeout)
 // nests inside the worker 360s execution budget
 // (riverpolicy.WorkspaceExecutionBudget), which nests inside the River 17min
 // job timeout (RiverJobTimeoutDrawing). This file adds no timeout of its own.
@@ -22,12 +22,12 @@ import (
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 )
 
-// GatewayResilienceConfig tunes the per-model guards. Zero values take the
+// WorkerResilienceConfig tunes the per-model guards. Zero values take the
 // conservative defaults; out-of-range values are clamped fail-closed to the
 // nearest bound (never unbounded: a zero MaxConcurrentPerModel reads as the
 // default, never unlimited).
-type GatewayResilienceConfig struct {
-	// MaxConcurrentPerModel caps in-flight gateway sends per model.
+type WorkerResilienceConfig struct {
+	// MaxConcurrentPerModel caps in-flight Worker sends per model.
 	MaxConcurrentPerModel int
 	// WindowSize bounds the outcome ring per model (failure/slow rates are
 	// computed over at most this many recent sends).
@@ -60,11 +60,11 @@ const (
 	maxResilienceCooldown      = 5 * time.Minute
 )
 
-// DefaultGatewayResilienceConfig returns the conservative code-owned
+// DefaultWorkerResilienceConfig returns the conservative code-owned
 // defaults: a tight per-model cap, a 20-call fuse window at 50% errors/slow
 // (>=60s) sends, and a 30s open before one half-open probe.
-func DefaultGatewayResilienceConfig() GatewayResilienceConfig {
-	return GatewayResilienceConfig{
+func DefaultWorkerResilienceConfig() WorkerResilienceConfig {
+	return WorkerResilienceConfig{
 		MaxConcurrentPerModel: defaultResilienceMaxConcurrent,
 		WindowSize:            defaultResilienceWindowSize,
 		MinCalls:              defaultResilienceMinCalls,
@@ -76,7 +76,7 @@ func DefaultGatewayResilienceConfig() GatewayResilienceConfig {
 
 // normalize clamps the config fail-closed: every field keeps an explicit
 // bound so no combination yields unlimited concurrency or a never-open fuse.
-func (c GatewayResilienceConfig) normalize() GatewayResilienceConfig {
+func (c WorkerResilienceConfig) normalize() WorkerResilienceConfig {
 	if c.MaxConcurrentPerModel <= 0 {
 		c.MaxConcurrentPerModel = defaultResilienceMaxConcurrent
 	}
@@ -110,46 +110,56 @@ func (c GatewayResilienceConfig) normalize() GatewayResilienceConfig {
 	return c
 }
 
-// GatewayResilience is the process-shared per-model guard set. One instance
-// is built in composition wiring and injected into every GatewayClient so
+// WorkerResilience is the process-shared per-model guard set. One instance
+// is built in composition wiring and injected into every WorkerClient so
 // breaker windows and concurrency slots span executions; per-client
 // instances would reset on every task and never fuse. It is safe for
 // concurrent use; a nil receiver fails closed in checkAndAcquire (no
 // unlimited path).
-type GatewayResilience struct {
-	cfg     GatewayResilienceConfig
+type WorkerResilience struct {
+	cfg     WorkerResilienceConfig
 	metrics *redmetrics.Set
 
 	mu     sync.Mutex
-	states map[string]*gatewayModelState
+	states map[string]*workerModelState
 }
 
-// gatewayModelState owns one model's in-flight count and windowed breaker.
+// workerModelState owns one model's in-flight count and windowed breaker.
 // An open breaker admits exactly one probe after its cooldown.
-type gatewayModelState struct {
+type workerModelState struct {
 	inFlight   int
-	outcomes   []gatewayCallOutcome
+	outcomes   []workerCallOutcome
 	next       int
 	openUntil  time.Time
 	probing    bool
 	generation uint64
 }
 
-type gatewayCallOutcome struct {
+type workerCallOutcome struct {
 	failed bool
 	slow   bool
 }
 
-// NewGatewayResilience builds the shared guard set. A nil metrics set keeps
+// NewWorkerResilience builds the shared guard set. A nil metrics set keeps
 // observations local (unit paths); production wires the RED set.
-func NewGatewayResilience(cfg GatewayResilienceConfig, metrics *redmetrics.Set) *GatewayResilience {
-	return &GatewayResilience{cfg: cfg.normalize(), metrics: metrics, states: make(map[string]*gatewayModelState)}
+func NewWorkerResilience(cfg WorkerResilienceConfig, metrics *redmetrics.Set) *WorkerResilience {
+	return &WorkerResilience{cfg: cfg.normalize(), metrics: metrics, states: make(map[string]*workerModelState)}
 }
 
-// normalizeGatewayResilienceModel keeps the guard key closed to
+// WorkerFuse is the narrow resilience seam consumed by WorkerClient.Do:
+// admit one send or reject fail-closed before any network I/O. The
+// returned handle releases the slot exactly once. *WorkerResilience is the
+// production implementation; tests inject a fake.
+type WorkerFuse interface {
+	checkAndAcquire(model string) (func(time.Duration, bool), error)
+}
+
+var _ WorkerFuse = (*WorkerResilience)(nil)
+
+// normalizeWorkerResilienceModel keeps the guard key closed to
 // admin-controlled values: empty reads as unknown so unmapped sends still
 // share one bounded slot set instead of escaping the guards.
-func normalizeGatewayResilienceModel(model string) string {
+func normalizeWorkerResilienceModel(model string) string {
 	if trimmed := strings.ToLower(strings.TrimSpace(model)); trimmed != "" {
 		return trimmed
 	}
@@ -159,48 +169,48 @@ func normalizeGatewayResilienceModel(model string) string {
 // stateFor returns the model's state, creating its semaphore on first use.
 // Caller holds r.mu. Models come from the admin mapping/catalog, so the map
 // stays bounded by the catalog size.
-func (r *GatewayResilience) stateFor(model string) *gatewayModelState {
-	key := normalizeGatewayResilienceModel(model)
+func (r *WorkerResilience) stateFor(model string) *workerModelState {
+	key := normalizeWorkerResilienceModel(model)
 	state, ok := r.states[key]
 	if !ok {
-		state = &gatewayModelState{outcomes: make([]gatewayCallOutcome, 0, r.cfg.WindowSize)}
+		state = &workerModelState{outcomes: make([]workerCallOutcome, 0, r.cfg.WindowSize)}
 		r.states[key] = state
 	}
 	return state
 }
 
-// gatewayResilienceReject is the retryable 429 the guards return before any
+// workerResilienceReject is the retryable 429 the guards return before any
 // network I/O. Callers wrap it in UpstreamHTTPError so worker classifiers
 // converge to timeout/retryable and the task requeues with backoff.
-type gatewayResilienceReject struct {
+type workerResilienceReject struct {
 	reason string
 	model  string
 }
 
-func (e *gatewayResilienceReject) Error() string {
-	return fmt.Sprintf("gateway %s for model %q", e.reason, e.model)
+func (e *workerResilienceReject) Error() string {
+	return fmt.Sprintf("worker %s for model %q", e.reason, e.model)
 }
 
 // checkAndAcquire admits one send and returns its completion handle. The handle
 // releases the concurrency slot exactly once and records only its own breaker
 // generation; sends admitted before a fuse cannot decide a later probe's result.
-func (r *GatewayResilience) checkAndAcquire(model string) (func(time.Duration, bool), error) {
-	key := normalizeGatewayResilienceModel(model)
+func (r *WorkerResilience) checkAndAcquire(model string) (func(time.Duration, bool), error) {
+	key := normalizeWorkerResilienceModel(model)
 	if r == nil {
-		return nil, &gatewayResilienceReject{reason: "resilience not configured", model: key}
+		return nil, &workerResilienceReject{reason: "resilience not configured", model: key}
 	}
 	r.mu.Lock()
 	state := r.stateFor(key)
 	probe := !state.openUntil.IsZero()
 	if probe && (time.Now().Before(state.openUntil) || state.probing) {
 		r.mu.Unlock()
-		r.metrics.IncGatewayPerModelLimited(key, redmetrics.GatewayLimitedBreakerOpen)
-		return nil, &gatewayResilienceReject{reason: "breaker open", model: key}
+		r.metrics.IncWorkerPerModelLimited(key, redmetrics.WorkerLimitedBreakerOpen)
+		return nil, &workerResilienceReject{reason: "breaker open", model: key}
 	}
 	if state.inFlight >= r.cfg.MaxConcurrentPerModel {
 		r.mu.Unlock()
-		r.metrics.IncGatewayPerModelLimited(key, redmetrics.GatewayLimitedConcurrency)
-		return nil, &gatewayResilienceReject{reason: "per-model concurrency limit reached", model: key}
+		r.metrics.IncWorkerPerModelLimited(key, redmetrics.WorkerLimitedConcurrency)
+		return nil, &workerResilienceReject{reason: "per-model concurrency limit reached", model: key}
 	}
 	state.inFlight++
 	state.probing = probe
@@ -216,19 +226,19 @@ func (r *GatewayResilience) checkAndAcquire(model string) (func(time.Duration, b
 			if generation != state.generation {
 				return
 			}
-			outcome := gatewayCallOutcome{failed: failed, slow: latency >= r.cfg.SlowCallThreshold}
+			outcome := workerCallOutcome{failed: failed, slow: latency >= r.cfg.SlowCallThreshold}
 			if probe {
 				state.probing = false
 				state.generation++
 				if outcome.failed || outcome.slow {
 					state.openUntil = time.Now().Add(r.cfg.Cooldown)
-					r.metrics.SetGatewayBreakerOpen(key, true)
+					r.metrics.SetWorkerBreakerOpen(key, true)
 					return
 				}
 				state.openUntil = time.Time{}
 				state.outcomes = state.outcomes[:0]
 				state.next = 0
-				r.metrics.SetGatewayBreakerOpen(key, false)
+				r.metrics.SetWorkerBreakerOpen(key, false)
 				return
 			}
 			if len(state.outcomes) < r.cfg.WindowSize {
@@ -254,7 +264,7 @@ func (r *GatewayResilience) checkAndAcquire(model string) (func(time.Duration, b
 				float64(slows)/float64(calls) >= r.cfg.FailureRate {
 				state.generation++
 				state.openUntil = time.Now().Add(r.cfg.Cooldown)
-				r.metrics.SetGatewayBreakerOpen(key, true)
+				r.metrics.SetWorkerBreakerOpen(key, true)
 			}
 		})
 	}, nil

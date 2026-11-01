@@ -28,11 +28,15 @@ describe('AdminModelEditDialog', () => {
     gatewayFakes.previewRoute.mockImplementation(async (input: { modelId: string; provider?: string }) => {
       const provider = input.provider || ''
       return {
-        provider_slug: provider || '未指定',
-        is_first_party: provider === 'fal',
-        target_path: 'birefnet',
-        path_source: 'fal',
-        path_source_label: 'Fal.ai Media Pipeline (图像/抠图)',
+        provider: provider || '未指定',
+        model: input.modelId,
+        // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+        valid: true,
+        // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+        reachable: true,
+        status_code: 200,
+        latency_ms: 12,
+        message: 'Worker 干跑正常 (12ms, HTTP 200)',
       }
     })
     gatewayFakes.listProviders.mockResolvedValue([
@@ -93,7 +97,7 @@ describe('AdminModelEditDialog', () => {
     // 检查右侧实时预览
     expect(within(dialog).getByText('卡片效果实时预览')).toBeInTheDocument()
     expect(within(dialog).getByText('Live Preview')).toBeInTheDocument()
-    expect(within(dialog).getByText('Cloudflare AI Gateway 路由透视')).toBeInTheDocument()
+    expect(within(dialog).getByText('Edge Worker 干跑透视')).toBeInTheDocument()
   })
 
   it('updates live preview card and gateway route dynamically as user types', async () => {
@@ -115,9 +119,8 @@ describe('AdminModelEditDialog', () => {
     expect(within(dialog).getByText('发丝级边缘羽化抠图')).toBeInTheDocument()
     expect(within(dialog).getByText('ID: fal/birefnet')).toBeInTheDocument()
 
-    // 网关透视经后端推导（防抖 + 异步）：fal 原生第一方
-    expect(await within(dialog).findByText('原生第一方')).toBeInTheDocument()
-    expect(await within(dialog).findByText('Fal.ai Media Pipeline (图像/抠图)')).toBeInTheDocument()
+    // Worker 干跑经后端推导（防抖 + 异步）：标识有效且干跑可达
+    expect(await within(dialog).findByText('Worker 干跑正常 (12ms, HTTP 200)')).toBeInTheDocument()
   })
 
   it('supports clicking provider preset buttons', async () => {
@@ -198,7 +201,7 @@ describe('AdminModelEditDialog', () => {
     await user.type(within(dialog).getByLabelText(/提供商 \(Provider\)/), 'Test')
 
     // 展开高级配置
-    const advancedBtn = within(dialog).getByRole('button', { name: /高级网关适配与参数微调/ })
+    const advancedBtn = within(dialog).getByRole('button', { name: /高级参数微调/ })
     await user.click(advancedBtn)
 
     // 输入不合法的 JSON

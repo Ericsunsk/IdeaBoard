@@ -65,10 +65,15 @@ describe('AdminModelsPage', () => {
     ])
     gatewayFakes.listObserved.mockResolvedValue([makeObservedSnapshot()])
     gatewayFakes.previewRoute.mockResolvedValue({
-      provider_slug: 'custom-test',
-      is_first_party: false,
-      target_path: 'v1/images/generations',
-      path_source: 'generations',
+      provider: 'custom-test',
+      model: 'custom-test/m',
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+      valid: true,
+      // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+      reachable: true,
+      status_code: 200,
+      latency_ms: 12,
+      message: 'Worker 干跑正常 (12ms, HTTP 200)',
     })
 
     useMswHandlers(

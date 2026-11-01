@@ -2,16 +2,17 @@ package providers
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/telemetry"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
-	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
@@ -19,17 +20,26 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// CallGatewayAPI executes one drawing operation through the sole AI egress.
-// Transport, auth, and retries live inside the gateway; this method owns
-// parameter validation, media resolution, dialect shaping/parsing, and
-// result materialization. It never touches accounts, endpoints, or keys.
-func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.GatewayCallInput) (runtimeports.ProviderCallOutput, error) {
-	ctx, span := telemetry.Start(ctx, "generation.gateway.request",
+func slogInfoWorkerCall(taskID, correlationID, provider, model string, operation workflow.RuntimeOperation) {
+	slog.Info("calling worker API",
+		"task_id", taskID, "correlation_id", correlationID,
+		"provider", provider, "model", model, "operation", string(operation))
+}
+
+// CallWorkerAPI executes one drawing operation through the sole Worker egress.
+// Transport, auth, and retries live inside the Worker; this method owns
+// parameter validation, presigned media handoff, and result materialization.
+// It never touches accounts, endpoints, or keys.
+func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerCallInput) (runtimeports.ProviderCallOutput, error) {
+	ctx, span := telemetry.Start(ctx, "generation.worker.request",
 		attribute.String("selected_model", input.Model),
 		attribute.Int("attempt_number", int(input.AttemptNo)))
 	defer telemetry.End(span, nil)
 	if c == nil {
 		return runtimeports.ProviderCallOutput{}, fmt.Errorf("provider executor is not initialized")
+	}
+	if c.transfer == nil {
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf("worker transfer is not configured"))
 	}
 	task := input.Task
 	if task == nil || strings.TrimSpace(task.TaskID) == "" {
@@ -38,28 +48,31 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	correlationID := task.EnsureCorrelationID()
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(errorrender.MsgRuntimeInterfacesWorkerProvidersCallGatewayAPI))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(errorrender.MsgRuntimeInterfacesWorkerProvidersCallWorkerAPI))
 	}
 	// Execution-side truth over the pinned display string: the pool
 	// stores structured provider + bare model, the snapshot pins their
-	// display form, and this split (not string-prefix inference) sets
-	// the namespace, the URL path, and the native body model. A bare
-	// model without a provider fails closed here.
-	provider, modelName, pathOverride, err := workflow.ParseExecutionModelRef(model)
+	// display form, and this split sets the Worker provider/model facts.
+	// A bare model without a provider fails closed here (the Worker is
+	// authoritative for provider membership and rejects the rest).
+	provider, modelName, err := workflow.ParseExecutionModelRef(model)
 	if err != nil {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
-	// Catalog route overrides fill gaps only: mapping @path always wins.
-	// A nil reader preserves mapping-only behavior (tests, minimal wiring).
-	customParams := ""
-	if pathOverride == "" && c != nil && c.modelRoutes != nil {
-		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, provider, modelName)
+	// Catalog custom params fill gaps only (opaque object merged by the
+	// Worker after its defaults). A nil reader preserves Worker-default
+	// behavior (tests, minimal wiring).
+	var providerOptions map[string]interface{}
+	if c != nil && c.customParams != nil {
+		foundParams, found, routeErr := c.customParams.LookupCustomParams(ctx, provider, modelName)
 		if routeErr != nil {
-			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(errorrender.MsgCallGatewayAPI2, routeErr))
+			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(errorrender.MsgCallWorkerAPI2, routeErr))
 		}
 		if found {
-			pathOverride = catalogPath
-			customParams = catalogParams
+			// Canonical custom-params rule lives in workflow.ParseProviderOptions
+			// (shared with Admin preview validation); malformed catalog JSON is
+			// ignored here because SaveCatalog already fails it closed upstream.
+			providerOptions, _ = workflow.ParseProviderOptions(foundParams)
 		}
 	}
 	params, err := c.parseAndNormalizeTaskParams(ctx, task)
@@ -71,40 +84,33 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	plan := *params.ExecutionPlan
 	operation := plan.RuntimeOperation()
-	// Single routing seam: operation dispatch, gateway path, and shaping
-	// dialect resolve together; execution and preview share dialects.Resolve.
-	route, err := dialects.Resolve(operation, provider, modelName, pathOverride, customParams)
-	if err != nil {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
-	}
 	modelRequired := plan.RoutingRequirement().ModelRequirement() == workflow.RoutingModelRequired
 	if modelRequired && modelName == "" {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("operation requires a model"))
 	}
-	params, err = c.resolveRuntimeProviderTaskParams(ctx, params)
-	if err != nil {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
-	}
-	providerReq, err := params.providerRequest(task.Prompt, model)
-	if err != nil {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
-	}
 
-	slogInfoGatewayCall(task.TaskID, correlationID, provider, model, operation)
+	slogInfoWorkerCall(task.TaskID, correlationID, provider, model, operation)
 	output := runtimeports.ProviderCallOutput{}
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
-	// Gateway log metadata stays searchable: task id + feature travel as
-	// cf-aig-metadata headers. Feature comes from canonical params (already
+	// Worker log metadata stays searchable: task id + feature travel for
+	// RED observations. Feature comes from canonical params (already
 	// validated above); empty stays empty rather than failing the call.
-	gatewayFeature := ""
+	workerFeature := ""
 	if params.Canonical != nil {
-		gatewayFeature = strings.TrimSpace(params.Canonical.Service)
+		workerFeature = strings.TrimSpace(params.Canonical.Service)
 	}
-	callResult, err := c.callGatewayAdapter(ctx, task.TaskID, gatewayFeature, route, provider, modelName, customParams, providerReq, operation, input.ExecutionToken)
+	workspaceID := workerWorkspaceID(params)
+	// NOTE: the execution token is deliberately not forwarded: the edge
+	// contract carries no idempotency field, and local settlement never
+	// depended on upstream dedup (the claim token fences terminal writes).
+	callResult, err := c.callWorker(
+		ctx, task.TaskID, workerFeature, workspaceID, provider, modelName,
+		task.Prompt, params, providerOptions,
+	)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
-	applyGatewayReceipt(&output, callResult.Receipt, model)
+	applyWorkerReceipt(&output, callResult.Receipt, model)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return output, err
@@ -112,7 +118,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
-			fmt.Errorf(errorrender.MsgCallGatewayAPI3, model, err),
+			fmt.Errorf(errorrender.MsgCallWorkerAPI3, model, err),
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
@@ -120,7 +126,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
-			errors.New(errorrender.MsgCallGatewayAPI4),
+			errors.New(errorrender.MsgCallWorkerAPI4),
 		)
 	}
 	finalizeStartedAt := time.Now()
@@ -150,13 +156,13 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	if len(imageURLs) == 0 {
 		markFinalizeFinished()
-		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New(errorrender.MsgCallGatewayAPI5))
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New(errorrender.MsgCallWorkerAPI5))
 	}
 	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()
 	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
-	result := baseGatewayTaskResult(task, model, callResult, imageURLs)
+	result := baseWorkerTaskResult(task, model, callResult, imageURLs)
 	result["status"] = tasks.ResultStatusSuccess
 	result["image_url"] = imageURL
 	result["image_urls"] = imageURLs
@@ -171,7 +177,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	return output, nil
 }
 
-func applyGatewayReceipt(output *runtimeports.ProviderCallOutput, receipt runtimeports.GatewayReceipt, requestedModel string) {
+func applyWorkerReceipt(output *runtimeports.ProviderCallOutput, receipt runtimeports.WorkerReceipt, requestedModel string) {
 	if output == nil {
 		return
 	}
@@ -185,7 +191,7 @@ func applyGatewayReceipt(output *runtimeports.ProviderCallOutput, receipt runtim
 	output.ReceiptEventID = strings.TrimSpace(receipt.EventID)
 }
 
-func baseGatewayTaskResult(task *tasks.TaskPayload, model string, callResult providerCallResult, imageURLs []string) map[string]interface{} {
+func baseWorkerTaskResult(task *tasks.TaskPayload, model string, callResult providerCallResult, imageURLs []string) map[string]interface{} {
 	result := map[string]interface{}{
 		"task_id":        task.TaskID,
 		"correlation_id": task.EffectiveCorrelationID(),
@@ -202,72 +208,155 @@ func baseGatewayTaskResult(task *tasks.TaskPayload, model string, callResult pro
 	return result
 }
 
-// providerFailureCategory maps one provider call error to its failure
-// category. It inlines the former errors.go helper verbatim: timeout first,
-// then HTTP status mapping, provider error fallback.
+// providerFailureCategory maps one Worker call error to its failure
+// category: edge codes first, then transport HTTP status, provider error
+// fallback. Deterministic codes (bad request, auth, unsupported model)
+// never burn retry budget; upstream/transient codes do per policy.
 func providerFailureCategory(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return tasks.FailureCategoryTimeout
 	}
-	if status, ok := runtimeports.ProviderHTTPStatus(err); ok {
-		switch status {
-		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+	if code, ok := runtimeports.WorkerErrorDetails(err); ok {
+		switch code {
+		case runtimeports.WorkerErrorBadRequest, runtimeports.WorkerErrorUnsupportedModel:
 			return tasks.FailureCategoryInputInvalid
-		case http.StatusUnauthorized, http.StatusForbidden:
+		case runtimeports.WorkerErrorUnauthorized:
 			return tasks.FailureCategoryAuth
-		case http.StatusPaymentRequired:
-			return tasks.FailureCategoryQuota
-		case http.StatusRequestTimeout, http.StatusTooManyRequests:
-			return tasks.FailureCategoryTimeout
+		case runtimeports.WorkerErrorUpstream:
+			var workerErr *runtimeports.WorkerError
+			if errors.As(err, &workerErr) && workerErr.UpstreamStatus != 0 {
+				return providerFailureCategoryForStatus(workerErr.UpstreamStatus)
+			}
+			return tasks.FailureCategoryProviderError
 		default:
 			return tasks.FailureCategoryProviderError
 		}
 	}
+	if status, ok := runtimeports.ProviderHTTPStatus(err); ok {
+		return providerFailureCategoryForStatus(status)
+	}
 	return tasks.FailureCategoryProviderError
 }
 
-func (c *Executor) gatewayClientForCall(ctx context.Context) (runtimeports.GatewayClient, error) {
-	if c == nil || c.gatewayFactory == nil {
-		return nil, fmt.Errorf("gateway client factory is not configured")
+func providerFailureCategoryForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		return tasks.FailureCategoryInputInvalid
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return tasks.FailureCategoryAuth
+	case http.StatusPaymentRequired:
+		return tasks.FailureCategoryQuota
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return tasks.FailureCategoryTimeout
+	default:
+		return tasks.FailureCategoryProviderError
 	}
-	client, err := c.gatewayFactory(ctx)
+}
+
+func (c *Executor) workerClientForCall(ctx context.Context) (runtimeports.WorkerClient, error) {
+	if c == nil || c.workerFactory == nil {
+		return nil, fmt.Errorf("worker client factory is not configured")
+	}
+	client, err := c.workerFactory(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if client == nil {
-		return nil, fmt.Errorf("gateway client factory returned nil")
+		return nil, fmt.Errorf("worker client factory returned nil")
 	}
 	return client, nil
 }
 
-func (c *Executor) callGatewayAdapter(
+// callWorker is the single Worker send for one execution: presign inputs +
+// output, POST CanonicalImageRequest, verify the landed key exactly, read
+// back landed bytes. Transport errors carry on unchanged; context.Canceled
+// passes through so interruption converges as requeue, not failure.
+func (c *Executor) callWorker(
 	ctx context.Context,
 	taskID, feature string,
-	route dialects.Route,
-	provider, model, customParams string,
-	providerReq providerRequest,
-	operation workflow.RuntimeOperation,
-	executionToken string,
+	workspaceID, provider, model, prompt string,
+	params providerTaskParams,
+	providerOptions map[string]interface{},
 ) (providerCallResult, error) {
-	// Single 300s budget shared with the gateway client default
-	// (runtimeports.GatewayDefaultTimeout, ADR-0010).
-	timeout := runtimeports.GatewayDefaultTimeout
-	switch route.Adapter {
-	case providerdomain.ProviderRuntimeAdapterModelImage:
-		return c.callGatewayModelImage(ctx, taskID, feature, provider, model, customParams, route, providerReq, operation, executionToken, timeout)
-	case providerdomain.ProviderRuntimeAdapterCutout:
-		payload, err := buildCutoutGatewayPayload(c, providerReq)
-		if err != nil {
-			return providerCallResult{}, err
-		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildCutoutGatewayPayload, executionToken, timeout)
-	case providerdomain.ProviderRuntimeAdapterUpscale:
-		payload, err := buildUpscaleGatewayPayload(c, providerReq)
-		if err != nil {
-			return providerCallResult{}, err
-		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildUpscaleGatewayPayload2, executionToken, timeout)
-	default:
-		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", route.Adapter)
+	client, err := c.workerClientForCall(ctx)
+	if err != nil {
+		return providerCallResult{}, err
 	}
+	if c.transfer == nil {
+		return providerCallResult{}, fmt.Errorf("worker transfer is not configured")
+	}
+	// Presigned GETs for inputs (inputs first, mask last).
+	var inputURLs []string
+	for _, ref := range workerInputRefs(params) {
+		publicID := strings.TrimSpace(ref.PublicAssetID)
+		if publicID == "" {
+			return providerCallResult{}, fmt.Errorf("worker input asset is missing a public asset id")
+		}
+		signed, _, err := c.transfer.PresignInputGET(ctx, workspaceID, publicID)
+		if err != nil {
+			return providerCallResult{}, err
+		}
+		inputURLs = append(inputURLs, signed)
+	}
+	// Single presigned PUT for the output: exact key, content-type bound.
+	outputKey := c.transfer.MintOutputKey(workspaceID, taskID)
+	uploadURL, _, err := c.transfer.PresignOutputPUT(outputKey, providerinfra.WorkerSlotContentType())
+	if err != nil {
+		return providerCallResult{}, err
+	}
+	width, height := workerImageSize(nil)
+	if params.Canonical != nil && params.Canonical.Controls != nil {
+		width, height = workerImageSize(params.Canonical.Controls)
+	}
+	var seed uint64
+	if params.Canonical != nil && params.Canonical.Generation != nil {
+		seed = params.Canonical.Generation.Seed
+	}
+	timeout := runtimeports.WorkerDefaultTimeout
+	resp, err := client.Do(ctx, runtimeports.WorkerRequest{
+		TaskID:          taskID,
+		Provider:        provider,
+		Model:           model,
+		Prompt:          prompt,
+		Width:           width,
+		Height:          height,
+		Seed:            seed,
+		Images:          inputURLs,
+		ProviderOptions: providerOptions,
+		UploadURL:       uploadURL,
+		Feature:         feature,
+		Timeout:         timeout,
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return providerCallResult{Receipt: resp.Receipt}, err
+		}
+		return providerCallResult{Receipt: resp.Receipt}, fmt.Errorf("worker image call failed: %w", err)
+	}
+	// Exact-key verification in one call: the landed URL must resolve to
+	// the minted slot key (query-stripped echo carries no signature; the
+	// PUT-time HMAC was verified by the media route).
+	landedKey, err := c.transfer.VerifyLandedKey(resp.ImageURL, outputKey)
+	if err != nil {
+		return providerCallResult{Receipt: resp.Receipt}, err
+	}
+	landedBytes, landedContentType, err := c.transfer.ReadLandedObject(ctx, landedKey)
+	if err != nil {
+		return providerCallResult{Receipt: resp.Receipt}, err
+	}
+	_ = landedContentType
+	dataURL := "data:" + providerinfra.WorkerSlotContentType() + ";base64," + base64.StdEncoding.EncodeToString(landedBytes)
+	preview := strings.TrimSpace(resp.RawPreview)
+	if preview == "" || strings.Contains(preview, "base64,") {
+		preview = providerRawOutputPreview("1 worker image")
+	}
+	return providerCallResult{
+		ImageURL:          dataURL,
+		ImageURLs:         []string{dataURL},
+		Model:             provider + "/" + model,
+		Receipt:           resp.Receipt,
+		RawOutputPreview:  preview,
+		ParsedOutputKind:  "image-results",
+		ParsedOutputCount: 1,
+	}, nil
 }

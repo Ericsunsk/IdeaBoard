@@ -156,7 +156,7 @@ const (
 //
 // | Layer | Owner | Budget | Notes |
 // | --- | --- | --- | --- |
-// | Gateway single attempt | runtime/ports GatewayDefaultTimeout | 300s | nests inside the 360s execution budget |
+// | Worker single attempt | runtime/ports WorkerDefaultTimeout | 300s | nests inside the 360s execution budget |
 // | Worker single execution | WorkspaceExecutionBudget() | 360s = min(360s, drawing) | slow-task cap; clamped never above the River drawing budget |
 // | River job outer bound | RiverJobTimeoutDrawing | 17min = 900s MaxTimeoutSeconds + 2min overhead | global bound + client fallback for unregistered/test workers |
 // | Frontend quote/submit shared retry | canvas canvasBudgets SHARED_TASK_REQUEST_ATTEMPTS | 2 attempts | assert + submit each; retryable errors only (mirror, owned by web) |

@@ -39,8 +39,8 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 	}
 }
 
-func TestGatewayCallTimeoutStandardBudget(t *testing.T) {
-	if runtimeports.GatewayDefaultTimeout != 300*time.Second {
-		t.Fatalf("GatewayDefaultTimeout = %v, want 300s single budget (ADR-0010)", runtimeports.GatewayDefaultTimeout)
+func TestWorkerCallTimeoutStandardBudget(t *testing.T) {
+	if runtimeports.WorkerDefaultTimeout != 300*time.Second {
+		t.Fatalf("WorkerDefaultTimeout = %v, want 300s single budget (ADR-0010)", runtimeports.WorkerDefaultTimeout)
 	}
 }

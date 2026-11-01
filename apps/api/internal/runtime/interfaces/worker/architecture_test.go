@@ -8,7 +8,7 @@ import (
 )
 
 func TestProviderExecutorImplementsRuntimePort(t *testing.T) {
-	var _ runtimeports.GatewayCaller = (*providers.Executor)(nil)
+	var _ runtimeports.WorkerCaller = (*providers.Executor)(nil)
 }
 
 // The worker implementation collaborates with Tasking exclusively through

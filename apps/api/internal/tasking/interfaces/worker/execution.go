@@ -14,11 +14,11 @@ package worker
 // provider. The post-commit Library save is best-effort:
 // the task is complete regardless of its outcome.
 //
-// The gateway bridge below consumes the canonical execution plan and calls
-// the EXISTING provider gateway seam. It never shapes provider bodies and
-// never dials providers: transport/auth/retries stay inside the gateway.
-// Gateway credentials resolve per execution through the AI gateway config
-// seam and are never persisted.
+// The Worker bridge below consumes the canonical execution plan and calls
+// the sole provider Worker seam. It never shapes provider bodies and
+// never dials providers: transport/auth/retries stay inside the Worker.
+// Worker credentials (base URL + secret) resolve per execution through env
+// and are never persisted.
 
 import (
 	"context"
@@ -219,45 +219,45 @@ func (w *WorkspaceTaskWorker) saveCompletedTask(ctx context.Context, completed *
 	}
 }
 
-// WorkspaceGatewayCallInput carries one gateway execution's resolved
-// inputs. It mirrors the runtime gateway seam with tasking-domain types so
-// this package never imports the runtime layer; the execution token fences
-// terminal writes so stale workers lose.
-type WorkspaceGatewayCallInput struct {
-	Task           *tasks.TaskPayload
-	Model          string
-	ExecutionToken string
+// WorkspaceWorkerCallInput carries one Worker execution's resolved
+// inputs. It mirrors the runtime Worker seam with tasking-domain types so
+// this package never imports the runtime layer. The execution token stays
+// on the durable task row (claim fence on terminal writes) and never
+// enters this seam.
+type WorkspaceWorkerCallInput struct {
+	Task  *tasks.TaskPayload
+	Model string
 }
 
-// WorkspaceGatewayCallOutput is the gateway result subset the workspace
+// WorkspaceWorkerCallOutput is the Worker result subset the workspace
 // bridge consumes: provider outputs mapped onto the workspace contract.
-type WorkspaceGatewayCallOutput struct {
+type WorkspaceWorkerCallOutput struct {
 	Outputs []tasks.TaskOutput
 }
 
-// WorkspaceGatewayCaller hides the gateway transport from the workspace
+// WorkspaceWorkerCaller hides the Worker transport from the workspace
 // task worker. The production implementation adapts the runtime provider
-// gateway executor (see workspaceGatewayCallerAdapter in
+// Worker executor (see workspaceWorkerCallerAdapter in
 // runtime/composition); tests inject deterministic fakes.
-type WorkspaceGatewayCaller interface {
-	CallGatewayAPI(ctx context.Context, input WorkspaceGatewayCallInput) (WorkspaceGatewayCallOutput, error)
+type WorkspaceWorkerCaller interface {
+	CallWorkerAPI(ctx context.Context, input WorkspaceWorkerCallInput) (WorkspaceWorkerCallOutput, error)
 }
 
-type workspaceGatewayProvider struct {
-	caller WorkspaceGatewayCaller
+type workspaceWorkerProvider struct {
+	caller WorkspaceWorkerCaller
 }
 
-// NewWorkspaceGatewayProvider bridges a gateway caller for workspace
+// NewWorkspaceWorkerProvider bridges a Worker caller for workspace
 // tasks. A nil caller fails closed per execution with a clear message.
-func NewWorkspaceGatewayProvider(caller WorkspaceGatewayCaller) WorkspaceTaskProvider {
-	return &workspaceGatewayProvider{caller: caller}
+func NewWorkspaceWorkerProvider(caller WorkspaceWorkerCaller) WorkspaceTaskProvider {
+	return &workspaceWorkerProvider{caller: caller}
 }
 
 // Generate implements WorkspaceTaskProvider. The model is the
 // snapshot-derived target the worker stamped onto the transient task
 // copy before calling: the bridge never resolves a model itself and
 // never consults the live pool or admin mapping.
-func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+func (p *workspaceWorkerProvider) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	if p == nil || p.caller == nil {
 		return nil, errors.New(errorrender.MsgGenerate4)
 	}
@@ -269,10 +269,9 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *tasks.Wor
 	if err != nil {
 		return nil, err
 	}
-	output, err := p.caller.CallGatewayAPI(ctx, WorkspaceGatewayCallInput{
-		Task:           payload,
-		Model:          model,
-		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
+	output, err := p.caller.CallWorkerAPI(ctx, WorkspaceWorkerCallInput{
+		Task:  payload,
+		Model: model,
 	})
 	if err != nil {
 		return nil, err
@@ -280,8 +279,8 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *tasks.Wor
 	return mapWorkspaceProviderOutputs(output.Outputs)
 }
 
-// workspaceBridgeTaskPayload synthesizes the gateway payload from the
-// durable canonical plan. The executor still owns dialect shaping and
+// workspaceBridgeTaskPayload synthesizes the Worker payload from the
+// durable canonical plan. The executor owns output-slot presigning and
 // materialization; an absent or invalid canonical plan fails closed.
 func workspaceBridgeTaskPayload(task *tasks.WorkspaceTask) (*tasks.TaskPayload, error) {
 	if task == nil || strings.TrimSpace(task.ID) == "" {

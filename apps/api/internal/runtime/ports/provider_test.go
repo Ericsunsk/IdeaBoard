@@ -11,18 +11,18 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
-func TestGatewayCallerFunc(t *testing.T) {
+func TestWorkerCallerFunc(t *testing.T) {
 	called := false
-	var fn ports.GatewayCallerFunc = func(ctx context.Context, input ports.GatewayCallInput) (ports.ProviderCallOutput, error) {
+	var fn ports.WorkerCallerFunc = func(ctx context.Context, input ports.WorkerCallInput) (ports.ProviderCallOutput, error) {
 		called = true
-		if input.Model != "openai/gpt-image-1" || input.ExecutionToken == "" {
-			t.Errorf("input = %+v, want model and token", input)
+		if input.Model != "openai/gpt-image-1" {
+			t.Errorf("input = %+v, want model openai/gpt-image-1", input)
 		}
 		return ports.ProviderCallOutput{Result: "ok"}, nil
 	}
 
-	out, err := fn.CallGatewayAPI(t.Context(), ports.GatewayCallInput{
-		Task: &tasks.TaskPayload{TaskID: "t-1"}, Model: "openai/gpt-image-1", ExecutionToken: "tok",
+	out, err := fn.CallWorkerAPI(t.Context(), ports.WorkerCallInput{
+		Task: &tasks.TaskPayload{TaskID: "t-1"}, Model: "openai/gpt-image-1",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

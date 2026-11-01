@@ -43,9 +43,16 @@ func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
-// isUploadRequest matches only the direct workspace-media upload route.
+// isUploadRequest matches the direct workspace-media upload route and the
+// Worker presigned PUT route (both carry image bytes above the base cap).
 func isUploadRequest(req *http.Request) bool {
-	if req == nil || req.URL == nil || req.Method != http.MethodPost {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	if req.Method == http.MethodPut && strings.HasPrefix(req.URL.Path, "/api/v1/worker/media/") {
+		return true
+	}
+	if req.Method != http.MethodPost {
 		return false
 	}
 	parts := strings.Split(req.URL.Path, "/")

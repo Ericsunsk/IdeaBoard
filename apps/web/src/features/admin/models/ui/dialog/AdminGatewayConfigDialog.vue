@@ -105,22 +105,11 @@
         :cancel-label="MODELS_MESSAGES.cancel"
         :confirm-label="MODELS_MESSAGES.gatewaySave"
         :loading="saving"
-        :disabled="loading || saving || testing"
-        :cancel-disabled="saving || testing"
+        :disabled="loading || saving"
+        :cancel-disabled="saving"
         @cancel="emit('update:visible', false)"
         @confirm="handleSave"
-      >
-        <template #extra-actions>
-          <ActionButton
-            variant="outline"
-            :disabled="loading || saving || testing"
-            :loading="testing"
-            @click="handleTestConnection"
-          >
-            {{ MODELS_MESSAGES.gatewayTest }}
-          </ActionButton>
-        </template>
-      </AdminDialogActions>
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -131,11 +120,9 @@ import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import { Check, ShieldCheck } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
-import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminInput } from '../../../shared'
-import { formatAdminDisplayError } from '../../../shared'
 import { useAdminGatewayConfigFeedback } from '../../session/useAdminModelCatalogFeedback'
 import { MODELS_MESSAGES } from '../pages/messages'
 import {
@@ -172,7 +159,6 @@ function gatewayHostnameOf(raw: string): string {
 const summary = ref<GatewayConnectionSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)
-const testing = ref(false)
 const form = useForm({
   initialValues: { base_url: '', token: '', account_id: '', gateway_id: '' },
   schema: v.object({
@@ -219,32 +205,6 @@ async function loadGatewayConfig() {
     loading.value = false
   }
 }
-
-const handleTestConnection = form.handleSubmit(async (values) => {
-  testing.value = true
-
-  try {
-    const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
-
-    // testConnection 是 connection interface 必需成员：直调服务端探活，无假成功回退。
-    // 测试连接恒探网关根 URL（provider/path 恒传空）。
-    const response = await resource.value.testConnection({
-      base_url: finalBaseUrl,
-      token: values.token.trim() || undefined,
-      provider: '',
-      path: '',
-    })
-    if (response.success) {
-      feedback.testPassed(response.message)
-    } else {
-      feedback.testFailed(response.message)
-    }
-  } catch (caughtError) {
-    feedback.testFailed(formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayTestFailed))
-  } finally {
-    testing.value = false
-  }
-})
 
 const handleSave = form.handleSubmit(async (values) => {
   saving.value = true

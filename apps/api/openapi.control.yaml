@@ -2474,10 +2474,11 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: previewControlAIGatewayRoute
-      summary: Dry-run gateway routing for a model identifier
+      summary: Dry-run Worker validation for a model identifier
       description: >-
-        Pure routing dry-run (no configuration read or write), so it
-        registers as a POST read-guard without idempotency
+        Worker dry-run validation (no billing, no storage writes): validates
+        the model ref and, when the Worker is configured, dry-runs it
+        server-side. Registers as a POST read-guard without idempotency
         requirements.
       x-capability: control:platform
       x-audit:
@@ -2496,8 +2497,6 @@ paths:
                 model_id:
                   type: string
                   minLength: 1
-                custom_path:
-                  type: string
                 custom_params:
                   type: string
       responses:
@@ -2520,9 +2519,9 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: testControlAIGatewayConnection
-      summary: Probe gateway reachability server-side
+      summary: Dry-run a model against the Worker server-side
       description: >-
-        The token is used for this probe only and never persisted. Pure
+        The secret is used for this dry-run only and never persisted. Pure
         diagnosis: no configuration is read or written.
       x-capability: control:platform
       x-audit:
@@ -2537,25 +2536,22 @@ paths:
           application/json:
             schema:
               type: object
-              required: [base_url]
+              required: [base_url, model]
               additionalProperties: false
               properties:
                 base_url:
                   type: string
                   minLength: 1
-                token:
-                  type: string
-                provider:
-                  type: string
-                model:
-                  type: string
-                path:
+                secret:
                   type: string
                   description: >-
-                    Optional provider-native path. Leave provider and path
-                    both empty to probe the gateway root URL for liveness;
-                    filling both probes the provider route. Exactly one
-                    empty is rejected as ambiguous.
+                    Worker secret used for this dry-run only; never
+                    persisted.
+                model:
+                  type: string
+                  minLength: 1
+                  description: >-
+                    Model identifier (provider/bare-model) to dry-run.
       responses:
         '200':
           description: Connection probe result (contract envelope).

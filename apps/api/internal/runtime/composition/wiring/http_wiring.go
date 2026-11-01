@@ -88,9 +88,8 @@ func NewAppRouter(
 	readyChecker ports.HealthChecker,
 	redMetrics *redmetrics.Set,
 ) (*gin.Engine, error) {
-	// #809 hard cut: the /api/user + /api/admin handler trees are
-	// deleted, so only the contract/static/webhook/internal handlers are
-	// built here. The Stripe webhook stays live; the Control Plane
+	// Only the contract/static/webhook/internal handlers are built here
+	// (no /api/user or /api/admin trees). The Stripe webhook stays live; the Control Plane
 	// reuses the platform-config handlers (ai-gateway, storage, search
 	// providers, feature prompts) under its capability guard.
 	paymentWebhookHandler := paymenthttp.NewWebhookHandler(services.paymentService)
@@ -108,6 +107,9 @@ func NewAppRouter(
 		modelregistryinfrastructure.NewObservedRepository(repos.db),
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
+	// Admin Preview dry-runs against the sole Worker egress (env config,
+	// never the browser). Empty keeps Preview validation-only.
+	aiGatewayHandler.SetWorkerConfig(cfg.Worker.Edge.BaseURL, cfg.Worker.Edge.Secret)
 	// Control audit durability (step 2: atomic where the guard owns the
 	// transaction). The directory is the request-scoped public->internal
 	// resolver the control handlers already use; both sinks reuse that
@@ -196,8 +198,11 @@ func NewAppRouter(
 			CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 			RateLimit:      services.runtimeSettings,
 			MediaPreviews:  mediaPreviews,
-			REDMetrics:     redMetrics,
-			ReadyChecker:   readyChecker,
+			// Worker presigned media handoff (HMAC URLs, no session auth):
+			// inputs GET + single output PUT served from the object store.
+			WorkerMedia:  runtimehttp.NewWorkerMediaHandler(cfg.Worker.Edge.Secret, services.storageService),
+			REDMetrics:   redMetrics,
+			ReadyChecker: readyChecker,
 		},
 		authDeps,
 		v1.ContractV1Deps{
@@ -236,9 +241,8 @@ func NewAppRouter(
 			// Acknowledge immediate delivery of transaction-committed access signals.
 			BoardAccessOutbox: eventoutbox.NewBoardAccessOutboxStore(repos.db),
 			// Workspace library and media stores are live. Library
-			// materialization is internal-only (owner hard cut): no
-			// public materialization route or emitter is wired here;
-			// the read-through orchestrator rides the typed
+			// materialization is internal-only: no public route or emitter
+			// is wired here; the read-through orchestrator rides the typed
 			// store/materializer/executor seams built above.
 			Library: v1library.ContractV1LibraryDeps{
 				Store:       libraryStore,

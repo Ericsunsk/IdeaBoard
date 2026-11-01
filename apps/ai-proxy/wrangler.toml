@@ -1,0 +1,12 @@
+name = "ideaboard-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 非密钥：可在 dashboard / wrangler.toml 直接配置
+# CF_ACCOUNT_ID = "your-account-id"
+# CF_GATEWAY_ID = "your-gateway-id"
+
+# 密钥（永不进 git，只能 wrangler secret put）：
+#   wrangler secret put CF_AIG_TOKEN
+#   wrangler secret put INTERNAL_SECRET

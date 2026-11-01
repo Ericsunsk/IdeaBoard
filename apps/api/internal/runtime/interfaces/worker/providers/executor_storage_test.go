@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/platform/config"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -35,7 +34,6 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	}
 	executor := &ProviderExecutor{
 		resultMaterializer: materializer,
-		publicOrigins:      config.PublicOriginsConfig{Web: "https://assets.example.test"},
 	}
 
 	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", []string{dataURL})
@@ -53,11 +51,6 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	}
 	if !reflect.DeepEqual(materializer.remoteSourceURLs, []string{dataURL}) {
 		t.Fatalf("materializer source urls=%#v", materializer.remoteSourceURLs)
-	}
-	for _, wantHost := range []string{"assets.example.test"} {
-		if !containsString(materializer.remoteOpts.AllowHosts, wantHost) {
-			t.Fatalf("AllowHosts=%#v missing %q", materializer.remoteOpts.AllowHosts, wantHost)
-		}
 	}
 }
 

@@ -21,13 +21,14 @@ type ProviderCallTimeline struct {
 	FinalizeFinishedAt *time.Time
 }
 
-// ProviderCallOutput is the stable result contract between the gateway
+// ProviderCallOutput is the stable result contract between the Worker
 // caller and execution orchestration.
 type ProviderCallOutput struct {
 	Result   string
 	Outputs  []tasks.TaskOutput
 	Timeline ProviderCallTimeline
-	// Gateway receipt facts recorded on the closed attempt.
+	// Worker receipt facts recorded on the closed attempt. Field names
+	// stay DB-mapped (gateway_step et al. are frozen sqlc columns).
 	ResolvedModel  string
 	GatewayStep    string
 	CacheHit       bool
@@ -35,30 +36,29 @@ type ProviderCallOutput struct {
 	ReceiptEventID string
 }
 
-// GatewayCallInput carries one gateway execution's resolved inputs. The
-// model comes from the admin mapping (read at execution time); the token
-// fences terminal writes so stale workers lose. The token is additionally
-// forwarded upstream as a best-effort idempotency key (ignored by upstreams
-// that do not understand it); local settlement never depends on upstream
-// dedup.
-type GatewayCallInput struct {
-	Task           *tasks.TaskPayload
-	Model          string
-	ExecutionToken string
-	AttemptNo      int32
-	Client         GatewayClient
+// WorkerCallInput carries one Worker execution's resolved inputs. The
+// model comes from the pinned RoutingSnapshot. The execution token stays
+// in the tasking layer (claim fence on terminal writes) and never enters
+// this seam: the edge contract carries no idempotency field, and local
+// settlement never depended on upstream dedup.
+type WorkerCallInput struct {
+	Task      *tasks.TaskPayload
+	Model     string
+	AttemptNo int32
+	Client    WorkerClient
 }
 
-// GatewayCaller hides the gateway transport from task execution
-// orchestration. Dialects shape the request body; this seam only sends it.
-type GatewayCaller interface {
-	CallGatewayAPI(context.Context, GatewayCallInput) (ProviderCallOutput, error)
+// WorkerCaller hides the Worker transport from task execution
+// orchestration. The Worker owns shaping and provider routing; this seam
+// only sends canonical task facts and materializes landed outputs.
+type WorkerCaller interface {
+	CallWorkerAPI(context.Context, WorkerCallInput) (ProviderCallOutput, error)
 }
 
-// GatewayCallerFunc adapts a function to GatewayCaller for focused orchestration tests.
-type GatewayCallerFunc func(context.Context, GatewayCallInput) (ProviderCallOutput, error)
+// WorkerCallerFunc adapts a function to WorkerCaller for focused orchestration tests.
+type WorkerCallerFunc func(context.Context, WorkerCallInput) (ProviderCallOutput, error)
 
-func (f GatewayCallerFunc) CallGatewayAPI(ctx context.Context, input GatewayCallInput) (ProviderCallOutput, error) {
+func (f WorkerCallerFunc) CallWorkerAPI(ctx context.Context, input WorkerCallInput) (ProviderCallOutput, error) {
 	return f(ctx, input)
 }
 
@@ -159,6 +159,10 @@ func ExecutionFailureDetails(err error) (string, string, bool) {
 }
 
 func ProviderHTTPStatus(err error) (int, bool) {
+	var workerErr *WorkerError
+	if errors.As(err, &workerErr) {
+		return workerErr.Status, true
+	}
 	var upstreamErr *UpstreamHTTPError
 	if !errors.As(err, &upstreamErr) {
 		return 0, false

@@ -22,8 +22,8 @@ package worker
 //	           IS the attempt's execution token).
 //	execution  (execution.go) — Generate through the provider
 //	           seam against the snapshot's current model (injected;
-//	           production bridges the EXISTING gateway executor, never
-//	           reimplements dialects); on a retryable failure with an
+//	           production bridges the sole Worker executor, never
+//	           shapes provider bodies); on a retryable failure with an
 //	           unspent retry candidate: ONE bounded model fallback in the
 //	           same claim (model_fallback attempt fact first, then the
 //	           second send; no second charge, no duplicate task).
@@ -47,8 +47,8 @@ package worker
 //
 // Provider-creds boundary (deliberate): the production Generate bridge
 // consumes the canonical execution plan and calls
-// providers.Executor.CallGatewayAPI (transport/auth/retries stay inside
-// the gateway). Missing gateway credentials fail the task
+// providers.Executor.CallWorkerAPI (transport/auth/retries stay inside
+// the Worker). Missing Worker configuration fails the task
 // deterministically with a clear message. The execution model is the
 // snapshot's pinned selection, stamped onto the transient claimed copy
 // by Work: the bridge consumes only that field and never performs a
@@ -118,8 +118,8 @@ type WorkspaceTaskWorkerSettler interface {
 }
 
 // WorkspaceTaskProvider generates persisted output refs for one claimed task.
-// Production bridges the existing gateway executor (see
-// NewWorkspaceGatewayProvider); tests inject deterministic fakes. A nil
+// Production bridges the sole Worker executor (see
+// NewWorkspaceWorkerProvider); tests inject deterministic fakes. A nil
 // provider fails closed: tasks converge to failed, never strand.
 type WorkspaceTaskProvider interface {
 	Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
@@ -273,7 +273,7 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue
 	// The attempt fact is written BY the claim statement, so the send's
 	// model and retry layer must be settled BEFORE claiming. Both only
 	// need the task id, which loadDispatchableTask already resolved. The
-	// execution's gateway target comes from the verified snapshot alone: a
+	// execution's Worker target comes from the verified snapshot alone: a
 	// redelivery that already consumed the fallback runs the retry
 	// candidate directly and never falls back again.
 	tracker := newWorkspaceSendTracker(w.attempts, task.ID, workspaceRiverJobID(job), snap.Service)

@@ -26,7 +26,6 @@
         />
 
         <CatalogGatewayPanel
-          v-model:custom-path="form.values.customPath"
           v-model:custom-params="form.values.customParams"
           :initially-open="showAdvanced"
         />
@@ -79,7 +78,7 @@ import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
 import CatalogPreviewCard, {
-  type GatewayRoutePreviewState,
+  type WorkerPreviewState,
 } from './components/CatalogPreviewCard.vue'
 import { MODELS_MESSAGES } from '../pages/messages'
 
@@ -150,12 +149,13 @@ const previewDisplayId = computed(() =>
   displayModelId({ id: form.values.id, provider: form.values.provider }),
 )
 
-// 路由透视
-const gatewayRoutePreview = ref<GatewayRoutePreviewState>({
-  providerSlug: MODELS_MESSAGES.editRouteUnspecified,
-  isFirstParty: false,
-  targetPath: '-',
-  protocol: '-',
+// Worker 干跑透视
+const gatewayRoutePreview = ref<WorkerPreviewState>({
+  provider: MODELS_MESSAGES.editRouteUnspecified,
+  model: '-',
+  isValid: false,
+  isReachable: false,
+  message: MODELS_MESSAGES.editRouteUnavailable,
 })
 let routePreviewVersion = 0
 
@@ -164,10 +164,11 @@ async function refreshGatewayRoutePreview() {
   const modelId = form.values.id.trim()
   if (!modelId) {
     gatewayRoutePreview.value = {
-      providerSlug: MODELS_MESSAGES.editRouteUnspecified,
-      isFirstParty: false,
-      targetPath: '-',
-      protocol: '-',
+      provider: MODELS_MESSAGES.editRouteUnspecified,
+      model: '-',
+      isValid: false,
+      isReachable: false,
+      message: MODELS_MESSAGES.editRouteUnavailable,
     }
     return
   }
@@ -175,29 +176,30 @@ async function refreshGatewayRoutePreview() {
     const preview = await catalogResource.previewRoute({
       modelId,
       provider: form.values.provider.trim() || undefined,
-      customPath: form.values.customPath?.trim() || undefined,
       customParams: form.values.customParams?.trim() || undefined,
     })
     if (version !== routePreviewVersion) return
     gatewayRoutePreview.value = {
-      providerSlug: preview.provider_slug || MODELS_MESSAGES.editRouteUnspecified,
-      isFirstParty: preview.is_first_party,
-      targetPath: preview.target_path,
-      protocol: preview.path_source_label || preview.path_source,
+      provider: preview.provider || MODELS_MESSAGES.editRouteUnspecified,
+      model: preview.model || modelId,
+      isValid: preview.valid,
+      isReachable: preview.reachable,
+      message: preview.message || MODELS_MESSAGES.editRouteUnavailable,
     }
   } catch {
     if (version !== routePreviewVersion) return
     gatewayRoutePreview.value = {
-      providerSlug: MODELS_MESSAGES.editRouteUnspecified,
-      isFirstParty: false,
-      targetPath: '-',
-      protocol: MODELS_MESSAGES.editRouteUnavailable,
+      provider: MODELS_MESSAGES.editRouteUnspecified,
+      model: modelId,
+      isValid: false,
+      isReachable: false,
+      message: MODELS_MESSAGES.editRouteUnavailable,
     }
   }
 }
 
 watchDebounced(
-  [() => form.values.id, () => form.values.provider, () => form.values.customPath, () => form.values.customParams],
+  [() => form.values.id, () => form.values.provider, () => form.values.customParams],
   () => {
     void refreshGatewayRoutePreview()
   },
@@ -213,7 +215,7 @@ watch(
       if (props.model) {
         form.resetForm({ ...props.model })
         capabilitiesDraft.value = props.model.capabilities.join(', ')
-        showAdvanced.value = Boolean(props.model.customPath || props.model.customParams)
+        showAdvanced.value = Boolean(props.model.customParams)
       } else {
         form.resetForm({ ...blankModelForm() })
         capabilitiesDraft.value = ''

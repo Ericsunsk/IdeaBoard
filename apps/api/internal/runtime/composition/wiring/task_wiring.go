@@ -205,22 +205,18 @@ func NewAppTaskRuntime(
 ) (AppTaskServices, AppWorkerRuntime, error) {
 	workerConcurrency := cfg.Worker.EffectiveConcurrency()
 
-	// #809 hard cut: the fail-closed legacyTaskStore is deleted, and with
-	// it every legacy-only task service (legacy River worker, retention
-	// service, submission store, task/task-stats services, startup
-	// recovery). The workspace settlement pieces below are the only task
-	// path; the legacy River job kinds are unregistered from the client
-	// (stray old-kind jobs fail loudly as unknown kinds, never silently).
+	// The workspace settlement pieces below are the only task path: only
+	// workspace_task_execute and periodic workers are registered on this
+	// client (unregistered kinds fail loudly as unknown kinds, never
+	// silently).
 	userEventHub := events.NewUserEventHub()
 	taskEventHub := taskservice.NewEventHub()
-	// The legacy task resolver is gone with the stub: the publisher
-	// degrades gracefully (nil resolver skips enrichment and still
-	// broadcasts bare task events to the local hubs and NATS).
+	// The publisher degrades gracefully without a task resolver (nil
+	// resolver skips enrichment and still broadcasts bare task events to
+	// the local hubs and NATS).
 	//
 	// The returned publisher is the ONLY way task.status_changed reaches
-	// the hubs; it used to be dropped here, so nothing ever called
-	// PublishTaskStatus and the whole event channel was dead. It is wired
-	// into the worker settler bridge below. The v1 HTTP submit/cancel edges
+	// the hubs; it is wired into the worker settler bridge below. The v1 HTTP submit/cancel edges
 	// deliberately do NOT route through it: they mint workspace envelopes
 	// from their own per-request Service, so no transition is emitted
 	// twice.
@@ -247,27 +243,25 @@ func NewAppTaskRuntime(
 	}
 
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.DB, riverpolicy.RiverMaxAttemptsDefault)
-	aiGatewayRepo := modelregistryinfrastructure.NewConfigRepository(repos.systemConfigRepo)
-	modelRoutes := aiGatewayModelRouteReader{repo: aiGatewayRepo}
+	modelCustomParams := workerCustomParamsReader{repo: modelregistryinfrastructure.NewConfigRepository(repos.systemConfigRepo)}
 	// Process-shared per-model guards: one breaker/concurrency window set
 	// across all executions so fuses actually trip (per-client instances
 	// would reset on every task). Thresholds come from env-backed config;
 	// unset fields fall back to the code-owned conservative defaults.
-	gatewayResilience := providerinfra.NewGatewayResilience(providerinfra.GatewayResilienceConfig{
-		MaxConcurrentPerModel: cfg.Worker.Gateway.PerModelLimit,
-		Cooldown:              time.Duration(cfg.Worker.Gateway.BreakerCooldownSeconds) * time.Second,
-		FailureRate:           float64(cfg.Worker.Gateway.BreakerFailureRatePercent) / 100,
+	workerResilience := providerinfra.NewWorkerResilience(providerinfra.WorkerResilienceConfig{
+		MaxConcurrentPerModel: cfg.Worker.Resilience.PerModelLimit,
+		Cooldown:              time.Duration(cfg.Worker.Resilience.BreakerCooldownSeconds) * time.Second,
+		FailureRate:           float64(cfg.Worker.Resilience.BreakerFailureRatePercent) / 100,
 	}, redMetrics)
-	gatewayFactory := func(ctx context.Context) (runtimeports.GatewayClient, error) {
-		resolved, err := aiGatewayRepo.Resolve(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{
-			BaseURL:    resolved.BaseURL,
-			Token:      resolved.Token,
+	// Single Worker exit: one client, no provider branching. A missing
+	// WORKER_BASE_URL or INTERNAL_SECRET fails every image task closed
+	// with a clear message before any send.
+	workerFactory := func(ctx context.Context) (runtimeports.WorkerClient, error) {
+		return providerinfra.NewWorkerClient(providerinfra.WorkerClientConfig{
+			BaseURL:    cfg.Worker.Edge.BaseURL,
+			Secret:     cfg.Worker.Edge.Secret,
 			Metrics:    redMetrics,
-			Resilience: gatewayResilience,
+			Resilience: workerResilience,
 		})
 	}
 	// #825 (#809 Phase 4b-01): the workspace settlement pieces are built
@@ -313,13 +307,14 @@ func NewAppTaskRuntime(
 		Log:   workspaceEvents, Bus: eventBus,
 	}
 	boardAccessOutboxWorker := outboxworker.NewBoardAccessWorker(boardAccessOutboxReplayer)
-	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
-	// Live dispatch finalize seam: provider image bytes land directly in
-	// workspace media assets (never legacy user storage), so Generate
+	// Live dispatch finalize seam: Worker image bytes land directly in
+	// workspace media assets, so Generate
 	// yields workspace asset refs for the renderer + atomic Complete.
-	// Credentials still resolve per execution inside gatewayFactory; a
-	// missing gateway configuration fails tasks deterministically before
-	// this materializer ever runs.
+	// Worker configuration resolves per execution inside workerFactory; a
+	// missing base URL or secret fails tasks deterministically before
+	// this materializer ever runs. The presigned media handoff mints
+	// HMAC URLs served by the public worker media route below
+	// (http_wiring): inputs GET, single output PUT, exact keys.
 	workspaceProviderMaterializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: workspaceMedia, Objects: services.storageService,
 		Fetcher: taskruntime.WorkspaceTaskResultBytesFetcher{},
@@ -327,7 +322,8 @@ func NewAppTaskRuntime(
 	if err != nil {
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
 	}
-	workspaceGateway := providers.NewExecutor(workspaceMediaResolver, workspaceProviderMaterializer, cfg.PublicOrigins, gatewayFactory, modelRoutes)
+	workspaceTransfer := providerinfra.NewWorkerTransfer(workspaceMedia, services.storageService, cfg.PublicOrigins.Web, cfg.Worker.Edge.Secret)
+	workspaceWorkerExec := providers.NewExecutor(workspaceProviderMaterializer, workerFactory, modelCustomParams, workspaceTransfer)
 	// Provider ingestion is complete; the renderer verifies workspace assets
 	// before settlement and owns reference-safe compensation after confirmed Fail.
 	workspaceRenderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
@@ -346,7 +342,7 @@ func NewAppTaskRuntime(
 	}
 	workspaceWorker, err := taskworker.NewWorkspaceTaskWorker(taskworker.WorkspaceTaskWorkerDeps{
 		Store: workspaceStore, Settler: workspaceSettlerBridge, Assets: workspaceAssets,
-		Provider: taskworker.NewWorkspaceGatewayProvider(&workspaceGatewayCallerAdapter{executor: workspaceGateway}),
+		Provider: taskworker.NewWorkspaceWorkerProvider(&workspaceWorkerCallerAdapter{executor: workspaceWorkerExec}),
 		Renderer: workspaceRenderer, LibrarySaver: workspaceAutoSaver,
 		// The postgres store is the durable attempt-fact recorder
 		// (retry_layer/gateway_retry_count, #848): it also gates the
@@ -416,8 +412,8 @@ func NewAppTaskRuntime(
 		}
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to load webhook subscriptions: %w", err)
 	}
-	// #809 hard cut: the legacy task-retention periodic jobs are dropped
-	// with the retention service (no legacy store left to purge against).
+	// No task-retention periodic jobs are registered (no retention store
+	// left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
 	// Workspace deletion is an immediate irreversible hard delete: there
 	// is no archive/restore lifecycle and no background purge.
@@ -442,10 +438,10 @@ func NewAppTaskRuntime(
 		periodicJobs = append(periodicJobs, identityPeriodicJobs...)
 		periodicJobs = append(periodicJobs, webhookPeriodicJobs...)
 	}
-	// #809 hard cut: the legacy River task worker (old job kinds) is
-	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
-	// fail loudly as unknown kinds; the workspace_task_execute consumer
-	// and all periodic workers ride this same client. Nil in http-only
+	// Only workspace_task_execute and periodic workers are registered
+	// (see workerriver.NewRiverClient); unregistered kinds fail loudly
+	// as unknown kinds. The workspace_task_execute consumer and all
+	// periodic workers ride this same client. Nil in http-only
 	// mode (see runWorkers above): the client then only enqueues.
 	invitationMailQueue := &invitations.MailQueue{}
 	var registerWorkers func(workers *river.Workers)
@@ -521,9 +517,8 @@ func NewAppTaskRuntime(
 		}
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
-	// #809 hard cut: legacy startup recovery was a no-op against the
-	// stub (no legacy running rows left to converge). Workspace recovery
-	// is River redelivery + lease-guarded claim (#825).
+	// No startup recovery pass runs here. Workspace recovery is River
+	// redelivery + lease-guarded claim (#825).
 	invitationMailQueue.Client = riverClient
 	riverQueue.SetClient(riverClient)
 	workspaceEnqueuer.SetClient(riverClient)
@@ -568,7 +563,7 @@ func NewAppTaskRuntime(
 // a missing queue loses its RED signals (depth/lag alerts in
 // docs/runbooks/backend-metrics.md), and a new matrix queue is picked up
 // without touching this wiring.
-// The legacy task-retention queue left with the #809 hard cut.
+// Only registered matrix queues are polled (no retention queue).
 func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics.RiverQueueStats {
 	seen := map[string]struct{}{}
 	queues := make([]string, 0, len(riverpolicy.RiverRetryMatrix()))
@@ -611,7 +606,7 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 // concurrently against ONE Service instance, and the staged-event buffer is
 // per-instance, so an unlocked drain could hand one job's transition to
 // another. The critical section is only the short terminal write (state
-// flip + Capture/Release); the expensive work (gateway send, download,
+// flip + Capture/Release); the expensive work (Worker send, download,
 // render) happens before Complete/Fail is called.
 type settlerEventBridge struct {
 	inner     settlerStager
@@ -798,24 +793,26 @@ func workerWorkspaceEventData(typ string, event tasks.TaskEvent) any {
 	}
 }
 
-// aiGatewayModelRouteReader adapts catalog route overrides by provider and native
-// model name. Runtime stays independent of the AIGateway business context.
-type aiGatewayModelRouteReader struct {
+// workerCustomParamsReader adapts catalog custom params by structured pool
+// model (provider plus bare model). Runtime stays independent of the model
+// registry business context. Only opaque custom JSON travels to the Worker;
+// @path overrides are rejected directly (single Worker endpoint).
+type workerCustomParamsReader struct {
 	repo interface {
 		ListCatalog(context.Context) ([]modelregistrydomain.CatalogItem, error)
 	}
 }
 
-func (a aiGatewayModelRouteReader) LookupRouteOverride(ctx context.Context, provider, model string) (string, string, bool, error) {
+func (a workerCustomParamsReader) LookupCustomParams(ctx context.Context, provider, model string) (string, bool, error) {
 	items, err := a.repo.ListCatalog(ctx)
 	if err != nil {
-		return "", "", false, err
+		return "", false, err
 	}
 	for _, item := range items {
 		if strings.EqualFold(strings.TrimSpace(item.Provider), strings.TrimSpace(provider)) &&
 			strings.TrimSpace(item.ID) != "" && strings.EqualFold(strings.TrimSpace(item.ID), strings.TrimSpace(model)) {
-			return item.CustomPath, item.CustomParams, true, nil
+			return item.CustomParams, true, nil
 		}
 	}
-	return "", "", false, nil
+	return "", false, nil
 }
