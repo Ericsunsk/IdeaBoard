@@ -3,7 +3,7 @@
 # Canonical source: root .node-version (enforced by scripts/handbook-version-contract.sh).
 # Realtime has no migrator target by design: it is a stateless presence-only
 # sidecar with no database schema (ADR-0019), so only the runtime image ships.
-ARG NODE_VERSION=22.23.2
+ARG NODE_VERSION=22.23.4
 
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 

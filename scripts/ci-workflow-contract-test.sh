@@ -13,6 +13,7 @@ cp -R "${root}/.github" "${fixture_root}/.github"
 for name in atlas-migration-check.sh ci-migration-integration.sh ci-change-classifier.sh run-all-self-tests.sh run-production-deploy.sh; do
   cp "${root}/scripts/${name}" "${fixture_root}/scripts/${name}"
 done
+cp "${root}/apps/api/install-atlas.sh" "${root}/apps/api/Dockerfile" "${fixture_root}/apps/api/"
 cp "${root}/apps/api/cmd/migrationhistory/main.go" "${fixture_root}/apps/api/cmd/migrationhistory/main.go"
 (cd "${fixture_root}/apps/api" && "${fixture_dir}/checker")
 reject_mutation() {
@@ -38,6 +39,8 @@ reject_mutation .github/workflows/docker-images.yml 's/--certificate-identity /-
 reject_mutation .github/workflows/docker-images.yml '/      - name: Checkout manifest implementation/,/      - name: Download component image plan/s/fetch-depth: 0/fetch-depth: 1/' 'Manifest validation needs source tags and ancestry'
 reject_mutation .github/workflows/docker-images.yml '/          infisical-token:/d' 'Deployment must consume Production connection input infisical-token'
 reject_mutation .github/actions/deploy-production/action.yml '/        INFISICAL_TOKEN:/d' 'Deployment must stream the scoped Infisical token through process env'
+reject_mutation .github/workflows/api.yml 's#./apps/api/install-atlas.sh#./apps/api/unverified-atlas.sh#' 'API migration gate must use the verified Atlas installer'
+reject_mutation .github/workflows/migration-integration.yml 's#./apps/api/install-atlas.sh#./apps/api/unverified-atlas.sh#' 'Migration integration must use the verified Atlas installer'
 reject_mutation .github/workflows/auth.yml 's/inputs.source_commit || github.sha/github.sha/' 'auth.yml must checkout the exact verified source'
 reject_mutation .github/workflows/auth.yml '\#      - uses: ./.github/actions/setup-go#,+2d' 'Auth must use the canonical Go setup'
 reject_mutation .github/workflows/auth.yml '/      - name: Prepare Go contract test/,+2d' 'Missing step: Prepare Go contract test'

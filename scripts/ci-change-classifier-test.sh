@@ -429,3 +429,13 @@ for cross_path in \
   assert_output_line "${owner_output}" 'api_migrations=false'
 done
 echo 'CI change classifier contract tests passed'
+
+for atlas_input in apps/api/install-atlas.sh apps/api/atlas-checksums; do
+  atlas_output="$(printf '%s\n' "$atlas_input" | "$classifier")"
+  for lane in api api_images migration_integration ops; do
+    assert_output_line "$atlas_output" "$lane=true"
+  done
+  for lane in web auth realtime; do
+    assert_output_line "$atlas_output" "$lane=false"
+  done
+done

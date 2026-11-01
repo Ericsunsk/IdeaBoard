@@ -56,7 +56,7 @@ jobs:
           shell_scripts=()
           while IFS= read -r -d '' script; do
             shell_scripts+=("$script")
-          done < <(git ls-files -z -- 'scripts/*.sh')
+          done < <(git ls-files -z -- 'scripts/*.sh' 'apps/api/install-atlas.sh')
           [[ "${#shell_scripts[@]}" -gt 0 ]]
           for script in "${shell_scripts[@]}"; do
             bash -n "$script"

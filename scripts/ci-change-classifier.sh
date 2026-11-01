@@ -40,13 +40,15 @@ while IFS= read -r changed_path; do
     contracts/library/library-source.fixtures.json) web=true; mark_api; auth=true ;;
     apps/api/internal/db/queries/* | apps/api/internal/db/sqlc/* | apps/api/sqlc.yaml | apps/api/sqlc.yml) mark_api; api_sqlc=true ;;
     apps/api/internal/testdb/* | apps/api/internal/testsupport/* | apps/api/internal/db/*) mark_api_all ;;
-    apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*[mM]igration* | apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; browser_smoke=true ;;
+    apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; browser_smoke=true; ops=true ;;
+    apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*[mM]igration*) auth=true; docker=true; migration_integration=true; browser_smoke=true ;;
     docker/postgres/* | docker/compose*.yml | docker/.env | docker/.env.example | docker/images.env.example | docker/migration.env.example) ops=true; migration_integration=true ;;
     apps/api/internal/platform/config/* | apps/api/.env.example) mark_api; api_build=true; ops=true; browser_smoke=true ;;
     apps/auth/src/infrastructure/env.ts | apps/auth/.env.example) auth=true; ops=true; browser_smoke=true ;;
     apps/realtime/src/infrastructure/env.ts | apps/realtime/.env.example) realtime=true; ops=true; browser_smoke=true ;;
-    apps/api/Dockerfile | apps/api/.dockerignore) mark_api_all; api_images=true; docker=true; browser_smoke=true ;;
-    apps/realtime/Dockerfile) realtime=true; docker=true; browser_smoke=true ;;
+    apps/api/install-atlas.sh | apps/api/atlas-checksums) mark_api_all; migration_integration=true; ops=true; api_images=true; docker=true ;;
+    apps/api/Dockerfile | apps/api/.dockerignore) mark_api_all; api_images=true; docker=true; browser_smoke=true; ops=true ;;
+    apps/realtime/Dockerfile) realtime=true; docker=true; browser_smoke=true; ops=true ;;
     apps/web/package.json | apps/web/package-lock.json) web=true; web_audit=true ;;
     apps/auth/package.json | apps/auth/package-lock.json) auth=true; auth_audit=true; docker=true; browser_smoke=true ;;
     apps/realtime/package.json | apps/realtime/package-lock.json) realtime=true; realtime_audit=true; docker=true; browser_smoke=true ;;

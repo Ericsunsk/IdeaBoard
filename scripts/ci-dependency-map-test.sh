@@ -79,4 +79,10 @@ printf 'package fixture\nvar fixturePath = "apps/web/fixtures"\n' > "$repo/apps/
 git -C "$repo" add .
 "$fixture/checker" --root "$repo" --json "$fixture/map.json" >/dev/null
 jq -e '.edges | any(.input == "apps/web/fixtures/payload.json" and .consumer == "api")' "$fixture/map.json" >/dev/null
+# Shared shell tooling in reusable workflow run blocks is also a real consumer.
+printf '#!/usr/bin/env bash\n' > "$repo/apps/api/install-atlas.sh"
+printf '      - run: ./apps/api/install-atlas.sh /tmp/atlas\n' >> "$repo/.github/workflows/web.yml"
+git -C "$repo" add .
+if "$fixture/checker" --root "$repo" > "$fixture/failure" 2>&1; then echo 'missing shared shell consumer accepted' >&2; exit 1; fi
+grep -Fq 'apps/api/install-atlas.sh requires web' "$fixture/failure"
 printf 'CI dependency discovery mutation fixtures passed\n'

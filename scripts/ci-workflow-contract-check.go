@@ -249,9 +249,7 @@ func checkReusableWorkflows(root string) {
 	reject(strings.Contains(scalarText(api), "github.event.before"), "API review cannot narrow to the last potentially failed commit")
 	installAPIAtlas := requireStep(migrationGate, "Install Atlas")
 	installAPIAtlasRun := stringValue(installAPIAtlas["run"])
-	requireContains(installAPIAtlasRun, "apps/api/Dockerfile", "API migration gate must derive Atlas from the Dockerfile pin")
-	requireContains(installAPIAtlasRun, "ARG ATLAS_VERSION", "API migration gate must derive Atlas from the Dockerfile pin")
-	reject(strings.Contains(installAPIAtlasRun, "v1.3.2"), "API migration gate must not hardcode the Atlas version")
+	requireContains(installAPIAtlasRun, "./apps/api/install-atlas.sh /tmp/atlas", "API migration gate must use the verified Atlas installer")
 	semanticCheck := requireStep(migrationGate, "Compare migration replay with schema snapshot")
 	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
 	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA}"`, "Migration gate must compare migration replay and snapshot semantics")
@@ -322,9 +320,7 @@ func checkReusableWorkflows(root string) {
 	requireStepRun(verify, "./scripts/ci-migration-integration.sh")
 	installMigrationAtlas := requireStep(verify, "Install Atlas")
 	installMigrationAtlasRun := stringValue(installMigrationAtlas["run"])
-	requireContains(installMigrationAtlasRun, "apps/api/Dockerfile", "Migration integration must derive Atlas from the Dockerfile pin")
-	requireContains(installMigrationAtlasRun, "ARG ATLAS_VERSION", "Migration integration must derive Atlas from the Dockerfile pin")
-	reject(strings.Contains(installMigrationAtlasRun, "v1.3.2"), "Migration integration must not hardcode the Atlas version")
+	requireContains(installMigrationAtlasRun, "./apps/api/install-atlas.sh /tmp/atlas", "Migration integration must use the verified Atlas installer")
 	for _, step := range steps(verify) {
 		run, _ := step["run"].(string)
 		reject(strings.Contains(run, "npm run build") || strings.Contains(run, "npm run migrate:dist"), "Migration implementation must stay inside ci-migration-integration.sh")
@@ -411,6 +407,14 @@ func checkAPITestMatrix(api workflow) {
 }
 
 func checkMigrationGate(root string) {
+	installer, err := os.ReadFile(filepath.Join(root, "apps/api/install-atlas.sh"))
+	failIf(err)
+	for _, required := range []string{"ARG ATLAS_VERSION=", "atlas-checksums", "sha256sum", `[[ "$actual" == "$expected" ]]`} {
+		requireContains(string(installer), required, "Atlas installer must verify the canonical version and checksum")
+	}
+	dockerfile, err := os.ReadFile(filepath.Join(root, "apps/api/Dockerfile"))
+	failIf(err)
+	requireContains(string(dockerfile), `./install-atlas.sh /out/atlas "${TARGETARCH}"`, "Migration image must use the verified Atlas installer")
 	// Atlas lint-equivalent gate: Community `migrate validate` plus the local
 	// static checks in atlas-migration-check.sh (Atlas Pro `migrate lint` is
 	// intentionally not a CI dependency). The checker owns the destructive

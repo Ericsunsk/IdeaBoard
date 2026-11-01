@@ -26,6 +26,7 @@ type edge struct {
 }
 
 var quoted = regexp.MustCompile("['\"]([^'\"\n]+)['\"]")
+var workflowInput = regexp.MustCompile(`(?:^|[\s"'])(?:\./)?(apps/[A-Za-z0-9_./-]+)`)
 
 func main() {
 	rootArg := flag.String("root", "../..", "repository root")
@@ -80,6 +81,11 @@ func main() {
 			})
 		}
 		walkUses(document, inspectAction)
+		walkToolchainFiles(document, func(path string) {
+			if tracked[path] {
+				add(path, lane, workflow)
+			}
+		})
 	}
 	for _, file := range files {
 		owner := app(file)
@@ -253,6 +259,13 @@ func walkToolchainFiles(value any, visit func(string)) {
 	switch current := value.(type) {
 	case map[string]any:
 		for key, child := range current {
+			if key == "run" {
+				if shell, ok := child.(string); ok {
+					for _, match := range workflowInput.FindAllStringSubmatch(shell, -1) {
+						visit(match[1])
+					}
+				}
+			}
 			if key == "go-version-file" || key == "node-version-file" {
 				if path, ok := child.(string); ok && !strings.Contains(path, "${{") {
 					visit(path)

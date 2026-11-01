@@ -27,7 +27,7 @@ migrate 失败整栈停住并报错，不带病起服务。日常开发无需手
 | Node.js    | 以根目录 `.node-version` 为准               |
 | Go         | 以 `apps/api/go.mod` 的 `go` directive 为准 |
 | PostgreSQL | `17+`                                       |
-| Atlas CLI  | `1.3.2`                                     |
+| Atlas CLI  | 以 `apps/api/Dockerfile` 的 `ATLAS_VERSION` 为准                                     |
 
 启动本地依赖（`docker/.env` 已是加密进 git 的文件，全新 clone 自带，
 不要再从 example 覆盖它；`migration.env` 仍是本机文件，缺失才创建）：
@@ -293,6 +293,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 ```
 
 Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。Dockerfile 中的 `NODE_VERSION` / `golang` pin 只是可独立构建的 fallback，必须与 canonical source 一致；handbook 入口链接与版本一致性由 `scripts/handbook-version-contract.sh` 在 CI 强制校验（见 `Handbook Contract` lane）。
+
+Atlas 的 image build 与 CI 安装共用 `apps/api/install-atlas.sh`，从 Dockerfile pin 和 `apps/api/atlas-checksums` 校验官方 binary。该 pin 暂为修复上游依赖漏洞的精确 canary build；升级时同时更新两种架构 checksum 并验证 migration replay，不使用 mutable latest。
 
 Migration Integration 的 Auth build、runtime role 初始化与 API/Auth 两轮幂等迁移统一由 `scripts/ci-migration-integration.sh` 编排；workflow 只负责准备 PostgreSQL、Node、Go、Atlas 与 locked dependencies，不复制迁移顺序。Fresh validation 与两轮 apply 共用 workflow 准备的 `ATLAS_BINARY`，不重复下载安装；本地直跑该脚本时需预先安装 Atlas，或通过 `ATLAS_BINARY` 指定可执行文件。
 
