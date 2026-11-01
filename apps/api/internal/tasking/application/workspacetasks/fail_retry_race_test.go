@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-
 )
 
 // TestFailRetryRaceKeepsTerminalClosed pins P1-4: Fail (running/pending ->

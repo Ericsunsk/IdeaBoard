@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/tasking/settlement"
 	tasks "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/tasking/settlement"
 )
 
 // TestStateVocabularyPinsWireWords locks the durable settlement words.

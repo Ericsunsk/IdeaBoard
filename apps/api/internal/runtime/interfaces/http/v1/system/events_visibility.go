@@ -168,7 +168,3 @@ func (h *Handler) DeliverBoardAccessSignals(ctx context.Context, records []event
 		slog.Warn("deliver board access signals failed", "err", err)
 	}
 }
-
-func (h *Handler) deliverBoardAccessSignals(ctx context.Context, records []eventoutbox.BoardAccessOutboxRecord) {
-	h.DeliverBoardAccessSignals(ctx, records)
-}

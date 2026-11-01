@@ -28,9 +28,9 @@ import (
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/runtime/interfaces/http/v1/billing"
-	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	v1library "ideaboard/api/internal/runtime/interfaces/http/v1/library"
 	v1media "ideaboard/api/internal/runtime/interfaces/http/v1/media"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	v1tasks "ideaboard/api/internal/runtime/interfaces/http/v1/tasks"
 	v1tenancy "ideaboard/api/internal/runtime/interfaces/http/v1/tenancy"
 	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
@@ -50,18 +50,14 @@ var testInvitations = v1testsupport.TestInvitations
 
 type fakeTaskQuoter = v1testsupport.FakeTaskQuoter
 type fakeTaskQueue = v1testsupport.FakeTaskQueue
-type fakeTaskHolder = v1testsupport.FakeTaskHolder
 
 var newFakeTaskHolder = v1testsupport.NewFakeTaskHolder
-
-type v1TxTaskStore = v1testsupport.TxTaskStore
 
 var newV1TxTaskStore = v1testsupport.NewTxTaskStore
 var allowTestPoolResolver = v1testsupport.AllowTestPoolResolver
 var v1TxSnapshotSaver = v1testsupport.TxSnapshotSaver
 
 type v1FakeBillingAccounts = v1testsupport.FakeBillingAccounts
-type v1FakeQuoteWallets = v1testsupport.FakeQuoteWallets
 
 var newV1FakeQuoteWallets = v1testsupport.NewFakeQuoteWallets
 
@@ -163,10 +159,6 @@ func newV1MediaAccessPGFixture(t *testing.T) *v1MediaAccessPGFixture {
 
 func (f *v1MediaAccessPGFixture) uploadsPath() string {
 	return "/api/v1/workspaces/" + f.ws.PublicID + "/uploads"
-}
-
-func (f *v1MediaAccessPGFixture) assetsPath() string {
-	return "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets"
 }
 
 func pgAccessUpload(t *testing.T, f *v1MediaAccessPGFixture, creator int64, boardID string, key string) string {

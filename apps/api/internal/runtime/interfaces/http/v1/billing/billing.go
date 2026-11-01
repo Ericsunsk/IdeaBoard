@@ -104,8 +104,6 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 // shared+kernel, never on each other); aliased here for compatibility.
 type AccountStore = shared.AccountStore
 
-type billingAccountStore = AccountStore
-
 // billingWalletReader composes the Credits-Ledger read side. Only Credits
 // owns ledger writes; this interface exposes reads. Reads are keyed by the
 // stable Billing Account (#916), never by a user wallet.
@@ -250,19 +248,13 @@ type MemberQuotaDTO = v1MemberQuotaDTO
 type WorkspaceDTO = shared.WorkspaceDTO
 
 var writeV1InputError = shared.WriteInputError
-var requireIdempotencyKey = shared.RequireIdempotencyKey
 var batchDisplayFacts = shared.BatchDisplayFacts
 var applyDisplayFact = shared.ApplyDisplayFact
 var batchUserPublicIDs = shared.BatchUserPublicIDs
 var readUserPublicIDs = shared.ReadUserPublicIDs
 var renderUserPublicIDsError = shared.RenderUserPublicIDsError
 var toWorkspaceDTO = shared.ToWorkspaceDTO
-var withWorkspaceBillingAccount = shared.WithWorkspaceBillingAccount
 var v1PageSize = shared.PageSize
-
-func v1OffsetPage[T any](c *gin.Context, items []T, encodeFailMsg string) ([]T, contract.PageMeta, bool) {
-	return shared.OffsetPage(c, items, encodeFailMsg)
-}
 
 func (d *Deps) normalize() {
 	if d.Idempotency == nil {
@@ -802,7 +794,6 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 		contract.RenderPaginated(c, records, meta)
 	})
 }
-
 
 type v1CreateCheckoutBody struct {
 	Data struct {

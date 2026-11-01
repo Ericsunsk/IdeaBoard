@@ -47,8 +47,8 @@ const RefreshTimeout = 5 * time.Second
 type Set struct {
 	httpRequestsTotal *prometheus.CounterVec
 	httpRequestTime   *prometheus.HistogramVec
-	workerRequests   *prometheus.CounterVec
-	workerRetries    *prometheus.CounterVec
+	workerRequests    *prometheus.CounterVec
+	workerRetries     *prometheus.CounterVec
 	// workerPerModelLimited counts sends rejected before egress by the
 	// per-model guards (reason=concurrency_limited|breaker_open). Rejections
 	// surface as retryable 429s so the worker requeues with backoff.

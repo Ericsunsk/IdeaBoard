@@ -26,10 +26,6 @@ func PublicBrandingSettingsV1Handler(provider settings.BrandingSettingProvider) 
 	}
 }
 
-func publicBrandingSettingsV1Handler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
-	return PublicBrandingSettingsV1Handler(provider)
-}
-
 func PublicSearchV1Handler(handler *searchhttp.SearchHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if handler == nil {
@@ -38,8 +34,4 @@ func PublicSearchV1Handler(handler *searchhttp.SearchHandler) gin.HandlerFunc {
 		}
 		handler.Search(c)
 	}
-}
-
-func publicSearchV1Handler(handler *searchhttp.SearchHandler) gin.HandlerFunc {
-	return PublicSearchV1Handler(handler)
 }

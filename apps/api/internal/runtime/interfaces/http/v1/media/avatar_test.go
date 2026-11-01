@@ -59,8 +59,8 @@ func TestV1AvatarProfilePersistsAcrossHandlers(t *testing.T) {
 		f.other: {ID: f.other, StorageUID: "AVTR02"},
 	}}
 	deps := ContractV1Deps{
-		Media:  ContractV1MediaDeps{Media: f.media, MediaObjects: f.objects},
-		Avatar: ContractV1AvatarDeps{AvatarObjects: f.objects, AvatarUID: NewV1AvatarDirectory(repo)},
+		Media:       ContractV1MediaDeps{Media: f.media, MediaObjects: f.objects},
+		Avatar:      ContractV1AvatarDeps{AvatarObjects: f.objects, AvatarUID: NewV1AvatarDirectory(repo)},
 		UserProfile: runtimehttp.NewV1UserProfileDirectory(repo),
 	}
 	engine := newV1MediaTestEngine(f.store, f.dir, deps)

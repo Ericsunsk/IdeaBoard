@@ -36,7 +36,7 @@ func IngestImage(ctx context.Context, sessions SessionStore, objects MediaObject
 	}
 	facts, err := imageformat.InspectDetectedBytes(params.Data)
 	if err != nil {
-		return nil, fmt.Errorf("workspacemedia: inspect image (%v): %w", err, NewFieldValidationError("file"))
+		return nil, fmt.Errorf("workspacemedia: inspect image (%w): %w", err, NewFieldValidationError("file"))
 	}
 	sum := sha256.Sum256(params.Data)
 	checksum := hex.EncodeToString(sum[:])

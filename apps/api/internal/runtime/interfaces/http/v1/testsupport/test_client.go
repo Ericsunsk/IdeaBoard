@@ -129,7 +129,7 @@ type Call struct {
 func DoRoundTrip(t *testing.T, engine *gin.Engine, call Call, reqIDPrefix string) (int, http.Header, string) {
 	t.Helper()
 	reader := strings.NewReader(call.Body)
-	req := httptest.NewRequest(call.Method, call.Path, reader)
+	req := httptest.NewRequestWithContext(context.Background(), call.Method, call.Path, reader)
 	if call.Body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -456,6 +456,7 @@ func TestImgproxyConfig(t *testing.T) imgproxy.Config {
 	t.Helper()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/webp")
+		//nolint:gosec // G705: test-only imgproxy stub echoes the request path; no untrusted sink.
 		_, _ = w.Write([]byte(r.URL.Path))
 	}))
 	t.Cleanup(upstream.Close)

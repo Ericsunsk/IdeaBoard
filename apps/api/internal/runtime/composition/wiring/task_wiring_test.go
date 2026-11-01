@@ -30,7 +30,7 @@ func TestLookupCustomParamsProviderModelIdentity(t *testing.T) {
 	}}
 	cases := []struct {
 		name, provider, model, wantParams string
-		wantFound                          bool
+		wantFound                         bool
 	}{
 		{name: "case-insensitive native model", provider: "openai", model: "gpt-image-1", wantParams: `{"quality":"high"}`, wantFound: true},
 		{name: "same-name provider isolation", provider: " AzureOpenAI ", model: " GPT-IMAGE-1 ", wantParams: `{"quality":"medium"}`, wantFound: true},

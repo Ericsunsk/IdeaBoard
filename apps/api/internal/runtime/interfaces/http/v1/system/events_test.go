@@ -176,10 +176,10 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 			TaskQuoteWallets:         newV1FakeQuoteWallets(),
 			TaskAcceptance:           &v1TxSubmissionAcceptance{boards: &boardtaskaccess.Authorizer{Store: boardsStore}, assets: taskAssets},
 		},
-		Boards:                   boardsStore,
-		Library:                  ContractV1LibraryDeps{Store: libStore},
-		Events:                   eventLog,
-		Webhooks:                 webhooks,
+		Boards:   boardsStore,
+		Library:  ContractV1LibraryDeps{Store: libStore},
+		Events:   eventLog,
+		Webhooks: webhooks,
 	})
 	const owner, admin, member, outsider = 1, 2, 3, 9
 	for _, id := range []int64{owner, admin, member, outsider, 4} {

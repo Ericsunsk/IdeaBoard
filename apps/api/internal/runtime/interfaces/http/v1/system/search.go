@@ -49,6 +49,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
 // V1SearchBackend serves one normalized workspace search page. The
 // providers filter is honored by the backend (post-filter fill stays
 // bounded inside the adapter). Results carry provider URL + source

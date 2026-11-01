@@ -15,7 +15,6 @@ import (
 	"ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
@@ -90,56 +89,6 @@ func v1SaveAssetBody(sourceID, folderID string) string {
 	}
 	return fmt.Sprintf(`{"data":{"source":"external","provider":"unsplash","source_id":%q,"source_url":%q,"preview_url":%q,"original_url":%q,"title":"dunes","author":"a","width":100,"height":80%s}}`,
 		sourceID, v1TestAssetURL, v1TestAssetURL, v1TestAssetURL, folder)
-}
-
-// fakeLibraryBilling and fakeLibraryQuoter implement the shared
-// V1CreditSettler/V1BillingQuoter seams. The library surface no longer
-// wires them (permanent free tier); the search surface tests in
-// v1/search_test.go still consume them — keep both types.
-
-type fakeLibraryBilling struct {
-	mu         sync.Mutex
-	holdErr    error
-	captures   int
-	releases   int
-	lastHoldWS string
-	lastHoldBy int64
-}
-
-func (f *fakeLibraryBilling) Hold(ctx context.Context, workspacePublicID string, actorUserID int64, amountCredits int64, idempotencyKey, reason string) (string, error) {
-	if f.holdErr != nil {
-		return "", f.holdErr
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.lastHoldWS, f.lastHoldBy = workspacePublicID, actorUserID
-	return "hold-1", nil
-}
-
-func (f *fakeLibraryBilling) Capture(ctx context.Context, workspacePublicID string, actorUserID int64, holdID string, amountCredits int64, idempotencyKey string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.captures++
-	return nil
-}
-
-func (f *fakeLibraryBilling) Release(ctx context.Context, workspacePublicID string, actorUserID int64, holdID string, amountCredits int64, idempotencyKey string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.releases++
-	return nil
-}
-
-type fakeLibraryQuoter struct {
-	amount int64
-	err    error
-}
-
-func (f *fakeLibraryQuoter) Quote(ctx context.Context, workspacePublicID, sku string) (int64, error) {
-	if f.err != nil {
-		return 0, f.err
-	}
-	return f.amount, nil
 }
 
 func TestV1LibraryFolderLifecycle(t *testing.T) {

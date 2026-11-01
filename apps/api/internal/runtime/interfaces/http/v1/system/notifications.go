@@ -10,8 +10,8 @@ import (
 
 	"ideaboard/api/internal/notifications"
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 
 	"github.com/gin-gonic/gin"
 )

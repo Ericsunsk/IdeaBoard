@@ -48,6 +48,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
 // V1VisionBillingDeferredObserve emits the billing_deferred metric +
 // backfill note for unpriced vision SKUs via the existing slog
 // observability pattern (closed labels only: sku, reason). It is a

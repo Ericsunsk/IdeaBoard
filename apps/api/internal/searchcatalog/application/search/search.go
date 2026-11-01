@@ -23,8 +23,8 @@ const (
 	// DefaultSearchLimit/MaxSearchLimit alias the contract kernel bounds
 	// (P0-5): the search edge validates through contract.ParseSearchLimit;
 	// the service keeps clamping semantics on the already-parsed value.
-	DefaultSearchLimit  = contract.DefaultSearchLimit
-	MaxSearchLimit      = contract.MaxSearchLimit
+	DefaultSearchLimit = contract.DefaultSearchLimit
+	MaxSearchLimit     = contract.MaxSearchLimit
 	// MaxSearchQueryRunes aliases the canonical domain bound (single
 	// source; never redeclare the literal).
 	MaxSearchQueryRunes = domain.QueryMaxRunes

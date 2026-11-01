@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"ideaboard/api/internal/tenancy/funds"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/db/dbutil/testscope"
@@ -14,6 +13,7 @@ import (
 	taskdomain "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/jackc/pgx/v5"

@@ -14,9 +14,9 @@ import (
 	eventoutbox "ideaboard/api/internal/events/outbox"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasking/settlement"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
@@ -94,13 +94,13 @@ var _ taskports.TxBillingAccountResolver = (*Store)(nil)
 // reason rides here because tasks carries no cancel text column. The Board
 // binding persists with the accepted inputs in the same task insert.
 type workflowInputEnvelope struct {
-	MediaAssetIDs   []string                        `json:"media_asset_ids,omitempty"`
-	Params          map[string]any                  `json:"params,omitempty"`
-	CanonicalParams string                          `json:"canonical_params,omitempty"`
+	MediaAssetIDs   []string               `json:"media_asset_ids,omitempty"`
+	Params          map[string]any         `json:"params,omitempty"`
+	CanonicalParams string                 `json:"canonical_params,omitempty"`
 	BillingSnapshot *tasks.BillingSnapshot `json:"billing_snapshot,omitempty"`
-	ExecutionToken  string                          `json:"execution_token,omitempty"`
-	CancelReason    string                          `json:"cancel_reason,omitempty"`
-	BoardID         string                          `json:"board_id,omitempty"`
+	ExecutionToken  string                 `json:"execution_token,omitempty"`
+	CancelReason    string                 `json:"cancel_reason,omitempty"`
+	BoardID         string                 `json:"board_id,omitempty"`
 	// BoardAccessVersion snapshots the Board access_version at submit.
 	BoardAccessVersion int64 `json:"board_access_version,omitempty"`
 }

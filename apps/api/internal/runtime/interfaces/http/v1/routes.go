@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"ideaboard/api/internal/boards"
@@ -11,18 +10,18 @@ import (
 	eventoutbox "ideaboard/api/internal/events/outbox"
 	eventwebhook "ideaboard/api/internal/events/webhook"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/notifications"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
-	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	v1boards "ideaboard/api/internal/runtime/interfaces/http/v1/boards"
 	v1library "ideaboard/api/internal/runtime/interfaces/http/v1/library"
 	v1media "ideaboard/api/internal/runtime/interfaces/http/v1/media"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	v1system "ideaboard/api/internal/runtime/interfaces/http/v1/system"
 	v1tasks "ideaboard/api/internal/runtime/interfaces/http/v1/tasks"
 	v1tenancy "ideaboard/api/internal/runtime/interfaces/http/v1/tenancy"
-	"ideaboard/api/internal/media/workspacemedia"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	taskdomain "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tenancy"
@@ -44,7 +43,7 @@ type ContractV1Deps struct {
 	// #802). Nil keeps the boards surface fail-closed with 501 until the
 	// postgres workspace-board mapping lands (#809); tests inject the
 	// in-memory implementation. Role facts leave this store only through
-	// the narrow boards.RoleReader port (#934: h.boardRoles()); Media /
+	// the narrow boards.RoleReader port (#934); Media /
 	// Tasking / Events must not copy the role mapping or reach past it
 	// into Boards storage.
 	Boards boards.WorkspaceBoardStore
@@ -89,7 +88,7 @@ type ContractV1Deps struct {
 	PublicSearchHandler *searchhttp.SearchHandler
 	// UserProfile persists profile updates and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
-	UserProfile   runtimehttp.V1UserProfileDirectory
+	UserProfile runtimehttp.V1UserProfileDirectory
 	// RealtimeTicketSecret is the HMAC secret for board presence tickets
 	// (RT_TICKET_SECRET). Empty fails the realtime-ticket endpoint
 	// closed with 500 (no fallback default); Load records the missing
@@ -167,19 +166,6 @@ func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
 	boardHandler.Mount(group)
 }
 
-func (h *contractV1Handler) authorizeBoardByID(c *gin.Context, workspace *tenancy.Workspace, boardID, workspaceRole string, userID int64, cap boards.Capability) (*boards.V1Board, boards.AccessRole, bool) {
-	return v1boards.AuthorizeBoardByID(c, h.deps.Boards, workspace, boardID, workspaceRole, userID, cap)
-}
-
-func (h *contractV1Handler) requireBoardsStore(c *gin.Context) bool {
-	if h.deps.Boards == nil {
-		contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, "The v1 boards surface is not implemented yet")
-		c.Abort()
-		return false
-	}
-	return true
-}
-
 func (h *contractV1Handler) libraryHandler() *v1library.Handler {
 	return v1library.NewHandler(v1library.Deps{
 		Store:                     h.deps.Store,
@@ -218,14 +204,6 @@ func (h *contractV1Handler) mediaHandler() *v1media.Handler {
 		EmitWorkspaceEvent:               h.emitWorkspaceEvent,
 		GetLibraryMaterializedMediaAsset: h.getLibraryMaterializedMediaAsset,
 	})
-}
-
-func (h *contractV1Handler) publicAvatar(c *gin.Context) {
-	h.mediaHandler().PublicAvatar(c)
-}
-
-func (h *contractV1Handler) publicBrandingLogo(c *gin.Context) {
-	h.mediaHandler().PublicBrandingLogo(c)
 }
 
 func (h *contractV1Handler) v1MediaBinaryAsset(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
@@ -278,24 +256,7 @@ func (h *contractV1Handler) deliverBoardAccessSignals(ctx context.Context, recor
 
 type workspaceEventViewer struct {
 	userID        int64
-	userPublicID  string
 	workspaceRole string
-}
-
-func (h *contractV1Handler) eventViewerFor(ctx context.Context, identityPrincipal principal.Principal, workspaceRole string) (workspaceEventViewer, bool) {
-	v, ok := h.systemHandler().EventViewerFor(ctx, identityPrincipal, workspaceRole)
-	if !ok {
-		return workspaceEventViewer{}, false
-	}
-	return workspaceEventViewer{userID: v.UserID, userPublicID: v.UserPublicID, workspaceRole: v.WorkspaceRole}, true
-}
-
-func (h *contractV1Handler) eventVisibleToViewer(ctx context.Context, workspacePublicID string, viewer workspaceEventViewer, envelope events.V1Envelope) bool {
-	return h.systemHandler().EventVisibleToViewer(ctx, workspacePublicID, v1system.WorkspaceEventViewer{
-		UserID:        viewer.userID,
-		UserPublicID:  viewer.userPublicID,
-		WorkspaceRole: viewer.workspaceRole,
-	}, envelope)
 }
 
 func (h *contractV1Handler) registerTaskRoutes(group *gin.RouterGroup) {
@@ -329,9 +290,6 @@ func (h *contractV1Handler) resolveTaskBoardAccess(ctx context.Context, workspac
 	return taskHandler.ResolveTaskBoardAccess(ctx, workspace, workspaceRole, userID, task)
 }
 
-var isTaskContentEvent = v1tasks.IsTaskContentEvent
-var reconcileTaskResolution = v1tasks.ReconcileTaskResolution
-
 type contractV1Handler struct {
 	deps ContractV1Deps
 }
@@ -349,10 +307,6 @@ func (h *contractV1Handler) tenancyHandler() *v1tenancy.Handler {
 		Boards:                    h.deps.Boards,
 		DeliverBoardAccessSignals: h.deliverBoardAccessSignals,
 	})
-}
-
-func (h *contractV1Handler) getWorkspaceInviteByToken(c *gin.Context) {
-	h.tenancyHandler().GetWorkspaceInviteByToken(c)
 }
 
 // RegisterContractV1RoutesOnEngine mounts the additive v1 group on the

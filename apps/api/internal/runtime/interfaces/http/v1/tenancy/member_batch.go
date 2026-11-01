@@ -15,25 +15,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var errUserDirectoryMissing = shared.ErrUserDirectoryMissing
-var errUserPublicIDsUnavailable = shared.ErrUserPublicIDsUnavailable
-
 // batchUserPublicIDs resolves many numeric user ids to usr_ ids in ONE
 // directory round trip. Unknown ids fail closed with 503, matching the
 // single-row toMemberDTO behavior (member rows must never silently drop).
 // A nil directory renders 501, matching the single-row guards.
 func batchUserPublicIDs(ctx context.Context, c *gin.Context, dir runtimehttp.V1UserDirectory, userIDs []int64) (map[int64]string, bool) {
 	return shared.BatchUserPublicIDs(ctx, c, dir, userIDs)
-}
-
-func renderUserPublicIDsError(c *gin.Context, err error) {
-	shared.RenderUserPublicIDsError(c, err)
-}
-
-// readUserPublicIDs is shared by HTTP projections and the overview read
-// adapter. It never renders a response and preserves the snapshot carrier.
-func readUserPublicIDs(ctx context.Context, dir runtimehttp.V1UserDirectory, userIDs []int64) (map[int64]string, error) {
-	return shared.ReadUserPublicIDs(ctx, dir, userIDs)
 }
 
 // batchDisplayFacts resolves workspace-visible display facts (Auth-owned

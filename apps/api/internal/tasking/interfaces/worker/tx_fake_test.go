@@ -35,10 +35,10 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
-	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/jackc/pgx/v5"
@@ -48,12 +48,6 @@ import (
 // harnesses cannot drift again. Neighboring suite files keep referring to
 // workerFakeTx; this alias keeps that wiring compiling.
 type workerFakeTx = testscope.Tx
-
-// workerShimTx aliases the shared shim: it wraps a real postgres
-// settlement transaction so the database-outside fake legs (in-memory
-// claim fence, fake holder maps, fake queue slice) can register rollback
-// undos on it. Task rows need no undo: the real rollback discards them.
-type workerShimTx = testscope.ShimTx
 
 // workerOnRollback registers an in-memory cleanup on either transaction
 // flavor. It is a no-op for foreign transactions (e.g. ambient carriers),

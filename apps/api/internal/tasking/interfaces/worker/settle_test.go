@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/riverpolicy"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/riverqueue/river"
 )

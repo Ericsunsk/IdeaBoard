@@ -57,12 +57,6 @@ type QuoteQuotaReader interface {
 	CheckQuotaForQuote(ctx context.Context, billingAccountID, userID int64, amount int64, reservedAt time.Time) error
 }
 
-type (
-	taskQuoteBillingAccountReader = QuoteBillingAccountReader
-	taskQuoteWalletReader         = QuoteWalletReader
-	taskQuoteQuotaReader          = QuoteQuotaReader
-)
-
 type ContractV1TaskDeps struct {
 	Tasks                    WorkspaceTaskReadStore
 	TaskLifecycle            WorkspaceTaskLifecycleStore
@@ -172,10 +166,6 @@ func (h *Handler) requireStoreAndTasks(c *gin.Context) bool {
 		return false
 	}
 	return true
-}
-
-func (h *Handler) requireTaskStores(c *gin.Context) bool {
-	return h.requireStoreAndTasks(c)
 }
 
 type v1WorkspaceOpts = shared.WorkspaceOpts

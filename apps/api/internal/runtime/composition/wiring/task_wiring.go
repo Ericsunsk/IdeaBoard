@@ -532,29 +532,29 @@ func NewAppTaskRuntime(
 	}
 
 	return AppTaskServices{
-			invitationMailQueue: invitationMailQueue, // #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
-			// production River client (workspace_task_execute kind); #825
-			// registers the real consumer on the same client above.
-			workspaceTaskQueue:  workspaceEnqueuer,
-			workspaceTaskStore:  workspaceStore,
-			workspaceTaskHolder: workspaceHolder,
-			workspaceTaskQuoter: workspaceQuoter,
-			workspaceTaskMedia:  workspaceMedia,
-			workspaceTaskAssets: workspaceAssets,
-			workspaceTaskRouter: workspaceRouter,
-			webhooks:            webhookStore,
-			workspaceEvents:     workspaceEvents,
-			workspaceEventBus:   eventBus,
-			userEvents:          userEventHub,
-			taskStatusPublisher: taskStatusPublisher,
-		}, AppWorkerRuntime{
-			riverClient:  riverClient,
-			eventBus:     eventBus,
-			queueName:    riverpolicy.RiverQueueDefault,
-			concurrency:  workerConcurrency,
-			consume:      runWorkers,
-			queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
-		}, nil
+		invitationMailQueue: invitationMailQueue, // #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
+		// production River client (workspace_task_execute kind); #825
+		// registers the real consumer on the same client above.
+		workspaceTaskQueue:  workspaceEnqueuer,
+		workspaceTaskStore:  workspaceStore,
+		workspaceTaskHolder: workspaceHolder,
+		workspaceTaskQuoter: workspaceQuoter,
+		workspaceTaskMedia:  workspaceMedia,
+		workspaceTaskAssets: workspaceAssets,
+		workspaceTaskRouter: workspaceRouter,
+		webhooks:            webhookStore,
+		workspaceEvents:     workspaceEvents,
+		workspaceEventBus:   eventBus,
+		userEvents:          userEventHub,
+		taskStatusPublisher: taskStatusPublisher,
+	}, AppWorkerRuntime{
+		riverClient:  riverClient,
+		eventBus:     eventBus,
+		queueName:    riverpolicy.RiverQueueDefault,
+		concurrency:  workerConcurrency,
+		consume:      runWorkers,
+		queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
+	}, nil
 }
 
 // riverQueueStatsByQueue fans one RiverQueue monitor out to every known

@@ -17,11 +17,11 @@ import (
 	"ideaboard/api/internal/prompts"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskservice "ideaboard/api/internal/tasking/application/task"
-	tasks "ideaboard/api/internal/tasking/domain"
 	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	tasks "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
-	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"

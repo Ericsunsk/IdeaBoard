@@ -55,40 +55,29 @@ func doV1(t *testing.T, engine *gin.Engine, call v1Call) (int, http.Header, map[
 	})
 }
 
-func doV1RoundTrip(t *testing.T, engine *gin.Engine, call v1Call, reqIDPrefix string) (int, http.Header, string) {
-	t.Helper()
-	return testsupport.DoRoundTrip(t, engine, testsupport.Call{
-		Method:  call.method,
-		Path:    call.path,
-		Body:    call.body,
-		UserID:  call.userID,
-		Headers: call.headers,
-	}, reqIDPrefix)
-}
-
 var v1Data = testsupport.Data
 var v1ErrorCode = testsupport.ErrorCode
 var v1WorkspaceFixture = testsupport.WorkspaceFixture
-var testUUIDForUser = testsupport.TestUUIDForUser
-var v1ErrorFields = testsupport.ErrorFields
-var configureV1WorkspaceDefaultQuota = testsupport.ConfigureWorkspaceDefaultQuota
 var v1GapsDeclare = testsupport.GapsDeclare
 var v1GapsStage = testsupport.GapsStage
 var v1GapsComplete = testsupport.GapsComplete
-var v1GapsChecksum = testsupport.GapsChecksum
-var v1MediaAssetID = testsupport.MediaAssetID
 var testInvitations = testsupport.TestInvitations
 var NewInvitationIdentityReader = testsupport.NewInvitationIdentityReader
 
 type fakeTaskQuoter = testsupport.FakeTaskQuoter
+
 var allowTestPoolResolver = testsupport.AllowTestPoolResolver
+
 type v1FakeBillingAccounts = testsupport.FakeBillingAccounts
-type v1FakeQuoteWallets = testsupport.FakeQuoteWallets
+
 var newV1FakeQuoteWallets = testsupport.NewFakeQuoteWallets
+
 type fakeTaskHolder = testsupport.FakeTaskHolder
+
 var newFakeTaskHolder = testsupport.NewFakeTaskHolder
+
 type fakeTaskQueue = testsupport.FakeTaskQueue
-type v1TxTaskStore = testsupport.TxTaskStore
+
 var newV1TxTaskStore = testsupport.NewTxTaskStore
 var v1TxSnapshotSaver = testsupport.TxSnapshotSaver
 
@@ -169,6 +158,7 @@ func (f *fakeLibraryQuoter) Quote(ctx context.Context, workspacePublicID, sku st
 }
 
 type staticMemberDisplayProvider = testsupport.StaticMemberDisplayProvider
+
 var testInvitationReader = testsupport.TestInvitationReader
 
 var v1GapsPNGBytes = testsupport.GapsPNGBytes

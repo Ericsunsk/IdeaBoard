@@ -18,8 +18,8 @@ import (
 
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	tasks "ideaboard/api/internal/tasking/domain"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
 
 // compensateCountingRenderer wraps a production renderer and counts

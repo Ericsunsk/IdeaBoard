@@ -25,7 +25,6 @@ type MemberDTO struct {
 }
 
 type v1MemberDTO = MemberDTO
-type v1DeletedDTO = shared.DeletedDTO
 
 func (h *Handler) toMemberDTO(c *gin.Context, m *domaintenancy.WorkspaceMember) (v1MemberDTO, bool) {
 	if m == nil {

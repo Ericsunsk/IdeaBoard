@@ -35,9 +35,9 @@ import (
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 	"ideaboard/api/internal/platform/sse"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	"ideaboard/api/internal/runtime/interfaces/http/v1/shared"
 
 	"github.com/gin-gonic/gin"
 )

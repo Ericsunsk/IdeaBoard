@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	librarydomain "ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
@@ -94,12 +93,6 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 	if reader.ownerID != 42 || reader.assetID != 9 {
 		t.Fatalf("library lookup = owner %d asset %d, want owner 42 asset 9", reader.ownerID, reader.assetID)
 	}
-}
-
-type visionTestOutboundPolicy struct{ hosts []string }
-
-func (p visionTestOutboundPolicy) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
-	return settings.OutboundPolicySetting{AllowHosts: p.hosts}, nil
 }
 
 func TestWriteVisionErrorUsesStableMachineCodes(t *testing.T) {

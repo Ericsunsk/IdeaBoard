@@ -529,10 +529,6 @@ func (f *v1MediaGapsFixture) uploadsPath() string {
 	return "/api/v1/workspaces/" + f.ws.PublicID + "/uploads"
 }
 
-func (f *v1MediaGapsFixture) assetsPath() string {
-	return "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets"
-}
-
 func newV1VisionGapsFixture(t *testing.T) (*v1MediaGapsFixture, *librarymemory.InMemoryWorkspaceLibraryStore, *fakeVisionExtractor, *fakeLibraryBilling) {
 	t.Helper()
 	ctx := context.Background()
@@ -677,13 +673,13 @@ func TestV1VisionQueryExternalURLs(t *testing.T) {
 	}
 
 	for name, url := range map[string]string{
-		"plain http":   "http://images.unsplash.com/photo-1",
-		"exotic port":  "https://images.unsplash.com:8080/photo-1",
-		"userinfo":     "https://user@images.unsplash.com/photo-1",
-		"loopback":     "https://127.0.0.1/photo-1",
-		"private":      "https://10.0.0.8/photo-1",
-		"non-url":      "not a url",
-		"data URL":     "data:image/png;base64,abcd",
+		"plain http":  "http://images.unsplash.com/photo-1",
+		"exotic port": "https://images.unsplash.com:8080/photo-1",
+		"userinfo":    "https://user@images.unsplash.com/photo-1",
+		"loopback":    "https://127.0.0.1/photo-1",
+		"private":     "https://10.0.0.8/photo-1",
+		"non-url":     "not a url",
+		"data URL":    "data:image/png;base64,abcd",
 	} {
 		body := fmt.Sprintf(`{"data":{"image_urls":[%q]}}`, url)
 		status, payload := v1VisionGapsPost(t, f, "vision-ext-bad-"+strings.ReplaceAll(name, " ", "-"), body, f.member)

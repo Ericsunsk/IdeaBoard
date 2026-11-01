@@ -45,28 +45,14 @@ func doV1(t *testing.T, engine *gin.Engine, call v1Call) (int, http.Header, map[
 	})
 }
 
-func doV1RoundTrip(t *testing.T, engine *gin.Engine, call v1Call, reqIDPrefix string) (int, http.Header, string) {
-	t.Helper()
-	return testsupport.DoRoundTrip(t, engine, testsupport.Call{
-		Method:  call.method,
-		Path:    call.path,
-		Body:    call.body,
-		UserID:  call.userID,
-		Headers: call.headers,
-	}, reqIDPrefix)
-}
-
 var v1Data = testsupport.Data
 var v1ErrorCode = testsupport.ErrorCode
 var v1WorkspaceFixture = testsupport.WorkspaceFixture
 var testUUIDForUser = testsupport.TestUUIDForUser
 var configureV1WorkspaceDefaultQuota = testsupport.ConfigureWorkspaceDefaultQuota
-var organizationWorkspaceFixture = testsupport.OrganizationWorkspaceFixture
+var v1OrganizationWorkspaceFixture = testsupport.OrganizationWorkspaceFixture
 var testInvitations = testsupport.TestInvitations
 var testInvitationReader = testsupport.TestInvitationReader
-
-var v1OrganizationWorkspaceFixture = testsupport.OrganizationWorkspaceFixture
-var v1UserAuthMiddleware = testsupport.UserAuthMiddleware
 var v1GapsErrorFields = testsupport.ErrorFields
 
 type billingAccountStore = shared.AccountStore

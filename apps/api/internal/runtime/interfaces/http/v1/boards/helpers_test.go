@@ -55,8 +55,6 @@ func doV1RoundTrip(t *testing.T, engine *gin.Engine, call v1Call, reqIDPrefix st
 
 var v1Data = testsupport.Data
 var v1ErrorCode = testsupport.ErrorCode
-var v1WorkspaceFixture = testsupport.WorkspaceFixture
-var testUUIDForUser = testsupport.TestUUIDForUser
 
 type v1ListCursor = shared.ListCursor
 type fakeMemberDisplay = testsupport.FakeMemberDisplay

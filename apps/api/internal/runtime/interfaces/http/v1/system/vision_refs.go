@@ -21,6 +21,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
 func (h *Handler) resolveVisionReferences(c *gin.Context, workspace *tenancy.Workspace, assetIDs []string) ([]searchcatalog.V1VisionReference, bool) {
 	references := make([]searchcatalog.V1VisionReference, 0, len(assetIDs))
 	for _, id := range assetIDs {

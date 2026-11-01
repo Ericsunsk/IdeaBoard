@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -90,26 +89,6 @@ func TestMaterializeProviderResultImagesLogsProvidedCorrelationID(t *testing.T) 
 	if !strings.Contains(logBuffer.String(), "correlation_id=corr-custom") {
 		t.Fatalf("materialization logs should include provided correlation id, got: %s", logBuffer.String())
 	}
-}
-
-func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
-	t.Helper()
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
-	}
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("chdir temp: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(oldWd)
-	})
-
-	// Legacy storage taskmedia seam removed (#815): callers override
-	// mediaResolver/resultMaterializer with test fakes as needed; the
-	// zero executor surfaces explicit unavailable errors otherwise.
-	return &ProviderExecutor{}
 }
 
 func TestMaterializeProviderResultImagesFailsWhenMaterializerMissing(t *testing.T) {

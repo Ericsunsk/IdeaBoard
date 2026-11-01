@@ -359,9 +359,9 @@ type envConfig struct {
 	RealtimeTicketSecret      string `env:"RT_TICKET_SECRET"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
-	WorkerPerModelLimit        string `env:"WORKER_PER_MODEL_LIMIT"`
-	WorkerBreakerCooldown      string `env:"WORKER_BREAKER_COOLDOWN_SECONDS"`
-	WorkerBreakerFailureRate   string `env:"WORKER_BREAKER_FAILURE_RATE"`
+	WorkerPerModelLimit       string `env:"WORKER_PER_MODEL_LIMIT"`
+	WorkerBreakerCooldown     string `env:"WORKER_BREAKER_COOLDOWN_SECONDS"`
+	WorkerBreakerFailureRate  string `env:"WORKER_BREAKER_FAILURE_RATE"`
 	// WorkerBaseURL is the ai-proxy Worker service root.
 	WorkerBaseURL string `env:"WORKER_BASE_URL"`
 	// WorkerSecret is the WORKER_INTERNAL_SECRET bearer credential for the Worker.

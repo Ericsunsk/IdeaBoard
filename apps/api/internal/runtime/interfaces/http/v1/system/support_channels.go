@@ -24,7 +24,3 @@ func PublicSupportChannelsV1Handler(provider settings.SupportChannelsSettingProv
 		contract.RenderSuccess(c, settings.EnabledSupportChannels(setting))
 	}
 }
-
-func publicSupportChannelsV1Handler(provider settings.SupportChannelsSettingProvider) gin.HandlerFunc {
-	return PublicSupportChannelsV1Handler(provider)
-}

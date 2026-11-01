@@ -9,8 +9,8 @@ import (
 	"errors"
 	"testing"
 
-	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	tasks "ideaboard/api/internal/tasking/domain"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/jackc/pgx/v5"

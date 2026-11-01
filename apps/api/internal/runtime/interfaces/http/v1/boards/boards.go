@@ -105,22 +105,8 @@ func (h *Handler) requireStoreAndBoards(c *gin.Context) bool {
 	return true
 }
 
-func (h *Handler) requireBoardsStore(c *gin.Context) bool {
-	return h.requireStoreAndBoards(c)
-}
-
 func (h *Handler) boardWorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
 	return shared.ResolveWorkspaceContext(c, h.deps.Store, identityPrincipal)
-}
-
-// boardRoles exposes the narrow board-access port (#934) consumed by this
-// surface today and by Media / Tasking / Events in #936/#937/#940: role
-// facts only, never Boards private storage and never an HTTP handler.
-// h.deps.Boards always satisfies it (both stores assert
-// domainboards.RoleReader); nil fails closed through requireStoreAndBoards
-// before any caller reaches here.
-func (h *Handler) boardRoles() domainboards.RoleReader {
-	return h.deps.Boards
 }
 
 // authorizeBoard resolves a board within a visible workspace and enforces

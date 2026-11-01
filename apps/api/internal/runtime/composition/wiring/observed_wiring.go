@@ -3,9 +3,9 @@ package wiring
 import (
 	"context"
 
-	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 	"ideaboard/api/internal/billing"
 	billingapplication "ideaboard/api/internal/billing/application"
+	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
 )
 
 // billingSKUCatalogAdapter projects BillableItemCatalog cards onto the narrow

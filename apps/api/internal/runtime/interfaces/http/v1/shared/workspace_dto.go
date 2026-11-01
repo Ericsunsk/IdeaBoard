@@ -18,11 +18,11 @@ func FormatTime(t time.Time) string {
 
 // WorkspaceDTO represents a workspace on the wire.
 type WorkspaceDTO struct {
-	ID             string  `json:"id"`
-	OrganizationID *string `json:"organization_id"`
-	Name           string  `json:"name"`
-	IsDefault      bool    `json:"is_default"`
-	CreatedAt      string  `json:"created_at"`
+	ID               string  `json:"id"`
+	OrganizationID   *string `json:"organization_id"`
+	Name             string  `json:"name"`
+	IsDefault        bool    `json:"is_default"`
+	CreatedAt        string  `json:"created_at"`
 	BillingAccountID *string `json:"billing_account_id,omitempty"`
 }
 

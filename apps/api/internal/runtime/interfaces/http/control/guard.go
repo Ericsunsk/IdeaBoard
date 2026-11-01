@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	billinghttp "ideaboard/api/internal/billing/interfaces/http"
 	"ideaboard/api/internal/boards"
 	creditsdomain "ideaboard/api/internal/credits/domain"
@@ -29,6 +28,7 @@ import (
 	"ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	modelregistryhttp "ideaboard/api/internal/modelregistry/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
