@@ -455,10 +455,11 @@ while (($# > 0)); do
   esac
 done
 [[ "${#paths[@]}" == 2 && "${paths[0]}" == / && "${paths[1]}" == /ai-proxy ]]
+[[ "${ENV_FILE:-}" == /var/lib/ideaboard/owner.env ]]
 [[ "$*" == 'env -u POSTGRES_PASSWORD -u PG_MIGRATION_USER -u PG_MIGRATION_PASSWORD scripts/deploy-stack.sh update --manifest release-manifest.json' ]]
 BASH
   chmod +x "$fixture_dir/recipe-bin/infisical"
-  recipe="$(grep '^scripts/infisical-run.sh --env prod .*scripts/deploy-stack.sh update --manifest release-manifest.json$' "$repo_root/docs/runbooks/deployment.md")"
+  recipe="$(grep '^ENV_FILE=/var/lib/ideaboard/owner.env scripts/infisical-run.sh --env prod .*scripts/deploy-stack.sh update --manifest release-manifest.json$' "$repo_root/docs/runbooks/deployment.md")"
   [[ -n "$recipe" ]] || fail 'production update recipe is missing'
   (cd "$repo_root" && PATH="$fixture_dir/recipe-bin:$PATH" bash -c "$recipe") ||
     fail 'documented production update must read root and /ai-proxy bindings'

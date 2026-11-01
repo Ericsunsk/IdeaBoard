@@ -63,6 +63,27 @@ assert_output_line "${ops_output}" 'realtime=false'
 assert_output_line "${ops_output}" 'docker=false'
 assert_output_line "${ops_output}" 'docs_only=false'
 
+for verification_path in \
+  .github/workflows/ops.yml \
+  scripts/ci-change-classifier.sh \
+  scripts/ci-change-classifier-test.sh \
+  scripts/ci-workflow-contract-check.go \
+  scripts/ci-workflow-contract-test.sh \
+  scripts/ci-baseline-test.sh \
+  scripts/ci-gate-test.sh; do
+  verification_output="$(printf '%s\n' "${verification_path}" | "${classifier}")"
+  assert_output_line "${verification_output}" 'ops=true'
+  assert_output_line "${verification_output}" 'docs_only=false'
+  for lane in web api auth realtime migration_integration docker api_tests api_sqlc api_migrations api_build api_images browser_smoke web_audit api_audit auth_audit realtime_audit; do
+    assert_output_line "${verification_output}" "${lane}=false"
+  done
+done
+
+baseline_output="$(printf '%s\n' scripts/ci-baseline.sh | "${classifier}")"
+for lane in web api auth realtime migration_integration docker ops; do
+  assert_output_line "${baseline_output}" "${lane}=true"
+done
+
 ci_output="$(printf '%s\n' .github/workflows/ci.yml | "${classifier}")"
 
 assert_output_line "${ci_output}" 'web=true'
@@ -374,6 +395,7 @@ for action in deploy-production setup-grype; do
 done
 go_action_output="$(printf '%s\n' .github/actions/setup-go/action.yml | "${classifier}")"
 assert_output_line "${go_action_output}" 'api=true'
+assert_output_line "${go_action_output}" 'auth=true'
 assert_output_line "${go_action_output}" 'web=false'
 assert_output_line "${go_action_output}" 'migration_integration=true'
 for action in setup-node npm-ci; do

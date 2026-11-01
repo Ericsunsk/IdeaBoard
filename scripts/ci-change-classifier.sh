@@ -11,9 +11,11 @@ mark_all_contexts() { mark_api_all; web=true; auth=true; realtime=true; migratio
 while IFS= read -r changed_path; do
   [[ -n "${changed_path}" ]] || continue
   case "${changed_path}" in
-    .github/workflows/ci.yml | .github/workflows/ops.yml | scripts/ci-change-classifier* | scripts/ci-baseline* | scripts/ci-gate* | scripts/ci-workflow-contract*) mark_all_contexts ;;
+    # Verification tooling is exercised by Ops; it does not change app runtimes.
+    .github/workflows/ops.yml | scripts/ci-change-classifier* | scripts/ci-workflow-contract* | scripts/ci-baseline-test.sh | scripts/ci-gate-test.sh) ops=true ;;
+    .github/workflows/ci.yml | scripts/ci-baseline* | scripts/ci-gate*) mark_all_contexts ;;
     .github/actions/deploy-production/* | .github/actions/setup-grype/*) ops=true ;;
-    .github/actions/setup-go/*) mark_api_all; migration_integration=true; ops=true ;;
+    .github/actions/setup-go/*) mark_api_all; auth=true; migration_integration=true; ops=true ;;
     .github/actions/setup-node/* | .github/actions/npm-ci/* | .node-version) mark_node_consumers ;;
     .github/actions/*) mark_all_contexts ;;
     .github/workflows/web.yml) web=true; ops=true ;;

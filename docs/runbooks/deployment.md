@@ -128,7 +128,7 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
+Docker Images workflow 只复用目标 commit 在本仓库 canonical `ci.yml`、`main` push 中已完成且成功的 `CI Gate`；同时校验 run 的 repository、event、workflow path 与 SHA，不重复运行 source test suites。main CI 按受影响的 context 验证，未知影响或可信基线不可用时保留 full fallback。发布随后构建、扫描、签名并发布五张同 commit 的 immutable `sha-<commit>` images，不混用其他批次镜像。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
 
 严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后通过 SSH stdin 发送 deployment protocol、只读 `INFISICAL_TOKEN` 和原始 manifest。VPS entrypoint 在内存中读取 token，从对应 checkout 运行 Infisical CLI，注入 `prod` 的 `/` 与 `/ai-proxy`，再执行 Cosign 验签、backup、migration、health、smoke 和 release state。token 不写入 manifest、临时文件、日志或命令参数，CLI 后的 deployment process 不保留 token；GitHub Actions 不读取应用业务 secret。
 

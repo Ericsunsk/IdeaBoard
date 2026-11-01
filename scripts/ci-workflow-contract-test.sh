@@ -25,9 +25,8 @@ reject_mutation() {
   grep -Fq "${expected}" "${fixture_dir}/failure.log"
   cp "${root}/${file}" "${fixture_root}/${file}"
 }
-reject_mutation .github/workflows/docker-images.yml 's/force_full: true/force_full: false/' 'An incremental CI pass cannot authorize publishing'
-reject_mutation .github/workflows/docker-images.yml '/      - verify-source/d' 'Publishing must wait for full source verification'
-reject_mutation .github/workflows/docker-images.yml "s/git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch/git fetch/" 'Release fetch must authenticate without persisted credentials'
+reject_mutation .github/workflows/docker-images.yml 's#./scripts/release-eligibility-check.sh#./scripts/untrusted-release-check.sh#' 'Release must verify exact-source canonical CI provenance'
+reject_mutation .github/workflows/docker-images.yml '/      - preflight/d' 'Image publication must depend on preflight'
 reject_mutation .github/workflows/docker-images.yml 's/persist-credentials: false/persist-credentials: true/' 'Release checkout must not persist credentials'
 reject_mutation .github/workflows/docker-images.yml '/          GH_TOKEN:/d' 'Release fetch must use the scoped GitHub token'
 reject_mutation .github/workflows/docker-images.yml '/          infisical-token:/d' 'Deployment must consume Production connection input infisical-token'
