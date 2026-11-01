@@ -8,4 +8,4 @@
 
 ## Operations
 
-- [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, and minimal VPS checkout.
+- [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, and repository-free signed deployment bundles.

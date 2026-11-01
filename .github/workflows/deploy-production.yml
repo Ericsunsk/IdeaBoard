@@ -44,9 +44,13 @@ jobs:
           gh release download "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern release-manifest.json \
+            --pattern deployment-bundle.tar \
+            --pattern deployment-bundle.sigstore.json \
             --dir release-assets \
             --clobber
           test -s release-assets/release-manifest.json
+          test -s release-assets/deployment-bundle.tar
+          test -s release-assets/deployment-bundle.sigstore.json
 
       - name: Deploy immutable Production release
         if: always()
@@ -54,6 +58,8 @@ jobs:
         with:
           prerequisite-status: ${{ job.status }}
           manifest-path: release-assets/release-manifest.json
+          bundle-path: release-assets/deployment-bundle.tar
+          bundle-signature-path: release-assets/deployment-bundle.sigstore.json
           release-tag: ${{ inputs.release_tag }}
           vps-host: ${{ vars.VPS_HOST }}
           vps-ssh-port: ${{ vars.VPS_SSH_PORT }}

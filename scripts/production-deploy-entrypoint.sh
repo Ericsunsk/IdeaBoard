@@ -11,12 +11,12 @@ TMP_DIR="${IDEABOARD_PRODUCTION_TMP_DIR:-/var/tmp}"
 EXPECTED_REPOSITORY="${IDEABOARD_PRODUCTION_EXPECTED_REPOSITORY:-Ericsunsk/IdeaBoard}"
 OWNER_ENV_FILE="${IDEABOARD_PRODUCTION_OWNER_ENV_FILE:-/var/lib/ideaboard/owner.env}"
 CONFIG_FILE="${IDEABOARD_PRODUCTION_CONFIG_FILE:-/etc/ideaboard/deployment.json}"
-CHECKOUT_COMMAND="${IDEABOARD_PRODUCTION_CHECKOUT_COMMAND:-/usr/local/libexec/ideaboard-deployment-checkout}"
-DEPLOY_ENV=(env -u INFISICAL_TOKEN)
-MAX_MANIFEST_BYTES=65536
+BUNDLE_COMMAND="${IDEABOARD_PRODUCTION_BUNDLE_COMMAND:-/usr/local/libexec/ideaboard-deployment-bundle}"
+DEPLOY_ENV=(env -u INFISICAL_TOKEN -u IDEABOARD_COMPOSE_OVERRIDE_FILE -u NPM_NETWORK_NAME IDEABOARD_SECRETS_SOURCE=infisical)
+RECEIVE_DIR=""
 MANIFEST_FILE=""
 DEPLOY_RESULT_FILE=""
-ENTRYPOINT_STAGE="manifest-validation"
+ENTRYPOINT_STAGE="bundle-validation"
 
 die() {
   printf '{"result":"failure","stage":"%s","recovery_hint":"inspect_restricted_entrypoint_on_vps"}\n' \
@@ -27,8 +27,8 @@ die() {
 
 # shellcheck disable=SC2317,SC2329 # Invoked indirectly by the EXIT trap below.
 cleanup() {
-  if [[ -n "${MANIFEST_FILE}" ]]; then
-    rm -f -- "${MANIFEST_FILE}"
+  if [[ -n "${RECEIVE_DIR}" ]]; then
+    rm -rf -- "${RECEIVE_DIR}"
   fi
   if [[ -n "${DEPLOY_RESULT_FILE}" ]]; then
     rm -f -- "${DEPLOY_RESULT_FILE}"
@@ -36,27 +36,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
-validate_image_ref() {
-  local value="$1"
-  local component="$2"
-  local expected_image_repository prefix digest
-
-  expected_image_repository="$(printf '%s' "${EXPECTED_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-  prefix="ghcr.io/${expected_image_repository}/ideaboard-${component}@sha256:"
-  [[ "${value}" == "${prefix}"* ]] || return 1
-  digest="${value#"${prefix}"}"
-  [[ "${digest}" =~ ^[0-9a-f]{64}$ ]]
-}
-
 (( $# == 0 )) || die 'command arguments are not accepted'
 [[ -z "${SSH_ORIGINAL_COMMAND:-}" ]] || die 'SSH commands are not accepted'
-
-for required_command in git head jq flock mktemp docker infisical python3; do
+for required_command in jq flock mktemp docker infisical python3 cosign; do
   command -v "${required_command}" >/dev/null 2>&1 || die "missing command: ${required_command}"
 done
-
-[[ -d "${STACK_DIR}/.git" ]] || die "Production checkout is unavailable"
-[[ -d "${TMP_DIR}" ]] || die "temporary directory is unavailable"
+[[ -d "${TMP_DIR}" ]] || die 'temporary directory is unavailable'
+python3 - "${BUNDLE_COMMAND}" <<'PYTHON' || die 'installed deployment bundle verifier is unavailable'
+import os, pathlib, stat, sys
+try:
+    info = pathlib.Path(sys.argv[1]).lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+        raise ValueError()
+except (OSError, ValueError):
+    sys.exit(1)
+PYTHON
 
 # Host topology belongs to this root-owned entrypoint, never to Cloud secrets.
 if [[ -e "${CONFIG_FILE}" || -L "${CONFIG_FILE}" ]]; then
@@ -86,94 +80,70 @@ PYTHON
   DEPLOY_ENV+=(IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml "NPM_NETWORK_NAME=${npm_network}")
 fi
 
-# Bound credential reads before writing the remaining, non-secret manifest.
+# The only untrusted inputs are bounded headers and bytes, never SSH commands.
 IFS= read -r -n 65 protocol || die 'deployment protocol header is missing'
-[[ "${protocol}" == IDEABOARD_DEPLOY_V1 ]] || die 'unsupported deployment protocol'
+[[ "${protocol}" == IDEABOARD_DEPLOY_V2 ]] || die 'unsupported deployment protocol'
 IFS= read -r -n 8193 INFISICAL_TOKEN || die 'Production Infisical token is missing'
 [[ -n "${INFISICAL_TOKEN}" && ${#INFISICAL_TOKEN} -le 8192 && "${INFISICAL_TOKEN}" != *[![:graph:]]* ]] || \
   die 'Production Infisical token is invalid'
-
-MANIFEST_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-manifest.XXXXXX")"
-chmod 600 "${MANIFEST_FILE}"
-head -c "$((MAX_MANIFEST_BYTES + 1))" > "${MANIFEST_FILE}"
-manifest_size="$(wc -c < "${MANIFEST_FILE}" | tr -d '[:space:]')"
-(( manifest_size > 0 )) || die 'manifest input is empty'
-(( manifest_size <= MAX_MANIFEST_BYTES )) || die 'manifest input exceeds 65536 bytes'
-
-if ! jq -e -s 'length == 1 and (.[0] | type == "object")' \
-  "${MANIFEST_FILE}" >/dev/null 2>&1; then
-  die 'manifest must contain exactly one JSON object'
-fi
-
-tag="$(jq -er '.tag | strings' "${MANIFEST_FILE}")" || die 'manifest tag is missing'
-commit="$(jq -er '.commit | strings' "${MANIFEST_FILE}")" || die 'manifest commit is missing'
-repository="$(jq -er '.repository | strings' "${MANIFEST_FILE}")" || die 'manifest repository is missing'
-api_image="$(jq -er '.images.api | strings' "${MANIFEST_FILE}")" || die 'manifest API image is missing'
-api_migrate_image="$(jq -er '.images["api-migrate"] | strings' "${MANIFEST_FILE}")" || \
-  die 'manifest API Migration image is missing'
-auth_image="$(jq -er '.images.auth | strings' "${MANIFEST_FILE}")" || die 'manifest Auth image is missing'
-auth_migrate_image="$(jq -er '.images["auth-migrate"] | strings' "${MANIFEST_FILE}")" || \
-  die 'manifest Auth Migration image is missing'
-realtime_image="$(jq -er '.images.realtime | strings' "${MANIFEST_FILE}")" || \
-  die 'manifest Realtime image is missing'
-[[ "${tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || \
-  die 'manifest tag must match vMAJOR.MINOR.PATCH'
-[[ "${commit}" =~ ^[0-9a-f]{40}$ ]] || die 'manifest commit must be a full Git SHA'
-[[ "${repository}" == "${EXPECTED_REPOSITORY}" ]] || die 'manifest repository is not allowed'
-validate_image_ref "${api_image}" api || die 'manifest API image must use the expected immutable digest'
-validate_image_ref "${api_migrate_image}" api-migrate || \
-  die 'manifest API Migration image must use the expected immutable digest'
-validate_image_ref "${auth_image}" auth || die 'manifest Auth image must use the expected immutable digest'
-validate_image_ref "${auth_migrate_image}" auth-migrate || \
-  die 'manifest Auth Migration image must use the expected immutable digest'
-validate_image_ref "${realtime_image}" realtime || \
-  die 'manifest Realtime image must use the expected immutable digest'
+IFS= read -r -n 4097 header || die 'deployment bundle header is missing'
+(( ${#header} <= 4096 )) || die 'deployment bundle header is too large'
 
 ENTRYPOINT_STAGE="lock"
 mkdir -p "$(dirname "${LOCK_FILE}")"
 exec 9>"${LOCK_FILE}"
 flock -n 9 || die 'another Production deployment is running'
+ENTRYPOINT_STAGE="bundle-validation"
+RECEIVE_DIR="$(mktemp -d "${TMP_DIR%/}/ideaboard-production-bundle.XXXXXX")"
+chmod 700 "${RECEIVE_DIR}"
+# Python owns the binary framing so NUL bytes never enter shell variables.
+python3 -c '
+import json, pathlib, re, sys
+try:
+    def unique(pairs):
+        value = dict(pairs)
+        if len(value) != len(pairs): raise ValueError()
+        return value
+    header = json.loads(sys.argv[1], object_pairs_hook=unique)
+    if not isinstance(header, dict) or set(header) != {"tag", "commit", "archive_bytes", "signature_bytes"}: raise ValueError()
+    if not isinstance(header["tag"], str) or not re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", header["tag"]): raise ValueError()
+    if not isinstance(header["commit"], str) or not re.fullmatch(r"[0-9a-f]{40}", header["commit"]): raise ValueError()
+    root = pathlib.Path(sys.argv[2])
+    for field, name, maximum in [("archive_bytes", "deployment-bundle.tar", 67108864), ("signature_bytes", "deployment-bundle.sigstore.json", 1048576)]:
+        size = header[field]
+        if type(size) is not int or not 0 < size <= maximum: raise ValueError()
+        data = sys.stdin.buffer.read(size)
+        if len(data) != size: raise ValueError()
+        (root / name).write_bytes(data)
+    if sys.stdin.buffer.read(1): raise ValueError()
+    (root / "header.json").write_text(json.dumps(header))
+except (ValueError, TypeError, OSError):
+    sys.exit(1)
+' "${header}" "${RECEIVE_DIR}" || die 'invalid or truncated deployment bundle transport'
+tag="$(jq -er .tag "${RECEIVE_DIR}/header.json")"
+commit="$(jq -er .commit "${RECEIVE_DIR}/header.json")"
+python3 "${BUNDLE_COMMAND}" verify \
+  --archive "${RECEIVE_DIR}/deployment-bundle.tar" \
+  --signature "${RECEIVE_DIR}/deployment-bundle.sigstore.json" \
+  --repository "${EXPECTED_REPOSITORY}" --tag "${tag}" --commit "${commit}" \
+  --output-dir "${RECEIVE_DIR}/content" >/dev/null 2>&1 || die 'deployment bundle signature or contents are invalid'
 
-ENTRYPOINT_STAGE="checkout"
-if [[ -n "$(git -C "${STACK_DIR}" status --porcelain --untracked-files=no)" ]]; then
-  die 'Production checkout has tracked modifications'
-fi
-
-git -C "${STACK_DIR}" fetch --no-tags origin "+refs/tags/${tag}:refs/tags/${tag}" \
-  >/dev/null 2>&1 || die 'release tag fetch failed'
-resolved_commit="$(git -C "${STACK_DIR}" rev-parse --verify "refs/tags/${tag}^{commit}" 2>/dev/null)" || \
-  die 'release tag could not be resolved'
-[[ "${resolved_commit}" == "${commit}" ]] || die 'manifest tag and commit do not match'
-
-git -C "${STACK_DIR}" checkout --detach "${commit}" >/dev/null 2>&1 || \
-  die 'release checkout failed'
-[[ "$(git -C "${STACK_DIR}" rev-parse HEAD 2>/dev/null)" == "${commit}" ]] || \
-  die 'detached checkout does not match manifest commit'
-[[ -f "${CHECKOUT_COMMAND}" ]] || die 'minimal deployment checkout helper is unavailable'
-bash "${CHECKOUT_COMMAND}" --apply "${STACK_DIR}" >/dev/null 2>&1 || \
-  die 'minimal deployment checkout failed'
-
-
-if jq -e '.schema_version == 2 or has("components")' "${MANIFEST_FILE}" >/dev/null; then
-  (cd "${STACK_DIR}" && python3 scripts/release-artifacts.py validate \
-    --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
-    --commit "${commit}" --tag "${tag}") >/dev/null 2>&1 || \
-    die 'component source provenance is invalid'
-  while IFS= read -r source_tag; do
-    [[ "${source_tag}" == "${tag}" ]] && continue
-    git -C "${STACK_DIR}" fetch --no-tags origin "+refs/tags/${source_tag}:refs/tags/${source_tag}" \
-      >/dev/null 2>&1 || die 'component source tag fetch failed'
-  done < <(jq -r '.components[].source_tag' "${MANIFEST_FILE}" | sort -u)
-  (cd "${STACK_DIR}" && python3 scripts/release-artifacts.py validate \
-    --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
-    --commit "${commit}" --tag "${tag}" --verify-inputs) >/dev/null 2>&1 || \
-    die 'component source provenance or build inputs are invalid'
-fi
-
-deploy_command="${STACK_DIR}/scripts/deploy-stack.sh"
-[[ -x "${deploy_command}" ]] || die 'release deployment command is unavailable'
-inject_command="${STACK_DIR}/scripts/infisical-run.sh"
-[[ -x "${inject_command}" ]] || die 'release Infisical injection command is unavailable'
+# Preserve the exact signed artifact and verified files for compatible rollback.
+bundle_digest="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "${RECEIVE_DIR}/deployment-bundle.tar")"
+install -d -m 700 "${STACK_DIR}/bundles/${tag}" "${STACK_DIR}/docker/releases"
+bundle_dir="$(mktemp -d "${STACK_DIR}/bundles/${tag}/${bundle_digest}.XXXXXX")"
+# Each deployment owns a private destination; previously verified releases are never overwritten.
+for bundle_file in deployment-bundle.tar deployment-bundle.sigstore.json header.json content; do
+  mv "${RECEIVE_DIR}/${bundle_file}" "${bundle_dir}/${bundle_file}"
+done
+release_dir="${bundle_dir}/content"
+MANIFEST_FILE="${release_dir}/release-manifest.json"
+(cd "${release_dir}" && python3 scripts/release-artifacts.py validate \
+  --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
+  --commit "${commit}" --tag "${tag}") >/dev/null 2>&1 || die 'signed component provenance is invalid'
+deploy_command="${release_dir}/scripts/deploy-stack.sh"
+inject_command="${release_dir}/scripts/infisical-run.sh"
+[[ -x "${deploy_command}" && -x "${inject_command}" ]] || die 'signed deployment commands are unavailable'
 
 # Existing PostgreSQL must retain its owner credential; never silently rotate it.
 if [[ ! -f "${OWNER_ENV_FILE}" ]]; then
@@ -188,16 +158,37 @@ ENTRYPOINT_STAGE="deployment"
 DEPLOY_RESULT_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-deploy-result.XXXXXX")"
 chmod 600 "${DEPLOY_RESULT_FILE}"
 
+# Cloud secrets may not redirect trusted files, persistent state, or verification.
+DEPLOY_ENV+=(
+  "IDEABOARD_STACK_DIR=${release_dir}"
+  "IMAGE_ENV_FILE=${STACK_DIR}/docker/images.env"
+  "RELEASE_STATE_DIR=${STACK_DIR}/docker/releases"
+  "BACKUP_DIR=$(dirname "${STACK_DIR}")/$(basename "${STACK_DIR}")-backups"
+  "IDEABOARD_DEPLOYMENT_BUNDLE_DIR=${release_dir}"
+  "IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST=sha256:${bundle_digest}"
+  "IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE=${bundle_dir}/deployment-bundle.tar"
+  "IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE=${bundle_dir}/deployment-bundle.sigstore.json"
+  "ENV_FILE=${OWNER_ENV_FILE}"
+  COMPOSE_PROJECT_NAME=ideaboard
+  "IDEABOARD_DEPLOY_RESULT_FILE=${DEPLOY_RESULT_FILE}"
+)
 deploy_status=0
 (
-  cd "${STACK_DIR}"
-  IDEABOARD_STACK_DIR="${STACK_DIR}" \
+  cd "${release_dir}"
+  IDEABOARD_STACK_DIR="${release_dir}" \
+    IMAGE_ENV_FILE="${STACK_DIR}/docker/images.env" \
+    RELEASE_STATE_DIR="${STACK_DIR}/docker/releases" \
+    BACKUP_DIR="$(dirname "${STACK_DIR}")/$(basename "${STACK_DIR}")-backups" \
+    IDEABOARD_DEPLOYMENT_BUNDLE_DIR="${release_dir}" \
+    IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST="sha256:${bundle_digest}" \
+    IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE="${bundle_dir}/deployment-bundle.tar" \
+    IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE="${bundle_dir}/deployment-bundle.sigstore.json" \
     ENV_FILE="${OWNER_ENV_FILE}" \
     COMPOSE_PROJECT_NAME=ideaboard \
     IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
     INFISICAL_TOKEN="${INFISICAL_TOKEN}" \
     "${inject_command}" --env prod --path / --path /ai-proxy -- \
-    "${DEPLOY_ENV[@]}" "${deploy_command}" update --manifest "${MANIFEST_FILE}"
+    "${DEPLOY_ENV[@]}" "${deploy_command}" deploy --manifest "${MANIFEST_FILE}"
 ) > /dev/null 2>&1 || deploy_status=$?
 
 if jq -e -s --argjson deploy_status "${deploy_status}" '

@@ -8,6 +8,12 @@ inputs:
   manifest-path:
     description: Path to the downloaded immutable release manifest
     required: true
+  bundle-path:
+    description: Complete immutable deployment archive
+    required: true
+  bundle-signature-path:
+    description: Keyless Sigstore signature binding the complete archive
+    required: true
   release-tag:
     description: Expected strict SemVer release tag
     required: true
@@ -50,31 +56,30 @@ runs:
         [[ "${RELEASE_TAG}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || exit 1
         [[ -z "${SOURCE_COMMIT}" || "${SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || exit 1
         test -s "${RELEASE_MANIFEST}"
-        if jq -e '.schema_version == 2 or has("components")' "${RELEASE_MANIFEST}" > /dev/null; then
-          python3 scripts/release-artifacts.py validate --manifest "${RELEASE_MANIFEST}" \
-            --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}"
-        fi
-        jq -e \
-          --arg expected_tag "${RELEASE_TAG}" \
-          --arg expected_commit "${SOURCE_COMMIT}" \
-          --arg expected_ref "refs/tags/${RELEASE_TAG}" \
-          --arg expected_repository "${GITHUB_REPOSITORY}" \
-          --arg expected_image_repository "ghcr.io/$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" \
-          '
-            . as $manifest |
-            .repository == $expected_repository and
-            .tag == $expected_tag and
-            .ref == $expected_ref and
-            (.commit | type == "string" and test("^[0-9a-f]{40}$")) and
-            ($expected_commit == "" or .commit == $expected_commit) and
-            (["api", "api-migrate", "auth", "auth-migrate", "realtime"] | all(.[];
-              . as $image |
-              ($expected_image_repository + "/ideaboard-" + $image + "@sha256:") as $prefix |
-              $manifest.images[$image] |
-              type == "string" and startswith($prefix) and
-              length == (($prefix | length) + 64) and test("@sha256:[0-9a-f]{64}$")
-            ))
-          ' "${RELEASE_MANIFEST}" > /dev/null
+        args=(validate --manifest "${RELEASE_MANIFEST}"
+          --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}")
+        [[ -z "${SOURCE_COMMIT}" ]] || args+=(--commit "${SOURCE_COMMIT}")
+        python3 scripts/release-artifacts.py "${args[@]}" > /dev/null
+
+    - name: Install Cosign for deployment verification
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+
+    - name: Verify signed deployment bundle
+      shell: bash
+      env:
+        RELEASE_MANIFEST: ${{ inputs.manifest-path }}
+        RELEASE_BUNDLE: ${{ inputs.bundle-path }}
+        RELEASE_BUNDLE_SIGNATURE: ${{ inputs.bundle-signature-path }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        set -euo pipefail
+        verified="$(mktemp -d "${RUNNER_TEMP}/ideaboard-verified-bundle.XXXXXX")"
+        trap 'rm -rf -- "${verified}"' EXIT
+        commit="$(jq -er '.commit' "${RELEASE_MANIFEST}")"
+        python3 scripts/deployment-bundle.py verify --archive "${RELEASE_BUNDLE}" \
+          --signature "${RELEASE_BUNDLE_SIGNATURE}" --repository "${GITHUB_REPOSITORY}" \
+          --tag "${RELEASE_TAG}" --commit "${commit}" --output-dir "${verified}"
+        cmp "${RELEASE_MANIFEST}" "${verified}/release-manifest.json"
 
     - name: Configure restricted SSH transport
       shell: bash
@@ -118,10 +123,12 @@ runs:
           exit 1
         }
 
-    - name: Stream manifest to Production deploy entrypoint
+    - name: Stream signed bundle to Production deploy entrypoint
       shell: bash
       env:
         RELEASE_MANIFEST: ${{ inputs.manifest-path }}
+        RELEASE_BUNDLE: ${{ inputs.bundle-path }}
+        RELEASE_BUNDLE_SIGNATURE: ${{ inputs.bundle-signature-path }}
         VPS_HOST: ${{ inputs.vps-host }}
         VPS_SSH_PORT: ${{ inputs.vps-ssh-port }}
         VPS_DEPLOY_USER: ${{ inputs.vps-deploy-user }}
@@ -129,7 +136,7 @@ runs:
         SSH_KNOWN_HOSTS_FILE: ${{ runner.temp }}/ideaboard-production-ssh/known_hosts
         PRODUCTION_DEPLOY_RESULT_PATH: ${{ runner.temp }}/production-deploy-result.json
         INFISICAL_TOKEN: ${{ inputs.infisical-token }}
-      run: ./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}"
+      run: ./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}" "${RELEASE_BUNDLE}" "${RELEASE_BUNDLE_SIGNATURE}"
 
     - name: Remove SSH credentials
       if: always()

@@ -5,6 +5,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 action="${root}/.github/actions/deploy-production/action.yml"
 fixture="$(mktemp -d)"
+fixture="$(cd "${fixture}" && pwd -P)"
 trap 'rm -rf -- "${fixture}"' EXIT
 mkdir -p "${fixture}/steps" "${fixture}/bin"
 
@@ -29,8 +30,9 @@ extract_step() {
   [[ -s "${target}" ]] || fail "missing composite step: ${name}"
 }
 extract_step 'Validate immutable release manifest' "${fixture}/steps/validate"
+extract_step 'Verify signed deployment bundle' "${fixture}/steps/verify-bundle"
 extract_step 'Configure restricted SSH transport' "${fixture}/steps/configure"
-extract_step 'Stream manifest to Production deploy entrypoint' "${fixture}/steps/deploy"
+extract_step 'Stream signed bundle to Production deploy entrypoint' "${fixture}/steps/deploy"
 extract_step 'Remove SSH credentials' "${fixture}/steps/cleanup"
 extract_step 'Write Production deployment summary' "${fixture}/steps/summary"
 
@@ -48,10 +50,19 @@ MOCK
 cat > "${fixture}/bin/ssh" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" > "${RUNNER_TEMP}/ssh-args"
-IFS= read -r protocol
-IFS= read -r token
-[[ "$protocol" == IDEABOARD_DEPLOY_V1 && "$token" == "$INFISICAL_TOKEN" ]] || exit 98
-cat > "${RUNNER_TEMP}/sent-manifest"
+python3 -c '
+import json, os, pathlib, sys
+stream=sys.stdin.buffer
+assert stream.readline()==b"IDEABOARD_DEPLOY_V2\n"
+assert stream.readline().decode().rstrip("\n")==os.environ["INFISICAL_TOKEN"]
+header=json.loads(stream.readline())
+assert header["tag"]==os.environ["RELEASE_TAG"]
+assert header["commit"]==json.loads(pathlib.Path(os.environ["RELEASE_MANIFEST"]).read_text())["commit"]
+for key,name in [("archive_bytes","sent-archive"),("signature_bytes","sent-signature")]:
+    data=stream.read(header[key]); assert len(data)==header[key]
+    pathlib.Path(os.environ["RUNNER_TEMP"],name).write_bytes(data)
+assert not stream.read(1)
+' || exit 98
 printf 'RAW-SSH-SECRET-MARKER\n' >&2
 if [[ "${TEST_DEPLOY_FAIL:-false}" == true ]]; then
   printf '%s\n' '{"result":"failure","stage":"api-migration","recovery_hint":"inspect_release_state_and_backups_before_manual_recovery"}'
@@ -63,18 +74,43 @@ chmod +x "${fixture}/bin/"*
 export PATH="${fixture}/bin:${PATH}"
 export PREREQUISITE_STATUS=success
 export GITHUB_REPOSITORY='Ericsunsk/IdeaBoard' RELEASE_TAG='v1.2.3'
-export SOURCE_COMMIT='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+export SOURCE_COMMIT
+SOURCE_COMMIT="$(git -C "${root}" rev-parse HEAD)"
 export VPS_HOST='vps.example.com' VPS_SSH_PORT='5522' VPS_DEPLOY_USER='root'
 export VPS_DEPLOY_PRIVATE_KEY='FAKE-DEPLOY-PRIVATE-KEY' VPS_KNOWN_HOSTS='FAKE-PINNED-HOST-KEY'
 export INFISICAL_TOKEN='st.SYNTHETIC-INFISICAL-TOKEN'
 export RELEASE_MANIFEST="${fixture}/release-manifest.json"
 export RUNNER_TEMP="${fixture}/runner" GITHUB_STEP_SUMMARY="${fixture}/summary"
 
+export RELEASE_BUNDLE="${fixture}/deployment-bundle.tar"
+export RELEASE_BUNDLE_SIGNATURE="${fixture}/deployment-bundle.sigstore.json"
+
+# Real package/validation boundary; only external keyless verification is stubbed.
+git clone -q --shared --no-checkout "${root}" "${fixture}/source"
+git -C "${fixture}/source" checkout -q --detach "${SOURCE_COMMIT}"
+git -C "${fixture}/source" tag v1.2.3
+PYTHONDONTWRITEBYTECODE=1 python3 - "${root}/scripts/release-artifacts.py" "${fixture}/source" "${RELEASE_MANIFEST}" <<'PYTHON'
+import importlib.util,json,pathlib,sys
+spec=importlib.util.spec_from_file_location("engine",sys.argv[1]);engine=importlib.util.module_from_spec(spec);spec.loader.exec_module(engine)
+repo=pathlib.Path(sys.argv[2]);commit=engine.git(repo,"rev-parse","HEAD").decode().strip()
+plan=engine.make_plan(repo,"Ericsunsk/IdeaBoard",commit,"v1.2.3",10,None)
+metadata={name:engine.component_metadata(plan,name,"sha256:"+"b"*64) for name in engine.COMPONENTS}
+manifest=engine.make_manifest(plan,metadata,repo)
+pathlib.Path(sys.argv[3]).write_text(json.dumps(manifest, indent=2, sort_keys=True)+"\n")
+PYTHON
+cp "${RELEASE_MANIFEST}" "${fixture}/original-manifest.json"
+python3 "${root}/scripts/deployment-bundle.py" build --root "${fixture}/source" \
+  --manifest "${RELEASE_MANIFEST}" --output "${RELEASE_BUNDLE}"
+printf '{}\n' > "${RELEASE_BUNDLE_SIGNATURE}"
+cat > "${fixture}/bin/cosign" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$1" == verify-blob ]] || exit 90
+printf '%s\n' "$*" > "${RUNNER_TEMP}/cosign-args"
+[[ "${TEST_BAD_SIGNATURE:-false}" == false ]]
+MOCK
+chmod +x "${fixture}/bin/cosign"
 write_manifest() {
-  jq -n --arg commit "${SOURCE_COMMIT}" \
-    '{repository: "Ericsunsk/IdeaBoard", tag: "v1.2.3", ref: "refs/tags/v1.2.3", commit: $commit,
-      images: (["api", "api-migrate", "auth", "auth-migrate", "realtime"] |
-        map({key: ., value: ("ghcr.io/ericsunsk/ideaboard/ideaboard-" + . + "@sha256:" + ("b" * 64))}) | from_entries)}' > "${RELEASE_MANIFEST}"
+  cp "${fixture}/original-manifest.json" "${RELEASE_MANIFEST}"
 }
 
 run_action() {
@@ -83,6 +119,9 @@ run_action() {
   mkdir -p "${RUNNER_TEMP}"
   : > "${GITHUB_STEP_SUMMARY}"
   bash "${fixture}/steps/validate" > "${fixture}/output" 2>&1 || status=$?
+  if (( status == 0 )); then
+    (cd "${root}" && bash "${fixture}/steps/verify-bundle") >> "${fixture}/output" 2>&1 || status=$?
+  fi
   if (( status == 0 )); then
     bash "${fixture}/steps/configure" >> "${fixture}/output" 2>&1 || status=$?
   fi
@@ -106,7 +145,8 @@ run_action() {
 
 write_manifest
 run_action || { cat "${fixture}/output" >&2; fail 'valid new release failed'; }
-cmp -s "${RELEASE_MANIFEST}" "${RUNNER_TEMP}/sent-manifest" || fail 'transport did not receive exact manifest'
+cmp -s "${RELEASE_BUNDLE}" "${RUNNER_TEMP}/sent-archive" || fail 'transport did not receive exact archive'
+cmp -s "${RELEASE_BUNDLE_SIGNATURE}" "${RUNNER_TEMP}/sent-signature" || fail 'transport did not receive exact signature'
 for option in 'StrictHostKeyChecking=yes' 'PasswordAuthentication=no' 'BatchMode=yes' 'root@vps.example.com'; do
   grep -Fq -- "${option}" "${RUNNER_TEMP}/ssh-args" || fail "missing transport option: ${option}"
 done
@@ -119,22 +159,6 @@ SOURCE_COMMIT='' run_action || fail 'valid existing release failed without a pre
 
 # v2 manifests must validate component provenance before any SSH credential setup.
 write_manifest
-PYTHONDONTWRITEBYTECODE=1 python3 - "${root}/scripts/release-artifacts.py" "${RELEASE_MANIFEST}" <<'PYTHON'
-import importlib.util, json, pathlib, sys
-spec = importlib.util.spec_from_file_location("engine", sys.argv[1])
-engine = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(engine)
-path = pathlib.Path(sys.argv[2])
-m = json.loads(path.read_text())
-m.update(schema_version=2, release_kind="production", workflow={"name":"docker-images.yml","run_id":"10"},
-         cosign={"certificate_identity":engine.identity(m["repository"],m["ref"]),"certificate_oidc_issuer":engine.ISSUER})
-m["components"] = {}
-for name, image in m["images"].items():
-    item = engine.base_component(m["repository"],m["commit"],m["tag"],"10",name,"sha256:"+"a"*64,m["ref"])
-    item.update(image=image,name=name,ref=image,digest=image.rsplit("@",1)[1])
-    m["components"][name] = item
-path.write_text(json.dumps(m))
-PYTHON
 run_action || fail 'valid v2 component provenance failed'
 cp "${RELEASE_MANIFEST}" "${fixture}/valid-v2.json"
 for mutation in '.components.api.certificate_identity = "https://attacker"' '.components.api.image = .images.auth' 'del(.components.realtime)' '.release_kind = "build-only"'; do
@@ -176,6 +200,8 @@ for invalid_token in '' 'invalid token' $'token\ninjected' "$(printf '%8193s' ''
   if INFISICAL_TOKEN="$invalid_token" run_action; then fail 'invalid Infisical token accepted'; fi
   [[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'invalid Infisical token reached SSH'
 done
+if TEST_BAD_SIGNATURE=true run_action; then fail 'unsigned bundle accepted'; fi
+[[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'invalid bundle signature reached transport'
 if TEST_UNKNOWN_HOST=true run_action; then fail 'untrusted host key accepted'; fi
 [[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'untrusted host reached transport'
 if TEST_DEPLOY_FAIL=true run_action; then fail 'migration failure accepted'; fi

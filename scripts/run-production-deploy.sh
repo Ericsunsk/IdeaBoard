@@ -4,12 +4,26 @@ set +x
 set -euo pipefail
 export LC_ALL=C
 
-if (( $# != 1 )); then
-  printf 'usage: %s <release-manifest.json>\n' "${0##*/}" >&2
+if (( $# != 3 )); then
+  printf 'usage: %s <release-manifest.json> <deployment-bundle.tar> <deployment-bundle.sigstore.json>\n' "${0##*/}" >&2
   exit 2
 fi
 
 manifest="$1"
+archive="$2"
+signature="$3"
+[[ -s "${archive}" && -s "${signature}" ]] || { echo "Signed deployment bundle is missing" >&2; exit 2; }
+header="$(python3 - "${manifest}" "${archive}" "${signature}" <<'PYTHON'
+import json, pathlib, re, sys
+manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+tag, commit = manifest.get("tag"), manifest.get("commit")
+if not isinstance(tag, str) or not re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", tag): sys.exit(1)
+if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit): sys.exit(1)
+a, s = pathlib.Path(sys.argv[2]).stat().st_size, pathlib.Path(sys.argv[3]).stat().st_size
+if not 0 < a <= 67108864 or not 0 < s <= 1048576: sys.exit(1)
+print(json.dumps(dict(tag=tag, commit=commit, archive_bytes=a, signature_bytes=s), separators=(",", ":")))
+PYTHON
+)" || { echo "Invalid deployment bundle identity or size" >&2; exit 2; }
 [[ -s "${manifest}" ]] || {
   printf 'Production release manifest is missing: %s\n' "${manifest}" >&2
   exit 2
@@ -62,7 +76,7 @@ ssh_options=(
 
 is_retryable_stage() {
   case "$1" in
-    init|resolve-images|preflight|pull|start-postgres|manifest-validation|lock|checkout|transport)
+    init|resolve-images|preflight|pull|start-postgres|bundle-validation|lock)
       return 0
       ;;
     *)
@@ -75,8 +89,9 @@ run_deploy_attempt() {
   local deploy_status=0
   DEPLOY_TIMED_OUT=0
   {
-    printf '%s\n' 'IDEABOARD_DEPLOY_V1' "${INFISICAL_TOKEN}"
-    cat < "${manifest}"
+    printf '%s\n' 'IDEABOARD_DEPLOY_V2' "${INFISICAL_TOKEN}" "${header}"
+    cat < "${archive}"
+    cat < "${signature}"
   } | timeout --foreground 25m \
     ssh "${ssh_options[@]}" "${VPS_DEPLOY_USER}@${VPS_HOST}" \
     > "${raw_result}" 2> "${raw_error}" || deploy_status=$?
@@ -89,7 +104,7 @@ run_deploy_attempt() {
     and (.[0].stage | IN(
       "init", "resolve-images", "preflight", "pull", "start-postgres", "backup",
       "api-migration", "auth-migration", "up", "smoke", "complete", "unknown",
-      "manifest-validation", "lock", "checkout", "deployment", "transport"
+      "bundle-validation", "lock", "deployment", "transport"
     ))
     and (.[0].recovery_hint | IN(
       "none",

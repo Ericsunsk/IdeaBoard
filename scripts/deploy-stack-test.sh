@@ -9,6 +9,7 @@ repo_root="$(cd "${script_dir}/.." && pwd)"
 deploy_script="${script_dir}/deploy-stack.sh"
 bootstrap_script="${script_dir}/bootstrap-vps.sh"
 fixture_dir="$(mktemp -d)"
+digest="$(printf 'a%.0s' {1..64})"
 trap 'rm -rf -- "${fixture_dir}"' EXIT
 
 fail() {
@@ -28,60 +29,34 @@ assert_fails_with() {
 }
 
 assert_fails_with \
-  'update requires --manifest <path-or-url>' \
-  env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}" update
+  'deploy requires --manifest <path>' \
+  env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}" deploy
 [[ ! -e "${fixture_dir}/docker/.env" ]] || fail 'missing manifest must fail before creating an environment file'
 
 assert_fails_with \
-  'update requires --manifest <path-or-url>' \
+  'deploy requires --manifest <path>' \
   env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}"
 
-assert_fails_with \
-  'deploy requires --manifest <path-or-url>' \
-  env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}" deploy
 
 assert_fails_with \
-  '--manifest requires a path or URL' \
-  env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}" update --manifest
+  '--manifest requires a local path' \
+  env IDEABOARD_STACK_DIR="${fixture_dir}" "${deploy_script}" deploy --manifest
 
 assert_fails_with \
-  '--ref <tag-or-commit> is required' \
+  '--ref <vX.Y.Z> is required' \
   "${bootstrap_script}"
 assert_fails_with \
-  '--manifest <path-or-url> is required' \
+  '--manifest, --bundle and --signature require nonempty local files' \
   "${bootstrap_script}" --ref v1.2.3
 assert_fails_with \
-  '--ref must be a strict SemVer tag or full Git commit SHA' \
+  '--ref must be a strict SemVer tag' \
   "${bootstrap_script}" --ref main --manifest "${fixture_dir}/release-manifest.json"
 
-checkout_fixture="${fixture_dir}/checkout"
-mkdir -p "${checkout_fixture}/docker"
-cp "${repo_root}/docker/.env.example" "${checkout_fixture}/docker/.env.example"
-cp "${repo_root}/docker/images.env.example" "${checkout_fixture}/docker/images.env.example"
-printf 'services: {}\n' > "${checkout_fixture}/docker/compose.yml"
-git init -q "${checkout_fixture}"
-git -C "${checkout_fixture}" config user.email 'deploy-test@example.com'
-git -C "${checkout_fixture}" config user.name 'Deploy Test'
-git -C "${checkout_fixture}" add docker
-git -C "${checkout_fixture}" commit -qm 'test checkout'
-digest="$(printf 'a%.0s' {1..64})"
-cat > "${fixture_dir}/release-manifest.json" <<EOF
-{
-  "tag": "v1.2.3",
-  "commit": "$(printf 'b%.0s' {1..40})",
-  "images": {
-    "api": "ghcr.io/ericsunsk/ideaboard/ideaboard-api@sha256:${digest}",
-    "api-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-api-migrate@sha256:${digest}",
-    "auth": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth@sha256:${digest}",
-    "auth-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth-migrate@sha256:${digest}",
-    "realtime": "ghcr.io/ericsunsk/ideaboard/ideaboard-realtime@sha256:${digest}"
-  }
-}
-EOF
 assert_fails_with \
-  'does not match release manifest commit' \
-  env IDEABOARD_STACK_DIR="${checkout_fixture}" \
-  "${deploy_script}" update --manifest "${fixture_dir}/release-manifest.json"
+  'deployment requires a verified signed bundle' \
+  env IDEABOARD_STACK_DIR="${fixture_dir}" \
+  "${deploy_script}" deploy --manifest "${fixture_dir}/release-manifest.json"
+[[ ! -e "${fixture_dir}/docker/.env" ]] || fail 'unsigned deployment must fail before local initialization'
 
 for removed_contract in \
   IDEABOARD_BRANCH \
@@ -89,7 +64,11 @@ for removed_contract in \
   perform_auto_update \
   detect_update_tag \
   resolve_digest_for_image \
-  needs_auto_update; do
+  needs_auto_update \
+  render_host_nginx_config \
+  render_cloudflare_real_ip_config \
+  check_nginx_template_render \
+  scripts/uninstall-vps.sh; do
   if grep -R -Fq -- "$removed_contract" \
     "${deploy_script}" "${bootstrap_script}" "${repo_root}/docker/.env.example"; then
     fail "mutable image fallback remains: ${removed_contract}"
@@ -439,29 +418,88 @@ BASH
 )
 printf 'Infisical wrapper source isolation test passed\n'
 
+
 (
-  # Exercise the actual documented production update command through the real
-  # wrapper, but stop at a fake CLI: no secrets, Docker actions or deployment.
-  mkdir -p "$fixture_dir/recipe-bin"
-  cat > "$fixture_dir/recipe-bin/infisical" <<'BASH'
+  bundle_root="$fixture_dir/verified-bundle"
+  mkdir -p "$bundle_root/scripts" "$bundle_root/bin" "$bundle_root/state/history"
+  for function_name in current_source_tag current_source_commit json_escape json_value json_string_field json_object_string_field json_image_field is_ideaboard_image_ref apply_update_manifest release_manifest_path write_release_manifest; do
+    if [[ "$function_name" == write_release_manifest ]]; then
+      sed -n '/^write_release_manifest() {/,/^restore_env_snapshot() {/p' "$deploy_script" | sed '$d'
+    else
+      sed -n "/^${function_name}() {/,/^}/p" "$deploy_script"
+    fi
+  done > "$bundle_root/functions.sh"
+  cp "$script_dir/release-artifacts.py" "$bundle_root/scripts/release-artifacts.py"
+  PYTHONDONTWRITEBYTECODE=1 python3 - "$script_dir/release-artifacts.py" "$bundle_root" <<'PYTHON'
+import importlib.util,json,pathlib,sys
+spec=importlib.util.spec_from_file_location('engine',sys.argv[1]); engine=importlib.util.module_from_spec(spec);spec.loader.exec_module(engine)
+root=pathlib.Path(sys.argv[2]);repo='Ericsunsk/IdeaBoard';commit='b'*40;tag='v1.2.3';ref='refs/tags/'+tag
+components={}
+for name in engine.COMPONENTS:
+    item=engine.base_component(repo,commit,tag,'10',name,'sha256:'+'a'*64,ref)
+    image=f'ghcr.io/{repo.lower()}/ideaboard-{name}@sha256:'+'a'*64
+    item.update(name=name,ref=image,image=image,digest='sha256:'+'a'*64);components[name]=item
+m=dict(schema_version=2,repository=repo,commit=commit,tag=tag,ref=ref,release_kind='production',workflow=dict(name='docker-images.yml',run_id='10'),components=components,images={n:i['image'] for n,i in components.items()},cosign=dict(certificate_identity=engine.identity(repo,ref),certificate_oidc_issuer=engine.ISSUER))
+(root/'release-manifest.json').write_text(json.dumps(m,indent=2))
+(root/'deployment-index.json').write_text(json.dumps(dict(tag=tag,commit=commit)))
+PYTHON
+  # Fail immediately if any runtime branch attempts source verification or Git.
+  cat > "$bundle_root/bin/git" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
-paths=()
-while (($# > 0)); do
-  case "$1" in
-    --path) paths+=("$2"); shift 2 ;;
-    --) shift; break ;;
-    *) shift ;;
-  esac
-done
-[[ "${#paths[@]}" == 2 && "${paths[0]}" == / && "${paths[1]}" == /ai-proxy ]]
-[[ "${ENV_FILE:-}" == /var/lib/ideaboard/owner.env ]]
-[[ "$*" == 'env -u POSTGRES_PASSWORD -u PG_MIGRATION_USER -u PG_MIGRATION_PASSWORD scripts/deploy-stack.sh update --manifest release-manifest.json' ]]
-BASH
-  chmod +x "$fixture_dir/recipe-bin/infisical"
-  recipe="$(grep '^ENV_FILE=/var/lib/ideaboard/owner.env scripts/infisical-run.sh --env prod .*scripts/deploy-stack.sh update --manifest release-manifest.json$' "$repo_root/docs/runbooks/deployment.md")"
-  [[ -n "$recipe" ]] || fail 'production update recipe is missing'
-  (cd "$repo_root" && PATH="$fixture_dir/recipe-bin:$PATH" bash -c "$recipe") ||
-    fail 'documented production update must read root and /ai-proxy bindings'
+exit 97
+EOF
+  cat > "$bundle_root/bin/python3" <<'EOF'
+#!/usr/bin/env bash
+for arg in "$@"; do [[ "$arg" != --verify-inputs ]] || exit 96; done
+exec "$BUNDLE_TEST_PYTHON" "$@"
+EOF
+  chmod +x "$bundle_root/bin/"*
+  export BUNDLE_TEST_PYTHON
+  BUNDLE_TEST_PYTHON="$(command -v python3)"
+  export PATH="$bundle_root/bin:$PATH"
+  # shellcheck source=/dev/null
+  source "$bundle_root/functions.sh"
+  die() { echo "$*" >&2; exit 1; }
+  set_env_value() { printf '%s=%s\n' "$1" "$2" >> "$bundle_root/images-capture"; }
+  env_value() { printf previous-image; }
+  utc_now() { printf '2026-11-02T00:00:00Z'; }
+  export ROOT_DIR="$bundle_root"
+  export IDEABOARD_DEPLOYMENT_BUNDLE_DIR="$bundle_root"
+  export IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST
+  IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST="sha256:$(printf 'a%.0s' {1..64})"
+  export IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE="$fixture_dir/signed.tar"
+  export IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE="$fixture_dir/signed.sigstore.json"
+  [[ "$(current_source_tag)" == v1.2.3 && "$(current_source_commit)" == bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ]] || fail 'bundle source identity must come from verified index'
+  apply_update_manifest "$bundle_root/release-manifest.json" >/dev/null
+  [[ "$(wc -l < "$bundle_root/images-capture" | tr -d ' ')" == 5 ]] || fail 'bundle manifest must apply all image digests without Git'
+  [[ "$DEPLOY_IMAGE_UPDATE_PENDING" == 1 ]] || fail 'image update was not recorded'
+  if grep -Eq '^(restore_previous_image_refs|run_previous_rollback)\(\)' "$deploy_script"; then
+    fail 'old image-only rollback implementation remains'
+  fi
+  # Invalid signed manifest metadata still fails structural validation on VPS.
+  jq '.components.api.certificate_identity="https://attacker"' "$bundle_root/release-manifest.json" > "$bundle_root/bad.json"
+  if (apply_update_manifest "$bundle_root/bad.json") >/dev/null 2>&1; then fail 'bundle runtime accepted malformed component provenance'; fi
+  export IDEABOARD_DEPLOYMENT_BUNDLE_DIR="$fixture_dir/foreign"
+  if (apply_update_manifest "$bundle_root/release-manifest.json") >/dev/null 2>&1; then fail 'foreign bundle directory accepted'; fi
+  export IDEABOARD_DEPLOYMENT_BUNDLE_DIR="$bundle_root"
+  export RELEASE_HISTORY_DIR="$bundle_root/state/history"
+  export CURRENT_RELEASE_FILE="$bundle_root/state/current.json"
+  export PREVIOUS_RELEASE_FILE="$bundle_root/state/previous.json"
+  export DEPLOY_RELEASE_ID=test-bundle
+  export DEPLOY_STAGE=complete DEPLOY_STARTED_AT=now DEPLOY_SOURCE_TAG=v1.2.3 DEPLOY_SOURCE_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  export PREVIOUS_API_IMAGE=old-api PREVIOUS_API_MIGRATE_IMAGE=old-api-migrate PREVIOUS_AUTH_IMAGE=old-auth PREVIOUS_AUTH_MIGRATE_IMAGE=old-auth-migrate PREVIOUS_REALTIME_IMAGE=old-realtime
+  export DEPLOY_POSTGRES_BACKUP=postgres-backup DEPLOY_UPLOADS_BACKUP=uploads-backup
+  export DEPLOY_SOURCE_MANIFEST="$bundle_root/release-manifest.json" DEPLOY_SOURCE_MANIFEST_COPY="$bundle_root/release-manifest.json"
+  export DEPLOY_PREFLIGHT_GATE=passed DEPLOY_COSIGN_GATE=passed DEPLOY_BACKUP_GATE=passed DEPLOY_MIGRATION_GATE=passed DEPLOY_SMOKE_GATE=passed DEPLOY_MIGRATION_STARTED=1
+  write_release_manifest active
+  jq -e --arg root "$bundle_root" --arg digest "$IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST" \
+    '.source_tag=="v1.2.3" and .source_commit=="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" and .deployment_bundle.directory==$root and .deployment_bundle.digest==$digest and (.deployment_bundle.archive|endswith("signed.tar")) and (.deployment_bundle.signature|endswith("signed.sigstore.json"))' \
+    "$CURRENT_RELEASE_FILE" >/dev/null || fail 'release state did not retain signed bundle identity and recovery paths'
 )
-printf 'Production update dual-path recipe test passed\n'
+printf 'Repository-free bundle runtime, state and rollback tests passed\n'
+
+# The local bootstrap now shares the installed signed-bundle entrypoint; the
+# actual bootstrap binary framing is exercised by production-deploy-entrypoint-test.sh.
+grep -Fq 'bootstrap-vps.sh --ref' "$repo_root/docs/runbooks/deployment.md" ||
+  fail 'Production runbook must document the signed local bootstrap command'
+printf 'Production signed bootstrap recipe contract passed\n'

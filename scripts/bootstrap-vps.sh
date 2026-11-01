@@ -1,279 +1,78 @@
 #!/usr/bin/env bash
 
+set +x
 set -euo pipefail
+export LC_ALL=C
 
-STACK_DIR="${IDEABOARD_STACK_DIR:-/opt/stacks/ideaboard}"
-REPO_URL="${IDEABOARD_REPO_URL:-https://github.com/Ericsunsk/IdeaBoard.git}"
 RELEASE_REF="${IDEABOARD_RELEASE_REF:-}"
-MANIFEST_SOURCE="${IDEABOARD_RELEASE_MANIFEST:-}"
-EDITOR_BIN="${EDITOR:-nano}"
-BIN_PATH="${IDEABOARD_BIN_PATH:-/usr/local/bin/ideaboard}"
-GIT_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
-FORCE="${IDEABOARD_FORCE:-0}"
-ASKPASS_FILE=""
-DEPLOY_SCRIPT="$STACK_DIR/scripts/deploy-stack.sh"
+MANIFEST="${IDEABOARD_RELEASE_MANIFEST:-}"
+ARCHIVE="${IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE:-}"
+SIGNATURE="${IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE:-}"
+ENTRYPOINT="${IDEABOARD_PRODUCTION_ENTRYPOINT:-/usr/local/libexec/ideaboard-production-deploy}"
 
 usage() {
-  cat <<EOF
-Usage: bootstrap-vps.sh --ref <tag-or-commit> --manifest <path-or-url> [--force]
+  cat <<'EOF'
+Usage: bootstrap-vps.sh --ref <vX.Y.Z> --manifest <path> --bundle <path> --signature <path>
 
-Options:
-  --ref            Strict SemVer tag or full Git commit SHA. Can also be set with IDEABOARD_RELEASE_REF.
-  --manifest       Release manifest path or URL. Can also be set with IDEABOARD_RELEASE_MANIFEST.
-  --force, -f      Move any existing stack directory to a backup, clone again, and restore docker/.env if present.
+Deploy local signed release artifacts through the independently installed trusted
+Production entrypoint. INFISICAL_TOKEN is required. This command never clones a
+repository or installs executable code. Provision Docker, Infisical CLI, Cosign,
+Python 3, jq, flock, the root-owned verifier and entrypoint before running it.
 EOF
 }
-
-while [[ $# -gt 0 ]]; do
+while (( $# > 0 )); do
   case "$1" in
-    --ref)
-      [[ $# -ge 2 ]] || {
-        echo "Missing value for $1" >&2
-        usage >&2
-        exit 1
-      }
-      RELEASE_REF="$2"
-      shift
+    --ref|--manifest|--bundle|--signature)
+      (( $# >= 2 )) || { printf 'Missing value for %s\n' "$1" >&2; exit 2; }
+      case "$1" in
+        --ref) RELEASE_REF="$2" ;;
+        --manifest) MANIFEST="$2" ;;
+        --bundle) ARCHIVE="$2" ;;
+        --signature) SIGNATURE="$2" ;;
+      esac
+      shift 2
       ;;
-    --manifest)
-      [[ $# -ge 2 ]] || {
-        echo "Missing value for $1" >&2
-        usage >&2
-        exit 1
-      }
-      MANIFEST_SOURCE="$2"
-      shift
-      ;;
-    --force|-f)
-      FORCE=1
-      ;;
-    --help|-h)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --help|-h) usage; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
-  shift
 done
-
-if [[ -z "$RELEASE_REF" ]]; then
-  echo "Error: --ref <tag-or-commit> is required; mutable branches are not supported for bootstrap." >&2
-  usage >&2
-  exit 1
-fi
-if ! [[ "$RELEASE_REF" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ || "$RELEASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Error: --ref must be a strict SemVer tag or full Git commit SHA; mutable branches are not supported." >&2
-  usage >&2
-  exit 1
-fi
-if [[ -z "$MANIFEST_SOURCE" ]]; then
-  echo "Error: --manifest <path-or-url> is required; mutable image tags are not supported." >&2
-  usage >&2
-  exit 1
-fi
-
-cleanup() {
-  if [[ -n "$ASKPASS_FILE" && -f "$ASKPASS_FILE" ]]; then
-    rm -f "$ASKPASS_FILE"
-  fi
+[[ -n "$RELEASE_REF" ]] || { echo '--ref <vX.Y.Z> is required' >&2; exit 2; }
+[[ "$RELEASE_REF" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+  echo '--ref must be a strict SemVer tag' >&2; exit 2;
 }
-trap cleanup EXIT
-
-git_with_auth() {
-  if [[ -n "$GIT_TOKEN" ]]; then
-    GIT_ASKPASS="$ASKPASS_FILE" GIT_TERMINAL_PROMPT=0 git "$@"
-    return
-  fi
-  git "$@"
-}
-
-is_force_enabled() {
-  [[ "$FORCE" == "1" || "$FORCE" == "true" || "$FORCE" == "yes" ]]
-}
-
-make_backup_dir() {
-  local base candidate index
-  base="${STACK_DIR}.backup.$(date +%Y%m%d%H%M%S)"
-  candidate="$base"
-  index=1
-  while [[ -e "$candidate" ]]; do
-    candidate="${base}.${index}"
-    index=$((index + 1))
-  done
-  printf '%s\n' "$candidate"
-}
-
-restore_env_from_backup() {
-  local backup_dir="$1"
-  local old_env="$backup_dir/docker/.env"
-  local new_env="$STACK_DIR/docker/.env"
-
-  if [[ -f "$old_env" && ! -f "$new_env" ]]; then
-    mkdir -p "$(dirname "$new_env")"
-    cp "$old_env" "$new_env"
-    echo "Restored docker/.env from $backup_dir"
-  fi
-}
-
-checkout_ref() {
-  local dir="$1"
-
-  git_with_auth -C "$dir" fetch --tags --prune origin
-  git_with_auth -C "$dir" checkout --detach "$RELEASE_REF"
-}
-
-need_command() {
-  command -v "$1" >/dev/null 2>&1 || {
-    echo "Missing command: $1" >&2
-    exit 1
-  }
-}
-
-env_file_value() {
-  local file="$1"
-  local key="$2"
-  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
-}
-
-cosign_verify_disabled() {
-  local env_file="$STACK_DIR/docker/.env"
-  local value
-  [[ -f "$env_file" ]] || return 1
-  value="$(env_file_value "$env_file" COSIGN_VERIFY)"
-  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
-  [[ "$value" == "false" || "$value" == "0" || "$value" == "no" || "$value" == "off" ]]
-}
-
-install_cosign() {
-  echo "cosign is missing. Attempting to install it automatically..." >&2
-
-  local os
-  os=$(uname -s | tr '[:upper:]' '[:lower:]')
-  local arch
-  arch=$(uname -m)
-  if [[ "$arch" == "x86_64" ]]; then
-    arch="amd64"
-  elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
-    arch="arm64"
-  else
-    echo "Warning: unsupported architecture $arch for auto-installing cosign." >&2
-    return 1
-  fi
-
-  local version="v2.4.1"
-  local url="https://github.com/sigstore/cosign/releases/download/${version}/cosign-${os}-${arch}"
-  local dest="/usr/local/bin/cosign"
-
-  echo "Downloading cosign from $url..." >&2
-  if curl -fsSL "$url" -o "$dest"; then
-    chmod +x "$dest"
-    echo "cosign has been successfully installed to $dest" >&2
-    return 0
-  fi
-
-  # Fallback to local project bin if /usr/local/bin is not writable
-  local local_bin="$STACK_DIR/bin"
-  mkdir -p "$local_bin"
-  dest="$local_bin/cosign"
-  echo "Retrying download to local bin: $dest..." >&2
-  if curl -fsSL "$url" -o "$dest"; then
-    chmod +x "$dest"
-    export PATH="$local_bin:$PATH"
-    echo "cosign has been successfully installed to $dest and added to PATH" >&2
-    return 0
-  fi
-
-  echo "Error: failed to download cosign automatically." >&2
-  return 1
-}
-
-need_command git
-need_command docker
-
-# P1: docker/.env is committed dotenvx-encrypted; deployment decrypts it via
-# deploy-stack.sh. Warn early instead of failing mid-deploy without a key.
-if ! command -v dotenvx >/dev/null 2>&1; then
-  echo "Warning: dotenvx is not installed; docker/.env is dotenvx-encrypted (install: npm i -g @dotenvx/dotenvx)." >&2
+for artifact in "$MANIFEST" "$ARCHIVE" "$SIGNATURE"; do
+  [[ -f "$artifact" && -s "$artifact" ]] || { echo '--manifest, --bundle and --signature require nonempty local files' >&2; exit 2; }
+done
+[[ -x "$ENTRYPOINT" ]] || { echo 'Independently installed Production entrypoint is unavailable' >&2; exit 2; }
+python3 - "$ENTRYPOINT" <<'PYTHON' || { echo 'Production entrypoint must be a trusted local file' >&2; exit 2; }
+import os, pathlib, stat, sys
+try:
+    info=pathlib.Path(sys.argv[1]).lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+        raise ValueError()
+except (OSError,ValueError):
+    sys.exit(1)
+PYTHON
+if [[ -z "${INFISICAL_TOKEN:-}" || ${#INFISICAL_TOKEN} -gt 8192 || "$INFISICAL_TOKEN" == *[![:graph:]]* ]]; then
+  echo 'A nonempty, single-line Production Infisical token is required' >&2; exit 2
 fi
-
-if ! docker compose version >/dev/null 2>&1; then
-  echo "Missing command: docker compose" >&2
-  exit 1
-fi
-
-if [[ -n "$GIT_TOKEN" ]]; then
-  export GITHUB_TOKEN="$GIT_TOKEN"
-  ASKPASS_FILE="$(mktemp)"
-  chmod 700 "$ASKPASS_FILE"
-  cat > "$ASKPASS_FILE" <<'EOF'
-#!/usr/bin/env sh
-case "$1" in
-  *Username*) printf '%s\n' x-access-token ;;
-  *Password*) printf '%s\n' "$GITHUB_TOKEN" ;;
-  *) printf '\n' ;;
-esac
-EOF
-fi
-
-mkdir -p "$(dirname "$STACK_DIR")"
-
-if [[ -e "$STACK_DIR" ]] && is_force_enabled; then
-  BACKUP_DIR="$(make_backup_dir)"
-  mv "$STACK_DIR" "$BACKUP_DIR"
-  echo "Backed up existing stack to $BACKUP_DIR"
-  if ! git_with_auth clone "$REPO_URL" "$STACK_DIR" || ! checkout_ref "$STACK_DIR"; then
-    mv "$BACKUP_DIR" "$STACK_DIR"
-    echo "Clone failed; restored stack from $BACKUP_DIR" >&2
-    exit 1
-  fi
-  restore_env_from_backup "$BACKUP_DIR"
-elif [[ -d "$STACK_DIR/.git" ]]; then
-  checkout_ref "$STACK_DIR"
-else
-  if [[ -e "$STACK_DIR" ]]; then
-    if [[ -n "$(find "$STACK_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-      echo "Error: $STACK_DIR exists but is not a git checkout. Move it away or set IDEABOARD_STACK_DIR." >&2
-      exit 1
-    fi
-    rmdir "$STACK_DIR"
-  fi
-  git_with_auth clone "$REPO_URL" "$STACK_DIR"
-  checkout_ref "$STACK_DIR"
-fi
-
-chmod +x \
-  "$DEPLOY_SCRIPT" \
-  "$STACK_DIR/scripts/render-cloudflare-real-ip-conf.sh" \
-  "$STACK_DIR/scripts/uninstall-vps.sh"
-chmod 755 "$STACK_DIR/docker/postgres/init-runtime-roles.sh"
-if [[ -w "$(dirname "$BIN_PATH")" ]]; then
-  ln -sf "$DEPLOY_SCRIPT" "$BIN_PATH"
-else
-  echo "Skip installing $BIN_PATH: directory is not writable" >&2
-fi
-"$DEPLOY_SCRIPT" init-env
-
-if [[ -t 0 || -e /dev/tty ]]; then
-  if grep -qE '^[A-Z][A-Z0-9_]*=encrypted:' "$STACK_DIR/docker/.env" 2>/dev/null; then
-    echo "docker/.env is dotenvx-encrypted; change secrets with: dotenvx set KEY value -f $STACK_DIR/docker/.env (never edit ciphertext by hand)." >&2
-  else
-    "$EDITOR_BIN" "$STACK_DIR/docker/.env" </dev/tty >/dev/tty
-  fi
-fi
-
-if ! command -v cosign >/dev/null 2>&1 && ! cosign_verify_disabled; then
-  if ! install_cosign; then
-    echo "Error: cosign is required for signed-image deployment. Install it manually or set COSIGN_VERIFY=false in docker/.env." >&2
-    exit 1
-  fi
-fi
-
-if [[ -n "$GIT_TOKEN" && -z "${GHCR_TOKEN:-}" ]]; then
-  GHCR_TOKEN="$GIT_TOKEN" "$DEPLOY_SCRIPT" update --manifest "$MANIFEST_SOURCE"
-else
-  "$DEPLOY_SCRIPT" update --manifest "$MANIFEST_SOURCE"
-fi
+header="$(python3 - "$MANIFEST" "$ARCHIVE" "$SIGNATURE" "$RELEASE_REF" <<'PYTHON'
+import json, pathlib, re, sys
+try:
+    manifest=json.loads(pathlib.Path(sys.argv[1]).read_text())
+    commit=manifest['commit']
+    if manifest['tag'] != sys.argv[4] or not isinstance(commit,str) or not re.fullmatch(r'[0-9a-f]{40}',commit):
+        raise ValueError()
+    a,s=(pathlib.Path(p).stat().st_size for p in sys.argv[2:4])
+    if not 0<a<=67108864 or not 0<s<=1048576:
+        raise ValueError()
+    print(json.dumps(dict(tag=sys.argv[4],commit=commit,archive_bytes=a,signature_bytes=s),separators=(',',':')))
+except (OSError,ValueError,KeyError,TypeError):
+    sys.exit(1)
+PYTHON
+)" || { echo 'Invalid local signed release identity or size' >&2; exit 2; }
+{
+  printf '%s\n' IDEABOARD_DEPLOY_V2 "$INFISICAL_TOKEN" "$header"
+  cat < "$ARCHIVE"
+  cat < "$SIGNATURE"
+} | env -u INFISICAL_TOKEN "$ENTRYPOINT"

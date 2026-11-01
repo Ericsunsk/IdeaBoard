@@ -42,14 +42,10 @@ RELEASE_HISTORY_DIR="$RELEASE_STATE_DIR/history"
 CURRENT_RELEASE_FILE="$RELEASE_STATE_DIR/current.json"
 PREVIOUS_RELEASE_FILE="$RELEASE_STATE_DIR/previous.json"
 
-requested_command="${1:-update}"
-command="$requested_command"
-if [[ "$command" == "update" ]]; then
-  command="deploy"
-fi
+command="${1:-deploy}"
 update_manifest_source=""
 
-if [[ "$requested_command" == "update" || "$requested_command" == "deploy" ]]; then
+if [[ "$command" == deploy ]]; then
   args=("${@:2}")
   remaining_args=()
   i=0
@@ -57,7 +53,7 @@ if [[ "$requested_command" == "update" || "$requested_command" == "deploy" ]]; t
     case "${args[$i]}" in
       --manifest)
         if (( i + 1 >= ${#args[@]} )); then
-          echo "Error: --manifest requires a path or URL" >&2
+          echo "Error: --manifest requires a local path" >&2
           exit 1
         fi
         update_manifest_source="${args[$((i + 1))]}"
@@ -74,20 +70,31 @@ if [[ "$requested_command" == "update" || "$requested_command" == "deploy" ]]; t
     esac
   done
   if (( ${#remaining_args[@]} > 0 )); then
-    echo "Error: unexpected arguments for $requested_command: ${remaining_args[*]}" >&2
+    echo "Error: unexpected arguments for $command: ${remaining_args[*]}" >&2
     exit 1
   fi
   if [[ -z "$update_manifest_source" ]]; then
-    echo "Error: $requested_command requires --manifest <path-or-url>; mutable image tags are not supported." >&2
+    echo "Error: $command requires --manifest <path>; mutable image tags are not supported." >&2
     exit 1
   fi
+fi
+
+if [[ "$command" == deploy ]]; then
+  [[ "${IDEABOARD_DEPLOYMENT_BUNDLE_DIR:-}" == "$ROOT_DIR" && -f "$ROOT_DIR/deployment-index.json" ]] || {
+    echo "Error: deployment requires a verified signed bundle" >&2
+    exit 1
+  }
+  [[ "$update_manifest_source" == "$ROOT_DIR/release-manifest.json" ]] || {
+    echo "Error: deployment manifest must be the verified bundle release-manifest.json" >&2
+    exit 1
+  }
 fi
 
 DEPLOY_STAGE="init"
 DEPLOY_RELEASE_ID=""
 DEPLOY_STARTED_AT=""
-DEPLOY_GIT_REF=""
-DEPLOY_GIT_COMMIT=""
+DEPLOY_SOURCE_TAG=""
+DEPLOY_SOURCE_COMMIT=""
 DEPLOY_POSTGRES_BACKUP=""
 DEPLOY_UPLOADS_BACKUP=""
 DEPLOY_ENV_SNAPSHOT=""
@@ -102,7 +109,7 @@ DEPLOY_BACKUP_GATE="pending"
 DEPLOY_MIGRATION_GATE="pending"
 DEPLOY_SMOKE_GATE="pending"
 DEPLOY_SOURCE_MANIFEST=""
-DEPLOY_SOURCE_MANIFEST_COPY=""
+DEPLOY_SOURCE_MANIFEST_COPY="$ROOT_DIR/release-manifest.json"
 DEPLOY_API_IMAGE=""
 DEPLOY_API_MIGRATE_IMAGE=""
 DEPLOY_AUTH_IMAGE=""
@@ -114,11 +121,6 @@ PREVIOUS_AUTH_IMAGE=""
 PREVIOUS_AUTH_MIGRATE_IMAGE=""
 PREVIOUS_REALTIME_IMAGE=""
 DEPLOY_AUTOMATION_RESULT_FILE="${IDEABOARD_DEPLOY_RESULT_FILE:-}"
-
-if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
-  shift || true
-  IDEABOARD_STACK_DIR="$ROOT_DIR" exec "$ROOT_DIR/scripts/uninstall-vps.sh" "$@"
-fi
 
 die() {
   echo "Error: $*" >&2
@@ -337,9 +339,6 @@ nginx_auth_health_upstream() {
   printf '%s/api/health\n' "${auth_upstream%/}"
 }
 
-nginx_real_ip_include() {
-  env_or_file_value NGINX_REAL_IP_INCLUDE
-}
 
 nginx_realtime_upstream() {
   local value
@@ -624,16 +623,6 @@ check_port_available_or_used_by_compose() {
   fi
 }
 
-check_nginx_template_render() {
-  local tmp
-  tmp="$(mktemp)"
-  render_host_nginx_config "$tmp" >/dev/null
-  if grep -F "\${" "$tmp" >/dev/null; then
-    rm -f -- "$tmp"
-    die "rendered Nginx config still contains unresolved template variables"
-  fi
-  rm -f -- "$tmp"
-}
 
 preflight_checks() {
   echo "Running deployment preflight checks..."
@@ -655,10 +644,6 @@ preflight_checks() {
   check_port_available_or_used_by_compose "$(api_metrics_host_port)" "api metrics" "ideaboard-api"
   check_port_available_or_used_by_compose "$(auth_host_port)" "auth" "ideaboard-auth"
   check_port_available_or_used_by_compose "$(realtime_host_port)" "realtime" "ideaboard-realtime"
-  if [[ -n "$(nginx_real_ip_include)" && ! -r "$(nginx_real_ip_include)" ]]; then
-    die "NGINX_REAL_IP_INCLUDE is not readable: $(nginx_real_ip_include)"
-  fi
-  check_nginx_template_render
   DEPLOY_PREFLIGHT_GATE="passed"
   echo "Preflight checks passed"
 }
@@ -1185,12 +1170,6 @@ wait_for_backend_health() {
   wait_for_http_local "realtime upstream" "$(nginx_realtime_upstream)/health"
 }
 
-is_false_value() {
-  local value
-  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
-  [[ "$value" == "0" || "$value" == "false" || "$value" == "no" || "$value" == "off" ]]
-}
-
 check_river_schema() {
   local result
 
@@ -1304,18 +1283,12 @@ run_backend_smoke_checks() {
   echo "Backend smoke checks passed"
 }
 
-current_git_ref() {
-  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" symbolic-ref --short -q HEAD 2>/dev/null || \
-      git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || \
-      git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || true
-  fi
+current_source_tag() {
+  jq -er .tag "$ROOT_DIR/deployment-index.json"
 }
 
-current_git_commit() {
-  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
-  fi
+current_source_commit() {
+  jq -er .commit "$ROOT_DIR/deployment-index.json"
 }
 
 release_manifest_path() {
@@ -1327,8 +1300,8 @@ init_release_context() {
   [[ -n "$DEPLOY_RELEASE_ID" ]] && return 0
   DEPLOY_RELEASE_ID="$(release_timestamp)"
   DEPLOY_STARTED_AT="$(utc_now)"
-  DEPLOY_GIT_REF="$(current_git_ref)"
-  DEPLOY_GIT_COMMIT="$(current_git_commit)"
+  DEPLOY_SOURCE_TAG="$(current_source_tag)"
+  DEPLOY_SOURCE_COMMIT="$(current_source_commit)"
   mkdir -p "$RELEASE_HISTORY_DIR"
   chmod 700 "$RELEASE_STATE_DIR" "$RELEASE_HISTORY_DIR"
   PREVIOUS_API_IMAGE="$(env_value IDEABOARD_API_IMAGE)"
@@ -1358,8 +1331,8 @@ write_release_manifest() {
   "stage": $(json_value "$DEPLOY_STAGE"),
   "started_at": $(json_value "$DEPLOY_STARTED_AT"),
   "completed_at": $(json_value "$completed_at"),
-  "git_ref": $(json_value "$DEPLOY_GIT_REF"),
-  "git_commit": $(json_value "$DEPLOY_GIT_COMMIT"),
+  "source_tag": $(json_value "$DEPLOY_SOURCE_TAG"),
+  "source_commit": $(json_value "$DEPLOY_SOURCE_COMMIT"),
   "images": {
     "api": $(json_value "${DEPLOY_API_IMAGE:-$(env_value IDEABOARD_API_IMAGE)}"),
     "api-migrate": $(json_value "${DEPLOY_API_MIGRATE_IMAGE:-$(env_value IDEABOARD_API_MIGRATE_IMAGE)}"),
@@ -1377,6 +1350,12 @@ write_release_manifest() {
   "backups": {
     "postgres": $(json_value "$DEPLOY_POSTGRES_BACKUP"),
     "uploads": $(json_value "$DEPLOY_UPLOADS_BACKUP")
+  },
+  "deployment_bundle": {
+    "digest": $(json_value "${IDEABOARD_DEPLOYMENT_BUNDLE_DIGEST:-}"),
+    "directory": $(json_value "${IDEABOARD_DEPLOYMENT_BUNDLE_DIR:-}"),
+    "archive": $(json_value "${IDEABOARD_DEPLOYMENT_BUNDLE_ARCHIVE:-}"),
+    "signature": $(json_value "${IDEABOARD_DEPLOYMENT_BUNDLE_SIGNATURE:-}")
   },
   "source_manifest": {
     "source": $(json_value "$DEPLOY_SOURCE_MANIFEST"),
@@ -1597,27 +1576,13 @@ run_doctor() {
   fi
 }
 
-fetch_update_manifest() {
+capture_update_manifest() {
   local source="$1"
   local dest
-
-  [[ -n "$source" ]] || die "manifest source is required"
+  [[ "$source" == "$ROOT_DIR/release-manifest.json" && -r "$source" ]] || \
+    die "deployment manifest must be the verified bundle release-manifest.json"
   dest="$(mktemp "$RELEASE_STATE_DIR/source-manifest.${DEPLOY_RELEASE_ID}.XXXXXX")"
-  case "$source" in
-    http://*|https://*)
-      if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 10 --max-time 60 "$source" -o "$dest"
-      elif command -v wget >/dev/null 2>&1; then
-        wget -q -T 60 -O "$dest" "$source"
-      else
-        die "curl or wget is required to fetch release manifest URL"
-      fi
-      ;;
-    *)
-      [[ -r "$source" ]] || die "manifest file is not readable: $source"
-      cp "$source" "$dest"
-      ;;
-  esac
+  cp "$source" "$dest"
   chmod 600 "$dest"
   printf '%s\n' "$dest"
 }
@@ -1631,15 +1596,12 @@ apply_update_manifest() {
   local realtime_image
   local tag
   local commit
-  local checkout_commit
+  local source_commit
 
   api_image="$(json_image_field "api" "$manifest_file")"
   api_migrate_image="$(json_image_field "api-migrate" "$manifest_file")"
   auth_image="$(json_image_field "auth" "$manifest_file")"
   auth_migrate_image="$(json_image_field "auth-migrate" "$manifest_file")"
-  if [[ -z "$auth_migrate_image" ]]; then
-    auth_migrate_image="$(json_image_field "auth_migrate" "$manifest_file")"
-  fi
   realtime_image="$(json_image_field "realtime" "$manifest_file")"
   [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" && -n "$realtime_image" ]] || \
     die "release manifest must contain images.api, images.api-migrate, images.auth, images.auth-migrate, and images.realtime"
@@ -1652,15 +1614,13 @@ apply_update_manifest() {
   tag="$(json_string_field "tag" "$manifest_file")"
   commit="$(json_string_field "commit" "$manifest_file")"
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "release manifest must contain a full Git commit SHA"
-  checkout_commit="$(current_git_commit)"
-  [[ -n "$checkout_commit" ]] || die "release manifest deployment requires a Git checkout"
-  [[ "$checkout_commit" == "$commit" ]] || \
-    die "stack checkout commit $checkout_commit does not match release manifest commit $commit"
-  if jq -e '.schema_version == 2 or has("components")' "$manifest_file" >/dev/null; then
-    (cd "$ROOT_DIR" && python3 scripts/release-artifacts.py validate --manifest "$manifest_file" \
-      --repository "$(json_string_field repository "$manifest_file")" --commit "$commit" --verify-inputs) || \
-      die "release component provenance does not match checkout inputs"
-  fi
+  [[ "${IDEABOARD_DEPLOYMENT_BUNDLE_DIR:-}" == "$ROOT_DIR" && -f "$ROOT_DIR/deployment-index.json" ]] || \
+    die "deployment requires a verified signed bundle"
+  source_commit="$(current_source_commit)"
+  [[ "$source_commit" == "$commit" ]] || die "bundle source commit does not match release manifest commit"
+  (cd "$ROOT_DIR" && python3 scripts/release-artifacts.py validate --manifest "$manifest_file" \
+    --repository "$(json_string_field repository "$manifest_file")" --commit "$commit" --tag "$(current_source_tag)") || \
+    die "release component provenance does not match verified deployment bundle"
   echo "Applying release manifest${tag:+ tag: $tag}${commit:+ commit: $commit}"
   set_env_value IDEABOARD_API_IMAGE "$api_image"
   set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
@@ -1672,7 +1632,7 @@ apply_update_manifest() {
 
 resolve_deploy_images() {
   local manifest_file
-  manifest_file="$(fetch_update_manifest "$update_manifest_source")"
+  manifest_file="$(capture_update_manifest "$update_manifest_source")"
   DEPLOY_SOURCE_MANIFEST="$update_manifest_source"
   DEPLOY_SOURCE_MANIFEST_COPY="$manifest_file"
   apply_update_manifest "$manifest_file"
@@ -1727,67 +1687,6 @@ run_stack_migrations() {
   DEPLOY_MIGRATION_GATE="passed"
 }
 
-restore_previous_image_refs() {
-  [[ -f "$PREVIOUS_RELEASE_FILE" ]] || die "previous release manifest not found: $PREVIOUS_RELEASE_FILE"
-  local api_image
-  local api_migrate_image
-  local auth_image
-  local auth_migrate_image
-  local realtime_image
-  api_image="$(json_object_string_field "images" "api" "$PREVIOUS_RELEASE_FILE")"
-  api_migrate_image="$(json_object_string_field "images" "api-migrate" "$PREVIOUS_RELEASE_FILE")"
-  auth_image="$(json_object_string_field "images" "auth" "$PREVIOUS_RELEASE_FILE")"
-  auth_migrate_image="$(json_object_string_field "images" "auth-migrate" "$PREVIOUS_RELEASE_FILE")"
-  realtime_image="$(json_object_string_field "images" "realtime" "$PREVIOUS_RELEASE_FILE")"
-  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" && -n "$realtime_image" ]] || die "previous release manifest is missing image refs"
-  is_ideaboard_image_ref "$api_image" "api" || die "previous release manifest has invalid api image ref"
-  is_ideaboard_image_ref "$api_migrate_image" "api-migrate" || die "previous release manifest has invalid api-migrate image ref"
-  is_ideaboard_image_ref "$auth_image" "auth" || die "previous release manifest has invalid auth image ref"
-  is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "previous release manifest has invalid auth-migrate image ref"
-  is_ideaboard_image_ref "$realtime_image" "realtime" || die "previous release manifest has invalid realtime image ref"
-  set_env_value IDEABOARD_API_IMAGE "$api_image"
-  set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
-  set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
-  set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
-  set_env_value IDEABOARD_REALTIME_IMAGE "$realtime_image"
-}
-
-run_previous_rollback() {
-  echo "Restoring previous image refs from $PREVIOUS_RELEASE_FILE"
-  init_release_context
-  DEPLOY_IMAGE_UPDATE_PENDING=1
-  enable_deploy_failure_trap
-
-  DEPLOY_STAGE="rollback-restore-env"
-  restore_previous_image_refs
-  local previous_source_manifest
-  previous_source_manifest="$(jq -r '.source_manifest.local_copy // empty' "$PREVIOUS_RELEASE_FILE")"
-  if [[ -n "$previous_source_manifest" && -f "$previous_source_manifest" ]] && \
-    jq -e '.schema_version == 2' "$previous_source_manifest" >/dev/null; then
-    python3 "$ROOT_DIR/scripts/release-artifacts.py" validate --manifest "$previous_source_manifest" \
-      --repository "$(json_string_field repository "$previous_source_manifest")" || \
-      die "previous release component provenance is invalid"
-    DEPLOY_SOURCE_MANIFEST_COPY="$previous_source_manifest"
-  fi
-  capture_deploy_image_refs
-
-  DEPLOY_STAGE="preflight"
-  preflight_checks
-
-  DEPLOY_STAGE="pull"
-  prepare_stack_images
-
-  DEPLOY_STAGE="up"
-  docker_compose up -d
-  DEPLOY_ENV_RESTORE_ALLOWED=0
-
-  DEPLOY_STAGE="smoke"
-  run_backend_smoke_checks
-
-  docker_compose ps
-  complete_deploy_success
-}
-
 login_ghcr_if_configured() {
   if [[ -z "${GHCR_TOKEN:-}" ]]; then
     return
@@ -1800,122 +1699,36 @@ login_ghcr_if_configured() {
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$username" --password-stdin
 }
 
-install_cosign() {
-  echo "cosign is missing. Attempting to install it automatically..." >&2
-
-  local os
-  os=$(uname -s | tr '[:upper:]' '[:lower:]')
-  local arch
-  arch=$(uname -m)
-  if [[ "$arch" == "x86_64" ]]; then
-    arch="amd64"
-  elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
-    arch="arm64"
-  else
-    echo "Warning: unsupported architecture $arch for auto-installing cosign." >&2
-    return 1
-  fi
-
-  local version="v2.4.1"
-  local url="https://github.com/sigstore/cosign/releases/download/${version}/cosign-${os}-${arch}"
-  local dest="/usr/local/bin/cosign"
-
-  echo "Downloading cosign from $url..." >&2
-  if curl -fsSL "$url" -o "$dest"; then
-    chmod +x "$dest"
-    echo "cosign has been successfully installed to $dest" >&2
-    return 0
-  fi
-
-  # Fallback to local project bin if /usr/local/bin is not writable
-  local local_bin="$ROOT_DIR/bin"
-  mkdir -p "$local_bin"
-  dest="$local_bin/cosign"
-  echo "Retrying download to local bin: $dest..." >&2
-  if curl -fsSL "$url" -o "$dest"; then
-    chmod +x "$dest"
-    export PATH="$local_bin:$PATH"
-    echo "cosign has been successfully installed to $dest and added to PATH" >&2
-    return 0
-  fi
-
-  echo "Error: failed to download cosign automatically." >&2
-  return 1
-}
-
-cosign_verify_enabled() {
-  local value
-  value="$(env_value COSIGN_VERIFY)"
-  if [[ -z "$value" ]]; then
-    value="true"
-  fi
-  ! is_false_value "$value"
-}
-
 verify_image_signature() {
   local image_ref="$1"
   local exact_identity="${2:-}" exact_issuer="${3:-}"
-  local identity_regexp
-  local oidc_issuer
-  local source_repo
-  local source_repo_regexp
-
-  if ! cosign_verify_enabled; then
-    echo "Skipping cosign verification for $image_ref because COSIGN_VERIFY=false"
-    return 0
-  fi
-  if ! command -v cosign >/dev/null 2>&1; then
-    if ! install_cosign; then
-      die "cosign is required to verify image signatures. Install cosign or set COSIGN_VERIFY=false only for temporary offline recovery."
-    fi
-  fi
-
-  identity_regexp="$(env_value COSIGN_CERTIFICATE_IDENTITY_REGEXP)"
-  if [[ -z "$identity_regexp" ]]; then
-    source_repo="$(image_source_repo_from_ref "$image_ref")" || die "cannot derive GitHub source repository from image ref: $image_ref"
-    source_repo_regexp="${source_repo//./\\.}"
-    identity_regexp="(?i)https://github.com/${source_repo_regexp}/\\.github/workflows/docker-images\\.yml@refs/(heads|tags)/.+"
-  fi
-  oidc_issuer="$(env_value COSIGN_CERTIFICATE_OIDC_ISSUER)"
-  oidc_issuer="${oidc_issuer:-https://token.actions.githubusercontent.com}"
-
-  local identity_args=(--certificate-identity-regexp "$identity_regexp")
-  if [[ -n "$exact_identity" ]]; then
-    identity_args=(--certificate-identity "$exact_identity")
-    oidc_issuer="$exact_issuer"
-  fi
+  [[ -n "$exact_identity" && "$exact_issuer" == https://token.actions.githubusercontent.com ]] || \
+    die "exact component signer identity and trusted issuer are required"
+  command -v cosign >/dev/null 2>&1 || die "cosign is required to verify image signatures"
   echo "Verifying image signature: $image_ref"
   if ! cosign verify \
-    "${identity_args[@]}" \
-    --certificate-oidc-issuer "$oidc_issuer" \
+    --certificate-identity "$exact_identity" \
+    --certificate-oidc-issuer "$exact_issuer" \
     "$image_ref" >/dev/null; then
     echo "Error: Image signature verification failed for $image_ref." >&2
-    echo "If you built these images locally (not via GitHub Actions) or want to bypass verification, please set COSIGN_VERIFY=false in /opt/stacks/ideaboard/docker/.env" >&2
     return 1
   fi
 }
 
 verify_image_signatures() {
-  if [[ -n "${DEPLOY_SOURCE_MANIFEST_COPY:-}" ]] && \
-    jq -e '.schema_version == 2' "$DEPLOY_SOURCE_MANIFEST_COPY" >/dev/null; then
-    local component image identity issuer variable
-    for component in api api-migrate auth auth-migrate realtime; do
-      image="$(jq -er --arg key "$component" '.images[$key]' "$DEPLOY_SOURCE_MANIFEST_COPY")"
-      variable="$(printf '%s' "$component" | tr '[:lower:]-' '[:upper:]_')"
-      [[ "$(env_value "IDEABOARD_${variable}_IMAGE")" == "$image" ]] || \
-        die "release component provenance does not match deployed $component image"
-      identity="$(jq -er --arg key "$component" '.components[$key].certificate_identity' "$DEPLOY_SOURCE_MANIFEST_COPY")"
-      issuer="$(jq -er --arg key "$component" '.components[$key].certificate_oidc_issuer' "$DEPLOY_SOURCE_MANIFEST_COPY")"
-      verify_image_signature "$image" "$identity" "$issuer" || return 1
-    done
-    DEPLOY_COSIGN_GATE="passed"
-    return
+  if [[ -z "${DEPLOY_SOURCE_MANIFEST_COPY:-}" ]] || ! jq -e '.schema_version == 2' "$DEPLOY_SOURCE_MANIFEST_COPY" >/dev/null; then
+    die "signed bundle component provenance is required for image verification"
   fi
-  verify_image_signature "$(env_value IDEABOARD_API_IMAGE)"
-  verify_image_signature "$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
-  verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"
-  verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
-  verify_image_signature "$(env_value IDEABOARD_REALTIME_IMAGE)"
+  local component image identity issuer variable
+  for component in api api-migrate auth auth-migrate realtime; do
+    image="$(jq -er --arg key "$component" '.images[$key]' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+    variable="$(printf '%s' "$component" | tr '[:lower:]-' '[:upper:]_')"
+    [[ "$(env_value "IDEABOARD_${variable}_IMAGE")" == "$image" ]] || \
+      die "release component provenance does not match deployed $component image"
+    identity="$(jq -er --arg key "$component" '.components[$key].certificate_identity' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+    issuer="$(jq -er --arg key "$component" '.components[$key].certificate_oidc_issuer' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+    verify_image_signature "$image" "$identity" "$issuer" || return 1
+  done
   DEPLOY_COSIGN_GATE="passed"
 }
 
@@ -1954,27 +1767,6 @@ run_api_migration() {
   docker_compose run --rm api-migrate
 }
 
-render_host_nginx_config() {
-  local output_path="${1:-$ROOT_DIR/deploy/nginx/ideaboard.conf}"
-
-  NGINX_API_UPSTREAM="$(nginx_api_upstream)" \
-  NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
-    NGINX_AUTH_HEALTH_UPSTREAM="$(nginx_auth_health_upstream)" \
-    NGINX_REALTIME_UPSTREAM="$(nginx_realtime_upstream)" \
-    NGINX_REAL_IP_INCLUDE="$(nginx_real_ip_include)" \
-    NGINX_SERVER_NAME="${NGINX_SERVER_NAME:-$(env_or_file_value NGINX_SERVER_NAME)}" \
-    NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}" \
-    NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-return 404}" \
-    bash "$ROOT_DIR/scripts/render-nginx-template.sh" "$output_path"
-  echo "Rendered Nginx config: $output_path"
-}
-
-render_cloudflare_real_ip_config() {
-  local output_path="${1:-$ROOT_DIR/deploy/nginx/cloudflare-real-ip.conf}"
-
-  bash "$ROOT_DIR/scripts/render-cloudflare-real-ip-conf.sh" "$output_path"
-}
-
 if [[ ! -f "$IMAGE_ENV_FILE" ]]; then
   cp "$ROOT_DIR/docker/images.env.example" "$IMAGE_ENV_FILE"
   chmod 600 "$IMAGE_ENV_FILE"
@@ -1991,18 +1783,6 @@ if [[ "$command" == "init-env" ]]; then
   else
     echo "Environment file was created or updated: $ENV_FILE"
   fi
-  exit 0
-fi
-
-if [[ "$command" == "nginx-conf" ]]; then
-  shift || true
-  render_host_nginx_config "${1:-}"
-  exit 0
-fi
-
-if [[ "$command" == "cloudflare-real-ip-conf" ]]; then
-  shift || true
-  render_cloudflare_real_ip_config "${1:-}"
   exit 0
 fi
 
@@ -2043,14 +1823,6 @@ case "$command" in
     validate_env_file || exit 1
     docker_compose config --quiet
     ;;
-  rollback)
-    validate_env_file || exit 1
-    shift || true
-    if [[ "${1:-}" != "--to" || "${2:-}" != "previous" || -n "${3:-}" ]]; then
-      die "usage: ideaboard rollback --to previous"
-    fi
-    run_previous_rollback
-    ;;
   logs)
     validate_env_file || exit 1
     shift || true
@@ -2079,15 +1851,11 @@ case "$command" in
     ;;
   *)
     cat >&2 <<EOF
-Usage: ideaboard [update|deploy|config|preflight|doctor|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|rollback|ps]
-       ideaboard update --manifest <path-or-url>
-       ideaboard deploy --manifest <path-or-url>
+Usage: ideaboard [deploy|config|preflight|doctor|smoke|restart|stop|status|logs|init-env|pull|up|migrate|ps]
+       ideaboard deploy --manifest <path>
        ideaboard doctor [--deep]
-       ideaboard rollback --to previous
-       ideaboard nginx-conf [output-path]
-       ideaboard cloudflare-real-ip-conf [output-path]
 
-Default command: update (requires --manifest)
+Default command: deploy (requires --manifest)
 Environment file: $ENV_FILE
 EOF
     exit 1

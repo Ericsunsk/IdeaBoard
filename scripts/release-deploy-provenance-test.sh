@@ -37,6 +37,7 @@ assert all(x['action']=='reuse' for x in plan['components'].values())
 metadata = {name:engine.component_metadata(plan,name) for name in engine.COMPONENTS}
 manifest = engine.make_manifest(plan,metadata,repo)
 (fixture/'manifest.json').write_text(json.dumps(manifest))
+(repo/'deployment-index.json').write_text(json.dumps(dict(tag=manifest['tag'],commit=manifest['commit'])))
 (repo/'release-plan.json').write_text(json.dumps(plan))
 PY
 awk '
@@ -56,33 +57,33 @@ source "$fixture/functions.sh"
 ROOT_DIR="$fixture/repo"
 export DEPLOY_SOURCE_MANIFEST_COPY="$fixture/manifest.json"
 export ROOT_DIR
-current_git_commit() { git -C "$ROOT_DIR" rev-parse HEAD; }
+export IDEABOARD_DEPLOYMENT_BUNDLE_DIR="$ROOT_DIR"
+current_source_commit() { jq -r .commit "$ROOT_DIR/deployment-index.json"; }
+current_source_tag() { jq -r .tag "$ROOT_DIR/deployment-index.json"; }
 json_string_field() { jq -r --arg key "$1" '.[$key] // empty' "$2"; }
 json_image_field() { jq -r --arg key "$1" '.images[$key] // empty' "$2"; }
 is_ideaboard_image_ref() { [[ "$1" == "ghcr.io/ericsunsk/ideaboard/ideaboard-$2@sha256:"* ]]; }
 die() { echo "$*" >&2; exit 1; }
 set_env_value() { export "$1=$2"; }
 env_value() { printf '%s' "${!1:-}"; }
-cosign_verify_enabled() { return 0; }
-image_source_repo_from_ref() { echo Ericsunsk/IdeaBoard; }
 cosign() { printf '%s\n' "$*" >> "$fixture/cosign.log"; [[ "${reject_signature:-0}" == 0 ]]; }
 apply_update_manifest "$fixture/manifest.json" > /dev/null
-verify_image_signatures > /dev/null
+COSIGN_VERIFY=false verify_image_signatures > /dev/null
 [[ "$(wc -l < "$fixture/cosign.log" | tr -d ' ')" == 5 ]]
 [[ "$DEPLOY_COSIGN_GATE" == passed ]]
 # Reused source is the old tag, even though the overall release is the new tag.
 grep -Fq -- '--certificate-identity https://github.com/Ericsunsk/IdeaBoard/.github/workflows/docker-images.yml@refs/tags/v1.0.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/' "$fixture/cosign.log"
 if grep -Fq -- '--certificate-identity-regexp' "$fixture/cosign.log"; then exit 1; fi
-# The same verification path serves rollback: provenance must match the refs restored into Compose.
+# Redeployment of a previous signed bundle uses its own provenance and image refs.
 if (IDEABOARD_API_IMAGE="ghcr.io/ericsunsk/ideaboard/ideaboard-api@sha256:$(printf 'b%.0s' {1..64})"; export IDEABOARD_API_IMAGE; verify_image_signatures) > "$fixture/failure" 2>&1; then exit 1; fi
 grep -Fq 'provenance does not match deployed api image' "$fixture/failure"
 if (reject_signature=1; verify_image_signatures) > "$fixture/failure" 2>&1; then exit 1; fi
 grep -Fq 'Image signature verification failed' "$fixture/failure"
-# Changed release inputs cannot be covered by a stale digest's metadata.
-printf 'changed\n' > "$ROOT_DIR/apps/auth/source"
-git -C "$ROOT_DIR" add apps/auth/source
-git -C "$ROOT_DIR" commit -qm changed
-jq --arg commit "$(current_git_commit)" '.commit = $commit' "$fixture/manifest.json" > "$fixture/stale.json"
+# A different source commit cannot be substituted beneath the verified index.
+jq '.commit = ("c" * 40)' "$fixture/manifest.json" > "$fixture/stale.json"
 if (apply_update_manifest "$fixture/stale.json") > "$fixture/failure" 2>&1; then exit 1; fi
-grep -Fq 'release component provenance does not match checkout inputs' "$fixture/failure"
+grep -Fq 'bundle source commit does not match release manifest commit' "$fixture/failure"
+# Image signatures always require exact provenance; no bypass or broad regex.
+if (verify_image_signature "$(jq -r .images.api "$fixture/manifest.json")" '' '') > "$fixture/failure" 2>&1; then exit 1; fi
+grep -Fq 'exact component signer identity and trusted issuer are required' "$fixture/failure"
 echo 'Release deployment provenance tests passed'

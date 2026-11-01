@@ -241,6 +241,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      packages: read
+      id-token: write
     outputs:
       is-production-release: ${{ steps.production-release.outputs.is-production-release }}
 
@@ -283,11 +285,38 @@ jobs:
           fi
           echo "is-production-release=${is_production_release}" >> "${GITHUB_OUTPUT}"
 
+      - name: Install Cosign for deployment bundle
+        if: steps.production-release.outputs.is-production-release == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+
+      - name: Verify component signatures and build deployment bundle
+        if: steps.production-release.outputs.is-production-release == 'true'
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          while IFS= read -r component; do
+            image="$(jq -er --arg key "${component}" '.components[$key].image' release-assets/release-manifest.json)"
+            identity="$(jq -er --arg key "${component}" '.components[$key].certificate_identity' release-assets/release-manifest.json)"
+            issuer="$(jq -er --arg key "${component}" '.components[$key].certificate_oidc_issuer' release-assets/release-manifest.json)"
+            cosign verify --certificate-identity "${identity}" --certificate-oidc-issuer "${issuer}" "${image}" > /dev/null
+          done < <(jq -r '.components | keys[]' release-assets/release-manifest.json)
+          python3 scripts/deployment-bundle.py build --root . \
+            --manifest release-assets/release-manifest.json --output release-assets/deployment-bundle.tar
+
+      - name: Sign deployment bundle
+        if: steps.production-release.outputs.is-production-release == 'true'
+        shell: bash
+        run: |
+          cosign sign-blob --yes --bundle release-assets/deployment-bundle.sigstore.json release-assets/deployment-bundle.tar
+
       - name: Upload release metadata bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-manifest
-          path: release-assets/release-manifest.json
+          path: release-assets
           if-no-files-found: error
           retention-days: 3
 
@@ -325,6 +354,8 @@ jobs:
         with:
           prerequisite-status: ${{ job.status }}
           manifest-path: release-assets/release-manifest.json
+          bundle-path: release-assets/deployment-bundle.tar
+          bundle-signature-path: release-assets/deployment-bundle.sigstore.json
           release-tag: ${{ github.ref_name }}
           source-commit: ${{ needs.preflight.outputs.source_commit }}
           vps-host: ${{ vars.VPS_HOST }}
@@ -354,7 +385,10 @@ jobs:
       - name: Upload image metadata to GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
-          files: release-assets/release-manifest.json
+          files: |
+            release-assets/release-manifest.json
+            release-assets/deployment-bundle.tar
+            release-assets/deployment-bundle.sigstore.json
           fail_on_unmatched_files: true
 
   measurements:

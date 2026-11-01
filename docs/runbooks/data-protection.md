@@ -4,7 +4,7 @@
 
 ## PostgreSQL Backup 安全基线
 
-`ideaboard update --manifest ...` 生成的 `postgres-*.dump` 会包含完整业务库数据，其中包括：
+签名 bundle 部署生成的 `postgres-*.dump` 会包含完整业务库数据，其中包括：
 
 - `api_account_secrets`：上游模型/API 渠道的 API key、token 或外部 secret 引用。
 - `storage_profile_secrets`：S3-compatible 存储的 access key、secret key 等对象存储凭据。

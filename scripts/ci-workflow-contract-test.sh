@@ -38,7 +38,15 @@ reject_mutation .github/workflows/docker-images.yml '/      - name: Scan linux\/
 reject_mutation .github/workflows/docker-images.yml 's/--certificate-identity /--certificate-identity-regexp /' 'Reused signature must bind the exact signed digest and identity'
 reject_mutation .github/workflows/docker-images.yml '/      - name: Checkout manifest implementation/,/      - name: Download component image plan/s/fetch-depth: 0/fetch-depth: 1/' 'Manifest validation needs source tags and ancestry'
 reject_mutation .github/workflows/docker-images.yml '/          infisical-token:/d' 'Deployment must consume Production connection input infisical-token'
+reject_mutation .github/actions/deploy-production/action.yml 's#scripts/release-artifacts.py#scripts/untrusted-manifest.py#' 'Deployment canonical manifest validation is missing'
 reject_mutation .github/actions/deploy-production/action.yml '/        INFISICAL_TOKEN:/d' 'Deployment must stream the scoped Infisical token through process env'
+reject_mutation .github/workflows/docker-images.yml 's#cosign sign-blob --yes#cosign sign-blob --skip-confirmation#' 'Complete deployment archive must have a keyless blob signature'
+reject_mutation .github/workflows/docker-images.yml '/          bundle-path:/d' 'Deployment must consume the complete signed deployment archive'
+reject_mutation .github/workflows/docker-images.yml '/          bundle-signature-path:/d' 'Deployment must consume the archive signature evidence'
+reject_mutation .github/actions/deploy-production/action.yml 's#scripts/deployment-bundle.py verify#scripts/unverified-bundle.py verify#' 'Production bundle verification is missing'
+reject_mutation .github/actions/deploy-production/action.yml '/    - name: Verify signed deployment bundle/a\
+      continue-on-error: true
+' 'Production archive verification failures must block deployment'
 reject_mutation .github/workflows/api.yml 's#./apps/api/install-atlas.sh#./apps/api/unverified-atlas.sh#' 'API migration gate must use the verified Atlas installer'
 reject_mutation .github/workflows/migration-integration.yml 's#./apps/api/install-atlas.sh#./apps/api/unverified-atlas.sh#' 'Migration integration must use the verified Atlas installer'
 reject_mutation .github/workflows/auth.yml 's/inputs.source_commit || github.sha/github.sha/' 'auth.yml must checkout the exact verified source'

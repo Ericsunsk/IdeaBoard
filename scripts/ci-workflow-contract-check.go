@@ -65,6 +65,8 @@ func checkDeploymentCaller(deploy map[string]any, releaseTag, sourceCommit strin
 	inputs := object(step, "with")
 	requireEqual(inputs["prerequisite-status"], "${{ job.status }}", "Deployment must be blocked after prerequisite failure or cancellation")
 	requireEqual(inputs["manifest-path"], "release-assets/release-manifest.json", "Deployment must consume the downloaded immutable manifest")
+	requireEqual(inputs["bundle-path"], "release-assets/deployment-bundle.tar", "Deployment must consume the complete signed deployment archive")
+	requireEqual(inputs["bundle-signature-path"], "release-assets/deployment-bundle.sigstore.json", "Deployment must consume the archive signature evidence")
 	requireEqual(inputs["release-tag"], releaseTag, "Deployment must bind the requested release tag")
 	if sourceCommit == "" {
 		rejectKey(inputs, "source-commit", "Existing releases must use the manifest's source commit")
@@ -94,13 +96,20 @@ func checkDeploymentAction(root string) {
 	requireEqual(object(validate, "env")["PREREQUISITE_STATUS"], "${{ inputs.prerequisite-status }}", "Deployment must consume the caller's prerequisite status")
 	requireContains(stringValue(validate["run"]), `[[ "${PREREQUISITE_STATUS}" == success ]]`, "Failed or cancelled prerequisites must never deploy")
 	requireEqual(object(validate, "env")["SOURCE_COMMIT"], "${{ inputs.source-commit }}", "Manifest validation must consume the preflight commit through env")
-	for _, required := range []string{".repository == $expected_repository", ".tag == $expected_tag", ".ref == $expected_ref", "$expected_commit == \"\" or .commit == $expected_commit"} {
-		requireContains(stringValue(validate["run"]), required, "Deployment manifest binding is missing "+required)
+	for _, required := range []string{`args=(validate --manifest "${RELEASE_MANIFEST}"`, `--repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}"`, `[[ -z "${SOURCE_COMMIT}" ]] || args+=(--commit "${SOURCE_COMMIT}")`, `python3 scripts/release-artifacts.py "${args[@]}" > /dev/null`} {
+		requireContains(stringValue(validate["run"]), required, "Deployment canonical manifest validation is missing "+required)
 	}
+	reject(strings.Contains(stringValue(validate["run"]), "schema_version =="), "Deployment must validate the sole canonical manifest schema unconditionally")
+	verify := requireStep(runs, "Verify signed deployment bundle")
+	for _, required := range []string{"scripts/deployment-bundle.py verify", `--archive "${RELEASE_BUNDLE}"`, `--signature "${RELEASE_BUNDLE_SIGNATURE}"`, `--repository "${GITHUB_REPOSITORY}"`, `--tag "${RELEASE_TAG}"`, `--commit "${commit}"`, `cmp "${RELEASE_MANIFEST}" "${verified}/release-manifest.json"`} {
+		requireContains(stringValue(verify["run"]), required, "Production bundle verification is missing "+required)
+	}
+	rejectKey(verify, "if", "Production archive verification cannot be skipped")
+	rejectKey(verify, "continue-on-error", "Production archive verification failures must block deployment")
 	configure := requireStep(runs, "Configure restricted SSH transport")
 	requireContains(stringValue(configure["run"]), "ssh-keygen -F", "Deployment must verify the pinned endpoint before SSH")
-	stream := requireStep(runs, "Stream manifest to Production deploy entrypoint")
-	requireEqual(stream["run"], `./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}"`, "Shared deployment action must use the sole transport client")
+	stream := requireStep(runs, "Stream signed bundle to Production deploy entrypoint")
+	requireEqual(stream["run"], `./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}" "${RELEASE_BUNDLE}" "${RELEASE_BUNDLE_SIGNATURE}"`, "Shared deployment action must use the sole transport client")
 	requireEqual(object(stream, "env")["INFISICAL_TOKEN"], "${{ inputs.infisical-token }}", "Deployment must stream the scoped Infisical token through process env")
 	for _, name := range []string{"Remove SSH credentials", "Write Production deployment summary"} {
 		requireEqual(requireStep(runs, name)["if"], "always()", name+" must run after deployment failure")
@@ -540,6 +549,23 @@ func checkRelease(root string, release workflow) {
 	aggregate := object(jobs, "aggregate-release-manifest")
 	requireEqual(object(requireStep(aggregate, "Checkout manifest implementation"), "with")["fetch-depth"], uint64(0), "Manifest validation needs source tags and ancestry")
 	requireContains(stringValue(requireStep(aggregate, "Generate release manifest")["run"]), "scripts/release-artifacts.py manifest", "Complete manifest must use the provenance owner")
+	// Source provenance is validated in CI; the runtime host verifies only signed artifacts.
+	requireEqual(object(aggregate, "permissions")["id-token"], "write", "Deployment bundle signing must use scoped GitHub OIDC")
+	bundleBuild := requireStep(aggregate, "Verify component signatures and build deployment bundle")
+	bundleSign := requireStep(aggregate, "Sign deployment bundle")
+	for _, step := range []map[string]any{bundleBuild, bundleSign} {
+		requireEqual(step["if"], "steps.production-release.outputs.is-production-release == 'true'", "Only strict Production tags may produce deployable bundles")
+		rejectKey(step, "continue-on-error", "Bundle provenance or signing failures must block publication")
+	}
+	for _, required := range []string{"cosign verify --certificate-identity", "--certificate-oidc-issuer", "scripts/deployment-bundle.py build", "--manifest release-assets/release-manifest.json", "--output release-assets/deployment-bundle.tar"} {
+		requireContains(stringValue(bundleBuild["run"]), required, "Deployment bundle must bind verified component provenance: "+required)
+	}
+	requireContains(stringValue(bundleSign["run"]), "cosign sign-blob --yes --bundle release-assets/deployment-bundle.sigstore.json release-assets/deployment-bundle.tar", "Complete deployment archive must have a keyless blob signature")
+	assets := object(jobs, "publish-release-assets")
+	files := stringValue(object(requireStep(assets, "Upload image metadata to GitHub Release"), "with")["files"])
+	for _, file := range []string{"release-assets/release-manifest.json", "release-assets/deployment-bundle.tar", "release-assets/deployment-bundle.sigstore.json"} {
+		requireContains(files, file, "Release assets must include "+file)
+	}
 
 	deploy := object(jobs, "deploy-production")
 	requireEqual(object(deploy, "concurrency")["cancel-in-progress"], false, "Production deployments must not cancel in progress")
@@ -552,7 +578,7 @@ func checkRelease(root string, release workflow) {
 		"StrictHostKeyChecking=yes",
 		"UserKnownHostsFile=\"${ssh_known_hosts_file}\"",
 		"PasswordAuthentication=no",
-		"< \"${manifest}\"",
+		"IDEABOARD_DEPLOY_V2",
 		"production-deploy-error.raw",
 	} {
 		requireContains(clientText, required, "Production transport contract is missing "+required)

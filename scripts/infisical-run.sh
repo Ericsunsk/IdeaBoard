@@ -5,7 +5,7 @@
 # `infisical run` (process-env injection, no files). This is the ONLY
 # supported Infisical injection shape for the business stack:
 #
-#   scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
+#   scripts/infisical-run.sh --env dev -- npm run dev
 #   scripts/infisical-run.sh --env dev --path / --path /ai-proxy -- scripts/deploy-stack.sh config
 #
 # Namespace: single project (`ideaboard`, --projectId or .infisical.yaml),
@@ -46,7 +46,7 @@ PATHS=()
 usage() {
   cat >&2 <<'EOF'
 usage: scripts/infisical-run.sh --env <dev|staging|prod> [--path / ...] [--project-id <id>] [--domain <url>] -- <command...>
-example: scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh deploy --manifest release-manifest.json
+example: scripts/infisical-run.sh --env dev -- npm run dev
 EOF
   exit 2
 }

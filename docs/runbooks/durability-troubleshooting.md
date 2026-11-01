@@ -66,13 +66,13 @@ Credits 对账的 `stale_hold` 只是审计 finding（`holds.status='held' AND c
 | 用户 Ideas 被锁、task 停在 `pending`/`running` 超过 24h | DB 按发现查询核对：`tasks`（`status`、`updated_at`）+ `task_billing_snapshots`（`total_credits>0`、`hold_transaction_id`）+ `task_billing_settlements`（非 `captured`/`released`）；日志 grep `stalled task settlement sweep completed`（看 `scanned/converged/skipped/failures`）与 `stalled task settlement convergence failed`（看 `workspace_id/task_id/err`，即仍被锁定的 hold） | 等 15min sweep；`Skipped` 为主属正常竞态（worker/cancel 先赢）。`Failures` 按 `err` 修 DB/ledger 后等下一轮，不要手工 `UPDATE tasks` 或手工 Release |
 | Admin 对账出现 `stale_hold`（`warning`/`low`）finding | Control API：`GET /credits/reconciliation/runs`、`GET /credits/reconciliation/runs/{run_id}`、`GET /credits/reconciliation/findings`（见 `openapi.control.yaml`）；DB `credit_reconciliation_runs` / `credit_reconciliation_findings` | 这是审计信号不是动作：24h 内的 hold 出现 finding 属正常（sweep 阈值未到）；超 24h 的 finding 应伴随 sweep `converged+1` 自动消失，手动触发一次对账 run 确认即可，不要手工清 finding |
 | `terminal_task_settlement_mismatch` / `active_task_not_held` / `task_hold_missing_billing_snapshot` 等 error/critical finding | 同上 control API + run 详情 | 按 finding 修业务根因（提交事务、snapshot、trace），保持 River worker 运行让对账重试；不要把 Dashboard 状态手工写入 PostgreSQL（同 deployment.md Payments 事故处理） |
-| sweep job 整体失败（非单任务 Failures） | `ideaboard doctor` → `ideaboard logs --tail=200 api` → `ideaboard doctor --deep`；确认 `/api/readyz` 与 `task_settlement_sweep` depth/lag | 修 DB 可用性 / wiring 后重启 API/Worker；sweep `RunOnStart: false`，重启后最多等一个 15min 周期 |
+| sweep job 整体失败（非单任务 Failures） | 按 [deployment runbook](./deployment.md#operations) 初始化当前包 `DEPLOY`，执行 `"${DEPLOY[@]}" doctor` → `"${DEPLOY[@]}" logs --tail=200 api` → `"${DEPLOY[@]}" doctor --deep`；确认 `/api/readyz` 与 `task_settlement_sweep` depth/lag | 修 DB 可用性 / wiring 后重启 API/Worker；sweep `RunOnStart: false`，重启后最多等一个 15min 周期 |
 
 ## 何时升级
 
 - `stalled task settlement convergence failed` 同一 `(workspace, task)` 连续两轮以上：用户资金仍锁定，需人工介入修 settle 事务（DB 约束 / ledger 状态），不要放过夜。
 - `workspace task stays running: ... neither settlement nor terminal convergence committed`：billed-send 未收敛，需人工用 cancel/settle 路径收敛并核对“一次计费”，涉及资金必须双人复核。
-- outbox `pending` 积压且 `last_error` 指向同一外部依赖（NATS / webhook 目标）超过 30min：按 deployment.md 先看 `ideaboard doctor` 与反代/网络，再升级到对应依赖负责人。
+- outbox `pending` 积压且 `last_error` 指向同一外部依赖（NATS / webhook 目标）超过 30min：按 deployment.md 先看当前签名包的 `doctor` 与反代/网络，再升级到对应依赖负责人。
 - 对账出现 `critical` finding（`ledger_postings_invalid`、`command_shape_invalid`、`terminal_task_settlement_mismatch` 等）：立即升级，不要手工改表；止血优先（Payments 事故先关 `purchases_enabled`，见 deployment.md）。
 
 ## 关联文档
@@ -80,7 +80,7 @@ Credits 对账的 `stale_hold` 只是审计 finding（`holds.status='held' AND c
 | 文档 | 用途 |
 |------|------|
 | [backend-metrics.md](./backend-metrics.md) | RED 指标、`task_settlement_sweep` depth/lag 查询、重试/超时矩阵 |
-| [deployment.md](./deployment.md) | `ideaboard doctor/logs/status/smoke`、升级回滚、Payments 事故处理 |
+| [deployment.md](./deployment.md) | 当前签名包的 `doctor/logs/status/smoke`、升级回滚、Payments 事故处理 |
 | [auth-operations.md](./auth-operations.md) | 账号与安全操作边界 |
 | [data-protection.md](./data-protection.md) | backup/restore 与密钥材料处理 |
 | [DESIGN.md](../../DESIGN.md) | 系统契约与 River/NATS 职责边界 |

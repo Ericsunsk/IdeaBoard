@@ -125,12 +125,12 @@ scripts/infisical-run.sh --env dev -- npm run dev           # apps/auth（只读
 scripts/infisical-run.sh --env dev -- npm run dev           # apps/realtime（只读 /）
 ```
 
-`docker/images.env` 由首次 manifest deploy 自动创建并写入五个 immutable image refs；
-后续 `up` 与 rollback 使用同一文件。手动渲染前需先完成该初始化（或从
+`/opt/stacks/ideaboard/docker/images.env` 由首次签名 bundle deploy 自动创建并写入五个 immutable image refs；
+后续 runtime 与签名包回滚使用同一稳定文件。手动渲染前需先完成该初始化（或从
 `docker/images.env.example` 创建并填入 release manifest refs）。`deploy-stack.sh`
 统一装配 Compose 输入：业务值只取 Cloud 注入，`POSTGRES_PASSWORD` 只取本地
 owner file（自动通道为 `/var/lib/ideaboard/owner.env`），image refs 只取 `docker/images.env`。owner 口令禁止进 Cloud，漂移门会拒绝。
-自动通道把只读 `INFISICAL_TOKEN` 从 GitHub `production` Environment 经受限 SSH stdin 送到 VPS，token 只存在于内存与 Infisical CLI process env；CLI 后的部署进程移除 token。VPS 在 checkout 目录运行 wrapper，按 `.infisical.yaml` 绑定 project，读取 `prod` 的两个 path。应用业务 secret 不经过 GitHub runner。
+自动通道把只读 `INFISICAL_TOKEN` 从 GitHub `production` Environment 经受限 SSH stdin 送到 VPS，token 只存在于内存与 Infisical CLI process env；CLI 后的部署进程移除 token。VPS 验签完整部署包后，在版本化 bundle 的 `content/` 目录运行 wrapper，按 `.infisical.yaml` 绑定 project，读取 `prod` 的两个 path。应用业务 secret 不经过 GitHub runner。
 只有继续使用旧 encrypted owner source 或离线 fallback 时才需要 `DOTENV_PRIVATE_KEY` / `.env.keys`。Fresh Database 首次缺少
 本地 owner file 时 `ensure_env_file` 会生成并持久化 owner 口令，不生成 Cloud 业务 secret；已有 PostgreSQL volume 缺 owner file 时拒绝自动生成，须恢复同一口令。
 wrapper 始终移除注入的 `POSTGRES_PASSWORD` 和 `PG_MIGRATION_*`，

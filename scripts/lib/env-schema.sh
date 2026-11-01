@@ -133,16 +133,13 @@ example_keys() { grep -oE '^[[:space:]]*#?[[:space:]]*[A-Z][A-Z0-9_]*=' "$1" | g
 # --- allowlists ---------------------------------------------------------------
 
 # Deploy-only docker example keys with no app schema (release images, reverse
-# proxy, cosign, backup, host port overrides). One entry per key, sorted.
+# proxy, backup, host port overrides). One entry per key, sorted.
 deploy_allowlist() {
   cat <<'EOF'
 API_HOST_PORT
 API_METRICS_HOST_PORT
 AUTH_HOST_PORT
 BACKUP_ENCRYPTION_RECIPIENT
-COSIGN_CERTIFICATE_IDENTITY_REGEXP
-COSIGN_CERTIFICATE_OIDC_ISSUER
-COSIGN_VERIFY
 IDEABOARD_API_IMAGE
 IDEABOARD_API_MIGRATE_IMAGE
 IDEABOARD_AUTH_IMAGE
