@@ -507,3 +507,22 @@ printf 'Repository-free bundle runtime, state and rollback tests passed\n'
 grep -Fq 'bootstrap-vps.sh --ref' "$repo_root/docs/runbooks/deployment.md" ||
   fail 'Production runbook must document the signed local bootstrap command'
 printf 'Production signed bootstrap recipe contract passed\n'
+
+# Render the actual override: all proxy upstreams keep the private network,
+# while storage, messaging and worker services remain private-only.
+for proxy_network in npm-nw fixture-npm; do
+  NPM_NETWORK_NAME="$proxy_network" docker compose \
+    -f "$repo_root/docker/compose.yml" -f "$repo_root/docker/compose.npm.yml" \
+    --env-file "$repo_root/docker/.env.example" --env-file "$repo_root/docker/images.env.example" \
+    config --format json > "$fixture_dir/npm-compose.json"
+  jq -e --arg network "$proxy_network" '
+    . as $compose |
+    .networks["npm-network"].external == true and
+    .networks["npm-network"].name == $network and
+    all(["api", "auth", "realtime"][]; . as $service |
+      ($compose.services[$service].networks | keys | sort) == ["ideaboard-network", "npm-network"]) and
+    all(["postgres", "nats", "api-worker", "imgproxy"][]; . as $service |
+      ($compose.services[$service].networks | keys) == ["ideaboard-network"])
+  ' "$fixture_dir/npm-compose.json" >/dev/null || fail 'NPM override must connect every proxy upstream and preserve private services'
+done
+printf 'Rendered NPM API/Auth/Realtime network contracts passed\n'
