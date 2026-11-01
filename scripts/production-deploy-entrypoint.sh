@@ -10,6 +10,8 @@ LOCK_FILE="${IDEABOARD_PRODUCTION_LOCK_FILE:-/run/lock/ideaboard-production-depl
 TMP_DIR="${IDEABOARD_PRODUCTION_TMP_DIR:-/var/tmp}"
 EXPECTED_REPOSITORY="${IDEABOARD_PRODUCTION_EXPECTED_REPOSITORY:-Ericsunsk/IdeaBoard}"
 OWNER_ENV_FILE="${IDEABOARD_PRODUCTION_OWNER_ENV_FILE:-/var/lib/ideaboard/owner.env}"
+CONFIG_FILE="${IDEABOARD_PRODUCTION_CONFIG_FILE:-/etc/ideaboard/deployment.json}"
+DEPLOY_ENV=(env -u INFISICAL_TOKEN)
 MAX_MANIFEST_BYTES=65536
 MANIFEST_FILE=""
 DEPLOY_RESULT_FILE=""
@@ -54,6 +56,34 @@ done
 
 [[ -d "${STACK_DIR}/.git" ]] || die "Production checkout is unavailable"
 [[ -d "${TMP_DIR}" ]] || die "temporary directory is unavailable"
+
+# Host topology belongs to this root-owned entrypoint, never to Cloud secrets.
+if [[ -e "${CONFIG_FILE}" || -L "${CONFIG_FILE}" ]]; then
+  npm_network="$(python3 - "${CONFIG_FILE}" <<'PYTHON'
+import json, os, pathlib, re, stat, sys
+try:
+    path = pathlib.Path(sys.argv[1])
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o022 or info.st_size > 4096:
+        raise ValueError()
+    def unique(pairs):
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise ValueError()
+        return result
+    config = json.loads(path.read_text(), object_pairs_hook=unique)
+    if not isinstance(config, dict) or set(config) != {"npm_network"}:
+        raise ValueError()
+    network = config["npm_network"]
+    if not isinstance(network, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", network):
+        raise ValueError()
+    print(network)
+except (OSError, ValueError, TypeError):
+    sys.exit(1)
+PYTHON
+  )" || die 'invalid local deployment configuration'
+  DEPLOY_ENV+=(IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml "NPM_NETWORK_NAME=${npm_network}")
+fi
 
 # Bound credential reads before writing the remaining, non-secret manifest.
 IFS= read -r -n 65 protocol || die 'deployment protocol header is missing'
@@ -162,7 +192,7 @@ deploy_status=0
     IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
     INFISICAL_TOKEN="${INFISICAL_TOKEN}" \
     "${inject_command}" --env prod --path / --path /ai-proxy -- \
-    env -u INFISICAL_TOKEN "${deploy_command}" update --manifest "${MANIFEST_FILE}"
+    "${DEPLOY_ENV[@]}" "${deploy_command}" update --manifest "${MANIFEST_FILE}"
 ) > /dev/null 2>&1 || deploy_status=$?
 
 if jq -e -s --argjson deploy_status "${deploy_status}" '

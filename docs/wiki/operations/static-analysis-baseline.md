@@ -88,3 +88,9 @@ Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
 - On 2026-11-02, verification of `Ericsunsk/IdeaBoard@20eec3ab18d351389f710fbaf09787bc3dcdcfd5` plus the security-refresh working tree passed actual-image Grype scans for all five release components at the existing High/Critical threshold with `ignore: []`. Node moved to `22.23.4`; the API runtime base digest and Atlas binary were refreshed. Unknown-severity advisories remain outside that threshold; this record does not claim zero vulnerabilities.
 - On 2026-11-02, the selected official Atlas `1.3.7-0a182ba-canary` build was pinned by exact version and separate AMD64/ARM64 SHA-256 values. Docker and both migration CI callers share the checksum-verifying installer. Canary stability remains a risk; actual ARM64 API/Auth migrator images passed PostgreSQL 17 Fresh validation, two apply rounds and Schema Release equivalence. Evidence lives in ignored `.cache/tag-vps-deploy/`; Production deployment had not run at this verification point.
+
+
+## 2026-11-02 — VPS topology ownership
+
+- On 2026-11-02, deployment of `Ericsunsk/IdeaBoard@6877395972b188c82d120f69a16cd415bec79f3e` verified the baseline and healthy runtime containers, while the public reverse proxy could not resolve API/Auth because the NPM Compose override was absent. Cloud mode reads runtime configuration from the injected process environment, so putting topology in the local PostgreSQL owner credential file did not configure it.
+- On 2026-11-02, the deployment decision assigned optional NPM topology to root-owned `/etc/ideaboard/deployment.json`, separate from Cloud secrets and owner credentials. The restricted entrypoint validates this bounded exact-key file and passes its topology after Infisical injection. An absent file preserves standalone topology; malformed or writable configuration refuses deployment. See the [deployment runbook](../../../docs/runbooks/deployment.md#nginx-proxy-manager).

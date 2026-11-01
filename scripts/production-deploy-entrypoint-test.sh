@@ -72,6 +72,7 @@ cp "$3" "${DEPLOY_CAPTURE_DIR}/manifest-copy"
 printf '%s\n' "${IDEABOARD_STACK_DIR:-}" > "${DEPLOY_CAPTURE_DIR}/stack-dir"
 printf '%s\n' "${ENV_FILE:-}" > "${DEPLOY_CAPTURE_DIR}/env-file"
 printf '%s\n' "${COMPOSE_PROJECT_NAME:-}" > "${DEPLOY_CAPTURE_DIR}/compose-project"
+printf '%s\n' "${IDEABOARD_COMPOSE_OVERRIDE_FILE:-}" "${NPM_NETWORK_NAME:-}" > "${DEPLOY_CAPTURE_DIR}/topology"
 [[ -z "${INFISICAL_TOKEN:-}" ]] || exit 96
 printf 'RAW-DEPLOY-SECRET-MARKER\n' >&2
 if [[ "${DEPLOY_SHOULD_FAIL:-0}" == "1" ]]; then
@@ -94,6 +95,8 @@ set -euo pipefail
 [[ "${INFISICAL_TOKEN:-}" == st.SYNTHETIC-INFISICAL-TOKEN ]] || exit 95
 [[ "$PWD" == "$IDEABOARD_STACK_DIR" ]] || exit 93
 [[ "$1 $2 $3 $4 $5 $6 $7" == '--env prod --path / --path /ai-proxy --' ]] || exit 94
+export IDEABOARD_COMPOSE_OVERRIDE_FILE="${CLOUD_COMPOSE_OVERRIDE:-${IDEABOARD_COMPOSE_OVERRIDE_FILE:-}}"
+export NPM_NETWORK_NAME="${CLOUD_NPM_NETWORK:-${NPM_NETWORK_NAME:-}}"
 printf 'prod root+ai-proxy injected\n' > "${DEPLOY_CAPTURE_DIR}/injection"
 shift 7
 exec "$@"
@@ -170,6 +173,7 @@ run_entrypoint_raw() {
     IDEABOARD_PRODUCTION_LOCK_FILE="${fixture_root}/deploy.lock" \
     IDEABOARD_PRODUCTION_TMP_DIR="${fixture_root}/tmp" \
     IDEABOARD_PRODUCTION_OWNER_ENV_FILE="${fixture_root}/state/owner.env" \
+    IDEABOARD_PRODUCTION_CONFIG_FILE="${fixture_root}/deployment.json" \
     bash "${entrypoint}" "$@"
 }
 
@@ -450,6 +454,42 @@ PYTHON
   [[ "$output" == *'component source provenance or build inputs are invalid'* ]] || fail 'missing provenance rejection'
 }
 
+test_local_npm_topology_reaches_deployment() {
+  setup_release_fixture local-npm
+  printf '%s\n' '{"npm_network":"npm-nw"}' > "${fixture_root}/deployment.json"
+  chmod 600 "${fixture_root}/deployment.json"
+  CLOUD_COMPOSE_OVERRIDE=untrusted.yml CLOUD_NPM_NETWORK=untrusted-network run_entrypoint < "${manifest}" >/dev/null
+  assert_file_contains "${capture}/topology" docker/compose.npm.yml
+  assert_file_contains "${capture}/topology" npm-nw
+}
+
+test_invalid_local_topology_fails_before_credentials() {
+  local config output
+  setup_release_fixture invalid-topology
+  # shellcheck disable=SC2016 # Malicious interpolation remains literal in the config fixture.
+  for config in '{"npm_network":"bad network"}' '{"npm_network":"$(touch SHOULD_NOT_EXIST)"}' \
+    '{"npm_network":"npm-nw","INFISICAL_TOKEN":"CONFIG-SECRET-MARKER"}' \
+    '{"npm_network":"one","npm_network":"two"}' '[]' '{'; do
+    printf '%s\n' "$config" > "${fixture_root}/deployment.json"
+    chmod 600 "${fixture_root}/deployment.json"
+    if output="$(run_entrypoint_raw </dev/null 2>&1)"; then fail 'invalid topology accepted'; fi
+    [[ "$output" == *'invalid local deployment configuration'* ]] || fail 'configuration was not rejected before credentials'
+    [[ "$output" != *CONFIG-SECRET-MARKER* ]] || fail 'configuration value leaked'
+    [[ ! -e "${capture}/args" && ! -e "${capture}/injection" ]] || fail 'invalid topology reached deployment'
+  done
+  printf '%s\n' '{"npm_network":"npm-nw"}' > "${fixture_root}/deployment.json"
+  chmod 666 "${fixture_root}/deployment.json"
+  if output="$(run_entrypoint_raw </dev/null 2>&1)"; then fail 'writable configuration accepted'; fi
+  [[ "$output" == *'invalid local deployment configuration'* ]] || fail 'writable configuration not rejected'
+  mv "${fixture_root}/deployment.json" "${fixture_root}/target.json"
+  chmod 600 "${fixture_root}/target.json"
+  ln -s target.json "${fixture_root}/deployment.json"
+  if output="$(run_entrypoint_raw </dev/null 2>&1)"; then fail 'symlink configuration accepted'; fi
+  [[ "$output" == *'invalid local deployment configuration'* ]] || fail 'symlink configuration not rejected'
+}
+
+test_local_npm_topology_reaches_deployment
+test_invalid_local_topology_fails_before_credentials
 test_v2_provenance_is_verified_before_secret_injection
 test_valid_manifest_reaches_deploy_command
 test_missing_malformed_and_oversized_tokens_are_rejected

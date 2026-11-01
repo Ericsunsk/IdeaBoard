@@ -84,7 +84,7 @@ Worker source path、迁移期 root 副本校验和进程 projection 由
 | `POSTGRES_PASSWORD` | 自动部署使用 VPS root-only `/var/lib/ideaboard/owner.env`；手动部署通过 `ENV_FILE` 选择同一文件；旧 encrypted `docker/.env` 仍可解密读取 | PostgreSQL owner 口令只供 Compose postgres / one-shot migrate；禁止进入 Cloud 和长期 API/Auth runtime |
 | `PG_MIGRATION_USER`/`PG_MIGRATION_PASSWORD` | 仍在 `docker/migration.env`（本机 0600，gitignored），只进一次性 migrate 容器 | owner/runtime 分离；migrate 凭据永不进长期 runtime，也就不进 Infisical 分发面 |
 | `VITE_*`（前端构建烘焙键，见 §11） | 不进 Infisical（键名由 `scripts/web-frontend-env-check.sh` 门禁，值按 §11 注入链处理） | Vite 把所有 `VITE_*` 烘焙进公开 bundle；生产正确值为空（同域 Gateway），存空字符串没有意义；未来某 `VITE_*` 需要非空生产值时再进 Cloud，注入形态不变 |
-| `IDEABOARD_*_IMAGE`、`COSIGN_*`、`BACKUP_ENCRYPTION_RECIPIENT`、端口与 `NGINX_*`/`NPM_*` | image refs 独占 `docker/images.env`；其余通过部署进程 env 提供 | 部署输入非 secret（digest/upstream），`infisical-drift-check.sh` 会拒绝它们进 Infisical |
+| `IDEABOARD_*_IMAGE`、`COSIGN_*`、`BACKUP_ENCRYPTION_RECIPIENT`、端口与 `NGINX_*`/`NPM_*` | image refs 独占 `docker/images.env`；其余通过部署进程 env 提供；自动部署的 NPM network 从 root-owned `/etc/ideaboard/deployment.json` 读取并导出 | 部署输入非 secret（digest/upstream），`infisical-drift-check.sh` 会拒绝它们进 Infisical |
 | `INIT_ADMIN_*`、`ATLAS_CLEAN_BREAK_ALLOW_RESET`、`API_MODE`、`APP_ENV`、`NODE_ENV`、`HEALTHCHECK_URL`、`ENV_FILE` | 进程本地/一次性 CLI 输入 | 启动拓扑或单次命令参数，不做 secret 分发 |
 
 Cloud 模式下没有本地自举变量：以前自托管的 `INFISICAL_*`

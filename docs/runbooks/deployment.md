@@ -329,16 +329,19 @@ Nginx Proxy Manager 与 IdeaBoard 运行在同一 Docker host 时，使用仓库
 docker network inspect npm-nw >/dev/null 2>&1 || docker network create npm-nw
 ```
 
-在 `/opt/stacks/ideaboard/docker/.env` 设置：
+自动部署从 root-owned `/etc/ideaboard/deployment.json` 读取本机拓扑配置。该文件可选，必须是部署用户拥有、不可被 group/other 写入的普通文件（推荐 `root:root 0600`），只允许以下字段：
 
-```text
-IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml
-NPM_NETWORK_NAME=npm-nw
+```json
+{"npm_network":"npm-nw"}
 ```
+
+受限 entrypoint 将其转换为 `IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml` 和 `NPM_NETWORK_NAME=npm-nw`，在注入 Infisical 后传给部署进程。这些非 secret 配置不放入 Infisical，也不写进 `/var/lib/ideaboard/owner.env`。手动部署则直接以这两个进程环境变量运行部署命令；仅 encrypted offline 模式可从 `docker/.env` 读取。
 
 随后使用目标 release manifest 执行 `ideaboard update --manifest release-manifest.json`。部署脚本会把 `compose.npm.yml` 叠加到 canonical Compose 配置，使 API/Auth 同时保留 IdeaBoard 内网并加入 NPM external network。NPM 的 Forward Hostname / IP 使用 `ideaboard-api`，Forward Port 使用 `6000`；不要使用容器自身的 `127.0.0.1`。PostgreSQL 与 NATS 只保留在 IdeaBoard 内网。
 
-取消 NPM 接入时，先切换反代流量，再从 `.env` 删除上述两个变量并执行 `ideaboard up`。Docker 会按新的目标配置重建 API/Auth，canonical Compose 文件不需要修改。
+旧 stack 重建后，先确认 NPM 容器内可以解析并访问 `ideaboard-api:6000` 与 `ideaboard-auth:6001`，再执行 `docker exec npm nginx -t && docker exec npm nginx -s reload`，刷新静态 upstream 的旧容器 IP；最后复验公开 health。
+
+取消 NPM 接入时，先切换反代流量，再删除本机 topology 配置（手动模式移除上述环境变量）并执行 `ideaboard up`。Docker 会按新的目标配置重建 API/Auth，canonical Compose 文件不需要修改。
 
 #### 宿主机 Nginx
 
