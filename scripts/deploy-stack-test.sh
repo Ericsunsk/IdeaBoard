@@ -459,9 +459,13 @@ EOF
   export PATH="$bundle_root/bin:$PATH"
   # shellcheck source=/dev/null
   source "$bundle_root/functions.sh"
+  # shellcheck disable=SC2317 # Called by the dynamically sourced production functions.
   die() { echo "$*" >&2; exit 1; }
+  # shellcheck disable=SC2317 # Called by the dynamically sourced production functions.
   set_env_value() { printf '%s=%s\n' "$1" "$2" >> "$bundle_root/images-capture"; }
+  # shellcheck disable=SC2317 # Called by the dynamically sourced production functions.
   env_value() { printf previous-image; }
+  # shellcheck disable=SC2317 # Called by the dynamically sourced production functions.
   utc_now() { printf '2026-11-02T00:00:00Z'; }
   export ROOT_DIR="$bundle_root"
   export IDEABOARD_DEPLOYMENT_BUNDLE_DIR="$bundle_root"
