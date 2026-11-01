@@ -136,12 +136,15 @@ Docker Images workflow 只复用目标 commit 在本仓库 canonical `ci.yml`、
 
 ### Production 自动部署通道
 
-先在 VPS 上以 `root` 安装由 root 管理的固定 entrypoint：
+先在 VPS 上以 `root` 安装由 root 管理的固定 entrypoint 和最小 checkout helper：
 
 ```bash
 install -o root -g root -m 0755 \
   /opt/stacks/ideaboard/scripts/production-deploy-entrypoint.sh \
   /usr/local/libexec/ideaboard-production-deploy
+install -o root -g root -m 0755 \
+  /opt/stacks/ideaboard/scripts/deployment-checkout.sh \
+  /usr/local/libexec/ideaboard-deployment-checkout
 ```
 
 为 GitHub Actions 创建一把仅用于 Production deployment 的 Ed25519 key。只把 public key 加入 VPS 的 `/root/.ssh/authorized_keys`，并固定 forced command：
@@ -166,6 +169,11 @@ restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <p
 `VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。业务 secret 由 Infisical Cloud 分发，不复制到 GitHub Environment；GitHub 只持上述只读 token。PostgreSQL owner credential 留在 VPS root-only `/var/lib/ideaboard/owner.env`，GHCR runtime credential 继续使用 VPS Docker credential store。
 
 自动部署要求 VPS 保留 `/opt/stacks/ideaboard` Git checkout，并安装 Python 3、Infisical CLI、Docker Compose 和 Cosign；v2 manifest 的 source tags 会从 origin 精确 fetch 后复核 commit 与 ancestry。Fresh Database 首次部署由既有 `ensure_env_file` 在 `0700` state directory 中创建 `0600` owner file；加密的 `docker/.env` 仍为离线 fallback，不需要为 Cloud 首次部署解密。若已有 `ideaboard_postgres-data` volume 而 owner file 缺失，entrypoint 会拒绝部署；必须先通过可信本机通道恢复同一 PostgreSQL owner 口令，不能生成新口令替代。已有 encrypted owner source 的迁移也只迁出 owner 值，不复制业务 secret、不自动 reset 数据库。
+
+Production checkout 使用 non-cone sparse-checkout，只物化部署所需的 Compose、PostgreSQL 初始化、Infisical metadata 和部署/manifest 校验脚本；应用 source、Dockerfile、Web 与 ai-proxy worktree 不保留。完整 Git commit/tag/blob 对象仍用于 ancestry 与 build-input fingerprint 验证，不等于清除 Git 历史。受限 entrypoint 在每次 authenticated release checkout 后调用 root-owned `/usr/local/libexec/ideaboard-deployment-checkout`，对应仓库 `scripts/deployment-checkout.sh`；协议升级时一并安装这两个受信本机脚本。缺失必要输入、浅克隆或 dirty tracked checkout 会拒绝继续。
+
+Sparse 操作只移除干净 tracked source，不执行 `git clean`；`docker/images.env`、`docker/releases/`、本机配置、owner 凭据、backups、Docker volumes/images 均保留。回退完整 worktree 可运行 `git -C /opt/stacks/ideaboard sparse-checkout disable`，这只恢复 Git source，不修改运行中的容器或数据。Nginx template/render/uninstall 等非部署操作若需要额外脚本，先在可信维护流程中恢复完整 worktree；自动发布下次仍会收敛。
+
 
 发布时创建并 push 严格 SemVer tag：
 

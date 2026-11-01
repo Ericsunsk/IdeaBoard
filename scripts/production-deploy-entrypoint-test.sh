@@ -118,6 +118,15 @@ EOF
   for component in api auth realtime; do
     printf 'FROM scratch AS runtime\nFROM scratch AS migrator\n' > "${seed}/apps/${component}/Dockerfile"
   done
+  mkdir -p "${seed}/docker/postgres" "${seed}/apps/web" "${seed}/apps/ai-proxy"
+  printf 'docker/releases/\ndocker/images.env\n' > "${seed}/.gitignore"
+  printf 'projectId: fixture\n' > "${seed}/.infisical.yaml"
+  for fixture_file in compose.yml compose.npm.yml .env.example images.env.example; do
+    printf 'fixture\n' > "${seed}/docker/${fixture_file}"
+  done
+  printf '#!/bin/sh\n' > "${seed}/docker/postgres/init-runtime-roles.sh"
+  printf 'web source\n' > "${seed}/apps/web/source.ts"
+  printf 'proxy source\n' > "${seed}/apps/ai-proxy/source.ts"
   git -C "${seed}" add .
   git -C "${seed}" commit -qm 'test release'
   git -C "${seed}" tag v1.2.3
@@ -174,6 +183,7 @@ run_entrypoint_raw() {
     IDEABOARD_PRODUCTION_TMP_DIR="${fixture_root}/tmp" \
     IDEABOARD_PRODUCTION_OWNER_ENV_FILE="${fixture_root}/state/owner.env" \
     IDEABOARD_PRODUCTION_CONFIG_FILE="${fixture_root}/deployment.json" \
+    IDEABOARD_PRODUCTION_CHECKOUT_COMMAND="${script_dir}/deployment-checkout.sh" \
     bash "${entrypoint}" "$@"
 }
 
@@ -488,6 +498,44 @@ test_invalid_local_topology_fails_before_credentials() {
   [[ "$output" == *'invalid local deployment configuration'* ]] || fail 'symlink configuration not rejected'
 }
 
+test_minimal_checkout_preserves_state_across_releases() {
+  local next_commit
+  setup_release_fixture minimal-checkout
+  mkdir -p "${stack}/docker/releases/history"
+  printf 'keep release state\n' > "${stack}/docker/releases/history/retained.json"
+  printf 'keep image refs\n' > "${stack}/docker/images.env"
+  run_entrypoint < "${manifest}" >/dev/null
+  [[ ! -d "${stack}/apps" && ! -e "${stack}/NEXT_RELEASE" ]] || fail 'unneeded source retained'
+  [[ "$(git -C "${stack}" config core.sparseCheckoutCone)" == false ]] || fail 'checkout must use exact non-cone patterns'
+  [[ -z "$(git -C "${stack}" status --porcelain --untracked-files=no)" ]] || fail 'sparse checkout is dirty'
+  next_commit="$(git -C "${stack}" rev-parse 'refs/tags/v1.2.4^{commit}')"
+  write_manifest "${manifest}" "${next_commit}"
+  sed -i.bak 's/v1.2.3/v1.2.4/' "${manifest}"
+  run_entrypoint < "${manifest}" >/dev/null
+  [[ "$(git -C "${stack}" rev-parse HEAD)" == "${next_commit}" ]] || fail 'next release checkout failed'
+  [[ ! -d "${stack}/apps" && ! -e "${stack}/NEXT_RELEASE" ]] || fail 'next release restored source'
+  assert_file_contains "${stack}/docker/releases/history/retained.json" 'keep release state'
+  assert_file_contains "${stack}/docker/images.env" 'keep image refs'
+  [[ "$(find "${stack}" -type f -not -path '*/.git/*' -not -path '*/docker/releases/*' -not -path '*/docker/images.env' | wc -l | tr -d ' ')" == 10 ]] || fail 'minimal checkout must contain ten host inputs'
+}
+
+test_missing_host_input_fails_before_secret_injection() {
+  local broken_commit output
+  setup_release_fixture missing-host-input
+  git -C "${fixture_root}/seed" rm -q .infisical.yaml
+  git -C "${fixture_root}/seed" commit -qm 'remove required deployment input'
+  git -C "${fixture_root}/seed" tag v1.2.5
+  git -C "${fixture_root}/seed" push -q "${fixture_root}/origin.git" refs/tags/v1.2.5
+  broken_commit="$(git -C "${fixture_root}/seed" rev-parse HEAD)"
+  write_manifest "${manifest}" "${broken_commit}"
+  sed -i.bak 's/v1.2.3/v1.2.5/' "${manifest}"
+  if output="$(run_entrypoint < "${manifest}" 2>&1)"; then fail 'release with missing input accepted'; fi
+  [[ "$output" == *'minimal deployment checkout failed'* ]] || fail 'missing host input was not rejected'
+  [[ ! -e "${capture}/injection" ]] || fail 'incomplete checkout reached Cloud injection'
+}
+
+test_minimal_checkout_preserves_state_across_releases
+test_missing_host_input_fails_before_secret_injection
 test_local_npm_topology_reaches_deployment
 test_invalid_local_topology_fails_before_credentials
 test_v2_provenance_is_verified_before_secret_injection

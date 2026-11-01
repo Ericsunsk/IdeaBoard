@@ -11,6 +11,7 @@ TMP_DIR="${IDEABOARD_PRODUCTION_TMP_DIR:-/var/tmp}"
 EXPECTED_REPOSITORY="${IDEABOARD_PRODUCTION_EXPECTED_REPOSITORY:-Ericsunsk/IdeaBoard}"
 OWNER_ENV_FILE="${IDEABOARD_PRODUCTION_OWNER_ENV_FILE:-/var/lib/ideaboard/owner.env}"
 CONFIG_FILE="${IDEABOARD_PRODUCTION_CONFIG_FILE:-/etc/ideaboard/deployment.json}"
+CHECKOUT_COMMAND="${IDEABOARD_PRODUCTION_CHECKOUT_COMMAND:-/usr/local/libexec/ideaboard-deployment-checkout}"
 DEPLOY_ENV=(env -u INFISICAL_TOKEN)
 MAX_MANIFEST_BYTES=65536
 MANIFEST_FILE=""
@@ -148,6 +149,10 @@ git -C "${STACK_DIR}" checkout --detach "${commit}" >/dev/null 2>&1 || \
   die 'release checkout failed'
 [[ "$(git -C "${STACK_DIR}" rev-parse HEAD 2>/dev/null)" == "${commit}" ]] || \
   die 'detached checkout does not match manifest commit'
+[[ -f "${CHECKOUT_COMMAND}" ]] || die 'minimal deployment checkout helper is unavailable'
+bash "${CHECKOUT_COMMAND}" --apply "${STACK_DIR}" >/dev/null 2>&1 || \
+  die 'minimal deployment checkout failed'
+
 
 if jq -e '.schema_version == 2 or has("components")' "${MANIFEST_FILE}" >/dev/null; then
   (cd "${STACK_DIR}" && python3 scripts/release-artifacts.py validate \
