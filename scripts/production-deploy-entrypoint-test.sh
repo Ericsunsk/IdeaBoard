@@ -16,6 +16,18 @@ fi
 exit 0
 EOF
 chmod +x "${test_bin}/flock"
+cat > "${test_bin}/docker" <<'EOF'
+#!/usr/bin/env bash
+[[ "$*" == "volume ls --filter name=^ideaboard_postgres-data$ --format {{.Name}}" ]] || exit 97
+[[ "${VOLUME_INSPECTION_FAILS:-0}" != 1 ]] || exit 1
+[[ "${EXISTING_DATABASE_VOLUME:-0}" != 1 ]] || printf '%s\n' ideaboard_postgres-data
+exit 0
+EOF
+cat > "${test_bin}/infisical" <<'EOF'
+#!/usr/bin/env bash
+exit 97
+EOF
+chmod +x "${test_bin}/docker" "${test_bin}/infisical"
 
 cleanup() {
   rm -rf -- "${test_root}"
@@ -60,6 +72,7 @@ cp "$3" "${DEPLOY_CAPTURE_DIR}/manifest-copy"
 printf '%s\n' "${IDEABOARD_STACK_DIR:-}" > "${DEPLOY_CAPTURE_DIR}/stack-dir"
 printf '%s\n' "${ENV_FILE:-}" > "${DEPLOY_CAPTURE_DIR}/env-file"
 printf '%s\n' "${COMPOSE_PROJECT_NAME:-}" > "${DEPLOY_CAPTURE_DIR}/compose-project"
+[[ -z "${INFISICAL_TOKEN:-}" ]] || exit 96
 printf 'RAW-DEPLOY-SECRET-MARKER\n' >&2
 if [[ "${DEPLOY_SHOULD_FAIL:-0}" == "1" ]]; then
   if [[ "${SKIP_DEPLOY_RESULT:-0}" != "1" ]]; then
@@ -75,8 +88,19 @@ if [[ "${SKIP_DEPLOY_RESULT:-0}" != "1" ]]; then
     > "${IDEABOARD_DEPLOY_RESULT_FILE}"
 fi
 EOF
+  cat > "${seed}/scripts/infisical-run.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "${INFISICAL_TOKEN:-}" == st.SYNTHETIC-INFISICAL-TOKEN ]] || exit 95
+[[ "$PWD" == "$IDEABOARD_STACK_DIR" ]] || exit 93
+[[ "$1 $2 $3 $4 $5 $6 $7" == '--env prod --path / --path /ai-proxy --' ]] || exit 94
+printf 'prod root+ai-proxy injected\n' > "${DEPLOY_CAPTURE_DIR}/injection"
+shift 7
+exec "$@"
+EOF
   chmod +x "${seed}/scripts/deploy-stack.sh"
-  git -C "${seed}" add scripts/deploy-stack.sh
+  chmod +x "${seed}/scripts/infisical-run.sh"
+  git -C "${seed}" add scripts/deploy-stack.sh scripts/infisical-run.sh
   git -C "${seed}" commit -qm 'test release'
   git -C "${seed}" tag v1.2.3
   git -C "${seed}" tag release-1.2.3
@@ -123,14 +147,22 @@ setup_release_fixture() {
   write_manifest "${manifest}" "${commit}"
 }
 
-run_entrypoint() {
+run_entrypoint_raw() {
   env \
     PATH="${test_bin}:${PATH}" \
     DEPLOY_CAPTURE_DIR="${capture}" \
     IDEABOARD_PRODUCTION_STACK_DIR="${stack}" \
     IDEABOARD_PRODUCTION_LOCK_FILE="${fixture_root}/deploy.lock" \
     IDEABOARD_PRODUCTION_TMP_DIR="${fixture_root}/tmp" \
+    IDEABOARD_PRODUCTION_OWNER_ENV_FILE="${fixture_root}/state/owner.env" \
     bash "${entrypoint}" "$@"
+}
+
+run_entrypoint() {
+  {
+    printf '%s\n' IDEABOARD_DEPLOY_V1 st.SYNTHETIC-INFISICAL-TOKEN
+    cat
+  } | run_entrypoint_raw "$@"
 }
 
 test_valid_manifest_reaches_deploy_command() {
@@ -144,12 +176,53 @@ test_valid_manifest_reaches_deploy_command() {
   deployed_manifest_path="$(< "${capture}/manifest-path")"
   [[ ! -e "${deployed_manifest_path}" ]] || fail 'temporary manifest was not removed after success'
   assert_file_contains "${capture}/stack-dir" "${stack}"
-  assert_file_contains "${capture}/env-file" "${stack}/docker/.env"
+  assert_file_contains "${capture}/env-file" "${fixture_root}/state/owner.env"
+  assert_file_contains "${capture}/injection" 'prod root+ai-proxy injected'
   assert_file_contains "${capture}/compose-project" 'ideaboard'
   [[ "${output}" == '{"result":"success","stage":"complete","recovery_hint":"none"}' ]] || \
     fail 'valid deployment did not return the allow-listed automation result'
   [[ "${output}" != *'RAW-DEPLOY-SECRET-MARKER'* ]] || fail 'raw deploy output reached the SSH caller'
   [[ "${output}" != *'RAW-RESULT-SECRET-MARKER'* ]] || fail 'non-allow-listed result data reached the SSH caller'
+  [[ "${output}" != *'SYNTHETIC-INFISICAL-TOKEN'* ]] || fail 'Infisical token reached caller output'
+  if grep -rFq 'SYNTHETIC-INFISICAL-TOKEN' "${capture}" "${fixture_root}/tmp"; then
+    fail 'Infisical token reached a manifest, result or capture file'
+  fi
+}
+
+test_missing_malformed_and_oversized_tokens_are_rejected() {
+  local token output
+  setup_release_fixture 'invalid-credential'
+  for token in '' 'invalid token' $'token\r' "$(printf '%8193s' '' | tr ' ' x)"; do
+    if output="$({ printf '%s\n' IDEABOARD_DEPLOY_V1 "$token"; cat "${manifest}"; } | run_entrypoint_raw 2>&1)"; then
+      fail 'invalid token reached deployment'
+    fi
+    [[ ! -e "${capture}/args" ]] || fail 'invalid token invoked deployment'
+    [[ "$output" != *"$token"* || -z "$token" ]] || fail 'invalid token was printed'
+    assert_directory_has_no_files "${fixture_root}/tmp"
+  done
+  if run_entrypoint_raw < "${manifest}" >/dev/null 2>&1; then
+    fail 'legacy manifest-only protocol bypassed required token'
+  fi
+}
+
+test_existing_database_requires_persisted_owner() {
+  setup_release_fixture 'existing-owner'
+  if EXISTING_DATABASE_VOLUME=1 run_entrypoint < "${manifest}" >/dev/null 2>&1; then
+    fail 'existing PostgreSQL accepted a newly generated owner password'
+  fi
+  [[ ! -e "${capture}/args" ]] || fail 'missing owner credential reached deploy command'
+  mkdir -p "${fixture_root}/state"
+  printf 'POSTGRES_PASSWORD=existing-owner-password\n' > "${fixture_root}/state/owner.env"
+  EXISTING_DATABASE_VOLUME=1 run_entrypoint < "${manifest}" >/dev/null || fail 'persisted owner should allow existing DB deployment'
+  assert_file_contains "${fixture_root}/state/owner.env" 'POSTGRES_PASSWORD=existing-owner-password'
+}
+
+test_volume_inspection_fails_closed() {
+  setup_release_fixture 'volume-inspection-failure'
+  if VOLUME_INSPECTION_FAILS=1 run_entrypoint < "${manifest}" >/dev/null 2>&1; then
+    fail 'volume inspection failure was treated as fresh database'
+  fi
+  [[ ! -e "${capture}/args" ]] || fail 'volume inspection failure reached deployment'
 }
 
 test_invalid_tag_is_rejected_before_deploy() {
@@ -321,6 +394,9 @@ test_missing_automation_result_fails_closed() {
 }
 
 test_valid_manifest_reaches_deploy_command
+test_missing_malformed_and_oversized_tokens_are_rejected
+test_existing_database_requires_persisted_owner
+test_volume_inspection_fails_closed
 test_invalid_tag_is_rejected_before_deploy
 test_wrong_repository_is_rejected_before_deploy
 test_invalid_image_digest_is_rejected_before_deploy

@@ -48,6 +48,9 @@ MOCK
 cat > "${fixture}/bin/ssh" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" > "${RUNNER_TEMP}/ssh-args"
+IFS= read -r protocol
+IFS= read -r token
+[[ "$protocol" == IDEABOARD_DEPLOY_V1 && "$token" == "$INFISICAL_TOKEN" ]] || exit 98
 cat > "${RUNNER_TEMP}/sent-manifest"
 printf 'RAW-SSH-SECRET-MARKER\n' >&2
 if [[ "${TEST_DEPLOY_FAIL:-false}" == true ]]; then
@@ -63,6 +66,7 @@ export GITHUB_REPOSITORY='Ericsunsk/IdeaBoard' RELEASE_TAG='v1.2.3'
 export SOURCE_COMMIT='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 export VPS_HOST='vps.example.com' VPS_SSH_PORT='5522' VPS_DEPLOY_USER='root'
 export VPS_DEPLOY_PRIVATE_KEY='FAKE-DEPLOY-PRIVATE-KEY' VPS_KNOWN_HOSTS='FAKE-PINNED-HOST-KEY'
+export INFISICAL_TOKEN='st.SYNTHETIC-INFISICAL-TOKEN'
 export RELEASE_MANIFEST="${fixture}/release-manifest.json"
 export RUNNER_TEMP="${fixture}/runner" GITHUB_STEP_SUMMARY="${fixture}/summary"
 
@@ -93,6 +97,9 @@ run_action() {
   bash "${fixture}/steps/summary"
   if grep -Eq 'FAKE-DEPLOY-PRIVATE-KEY|FAKE-PINNED-HOST-KEY|RAW-SSH-SECRET-MARKER|RAW-RESULT-SECRET-MARKER' "${fixture}/output" "${GITHUB_STEP_SUMMARY}"; then
     fail 'credentials or raw remote logs leaked'
+  fi
+  if grep -rFq -- 'SYNTHETIC-INFISICAL-TOKEN' "${RUNNER_TEMP}" "${fixture}/output" "${GITHUB_STEP_SUMMARY}"; then
+    fail 'Infisical token reached a file or log'
   fi
   return "${status}"
 }
@@ -139,6 +146,10 @@ for invalid_port in 0 65536 '22;echo injected'; do
   [[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'invalid SSH port reached transport'
 done
 if VPS_DEPLOY_PRIVATE_KEY='' run_action; then fail 'missing private key accepted'; fi
+for invalid_token in '' 'invalid token' $'token\ninjected' "$(printf '%8193s' '' | tr ' ' x)"; do
+  if INFISICAL_TOKEN="$invalid_token" run_action; then fail 'invalid Infisical token accepted'; fi
+  [[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'invalid Infisical token reached SSH'
+done
 if TEST_UNKNOWN_HOST=true run_action; then fail 'untrusted host key accepted'; fi
 [[ ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'untrusted host reached transport'
 if TEST_DEPLOY_FAIL=true run_action; then fail 'migration failure accepted'; fi

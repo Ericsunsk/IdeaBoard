@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
+set +x
 set -euo pipefail
+export LC_ALL=C
 umask 077
 
 STACK_DIR="${IDEABOARD_PRODUCTION_STACK_DIR:-/opt/stacks/ideaboard}"
 LOCK_FILE="${IDEABOARD_PRODUCTION_LOCK_FILE:-/run/lock/ideaboard-production-deploy.lock}"
 TMP_DIR="${IDEABOARD_PRODUCTION_TMP_DIR:-/var/tmp}"
 EXPECTED_REPOSITORY="${IDEABOARD_PRODUCTION_EXPECTED_REPOSITORY:-Ericsunsk/IdeaBoard}"
+OWNER_ENV_FILE="${IDEABOARD_PRODUCTION_OWNER_ENV_FILE:-/var/lib/ideaboard/owner.env}"
 MAX_MANIFEST_BYTES=65536
 MANIFEST_FILE=""
 DEPLOY_RESULT_FILE=""
@@ -45,12 +48,19 @@ validate_image_ref() {
 (( $# == 0 )) || die 'command arguments are not accepted'
 [[ -z "${SSH_ORIGINAL_COMMAND:-}" ]] || die 'SSH commands are not accepted'
 
-for required_command in git head jq flock mktemp; do
+for required_command in git head jq flock mktemp docker infisical; do
   command -v "${required_command}" >/dev/null 2>&1 || die "missing command: ${required_command}"
 done
 
 [[ -d "${STACK_DIR}/.git" ]] || die "Production checkout is unavailable"
 [[ -d "${TMP_DIR}" ]] || die "temporary directory is unavailable"
+
+# Bound credential reads before writing the remaining, non-secret manifest.
+IFS= read -r -n 65 protocol || die 'deployment protocol header is missing'
+[[ "${protocol}" == IDEABOARD_DEPLOY_V1 ]] || die 'unsupported deployment protocol'
+IFS= read -r -n 8193 INFISICAL_TOKEN || die 'Production Infisical token is missing'
+[[ -n "${INFISICAL_TOKEN}" && ${#INFISICAL_TOKEN} -le 8192 && "${INFISICAL_TOKEN}" != *[![:graph:]]* ]] || \
+  die 'Production Infisical token is invalid'
 
 MANIFEST_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-manifest.XXXXXX")"
 chmod 600 "${MANIFEST_FILE}"
@@ -111,18 +121,33 @@ git -C "${STACK_DIR}" checkout --detach "${commit}" >/dev/null 2>&1 || \
 
 deploy_command="${STACK_DIR}/scripts/deploy-stack.sh"
 [[ -x "${deploy_command}" ]] || die 'release deployment command is unavailable'
+inject_command="${STACK_DIR}/scripts/infisical-run.sh"
+[[ -x "${inject_command}" ]] || die 'release Infisical injection command is unavailable'
+
+# Existing PostgreSQL must retain its owner credential; never silently rotate it.
+if [[ ! -f "${OWNER_ENV_FILE}" ]]; then
+  database_volume="$(docker volume ls --filter 'name=^ideaboard_postgres-data$' --format '{{.Name}}')" || \
+    die 'could not inspect the existing PostgreSQL volume'
+  [[ -z "${database_volume}" ]] || die 'restore the existing PostgreSQL owner credential before deployment'
+fi
+install -d -m 700 "$(dirname "${OWNER_ENV_FILE}")"
+[[ ! -f "${OWNER_ENV_FILE}" ]] || chmod 600 "${OWNER_ENV_FILE}"
 
 ENTRYPOINT_STAGE="deployment"
 DEPLOY_RESULT_FILE="$(mktemp "${TMP_DIR%/}/ideaboard-production-deploy-result.XXXXXX")"
 chmod 600 "${DEPLOY_RESULT_FILE}"
 
 deploy_status=0
-IDEABOARD_STACK_DIR="${STACK_DIR}" \
-  ENV_FILE="${STACK_DIR}/docker/.env" \
-  COMPOSE_PROJECT_NAME=ideaboard \
-  IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
-  "${deploy_command}" update --manifest "${MANIFEST_FILE}" \
-  > /dev/null 2>&1 || deploy_status=$?
+(
+  cd "${STACK_DIR}"
+  IDEABOARD_STACK_DIR="${STACK_DIR}" \
+    ENV_FILE="${OWNER_ENV_FILE}" \
+    COMPOSE_PROJECT_NAME=ideaboard \
+    IDEABOARD_DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE}" \
+    INFISICAL_TOKEN="${INFISICAL_TOKEN}" \
+    "${inject_command}" --env prod --path / --path /ai-proxy -- \
+    env -u INFISICAL_TOKEN "${deploy_command}" update --manifest "${MANIFEST_FILE}"
+) > /dev/null 2>&1 || deploy_status=$?
 
 if jq -e -s --argjson deploy_status "${deploy_status}" '
   length == 1

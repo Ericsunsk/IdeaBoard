@@ -69,3 +69,8 @@ Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
 - `Ericsunsk/IdeaBoard@7e803581ed5c1511788dd96b86413819533f1e17` 的 [CI run 41313760231](https://github.com/Ericsunsk/IdeaBoard/actions/runs/41313760231) 只有 Auth Quality 失败：live Go↔Fastify contract 的 60 秒 deadline 包含依赖下载和编译，Auth job 未配置 canonical Go setup。API、Web、Ops、Media 和 Migration lanes 通过。这补充上一轮本地通过的记录，未将本地结果等同于远端成功。
 - 在 2026-11-01，以固定 Go `1.26.10`、独立 module/build cache 和两核并发复现相同的 60 秒超时；热缓存约 4 秒通过。修复将 Go setup 与 contract package 编译移到 `Test Auth` 之前，使用独立 `auth-contract` build cache，保留原 timeout 和全部接口断言；workflow 负向 fixtures 拦截缺失准备、替换编译命令、错误顺序和忽略失败。复现与验证证据位于 ignored `.cache/github-ci-fix/`；本地冷环境操作见 [CI parity gate](../../../DEVELOPMENT.md#ci-parity-gate)。
+
+## 2026-11-01 — 首次 clean-break 发布预检
+
+- `Ericsunsk/IdeaBoard@f7d8b6a0dd4cbc0fd074530a947f082a7756cff9` 的 [CI run 41319535895](https://github.com/Ericsunsk/IdeaBoard/actions/runs/41319535895) 通过后创建 `v0.1.27`。对应 [Docker Images run 41321975778](https://github.com/Ericsunsk/IdeaBoard/actions/runs/41321975778) 在 Release Eligibility 失败：checkout 禁止持久化 credential，后续 private repository 的 `git fetch` 未显式认证，尚未构建镜像或进入部署。隔离 Git config 的私库只读 fetch 复现该错误；command-scoped `gh auth git-credential` 配合既有 `GH_TOKEN` 通过，未写入 Git credential。
+- 在 2026-11-01，用户说明旧 VPS stack 已删除，production `INFISICAL_TOKEN` 配置在 GitHub Environment。只读检查确认 checkout、IdeaBoard 容器和 volumes 均不存在，restricted entrypoint 与 Infisical CLI 仍在；GitHub job 的 env 不会自动传到 SSH 远端。发布准备需补齐明确的 Cloud token 注入和首次本地 owner 凭据初始化，保留 encrypted offline fallback；不得把删除旧 stack 解释为额外 reset 数据库的授权。失败 tag 保留，不移动到后续修复 commit。

@@ -23,12 +23,6 @@ jobs:
     permissions:
       contents: read
     environment: production
-    # INFISICAL_TOKEN resolves from the production Environment secret first
-    # (a repo secret of the same name is only a fallback). Reference by name
-    # only: never echo, write to disk, or trace the value.
-    env:
-      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-
     steps:
       - name: Checkout deployment client
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -66,3 +60,4 @@ jobs:
           vps-deploy-user: ${{ vars.VPS_DEPLOY_USER }}
           vps-deploy-private-key: ${{ secrets.VPS_DEPLOY_PRIVATE_KEY }}
           vps-known-hosts: ${{ secrets.VPS_KNOWN_HOSTS }}
+          infisical-token: ${{ secrets.INFISICAL_TOKEN }}

@@ -77,6 +77,7 @@ func checkDeploymentCaller(deploy map[string]any, releaseTag, sourceCommit strin
 		"vps-deploy-user":        "${{ vars.VPS_DEPLOY_USER }}",
 		"vps-deploy-private-key": "${{ secrets.VPS_DEPLOY_PRIVATE_KEY }}",
 		"vps-known-hosts":        "${{ secrets.VPS_KNOWN_HOSTS }}",
+		"infisical-token":        "${{ secrets.INFISICAL_TOKEN }}",
 	} {
 		requireEqual(inputs[input], expected, "Deployment must consume Production connection input "+input)
 	}
@@ -100,6 +101,7 @@ func checkDeploymentAction(root string) {
 	requireContains(stringValue(configure["run"]), "ssh-keygen -F", "Deployment must verify the pinned endpoint before SSH")
 	stream := requireStep(runs, "Stream manifest to Production deploy entrypoint")
 	requireEqual(stream["run"], `./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}"`, "Shared deployment action must use the sole transport client")
+	requireEqual(object(stream, "env")["INFISICAL_TOKEN"], "${{ inputs.infisical-token }}", "Deployment must stream the scoped Infisical token through process env")
 	for _, name := range []string{"Remove SSH credentials", "Write Production deployment summary"} {
 		requireEqual(requireStep(runs, name)["if"], "always()", name+" must run after deployment failure")
 	}
@@ -487,6 +489,11 @@ func checkRelease(root string, release workflow) {
 	jobs := object(release, "jobs")
 	preflight := object(jobs, "preflight")
 	requireEqual(object(preflight, "permissions")["checks"], "read", "Release preflight must read CI checks")
+	checkout := requireStep(preflight, "Checkout requested ref")
+	requireEqual(object(checkout, "with")["persist-credentials"], false, "Release checkout must not persist credentials")
+	validate := requireStep(preflight, "Verify source commit and CI Gate")
+	requireEqual(object(validate, "env")["GH_TOKEN"], "${{ github.token }}", "Release fetch must use the scoped GitHub token")
+	requireContains(stringValue(validate["run"]), `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main --no-tags`, "Release fetch must authenticate without persisted credentials")
 	requireStringIn(object(jobs, "publish-images"), "needs", "preflight", "Image publication must depend on preflight")
 	requireStringIn(object(jobs, "publish-images"), "needs", "verify-source", "Publishing must wait for full source verification")
 	verify := object(jobs, "verify-source")

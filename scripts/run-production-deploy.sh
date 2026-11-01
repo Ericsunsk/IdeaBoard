@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
+set +x
 set -euo pipefail
+export LC_ALL=C
 
 if (( $# != 1 )); then
   printf 'usage: %s <release-manifest.json>\n' "${0##*/}" >&2
@@ -17,6 +19,10 @@ manifest="$1"
 : "${VPS_HOST:?VPS_HOST is required}"
 : "${VPS_SSH_PORT:?VPS_SSH_PORT is required}"
 : "${VPS_DEPLOY_USER:?VPS_DEPLOY_USER is required}"
+if [[ -z "${INFISICAL_TOKEN:-}" || ${#INFISICAL_TOKEN} -gt 8192 || "${INFISICAL_TOKEN}" == *[![:graph:]]* ]]; then
+  printf 'A nonempty, single-line Production Infisical token is required\n' >&2
+  exit 2
+fi
 
 ssh_key_file="${SSH_KEY_FILE:-${RUNNER_TEMP}/ideaboard-production-ssh/deploy-key}"
 ssh_known_hosts_file="${SSH_KNOWN_HOSTS_FILE:-${RUNNER_TEMP}/ideaboard-production-ssh/known_hosts}"
@@ -68,9 +74,11 @@ is_retryable_stage() {
 run_deploy_attempt() {
   local deploy_status=0
   DEPLOY_TIMED_OUT=0
-  timeout --foreground 25m \
+  {
+    printf '%s\n' 'IDEABOARD_DEPLOY_V1' "${INFISICAL_TOKEN}"
+    cat < "${manifest}"
+  } | timeout --foreground 25m \
     ssh "${ssh_options[@]}" "${VPS_DEPLOY_USER}@${VPS_HOST}" \
-    < "${manifest}" \
     > "${raw_result}" 2> "${raw_error}" || deploy_status=$?
   (( deploy_status == 124 )) && DEPLOY_TIMED_OUT=1
 

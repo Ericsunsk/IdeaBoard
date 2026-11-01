@@ -130,7 +130,7 @@ VPS
 
 Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
 
-严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
+严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后通过 SSH stdin 发送 deployment protocol、只读 `INFISICAL_TOKEN` 和原始 manifest。VPS entrypoint 在内存中读取 token，从对应 checkout 运行 Infisical CLI，注入 `prod` 的 `/` 与 `/ai-proxy`，再执行 Cosign 验签、backup、migration、health、smoke 和 release state。token 不写入 manifest、临时文件、日志或命令参数，CLI 后的 deployment process 不保留 token；GitHub Actions 不读取应用业务 secret。
 
 如果既有 image 已成功构建但 Production deployment 失败，请在 Actions 中运行 [Deploy Existing Production Release](../../.github/workflows/deploy-production.yml)，只填写失败发布的 strict SemVer `release_tag`。该 workflow 从对应 GitHub Release 下载原始 `release-manifest.json`，校验五张 immutable digest 后直接执行部署，不包含 image build、scan、sign 或 push。它与常规 Production deployment 共用 `production-deployment` concurrency，并仍需 `production` Environment approval；Migration 阶段或之后的失败不会自动重试。
 
@@ -150,9 +150,9 @@ install -o root -g root -m 0755 \
 restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <public-key> ideaboard-production-deploy
 ```
 
-`restrict` 会关闭 PTY、port forwarding、agent forwarding 和 X11 forwarding；entrypoint 还会拒绝任何非空的 `SSH_ORIGINAL_COMMAND`。workflow 的 SSH 调用不发送 remote command，只通过 stdin 传输 `release-manifest.json`。不要把 unrestricted 管理员 key 复用为 deployment key。
+`restrict` 会关闭 PTY、port forwarding、agent forwarding 和 X11 forwarding；entrypoint 还会拒绝任何非空的 `SSH_ORIGINAL_COMMAND`。workflow 的 SSH 调用不发送 remote command，只通过 stdin 传输 `IDEABOARD_DEPLOY_V1` header、token 行和 `release-manifest.json`。两端拒绝空、多行或超过 8192 bytes 的 token；manifest 仍限制为 65536 bytes。升级该协议时先安装匹配的 root-owned entrypoint，再发布新 workflow；不支持旧 manifest-only 请求。不要把 unrestricted 管理员 key 复用为 deployment key。
 
-在 GitHub repository 中创建名为 `production` 的 Environment，并只配置以下连接值：
+在 GitHub repository 中创建名为 `production` 的 Environment，配置以下值：
 
 | 类型     | 名称                     | 用途                                                                   |
 | -------- | ------------------------ | ---------------------------------------------------------------------- |
@@ -161,8 +161,11 @@ restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <p
 | Variable | `VPS_DEPLOY_USER`        | forced command 所属用户；当前部署为 `root`                             |
 | Secret   | `VPS_DEPLOY_PRIVATE_KEY` | 上述专用 Ed25519 private key                                           |
 | Secret   | `VPS_KNOWN_HOSTS`        | 与 `VPS_HOST`、`VPS_SSH_PORT` 精确匹配的 pinned OpenSSH host-key entry |
+| Secret   | `INFISICAL_TOKEN`        | 只读 `prod` service token，scope 同时覆盖 `/` 与 `/ai-proxy` |
 
-`VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。数据库密码、Better Auth、Stripe、Resend、OAuth、encryption key 和 GHCR runtime credential 继续只保存在 VPS 的 root-only `.env`，不得复制到 GitHub Environment。
+`VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。业务 secret 由 Infisical Cloud 分发，不复制到 GitHub Environment；GitHub 只持上述只读 token。PostgreSQL owner credential 留在 VPS root-only `/var/lib/ideaboard/owner.env`，GHCR runtime credential 继续使用 VPS Docker credential store。
+
+自动部署要求 VPS 保留 `/opt/stacks/ideaboard` Git checkout，并安装 Infisical CLI、Docker Compose 和 Cosign。Fresh Database 首次部署由既有 `ensure_env_file` 在 `0700` state directory 中创建 `0600` owner file；加密的 `docker/.env` 仍为离线 fallback，不需要为 Cloud 首次部署解密。若已有 `ideaboard_postgres-data` volume 而 owner file 缺失，entrypoint 会拒绝部署；必须先通过可信本机通道恢复同一 PostgreSQL owner 口令，不能生成新口令替代。已有 encrypted owner source 的迁移也只迁出 owner 值，不复制业务 secret、不自动 reset 数据库。
 
 发布时创建并 push 严格 SemVer tag：
 
@@ -209,15 +212,15 @@ image refs 的唯一持久化位置是 `docker/images.env`（gitignored，manife
 
 生产 secret 的 canonical 通道是 Infisical Cloud，完整配置和迁入步骤见
 [Secrets runbook](./secrets-infisical.md)。`POSTGRES_PASSWORD` 是本地 owner 凭据，
-禁止进 Cloud；部署时从 `docker/.env` 解密读取，首次缺少文件时自动生成。
+禁止进 Cloud；自动通道读取 `/var/lib/ideaboard/owner.env`，Fresh Database 首次缺少文件时自动生成。手动部署显式设置同一 `ENV_FILE`；需要使用旧 encrypted owner source 时才通过 dotenvx 解密。
 image refs 不进 Cloud，由 manifest 写入 `docker/images.env`。
 
 ```bash
-scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh update --manifest release-manifest.json
+ENV_FILE=/var/lib/ideaboard/owner.env scripts/infisical-run.sh --env prod --path / --path /ai-proxy -- scripts/deploy-stack.sh update --manifest release-manifest.json
 ```
 
 Cloud 模式的业务值只消费注入值；本地文件仅提供独立的 owner 口令。
-部署机从密码管理器临时 export `DOTENV_PRIVATE_KEY`（或使用本地 `.env.keys`）；脚本将
+仅旧 encrypted owner source 或离线 fallback 需要从密码管理器临时 export `DOTENV_PRIVATE_KEY`（或使用本地 `.env.keys`）；脚本将
 加密 `docker/.env` 解密为 `0600` 临时文件，退出时删除。实际 secret 和私钥
 不进入 git 明文，也不写入 release history。
 

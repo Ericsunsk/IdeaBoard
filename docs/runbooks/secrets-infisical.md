@@ -81,7 +81,7 @@ Worker source path、迁移期 root 副本校验和进程 projection 由
 
 | Key | 去向 | 原因 |
 | --- | ---- | ---- |
-| `POSTGRES_PASSWORD` | 本地 `docker/.env`（已有文件先解密，首次缺失时由 `ensure_env_file` 生成） | PostgreSQL owner 口令只供 Compose postgres / one-shot migrate；禁止进入 Cloud 和长期 API/Auth runtime |
+| `POSTGRES_PASSWORD` | 自动部署使用 VPS root-only `/var/lib/ideaboard/owner.env`；手动部署通过 `ENV_FILE` 选择同一文件；旧 encrypted `docker/.env` 仍可解密读取 | PostgreSQL owner 口令只供 Compose postgres / one-shot migrate；禁止进入 Cloud 和长期 API/Auth runtime |
 | `PG_MIGRATION_USER`/`PG_MIGRATION_PASSWORD` | 仍在 `docker/migration.env`（本机 0600，gitignored），只进一次性 migrate 容器 | owner/runtime 分离；migrate 凭据永不进长期 runtime，也就不进 Infisical 分发面 |
 | `VITE_*`（前端构建烘焙键，见 §11） | 不进 Infisical（键名由 `scripts/web-frontend-env-check.sh` 门禁，值按 §11 注入链处理） | Vite 把所有 `VITE_*` 烘焙进公开 bundle；生产正确值为空（同域 Gateway），存空字符串没有意义；未来某 `VITE_*` 需要非空生产值时再进 Cloud，注入形态不变 |
 | `IDEABOARD_*_IMAGE`、`COSIGN_*`、`BACKUP_ENCRYPTION_RECIPIENT`、端口与 `NGINX_*`/`NPM_*` | image refs 独占 `docker/images.env`；其余通过部署进程 env 提供 | 部署输入非 secret（digest/upstream），`infisical-drift-check.sh` 会拒绝它们进 Infisical |
@@ -129,9 +129,10 @@ scripts/infisical-run.sh --env dev -- npm run dev           # apps/realtime（�
 后续 `up` 与 rollback 使用同一文件。手动渲染前需先完成该初始化（或从
 `docker/images.env.example` 创建并填入 release manifest refs）。`deploy-stack.sh`
 统一装配 Compose 输入：业务值只取 Cloud 注入，`POSTGRES_PASSWORD` 只取本地
-`docker/.env`，image refs 只取 `docker/images.env`。owner 口令禁止进 Cloud，漂移门会拒绝。
-部署机须能用 `DOTENV_PRIVATE_KEY` 或本地 `.env.keys` 解密现有 owner 口令；首次缺少
-本地文件时 `ensure_env_file` 会生成并持久化 owner 口令，不生成 Cloud 业务 secret。
+owner file（自动通道为 `/var/lib/ideaboard/owner.env`），image refs 只取 `docker/images.env`。owner 口令禁止进 Cloud，漂移门会拒绝。
+自动通道把只读 `INFISICAL_TOKEN` 从 GitHub `production` Environment 经受限 SSH stdin 送到 VPS，token 只存在于内存与 Infisical CLI process env；CLI 后的部署进程移除 token。VPS 在 checkout 目录运行 wrapper，按 `.infisical.yaml` 绑定 project，读取 `prod` 的两个 path。应用业务 secret 不经过 GitHub runner。
+只有继续使用旧 encrypted owner source 或离线 fallback 时才需要 `DOTENV_PRIVATE_KEY` / `.env.keys`。Fresh Database 首次缺少
+本地 owner file 时 `ensure_env_file` 会生成并持久化 owner 口令，不生成 Cloud 业务 secret；已有 PostgreSQL volume 缺 owner file 时拒绝自动生成，须恢复同一口令。
 wrapper 始终移除注入的 `POSTGRES_PASSWORD` 和 `PG_MIGRATION_*`，
 owner 值由部署脚本单独传给 Compose，再由 service environment maps 仅传给 postgres/migrate。
 

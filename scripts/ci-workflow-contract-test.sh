@@ -27,6 +27,11 @@ reject_mutation() {
 }
 reject_mutation .github/workflows/docker-images.yml 's/force_full: true/force_full: false/' 'An incremental CI pass cannot authorize publishing'
 reject_mutation .github/workflows/docker-images.yml '/      - verify-source/d' 'Publishing must wait for full source verification'
+reject_mutation .github/workflows/docker-images.yml "s/git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch/git fetch/" 'Release fetch must authenticate without persisted credentials'
+reject_mutation .github/workflows/docker-images.yml 's/persist-credentials: false/persist-credentials: true/' 'Release checkout must not persist credentials'
+reject_mutation .github/workflows/docker-images.yml '/          GH_TOKEN:/d' 'Release fetch must use the scoped GitHub token'
+reject_mutation .github/workflows/docker-images.yml '/          infisical-token:/d' 'Deployment must consume Production connection input infisical-token'
+reject_mutation .github/actions/deploy-production/action.yml '/        INFISICAL_TOKEN:/d' 'Deployment must stream the scoped Infisical token through process env'
 reject_mutation .github/workflows/auth.yml 's/inputs.source_commit || github.sha/github.sha/' 'auth.yml must checkout the exact verified source'
 reject_mutation .github/workflows/auth.yml '\#      - uses: ./.github/actions/setup-go#,+2d' 'Auth must use the canonical Go setup'
 reject_mutation .github/workflows/auth.yml '/      - name: Prepare Go contract test/,+2d' 'Missing step: Prepare Go contract test'
