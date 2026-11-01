@@ -33,7 +33,7 @@ const env: Env = {
   CF_ACCOUNT_ID: "contract-account",
   CF_GATEWAY_ID: "contract-gateway",
   CF_AIG_TOKEN: "contract-token",
-  INTERNAL_SECRET: "contract-secret",
+  WORKER_INTERNAL_SECRET: "contract-secret",
 };
 const upstreamURL =
   "https://api.cloudflare.com/client/v4/accounts/contract-account/ai/run";
@@ -48,7 +48,7 @@ async function execute(
   body: CanonicalImageRequest,
   fetchFn: typeof fetch,
   path = "/v1/generate",
-  auth = `Bearer ${env.INTERNAL_SECRET}`,
+  auth = `Bearer ${env.WORKER_INTERNAL_SECRET}`,
 ) {
   let fetchFailure: unknown;
   globalThis.fetch = async (...args) => {

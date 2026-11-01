@@ -11,7 +11,11 @@
 PC_PORT_NUM=8081 process-compose up
 ```
 
-`up` 自动按 `docker-deps → migrate → api/auth/realtime/web` 顺序起：
+AI image egress 的 `ai-proxy` 独立启动在 `:8787`，不等待数据库。首次启动前按
+[ai-proxy README](./apps/ai-proxy/README.md#运行与验证) 安装依赖并生成本地 bindings；
+Infisical dev 的 `WORKER_BASE_URL` 使用 `http://localhost:8787`。
+
+`up` 的数据库应用按 `docker-deps → migrate → api/auth/realtime/web` 顺序起：
 infra 容器先行，随后 one-shot `migrate` 跑 `scripts/migrate.sh --env dev`
 （API→Auth 强制顺序，幂等，重跑无操作），成功才放行四个应用进程；
 migrate 失败整栈停住并报错，不带病起服务。日常开发无需手跑 migrate。

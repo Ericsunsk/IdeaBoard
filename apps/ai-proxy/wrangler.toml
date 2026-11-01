@@ -3,10 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
 [vars]
-# 非密钥：可在 dashboard / wrangler.toml 直接配置
+# 线上非密钥：可在 dashboard / wrangler.toml 直接配置。
+# 本地使用 helper 从 Infisical dev 写入完整 .dev.vars，不继承 dashboard vars。
 # CF_ACCOUNT_ID = "your-account-id"
 # CF_GATEWAY_ID = "your-gateway-id"
 
-# 密钥（永不进 git，只能 wrangler secret put）：
+# 线上密钥（永不进 git；dashboard Secrets 或 wrangler secret put）：
 #   wrangler secret put CF_AIG_TOKEN
-#   wrangler secret put INTERNAL_SECRET
+#   wrangler secret put WORKER_INTERNAL_SECRET

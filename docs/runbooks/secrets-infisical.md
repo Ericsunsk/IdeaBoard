@@ -34,11 +34,10 @@ secret 全放 root path `/`，注入即全集（union injection，本就把全�
 小团队不建 folder；哪天要做按路径收窄 token scope 再分。
 该设计与后端无关，未来迁回自托管时原样平移（见 §8）。
 
-### 2.1 现有 25 个 Go env tag 的迁入对照
+### 2.1 Code-owned env 与 bindings 对照
 
-Go `env:"..."` 共 25 个（`apps/api/internal/platform/config/config.go`），
-是“25 个 env tag”的计数口径。加上 Auth/Realtime 的 Node 侧 reads，
-union 约 35 个 key，全部映射如下（值从 dotenvx 加密 `docker/.env` 原样迁入，不改值）：
+Key 名由 Go `env:"..."` tags、Auth/Realtime 的 Node reads 和 Worker
+`src/contracts.ts` 的 `Env` bindings 拥有；下表记录其 Infisical 分发与消费者。
 
 | Key | Infisical 路径 | 消费者 | 备注 |
 | --- | -------------- | ------ | ---- |
@@ -52,6 +51,11 @@ union 约 35 个 key，全部映射如下（值从 dotenvx 加密 `docker/.env` 
 | `NATS_PASSWORD` | `/` | api/worker | URL-safe 字符约束不变 |
 | `BETTER_AUTH_SECRET` | `/` | auth | 生产 ≥32 高熵 |
 | `RT_TICKET_SECRET` | `/` | api/realtime | 两端同名同值，改一处 |
+| `CF_ACCOUNT_ID`/`CF_GATEWAY_ID` | `/` | ai-proxy | 非 secret；本地 helper 从 dev 写入 `.dev.vars`，线上同步到对应 environment 的 vars；dashboard 配置不进入本地 Wrangler |
+| `CF_AIG_TOKEN` | `/` | ai-proxy | Worker Gateway token；本地仅写入 0600 `.dev.vars`，线上同步到 dashboard Secrets，不进入 VPS Compose |
+| `WORKER_BASE_URL` | `/` | api | Worker 入口地址；拓扑值非 secret，每 env 一份（dev 与 prod 值不同），类比 `PUBLIC_ORIGIN` |
+| `WORKER_INTERNAL_SECRET` | `/` | api（VPS 侧经 Infisical 注入；Worker 侧另走 `wrangler secret put` 同值） | 两端同名同值，改一处（+ Worker 侧一次），类比 `RT_TICKET_SECRET` |
+| `WORKER_PER_MODEL_LIMIT`/`WORKER_BREAKER_COOLDOWN_SECONDS`/`WORKER_BREAKER_FAILURE_RATE` | `/` | api-worker | 非 secret 韧性旋钮，有界默认值，可随注入统一管理，但永不进 dotenvx 加密 `docker/.env`（同 `RIVER_WORKER_CONCURRENCY`） |
 | `REWARDS_CODE_HMAC_KEYS` | `/` | api | JSON keyring；轮换走 two-stage（§4） |
 | `CREDITS_WELCOME_IDENTITY_KEY` | `/` | api | **fingerprint 绑定，误换 fail closed；非事故不轮换** |
 | `RIVER_WORKER_CONCURRENCY` | `/` | api-worker | 非 secret 明文部署输入（compose 缺省 5），可随注入统一管理，但永不进 dotenvx 加密 `docker/.env` |
@@ -197,7 +201,8 @@ scripts/infisical-run.sh --env dev -- printenv PG_DB
 ## 5. 漂移门兼容（选边：仍校验文件，Cloud 为镜像）
 
 **选边结论：`scripts/env-schema-check.sh` 继续是唯一的 required gate，
-校验对象仍是 code（Go/Node schema）vs 文件（`*.env.example` + compose + 加密 `docker/.env` key 名），
+校验对象仍是 code（Go/Node schema + Worker `Env` bindings）vs 文件（`*.env.example`、
+Worker `.dev.vars.example` + compose + 加密 `docker/.env` key 名），
 不改、不降级。Cloud 是只读镜像，由 `scripts/infisical-drift-check.sh` 做同源检查。**
 
 理由：code tags 是编译期事实源（改名即改代码），`.env.example` 是其派生文档；
@@ -206,6 +211,10 @@ Cloud 是运行时分发，存错 key 名只会在启动时爆炸。让 gate 去
 因此：
 
 - Gate 不变：PR 照常跑 `env-schema-check.sh`（A–F 全门）。
+- Worker keys 从 `apps/ai-proxy/src/contracts.ts` 的 `Env` 提取，仅校验其独立
+  `.dev.vars.example`；Edge-only bindings 不进入 VPS example/Compose 或 VPS-required
+  列表。Cloud mirror 接受它们，但不会把可选 Worker 部署变成后端 bootstrap 前提。
+  本地 helper 会验证全部 Worker bindings 后才写文件，线上按对应 environment 配置。
 - 新增镜像检查（不同步失败就 loud fail，不进 required gate，值班/发布前手动跑；
   export 一步走 Cloud API，需联网 + 登录/token，检查本身只读导出文件）：
 

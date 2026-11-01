@@ -99,7 +99,7 @@ func (t *workerTransfer) baseURL() (string, error) {
 		return "", fmt.Errorf("worker media origin is not configured")
 	}
 	if strings.TrimSpace(t.secret) == "" {
-		return "", fmt.Errorf("worker media secret is not configured (INTERNAL_SECRET)")
+		return "", fmt.Errorf("worker media secret is not configured (WORKER_INTERNAL_SECRET)")
 	}
 	return t.origin, nil
 }

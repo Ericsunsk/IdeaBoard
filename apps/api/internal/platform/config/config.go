@@ -178,7 +178,7 @@ func (c WorkerConfig) EffectiveConcurrency() int {
 type EdgeWorkerConfig struct {
 	// BaseURL is the Worker service root (WORKER_BASE_URL).
 	BaseURL string
-	// Secret is the INTERNAL_SECRET bearer credential. Empty fails closed.
+	// Secret is the WORKER_INTERNAL_SECRET bearer credential. Empty fails closed.
 	Secret string
 }
 
@@ -341,9 +341,9 @@ type envConfig struct {
 	WorkerBreakerFailureRate   string `env:"WORKER_BREAKER_FAILURE_RATE"`
 	// WorkerBaseURL is the ai-proxy Worker service root.
 	WorkerBaseURL string `env:"WORKER_BASE_URL"`
-	// WorkerSecret is the INTERNAL_SECRET bearer credential for the Worker.
+	// WorkerSecret is the WORKER_INTERNAL_SECRET bearer credential for the Worker.
 	// Empty fails every image task closed.
-	WorkerSecret string `env:"INTERNAL_SECRET"`
+	WorkerSecret string `env:"WORKER_INTERNAL_SECRET"`
 
 	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
 	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`

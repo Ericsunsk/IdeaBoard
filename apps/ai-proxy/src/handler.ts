@@ -43,10 +43,11 @@ function badRequest(taskId: string, message: string): Response {
 }
 
 function checkAuth(request: Request, env: Env): boolean {
-  // INTERNAL_SECRET 缺失即 fail-closed：任何请求都 401。
-  if (!env.INTERNAL_SECRET) return false;
+  // WORKER_INTERNAL_SECRET 缺失即 fail-closed：任何请求都 401。
+  if (!env.WORKER_INTERNAL_SECRET) return false;
   return (
-    request.headers.get("Authorization") === `Bearer ${env.INTERNAL_SECRET}`
+    request.headers.get("Authorization") ===
+    `Bearer ${env.WORKER_INTERNAL_SECRET}`
   );
 }
 

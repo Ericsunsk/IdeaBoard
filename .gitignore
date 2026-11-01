@@ -52,6 +52,9 @@ Thumbs.db
 output/
 
 # ===== Env / Secrets =====
+# apps/ai-proxy 本地 secret（0600，wrangler dev 读取，永不进 git；模板见 .dev.vars.example）
+apps/ai-proxy/.dev.vars
+apps/ai-proxy/.dev.vars.tmp.*
 .env
 .env.*
 !apps/api/.env.example

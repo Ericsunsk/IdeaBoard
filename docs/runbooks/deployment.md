@@ -612,3 +612,11 @@ dotenvx run -f /opt/stacks/ideaboard/docker/.env -- \
 - `@path` 永远优先：fal 各模型路径、cutout/upscale/inpaint 类 custom 路由必须在映射里显式写 `@path`。
 - 禁止事项：不上 Google 原生 `:generateContent`/`:predict` 路由（已删除对应方言代码）；upscale 只许 `fal-ai/esrgan`，禁止 `clarity-upscaler`（毛利为负）；vision 搜索走中央网关连接（openrouter 路由），模型与其它 feature 一样在模型映射里配（`vision` key，定价页"其它模型映射"区），搜索供应商设置里不再有 vision 配置面。
 - Egress allowlist 需放行网关域名；fal 结果图床 host 由该 allowlist 覆盖（materializer 下载用）。
+
+## ai-proxy Worker 部署（Cloudflare Git 直连）
+
+VPS 镜像通道之外，`apps/ai-proxy`（唯一的 AI 出口适配器）不走 CI 发版、不跑 `wrangler deploy`：在 CF dashboard 把本仓库连到 Worker `ideaboard-ai-proxy`，Root directory 填 `apps/ai-proxy`，Watch paths 只含 `apps/ai-proxy/**`（改 Go/前端不触发 Worker 重建），production 分支绑 main，PR 自动出 preview 部署（只做 dry-run 验证，永不配给任何 VPS）。
+
+变量在 dashboard 上按 environment 分开配：`[vars]` 非密钥（`CF_ACCOUNT_ID`/`CF_GATEWAY_ID`）toml 明文或 dashboard 二选一；Secrets 只放 dashboard Secrets——production 填 Infisical prod 同名 key 的值（`CF_AIG_TOKEN`、`WORKER_INTERNAL_SECRET`），preview 填 dev 的值。`wrangler secret put` 与 dashboard 写的是同一份，任选其一。
+
+VPS 侧 prod `WORKER_BASE_URL` 填 production Worker 地址（`https://ideaboard-ai-proxy.<account>.workers.dev` 或自定域名），与 preview 无关。回滚 = CF dashboard 回滚 Worker 版本（无状态，无需数据回滚）。本地 bindings 与启动步骤见 [ai-proxy README](../../apps/ai-proxy/README.md#运行与验证)。

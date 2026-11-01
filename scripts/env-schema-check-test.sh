@@ -23,6 +23,24 @@ write_tree() {
   mkdir -p "$root/apps/auth/src/infrastructure"
   mkdir -p "$root/apps/realtime/src/infrastructure"
   mkdir -p "$root/docker/postgres"
+  mkdir -p "$root/apps/ai-proxy/src"
+  cat >"$root/apps/ai-proxy/src/contracts.ts" <<'EOF'
+export interface Env {
+  CF_ACCOUNT_ID: string;
+  CF_GATEWAY_ID: string;
+  CF_AIG_TOKEN: string;
+  WORKER_INTERNAL_SECRET: string;
+}
+export interface Other {
+  NOT_A_BINDING: string;
+}
+EOF
+  cat >"$root/apps/ai-proxy/.dev.vars.example" <<'EOF'
+CF_ACCOUNT_ID=
+CF_GATEWAY_ID=
+CF_AIG_TOKEN=
+WORKER_INTERNAL_SECRET=
+EOF
   cat >"$root/apps/api/internal/platform/config/config.go" <<'EOF'
 package config
 
@@ -154,6 +172,27 @@ expect_fail() {
 valid="$fixture_root/valid"
 write_tree "$valid"
 expect_pass "in-sync tree passes" "$valid"
+
+worker_missing="$fixture_root/worker-missing"
+write_tree "$worker_missing"
+printf 'CF_ACCOUNT_ID=\nCF_GATEWAY_ID=\nWORKER_INTERNAL_SECRET=\n' >"$worker_missing/apps/ai-proxy/.dev.vars.example"
+expect_fail "missing Worker binding documentation is rejected" "$worker_missing" "A: required CF_AIG_TOKEN (Worker Env)"
+
+worker_unknown="$fixture_root/worker-unknown"
+write_tree "$worker_unknown"
+printf 'STALE_WORKER_BINDING=\n' >>"$worker_unknown/apps/ai-proxy/.dev.vars.example"
+expect_fail "unknown Worker binding is rejected" "$worker_unknown" "B:"
+
+worker_changed="$fixture_root/worker-changed"
+write_tree "$worker_changed"
+sed 's/  CF_ACCOUNT_ID: string;/  WORKER_NEW_BINDING: string;/' "$worker_changed/apps/ai-proxy/src/contracts.ts" >"$worker_changed/changed.ts"
+mv "$worker_changed/changed.ts" "$worker_changed/apps/ai-proxy/src/contracts.ts"
+expect_fail "Worker contract changes require matching documentation" "$worker_changed" "A: required WORKER_NEW_BINDING"
+
+worker_vps="$fixture_root/worker-vps"
+write_tree "$worker_vps"
+printf 'CF_AIG_TOKEN=\n' >>"$worker_vps/docker/.env.example"
+expect_fail "Worker-only credentials are not VPS inputs" "$worker_vps" "B:"
 
 missing_required="$fixture_root/missing-required"
 write_tree "$missing_required"

@@ -3,7 +3,8 @@
 #
 # Compares an Infisical dotenv export against the code-owned env schema
 # (same sources as scripts/env-schema-check.sh: Go `env:"..."` tags +
-# Node getEnv reads). Key NAMES only; values are never inspected.
+# Node getEnv reads + Worker Env bindings). Key NAMES only; values are
+# never inspected.
 #
 # Usage (Infisical Cloud export — hits the Cloud API, needs network + auth):
 #   infisical export --domain https://app.infisical.com --projectId <id> \
@@ -41,8 +42,9 @@ fi
 GO_CONFIG="$ROOT_DIR/apps/api/internal/platform/config/config.go"
 AUTH_ENV="$ROOT_DIR/apps/auth/src/infrastructure/env.ts"
 RT_ENV="$ROOT_DIR/apps/realtime/src/infrastructure/env.ts"
+WORKER_ENV="$ROOT_DIR/apps/ai-proxy/src/contracts.ts"
 
-for f in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV"; do
+for f in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV" "$WORKER_ENV"; do
   if [[ ! -f "$f" ]]; then
     echo "infisical-drift-check: missing input $f" >&2
     exit 1
@@ -63,7 +65,14 @@ auth_keys="$(node_schema "$AUTH_ENV")"
 auth_req="$(node_required "$AUTH_ENV")"
 rt_keys="$(node_schema "$RT_ENV")"
 rt_req="$(node_required "$RT_ENV")"
-all_app_keys="$(printf '%s\n%s\n%s\n' "$go_keys" "$auth_keys" "$rt_keys" | sort -u)"
+worker_keys="$(worker_schema "$WORKER_ENV")"
+if [[ -z "$worker_keys" ]]; then
+  echo "infisical-drift-check: Worker Env binding schema is empty" >&2
+  exit 1
+fi
+all_app_keys="$(printf '%s\n%s\n%s\n%s\n' "$go_keys" "$auth_keys" "$rt_keys" "$worker_keys" | sort -u)"
+# Worker availability is checked by its local/deployment setup, not by VPS
+# bootstrap. Its bindings are recognized without making them VPS-required.
 all_required="$(printf '%s\n%s\n%s\n' "$go_req" "$auth_req" "$rt_req" | sort -u)"
 exported="$(export_keys)"
 non_infisical="$(printf '%s\n%s\n%s\n' "$(deploy_allowlist)" "$(third_party_allowlist)" "$(command_allowlist)" | sort -u)"

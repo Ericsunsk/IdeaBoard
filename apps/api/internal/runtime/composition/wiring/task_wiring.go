@@ -254,7 +254,7 @@ func NewAppTaskRuntime(
 		FailureRate:           float64(cfg.Worker.Resilience.BreakerFailureRatePercent) / 100,
 	}, redMetrics)
 	// Single Worker exit: one client, no provider branching. A missing
-	// WORKER_BASE_URL or INTERNAL_SECRET fails every image task closed
+	// WORKER_BASE_URL or WORKER_INTERNAL_SECRET fails every image task closed
 	// with a clear message before any send.
 	workerFactory := func(ctx context.Context) (runtimeports.WorkerClient, error) {
 		return providerinfra.NewWorkerClient(providerinfra.WorkerClientConfig{

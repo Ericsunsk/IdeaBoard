@@ -1,0 +1,7 @@
+# 本地 Wrangler bindings，由 scripts/ai-proxy-dev-vars.sh 从 Infisical dev
+# 读取完整 Worker Env。仅占位；真实 .dev.vars 为 0600，永不进 git。
+# dashboard 的 vars 不会自动进入本地 Wrangler。
+CF_ACCOUNT_ID=
+CF_GATEWAY_ID=
+CF_AIG_TOKEN=
+WORKER_INTERNAL_SECRET=

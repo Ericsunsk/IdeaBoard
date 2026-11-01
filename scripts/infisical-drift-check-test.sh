@@ -21,6 +21,18 @@ cleanup_path "$fixture_root"
 mkdir -p "$fixture_root/apps/api/internal/platform/config"
 mkdir -p "$fixture_root/apps/auth/src/infrastructure"
 mkdir -p "$fixture_root/apps/realtime/src/infrastructure"
+mkdir -p "$fixture_root/apps/ai-proxy/src"
+cat >"$fixture_root/apps/ai-proxy/src/contracts.ts" <<'EOF'
+export interface Env {
+  CF_ACCOUNT_ID: string;
+  CF_GATEWAY_ID: string;
+  CF_AIG_TOKEN: string;
+  WORKER_INTERNAL_SECRET: string;
+}
+export interface Payload {
+  NOT_A_BINDING: string;
+}
+EOF
 cat >"$fixture_root/apps/api/internal/platform/config/config.go" <<'EOF'
 package config
 
@@ -81,7 +93,20 @@ printf 'AUTH_INTERNAL_KEY=x\nPG_DB=x\n' >"$fixture_root/missing.env"
 printf 'API_PG_PASSWORD=x\nAUTH_INTERNAL_KEY=x\nNOPE_UNKNOWN=x\n' >"$fixture_root/unknown.env"
 printf 'API_PG_PASSWORD=x\nAUTH_INTERNAL_KEY=x\nIDEABOARD_API_IMAGE=x\n' >"$fixture_root/deploy.env"
 
-expect_pass "$fixture_root/green.env" "complete export"
+expect_pass "$fixture_root/green.env" "VPS-required export without optional Worker setup"
+cp "$fixture_root/green.env" "$fixture_root/worker.env"
+printf 'CF_ACCOUNT_ID=x\nCF_GATEWAY_ID=x\nCF_AIG_TOKEN=x\nWORKER_INTERNAL_SECRET=x\n' >>"$fixture_root/worker.env"
+expect_pass "$fixture_root/worker.env" "Worker bindings are recognized from their contract"
+printf 'NOT_A_BINDING=x\n' >>"$fixture_root/worker.env"
+expect_fail_with "$fixture_root/worker.env" "non-Env fields are not bindings" "NOT_A_BINDING"
+# Derive new names from the interface rather than a frozen key allowlist.
+sed 's/  CF_ACCOUNT_ID: string;/  WORKER_NEW_BINDING: string;/' "$fixture_root/apps/ai-proxy/src/contracts.ts" >"$fixture_root/changed.ts"
+mv "$fixture_root/changed.ts" "$fixture_root/apps/ai-proxy/src/contracts.ts"
+cp "$fixture_root/green.env" "$fixture_root/worker.env"
+printf 'WORKER_NEW_BINDING=x\n' >>"$fixture_root/worker.env"
+expect_pass "$fixture_root/worker.env" "new Worker contract binding is recognized"
+printf 'CF_ACCOUNT_ID=x\n' >>"$fixture_root/worker.env"
+expect_fail_with "$fixture_root/worker.env" "removed Worker binding is rejected" "CF_ACCOUNT_ID"
 for owner_key in POSTGRES_PASSWORD PG_MIGRATION_USER PG_MIGRATION_PASSWORD; do
   cp "$fixture_root/green.env" "$fixture_root/owner.env"
   printf '%s=x\n' "$owner_key" >> "$fixture_root/owner.env"

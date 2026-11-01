@@ -11,7 +11,7 @@ const env: Env = {
   CF_ACCOUNT_ID: "acct123",
   CF_GATEWAY_ID: "gw1",
   CF_AIG_TOKEN: "cf-token",
-  INTERNAL_SECRET: "s3cr3t",
+  WORKER_INTERNAL_SECRET: "s3cr3t",
 };
 
 function fakeInput(i: number): FetchedInput {

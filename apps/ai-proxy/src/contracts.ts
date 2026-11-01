@@ -17,7 +17,7 @@ export interface Env {
   CF_ACCOUNT_ID: string;
   CF_GATEWAY_ID: string;
   CF_AIG_TOKEN: string;
-  INTERNAL_SECRET: string;
+  WORKER_INTERNAL_SECRET: string;
 }
 
 export interface CanonicalImageRequest {

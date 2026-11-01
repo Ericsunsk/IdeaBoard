@@ -33,7 +33,7 @@ const (
 type WorkerClientConfig struct {
 	// BaseURL is the Worker service root, e.g. https://worker.internal.
 	BaseURL string
-	// Secret is the INTERNAL_SECRET bearer credential. Empty fails closed.
+	// Secret is the WORKER_INTERNAL_SECRET bearer credential. Empty fails closed.
 	Secret string
 	// Timeout bounds one call when the request sets none.
 	Timeout time.Duration
@@ -81,7 +81,7 @@ func NewWorkerClient(cfg WorkerClientConfig) (*WorkerClient, error) {
 		return nil, fmt.Errorf("worker base URL must be an http(s) URL with a host")
 	}
 	if strings.TrimSpace(cfg.Secret) == "" {
-		return nil, fmt.Errorf("worker secret is required (INTERNAL_SECRET)")
+		return nil, fmt.Errorf("worker secret is required (WORKER_INTERNAL_SECRET)")
 	}
 	timeout := cfg.Timeout
 	if timeout <= 0 {

@@ -48,6 +48,10 @@ services:
       NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
+      # AI image egress (sole ai-proxy Worker): empty fails image tasks
+      # closed per-task, never at boot.
+      WORKER_BASE_URL: ${WORKER_BASE_URL:-}
+      WORKER_INTERNAL_SECRET: ${WORKER_INTERNAL_SECRET:-}
     volumes:
       - api-uploads:/app/uploads
     ports:
@@ -115,6 +119,10 @@ services:
       RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
+      # AI image egress (sole ai-proxy Worker): empty fails image tasks
+      # closed per-task, never at boot.
+      WORKER_BASE_URL: ${WORKER_BASE_URL:-}
+      WORKER_INTERNAL_SECRET: ${WORKER_INTERNAL_SECRET:-}
     volumes:
       - api-uploads:/app/uploads
     healthcheck:

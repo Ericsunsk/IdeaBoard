@@ -8,7 +8,7 @@ const env: Env = {
   CF_ACCOUNT_ID: "acct123",
   CF_GATEWAY_ID: "gw1",
   CF_AIG_TOKEN: "cf-gateway-token-xyz",
-  INTERNAL_SECRET: "internal-abc",
+  WORKER_INTERNAL_SECRET: "internal-abc",
 };
 
 function req(
@@ -57,8 +57,8 @@ function mockFetchSuccess(expectedUpload: string) {
 }
 
 describe("auth", () => {
-  test("INTERNAL_SECRET 缺失 -> 401 fail-closed", async () => {
-    const noSecret = { ...env, INTERNAL_SECRET: "" };
+  test("WORKER_INTERNAL_SECRET 缺失 -> 401 fail-closed", async () => {
+    const noSecret = { ...env, WORKER_INTERNAL_SECRET: "" };
     const res = await handleGenerate(
       req("/v1/generate", {
         task_id: "t1",

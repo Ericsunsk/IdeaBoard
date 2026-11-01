@@ -50,8 +50,8 @@ func TestNewWorkerClientFailsClosedWithoutConfig(t *testing.T) {
 		t.Fatalf("missing base err = %v, want WORKER_BASE_URL fail-closed", err)
 	}
 	if _, err := NewWorkerClient(WorkerClientConfig{BaseURL: "https://w.example", Secret: ""}); err == nil ||
-		!strings.Contains(err.Error(), "INTERNAL_SECRET") {
-		t.Fatalf("missing secret err = %v, want INTERNAL_SECRET fail-closed", err)
+		!strings.Contains(err.Error(), "WORKER_INTERNAL_SECRET") {
+		t.Fatalf("missing secret err = %v, want WORKER_INTERNAL_SECRET fail-closed", err)
 	}
 }
 

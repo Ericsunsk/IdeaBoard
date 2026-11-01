@@ -3,7 +3,8 @@
 #
 # P0 env drift gate: the single source of truth for env names is code
 # (Go `env:"..."` tags + Node `getEnv[source], '...'` reads + the
-# `problems.push` / `missing = append(missing, ...)` required lists).
+# `problems.push` / `missing = append(missing, ...)` required lists, plus
+# the Worker Env binding interface).
 # Every `.env.example` is derived documentation and must track it:
 #
 #   A. required schema keys are documented in the owning .env.example
@@ -35,6 +36,8 @@ ROOT_DIR="${1:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 GO_CONFIG="$ROOT_DIR/apps/api/internal/platform/config/config.go"
 AUTH_ENV="$ROOT_DIR/apps/auth/src/infrastructure/env.ts"
 RT_ENV="$ROOT_DIR/apps/realtime/src/infrastructure/env.ts"
+WORKER_ENV="$ROOT_DIR/apps/ai-proxy/src/contracts.ts"
+WORKER_EXAMPLE="$ROOT_DIR/apps/ai-proxy/.dev.vars.example"
 API_EXAMPLE="$ROOT_DIR/apps/api/.env.example"
 AUTH_EXAMPLE="$ROOT_DIR/apps/auth/.env.example"
 RT_EXAMPLE="$ROOT_DIR/apps/realtime/.env.example"
@@ -150,7 +153,7 @@ check_no_legacy() {
   # Untracked-but-canonical example files (e.g. a newly added .env.example
   # awaiting git add) are scanned directly since git grep skips them.
   local doc
-  for doc in "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
+  for doc in "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
     [[ -f "$doc" ]] || continue
     while IFS= read -r hit; do
       [[ -z "$hit" ]] && continue
@@ -163,7 +166,7 @@ check_no_legacy() {
 
 check_no_weak_example_values() {
   local file
-  for file in "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE"; do
+  for file in "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE"; do
     [[ -f "$file" ]] || { fail "D: missing example file $file"; continue; }
     while IFS= read -r line; do
       [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -234,12 +237,12 @@ check_encrypted_env_keys() {
 
 main() {
   local file
-  for file in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
+  for file in "$GO_CONFIG" "$AUTH_ENV" "$RT_ENV" "$WORKER_ENV" "$WORKER_EXAMPLE" "$API_EXAMPLE" "$AUTH_EXAMPLE" "$RT_EXAMPLE" "$DOCKER_EXAMPLE" "$IMAGES_EXAMPLE" "$MIGRATION_EXAMPLE" "$COMPOSE" "$COMPOSE_LOCAL"; do
     [[ -f "$file" ]] || fail "missing input $file"
   done
   (( failures > 0 )) && return 1
 
-  local go_keys go_req auth_keys auth_req rt_keys rt_req
+  local go_keys go_req auth_keys auth_req rt_keys rt_req worker_keys
   local deploy_keys third_party command_keys all_known
   go_keys="$(go_schema "$GO_CONFIG")"
   go_req="$(go_required "$GO_CONFIG")"
@@ -247,6 +250,8 @@ main() {
   auth_req="$(node_required "$AUTH_ENV")"
   rt_keys="$(node_schema "$RT_ENV")"
   rt_req="$(node_required "$RT_ENV")"
+  worker_keys="$(worker_schema "$WORKER_ENV")"
+  [[ -n "$worker_keys" ]] || fail "Worker Env binding schema is empty"
   deploy_keys="$(deploy_allowlist)"
   third_party="$(third_party_allowlist)"
   command_keys="$(command_allowlist)"
@@ -256,6 +261,7 @@ main() {
   check_required_documented "go ValidateRequired" "$API_EXAMPLE" "$go_req"
   check_required_documented "auth loadEnv" "$AUTH_EXAMPLE" "$auth_req"
   check_required_documented "realtime loadEnv" "$RT_EXAMPLE" "$rt_req"
+  check_required_documented "Worker Env" "$WORKER_EXAMPLE" "$worker_keys"
   # Compose-required inputs must be settable from docker/.env.
   local compose_req docker_documented
   compose_req="$(printf '%s\n%s\n' "$(compose_required "$COMPOSE")" "$(compose_required "$COMPOSE_LOCAL")" | sort -u)"
@@ -271,6 +277,8 @@ main() {
   check_required_documented "migration" "$MIGRATION_EXAMPLE" "$(printf 'PG_HOST\nPG_PORT\nPG_DB\nPG_SSLMODE\nPG_MIGRATION_USER\nPG_MIGRATION_PASSWORD\n')"
 
   # B: example keys are known.
+  # Edge-only bindings belong to the Worker example, not VPS/Compose inputs.
+  check_example_known "$WORKER_EXAMPLE" "$worker_keys"
   check_example_known "$API_EXAMPLE" "$all_known"
   check_example_known "$AUTH_EXAMPLE" "$all_known"
   check_example_known "$RT_EXAMPLE" "$all_known"

@@ -21,6 +21,12 @@ node_schema() {
 # Node always-required names from problems.push('NAME is required').
 node_required() { grep -o "problems\.push('[A-Z][A-Z0-9_]* is required'" "$1" | cut -d"'" -f2 | awk '{print $1}' | sort -u || true; }
 
+# Worker bindings come from its owned Env interface, not provider payloads.
+worker_schema() {
+  sed -n '/^export interface Env {$/,/^}/p' "$1" |
+    sed -nE 's/^[[:space:]]+([A-Z][A-Z0-9_]*): string;$/\1/p' | sort -u
+}
+
 # Example keys (active or commented) from KEY= / # KEY= lines.
 example_keys() { grep -oE '^[[:space:]]*#?[[:space:]]*[A-Z][A-Z0-9_]*=' "$1" | grep -oE '[A-Z][A-Z0-9_]*' | sort -u || true; }
 

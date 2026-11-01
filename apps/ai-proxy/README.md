@@ -5,7 +5,7 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 
 ## 冻结合同（唯一出口）
 
-- `POST /v1/generate`，`Authorization: Bearer INTERNAL_SECRET`。
+- `POST /v1/generate`，`Authorization: Bearer WORKER_INTERNAL_SECRET`。
   Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai`、`model`、`prompt`、
   `negative_prompt?`、`width?`、`height?`、`steps?`、`guidance_scale?`、`seed?`、
   `images?: string[]`（presigned GET URL）与可选 `mask_index?: number`（显式零基 mask 索引）、`provider_options?`、
@@ -20,7 +20,7 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 - Go Worker 输出 URL 始终经 API HMAC route；Local/S3 后端共用同一验证后再写入对象，S3 读取走独立 presigned GET 并使用对象真实 MIME。未放宽浏览器 upload 的 S3 签名合同。
 - 所有 Gateway transport（Fal/OpenAI 与携带 gateway id 的 `@cf/` Airun）强制 `cf-aig-skip-cache: true`、`cf-aig-collect-log-payload: false`，`provider_options` 无权覆盖。
 - S3/网关密钥永不进 Worker 日志；`safeLog` 只记 `task_id/provider/model/path_source/upstream_status/duration_ms/code`。
-- `INTERNAL_SECRET` 缺失即 fail-closed：任何请求都 401。
+- `WORKER_INTERNAL_SECRET` 缺失即 fail-closed：任何请求都 401。
 
 ## Endpoint slug（置顶常量，见 `src/providers/airun/index.ts` 与 `src/providers/gateway/index.ts`）
 
@@ -58,12 +58,12 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
 
 ## 环境变量
 
-| 变量              | 说明                                           |
-| ----------------- | ---------------------------------------------- |
-| `CF_ACCOUNT_ID`   | Gateway account id（vars）                     |
-| `CF_GATEWAY_ID`   | Gateway id（vars）                             |
-| `CF_AIG_TOKEN`    | Gateway token（secret，`wrangler secret put`） |
-| `INTERNAL_SECRET` | 后端→Worker 鉴权（secret，缺失即 401）         |
+| 变量                     | 说明                                                                   |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `CF_ACCOUNT_ID`          | Gateway account id（线上 vars；本地从 Infisical dev 写入 `.dev.vars`） |
+| `CF_GATEWAY_ID`          | Gateway id（线上 vars；本地从 Infisical dev 写入 `.dev.vars`）         |
+| `CF_AIG_TOKEN`           | Gateway token（线上 Secret；本地仅 `.dev.vars`）                       |
+| `WORKER_INTERNAL_SECRET` | 后端→Worker 鉴权（线上 Secret；本地仅 `.dev.vars`；缺失即 401）        |
 
 ## 运行与验证
 
@@ -76,7 +76,23 @@ npm run test:contract # Go 编码 → 真实 Edge 入口 → Go 解码（需 Go�
 npm run dev     # wrangler dev（需先配 vars + secrets）
 ```
 
+本地 dev：先安装此目录的 npm dependencies，再在仓库根目录运行
+`scripts/ai-proxy-dev-vars.sh`。它按 `src/contracts.ts` 的 `Env` 从 Infisical dev
+读取全部四个 bindings（两个 IDs、两个 secrets），原子写入 0600 的
+`apps/ai-proxy/.dev.vars`。任一值缺失、重复或为空则拒绝覆盖旧文件。
+这四项都需在 Infisical dev root 配齐；dashboard vars 和普通进程 env 不会自动成为本地 bindings。
+模板见 `.dev.vars.example`；真实文件和写入临时文件都被 Git 忽略。
+
+随后在仓库根目录 `process-compose up`，或 `cd apps/ai-proxy && npm run dev -- --port 8787`；
+两者都使用项目内安装的 Wrangler。Infisical dev 的 `WORKER_BASE_URL` 填
+`http://localhost:8787`。不需要把本机 IDs 或 secrets 写入 tracked `wrangler.toml`。
+
 Go wire 定义统一由 `apps/api/internal/platform/workerwire` 拥有；Runtime 的 timeout、metrics 与本地 metadata 不进入 wire。`test:contract` 使用该目录的共享 request fixture，严格检查 JSON 往返不丢字段，再通过真实 Edge entry 验证 generate、零值数字、显式 mask、无图片/上传的 dry-run、实际 MIME、receipt 和全部 failure code；所有 HTTP(S) fetch 及 PUT 均使用本地 mock。普通 `go test` 不依赖 Node。
+
+## 部署
+
+Cloudflare Git 直连、production/preview 隔离、环境变量同步及回滚步骤统一见
+[部署 runbook](../../docs/runbooks/deployment.md#ai-proxy-worker-部署cloudflare-git-直连)。
 
 ## 待首单实测确认项（P0）
 
