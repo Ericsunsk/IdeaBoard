@@ -17,10 +17,8 @@ vi.mock('@/core/composables/useConfirmDialog', () => ({
   useConfirm: () => ({ confirm: confirmMock }),
 }))
 
-// Observed/route-preview have no control equivalent (fail-closed in
-// the resource); page UX keeps coverage through fakes while the resource
-// spec pins the fail-closed contract. Providers ride the real resource
-// over MSW control handlers. Everything else rides the real resource.
+// Providers, observed snapshots and route previews use page-level fakes;
+// resource contract specs cover their Control API adapters.
 vi.mock('../../resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../resource')>()
   return {

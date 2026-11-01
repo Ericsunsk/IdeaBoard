@@ -8,7 +8,7 @@ import {
   UnsupportedModelError,
   dryBodyWithImagePlaceholders,
   type VendorInput,
-} from "../index.js";
+} from "../shared.js";
 
 // additionalProperties:false：provider_options 白名单，超集直接拒绝。
 const ALLOWED_OPTIONS = new Set([

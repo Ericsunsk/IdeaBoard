@@ -98,7 +98,7 @@ describe('Admin gateway resource', () => {
     })
   })
 
-  it('previews routes, lists configured providers, and probes connections through control', async () => {
+  it('previews routes and lists configured providers through control', async () => {
     const seen: Array<{ path: string; body: unknown }> = []
     useMswHandlers(
       http.post('/api/control/v1/platform/ai-gateway/route-preview', async ({ request }) => {
@@ -127,21 +127,6 @@ describe('Admin gateway resource', () => {
           ],
         }),
       ),
-      http.post('/api/control/v1/platform/ai-gateway/test-connection', async ({ request }) => {
-        seen.push({
-          path: 'test-connection',
-          body: await request.json(),
-        })
-        return HttpResponse.json({
-          data: {
-            // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
-            reachable: true,
-            status_code: 200,
-            latency_ms: 38,
-            message: 'ok',
-          },
-        })
-      }),
     )
     const resource = createAdminGatewayResource()
 
@@ -166,18 +151,6 @@ describe('Admin gateway resource', () => {
       { slug: 'openai', display_name: 'OpenAI' },
       { slug: 'workers-ai', display_name: 'Workers AI' },
     ])
-
-    await expect(
-      resource.connection.testConnection(
-        { base_url: 'https://worker.example.com', secret: 's3cr3t', model: 'openai/gpt-image-1' },
-        options,
-      ),
-    ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
-    expect(seen[2]?.body).toMatchObject({
-      base_url: 'https://worker.example.com',
-      secret: 's3cr3t',
-      model: 'openai/gpt-image-1',
-    })
   })
 
   it('passes custom domain update payload with explicit identity through', async () => {

@@ -10,60 +10,6 @@ import (
 	"ideaboard/api/internal/platform/safehttp"
 )
 
-// Parity pin: workerDryRunBody/workerDryRunRequest must stay key-identical to
-// apps/ai-proxy/src/contracts.ts CanonicalImageRequest (task_id, provider,
-// model, prompt, negative_prompt?, width?, height?, steps?, guidance_scale?,
-// seed?, images?, provider_options?, upload_url?, public_url?).
-//
-// The constructor is exercised by marshaling only (no network). If the TS
-// side adds or renames a field, extend workerDryRunRequest in model.go and
-// the expectation below together — a red test here means the Go dry-run
-// body drifted from the TS contract.
-func TestWorkerDryRunBodyMatchesContractsShape(t *testing.T) {
-	full := workerDryRunRequest{
-		TaskID:          "probe",
-		Provider:        "openai",
-		Model:           "gpt-image-1",
-		Prompt:          "probe",
-		NegativePrompt:  strPtr("no blur"),
-		Width:           intPtr(1024),
-		Height:          intPtr(1024),
-		Steps:           intPtr(20),
-		GuidanceScale:   floatPtr(3.5),
-		Seed:            uintPtr(7),
-		Images:          []string{"https://example.com/in.png"},
-		ProviderOptions: map[string]any{"quality": "high"},
-		UploadURL:       strPtr("https://example.com/up"),
-		PublicURL:       strPtr("https://example.com/pub"),
-	}
-	raw, err := json.Marshal(full)
-	if err != nil {
-		t.Fatalf("marshal full dry-run request: %v", err)
-	}
-	var decoded map[string]any
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		t.Fatalf("unmarshal dry-run request: %v", err)
-	}
-	var got []string
-	for k := range decoded {
-		got = append(got, k)
-	}
-	sort.Strings(got)
-	want := []string{
-		"guidance_scale", "height", "images", "model", "negative_prompt",
-		"prompt", "provider", "provider_options", "public_url", "seed",
-		"steps", "task_id", "upload_url", "width",
-	}
-	if len(got) != len(want) {
-		t.Fatalf("dry-run keys = %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("dry-run keys = %v, want %v", got, want)
-		}
-	}
-}
-
 // The shared constructor omits every unset optional (omitempty), so the
 // minimal probe body carries exactly the four required TS keys.
 func TestWorkerDryRunBodyOmitsEmptyOptionals(t *testing.T) {
@@ -147,8 +93,3 @@ func sortedKeys(m map[string]any) []string {
 	sort.Strings(keys)
 	return keys
 }
-
-func strPtr(s string) *string     { return &s }
-func intPtr(i int) *int           { return &i }
-func floatPtr(f float64) *float64 { return &f }
-func uintPtr(u uint64) *uint64    { return &u }

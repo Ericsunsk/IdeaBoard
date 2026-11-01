@@ -189,12 +189,3 @@ func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context
 func cloneMaterializedResults(result taskmedia.MaterializedResults) taskmedia.MaterializedResults {
 	return taskmedia.MaterializedResults{Items: append([]taskmedia.MaterializedResult(nil), result.Items...)}
 }
-
-func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
-}

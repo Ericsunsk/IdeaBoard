@@ -54,7 +54,11 @@
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.routeValidityLabel }}</span>
           <span
             class="inline-flex rounded-control px-1 text-admin-micro font-medium"
-            :class="routePreview.isValid ? 'bg-success-soft text-success' : 'bg-destructive-soft text-destructive'"
+            :class="
+              routePreview.isValid
+                ? 'bg-success-soft text-success'
+                : 'bg-destructive-soft text-destructive'
+            "
           >
             {{ routePreview.isValid ? MODELS_MESSAGES.routeValid : MODELS_MESSAGES.routeInvalid }}
           </span>
@@ -87,7 +91,6 @@ export interface WorkerPreviewState {
   provider: string
   model: string
   isValid: boolean
-  isReachable: boolean
   message: string
 }
 

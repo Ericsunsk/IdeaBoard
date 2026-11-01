@@ -77,9 +77,7 @@ import { useForm, firstFormError } from '@/components/ui/form'
 import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
-import CatalogPreviewCard, {
-  type WorkerPreviewState,
-} from './components/CatalogPreviewCard.vue'
+import CatalogPreviewCard, { type WorkerPreviewState } from './components/CatalogPreviewCard.vue'
 import { MODELS_MESSAGES } from '../pages/messages'
 
 const props = defineProps<{
@@ -154,7 +152,6 @@ const gatewayRoutePreview = ref<WorkerPreviewState>({
   provider: MODELS_MESSAGES.editRouteUnspecified,
   model: '-',
   isValid: false,
-  isReachable: false,
   message: MODELS_MESSAGES.editRouteUnavailable,
 })
 let routePreviewVersion = 0
@@ -167,7 +164,6 @@ async function refreshGatewayRoutePreview() {
       provider: MODELS_MESSAGES.editRouteUnspecified,
       model: '-',
       isValid: false,
-      isReachable: false,
       message: MODELS_MESSAGES.editRouteUnavailable,
     }
     return
@@ -183,7 +179,6 @@ async function refreshGatewayRoutePreview() {
       provider: preview.provider || MODELS_MESSAGES.editRouteUnspecified,
       model: preview.model || modelId,
       isValid: preview.valid,
-      isReachable: preview.reachable,
       message: preview.message || MODELS_MESSAGES.editRouteUnavailable,
     }
   } catch {
@@ -192,7 +187,6 @@ async function refreshGatewayRoutePreview() {
       provider: MODELS_MESSAGES.editRouteUnspecified,
       model: modelId,
       isValid: false,
-      isReachable: false,
       message: MODELS_MESSAGES.editRouteUnavailable,
     }
   }

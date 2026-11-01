@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/workerwire"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -82,29 +83,6 @@ func PreviewWorkerRoute(ctx context.Context, baseURL, secret, modelID, customPar
 	return preview
 }
 
-// workerDryRunRequest mirrors apps/ai-proxy/src/contracts.ts
-// CanonicalImageRequest field-for-field (dry-run accepts the same shape;
-// upload_url stays optional). Preview and Probe share newWorkerDryRunBody
-// so the two call sites cannot hand-build divergent maps: if the TS
-// contract gains a field, add it here (omitempty when TS marks it optional)
-// and extend TestWorkerDryRunBodyMatchesContractsShape together.
-type workerDryRunRequest struct {
-	TaskID          string         `json:"task_id"`
-	Provider        string         `json:"provider"`
-	Model           string         `json:"model"`
-	Prompt          string         `json:"prompt"`
-	NegativePrompt  *string        `json:"negative_prompt,omitempty"`
-	Width           *int           `json:"width,omitempty"`
-	Height          *int           `json:"height,omitempty"`
-	Steps           *int           `json:"steps,omitempty"`
-	GuidanceScale   *float64       `json:"guidance_scale,omitempty"`
-	Seed            *uint64        `json:"seed,omitempty"`
-	Images          []string       `json:"images,omitempty"`
-	ProviderOptions map[string]any `json:"provider_options,omitempty"`
-	UploadURL       *string        `json:"upload_url,omitempty"`
-	PublicURL       *string        `json:"public_url,omitempty"`
-}
-
 // newWorkerDryRunBody is the single dry-run request constructor shared by
 // PreviewWorkerRoute and ProbeWorkerConnection. Custom params ride
 // provider_options under the canonical workflow.ParseProviderOptions rule
@@ -114,12 +92,14 @@ func newWorkerDryRunBody(provider, model, customParams string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(workerDryRunRequest{
-		TaskID:          "probe",
-		Provider:        provider,
-		Model:           model,
-		Prompt:          "probe",
-		ProviderOptions: options,
+	return json.Marshal(workerwire.DryRunRequest{
+		ImageRequest: workerwire.ImageRequest{
+			TaskID:          "probe",
+			Provider:        provider,
+			Model:           model,
+			Prompt:          "probe",
+			ProviderOptions: options,
+		},
 	})
 }
 
@@ -176,7 +156,7 @@ func probeWorkerConnection(ctx context.Context, baseURL, secret, modelID, custom
 	if err != nil {
 		return ConnectionProbeResult{Message: errorrender.MsgProbeWorkerConnection4 + err.Error()}
 	}
-	probeURL := trimmed + "/v1/dry-run"
+	probeURL := trimmed + workerwire.DryRunPath
 
 	start := time.Now()
 
@@ -212,7 +192,7 @@ func probeWorkerConnection(ctx context.Context, baseURL, secret, modelID, custom
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
 	latency := time.Since(start).Milliseconds()
-	detail := probeDryRunDetail(resp.StatusCode, respBody)
+	detail := probeDryRunDetail(respBody)
 	if resp.StatusCode != http.StatusOK {
 		return ConnectionProbeResult{
 			Reachable:  false,
@@ -244,19 +224,12 @@ func dryRunPathSource(body []byte) string {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return ""
 	}
-	var dryRun struct {
-		Target *struct {
-			PathSource string `json:"path_source"`
-		} `json:"target"`
-		PathSource string `json:"path_source"`
-	}
+	var dryRun workerwire.DryRunResponse
 	if err := json.Unmarshal(body, &dryRun); err != nil {
 		return ""
 	}
-	if dryRun.Target != nil {
-		if source := strings.TrimSpace(dryRun.Target.PathSource); source != "" {
-			return source
-		}
+	if source := strings.TrimSpace(dryRun.Target.PathSource); source != "" {
+		return source
 	}
 	return strings.TrimSpace(dryRun.PathSource)
 }
@@ -264,21 +237,16 @@ func dryRunPathSource(body []byte) string {
 // probeDryRunDetail extracts the Worker dry-run path_source (or the edge
 // failure code) for the Admin message. Bodies stay truncated; secrets never
 // appear (the Worker masks them server-side).
-func probeDryRunDetail(status int, body []byte) string {
+func probeDryRunDetail(body []byte) string {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return ""
 	}
-	var dryRun struct {
-		Error *struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(body, &dryRun); err != nil {
+	var failure workerwire.Failure
+	if err := json.Unmarshal(body, &failure); err != nil {
 		return ""
 	}
-	if dryRun.Error != nil && strings.TrimSpace(dryRun.Error.Code) != "" {
-		return " (" + strings.TrimSpace(dryRun.Error.Code) + ")"
+	if strings.TrimSpace(failure.Error.Code) != "" {
+		return " (" + strings.TrimSpace(failure.Error.Code) + ")"
 	}
 	if source := dryRunPathSource(body); source != "" {
 		return " (" + source + ")"

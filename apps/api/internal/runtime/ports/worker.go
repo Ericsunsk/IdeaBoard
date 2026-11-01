@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/platform/workerwire"
 )
 
 // WorkerDefaultTimeout bounds one Worker attempt. It nests inside the
@@ -15,21 +17,21 @@ import (
 // default and provider execution share it.
 const WorkerDefaultTimeout = 300 * time.Second
 
-// Edge Worker error codes (mirror apps/ai-proxy contracts.ts).
+// Runtime failure classifiers use the shared Worker wire error codes.
 const (
-	WorkerErrorBadRequest       = "BAD_REQUEST"
-	WorkerErrorUnauthorized     = "UNAUTHORIZED"
-	WorkerErrorUpstream         = "UPSTREAM_ERROR"
-	WorkerErrorUnsupportedModel = "UNSUPPORTED_MODEL"
-	WorkerErrorInputFetchFailed = "INPUT_FETCH_FAILED"
-	WorkerErrorUploadFailed     = "UPLOAD_FAILED"
-	WorkerErrorAdapterInternal  = "ADAPTER_INTERNAL_ERROR"
+	WorkerErrorBadRequest       = workerwire.ErrorBadRequest
+	WorkerErrorUnauthorized     = workerwire.ErrorUnauthorized
+	WorkerErrorUpstream         = workerwire.ErrorUpstream
+	WorkerErrorUnsupportedModel = workerwire.ErrorUnsupportedModel
+	WorkerErrorInputFetchFailed = workerwire.ErrorInputFetchFailed
+	WorkerErrorUploadFailed     = workerwire.ErrorUploadFailed
+	WorkerErrorAdapterInternal  = workerwire.ErrorAdapterInternal
 )
 
 // WorkerRequest is one image generation call through the sole Worker egress
 // (ai-proxy service). Field names mirror CanonicalImageRequest: the
 // Worker owns shaping, provider routing, and retries. The API only sends
-// canonical task facts plus presigned media URLs (inputs first, mask last;
+// canonical task facts plus presigned media URLs (explicit MaskIndex;
 // single presigned PUT for the output).
 type WorkerRequest struct {
 	// TaskID is the workspace task public id.
@@ -45,8 +47,10 @@ type WorkerRequest struct {
 	Height int
 	// Seed pins deterministic generation; always set from the snapshot.
 	Seed uint64
-	// Images carries presigned GET URLs: input images first, mask last.
+	// Images carries ordered presigned GET URLs; MaskIndex identifies an optional mask.
 	Images []string
+	// MaskIndex explicitly identifies the zero-based mask in Images; nil means references only.
+	MaskIndex *int
 	// ProviderOptions carries opaque operator custom JSON (object only).
 	ProviderOptions map[string]interface{}
 	// UploadURL is the presigned PUT for the single output (exact key,
@@ -69,7 +73,14 @@ func (r WorkerRequest) Validate() error {
 	if strings.TrimSpace(r.UploadURL) == "" {
 		return fmt.Errorf("worker request requires an upload URL")
 	}
-	if len(r.Images) > 4 {
+	references := len(r.Images)
+	if r.MaskIndex != nil {
+		if *r.MaskIndex < 0 || *r.MaskIndex >= len(r.Images) || len(r.Images) < 2 {
+			return fmt.Errorf("worker mask index must identify a mask alongside an input image")
+		}
+		references--
+	}
+	if references > 4 {
 		return fmt.Errorf("worker request carries at most 4 input images")
 	}
 	if r.Timeout < 0 {

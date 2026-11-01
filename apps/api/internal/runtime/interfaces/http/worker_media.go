@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/workspacemedia"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 
@@ -75,8 +76,8 @@ func (h *WorkerMediaHandler) ServeGET(c *gin.Context) {
 }
 
 // ServePUT stores one presigned output object after HMAC verification.
-// The header content-type must equal the signed binding; the key must stay
-// under the worker slot root.
+// The signed binding is an exact supported MIME or SlotImagePolicy; both
+// require matching MIME and a complete image. The key stays under the worker slot root.
 func (h *WorkerMediaHandler) ServePUT(c *gin.Context) {
 	if h == nil || h.objects == nil || strings.TrimSpace(h.secret) == "" {
 		RenderV1BinaryError(c, http.StatusServiceUnavailable)
@@ -95,7 +96,8 @@ func (h *WorkerMediaHandler) ServePUT(c *gin.Context) {
 	if headerType == "" {
 		headerType = strings.TrimSpace(c.ContentType())
 	}
-	if !strings.EqualFold(headerType, verified.ContentType) {
+	headerType = strings.ToLower(headerType)
+	if !platformworkermedia.AllowedOutputContentType(headerType) || (verified.ContentType != platformworkermedia.SlotImagePolicy && headerType != verified.ContentType) {
 		RenderV1BinaryError(c, http.StatusBadRequest)
 		return
 	}
@@ -108,7 +110,12 @@ func (h *WorkerMediaHandler) ServePUT(c *gin.Context) {
 		RenderV1BinaryError(c, http.StatusRequestEntityTooLarge)
 		return
 	}
-	if err := h.objects.PutObjectAtProfile(c.Request.Context(), workspacemedia.DefaultStorageProfile, verified.Key, body, verified.ContentType); err != nil {
+	facts, err := imageformat.InspectCompleteDetectedBytes(body)
+	if err != nil || facts.MIMEType != headerType {
+		RenderV1BinaryError(c, http.StatusBadRequest)
+		return
+	}
+	if err := h.objects.PutObjectAtProfile(c.Request.Context(), workspacemedia.DefaultStorageProfile, verified.Key, body, facts.MIMEType); err != nil {
 		RenderV1BinaryError(c, http.StatusBadGateway)
 		return
 	}

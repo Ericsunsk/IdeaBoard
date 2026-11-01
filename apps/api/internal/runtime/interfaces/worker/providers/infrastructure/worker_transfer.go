@@ -2,34 +2,64 @@ package providerinfra
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/media/imageformat"
 	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/media/workspacemedia"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 )
 
-// WorkerTransfer is the single presigned-media seam for Worker execution:
-// exact keys, bound content-types, short TTLs, plus landed-object reads.
-// Production mints HMAC URLs served by the API media route; tests inject a
-// fake over httptest.
+// WorkerTransfer owns the presigned-media handoff. Output slots retain their
+// exact key and image policy; callers receive only a verified image result.
 type WorkerTransfer interface {
 	// PresignInputGET mints a presigned GET for one canonical input asset.
 	PresignInputGET(ctx context.Context, workspaceID, publicAssetID string) (url, key string, err error)
-	// MintOutputKey renders the exact storage key for the single result.
-	MintOutputKey(workspaceID, taskID string) string
-	// PresignOutputPUT mints the presigned PUT for the exact output key.
-	PresignOutputPUT(key, contentType string) (url string, expiresAt time.Time, err error)
-	// ImageKeyFromURL recovers the exact key from a landed image URL.
-	ImageKeyFromURL(rawURL string) (string, error)
-	// VerifyLandedKey recovers the exact key from a landed image URL and
-	// fails closed unless it equals the minted slot key: parse and
-	// exact-equality in one call, so callers cannot use an unverified key.
-	VerifyLandedKey(rawURL, expectedKey string) (string, error)
-	// ReadLandedObject reads back bytes the Worker landed at key.
-	ReadLandedObject(ctx context.Context, key string) (data []byte, contentType string, err error)
+	PrepareOutput(workspaceID, taskID string) (*WorkerOutputSlot, error)
+}
+
+// WorkerOutputSlot binds one upload to its trusted result. Its key, policy and
+// object reader are private so acceptance cannot skip exact-key verification.
+type WorkerOutputSlot struct {
+	uploadURL string
+	key       string
+	objects   WorkerObjectStore
+}
+
+func (s *WorkerOutputSlot) UploadURL() string {
+	if s == nil {
+		return ""
+	}
+	return s.uploadURL
+}
+
+// Accept verifies the echoed URL before any bounded object read, then checks
+// complete image bytes and agreement between actual, stored and reported MIME.
+// The PUT route independently verifies the upload's HMAC and image integrity.
+func (s *WorkerOutputSlot) Accept(ctx context.Context, imageURL, contentType string) (string, error) {
+	if s == nil || s.objects == nil || !platformworkermedia.ValidSlotKey(s.key) {
+		return "", fmt.Errorf("worker output slot is not configured")
+	}
+	key, err := platformworkermedia.ParseKey(imageURL)
+	if err != nil || key != s.key {
+		return "", fmt.Errorf("worker image URL does not match the presigned output slot")
+	}
+	object, err := s.objects.ReadObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, s.key, workspacemedia.MaxUploadSizeBytes)
+	if err != nil {
+		return "", fmt.Errorf("read worker landed object: %w", err)
+	}
+	if object == nil || len(object.Data) == 0 || int64(len(object.Data)) > workspacemedia.MaxUploadSizeBytes {
+		return "", fmt.Errorf("worker landed object is empty or exceeds size limit")
+	}
+	facts, err := imageformat.InspectCompleteDetectedBytes(object.Data)
+	if err != nil || !platformworkermedia.AllowedOutputContentType(facts.MIMEType) ||
+		strings.ToLower(strings.TrimSpace(object.ContentType)) != facts.MIMEType || contentType != facts.MIMEType {
+		return "", fmt.Errorf("worker landed image content type or bytes mismatch")
+	}
+	return "data:" + facts.MIMEType + ";base64," + base64.StdEncoding.EncodeToString(object.Data), nil
 }
 
 // WorkerAssetStore resolves canonical asset storage facts for presigning.
@@ -62,21 +92,6 @@ func NewWorkerTransfer(assets WorkerAssetStore, objects WorkerObjectStore, origi
 		origin: strings.TrimRight(strings.TrimSpace(origin), "/"),
 		secret: secret,
 	}
-}
-
-// WorkerSlotContentType returns the bound output slot content-type.
-func WorkerSlotContentType() string { return platformworkermedia.SlotContentType }
-
-// WorkerSlotTTL returns the short presigned-URL validity.
-func WorkerSlotTTL() time.Duration { return platformworkermedia.SlotTTL }
-
-// MintWorkerOutputKey renders the exact storage key for the single result.
-func MintWorkerOutputKey(workspaceID, taskID string) string {
-	return platformworkermedia.MintOutputKey(workspaceID, taskID)
-}
-
-func (t *workerTransfer) MintOutputKey(workspaceID, taskID string) string {
-	return platformworkermedia.MintOutputKey(workspaceID, taskID)
 }
 
 func (t *workerTransfer) baseURL() (string, error) {
@@ -115,81 +130,24 @@ func (t *workerTransfer) PresignInputGET(ctx context.Context, workspaceID, publi
 	return signed, asset.StorageKey, nil
 }
 
-// PresignOutputPUT mints the presigned PUT for the exact output key, bound
-// to the slot content-type with short expiry.
-func (t *workerTransfer) PresignOutputPUT(key, contentType string) (string, time.Time, error) {
-	if t == nil {
-		return "", time.Time{}, fmt.Errorf("worker transfer is not configured")
+// PrepareOutput creates the single fixed-policy slot and keeps its storage key
+// inside the acceptance handle. An unconfigured object reader fails before send.
+func (t *workerTransfer) PrepareOutput(workspaceID, taskID string) (*WorkerOutputSlot, error) {
+	if t == nil || t.objects == nil {
+		return nil, fmt.Errorf("worker object store is not configured")
 	}
 	base, err := t.baseURL()
 	if err != nil {
-		return "", time.Time{}, err
+		return nil, err
 	}
-	key = strings.TrimSpace(key)
+	key := platformworkermedia.MintOutputKey(workspaceID, taskID)
 	if !platformworkermedia.ValidSlotKey(key) {
-		return "", time.Time{}, fmt.Errorf("worker media key is invalid")
-	}
-	contentType = strings.TrimSpace(contentType)
-	if contentType == "" {
-		return "", time.Time{}, fmt.Errorf("worker media slot requires a content type")
+		return nil, fmt.Errorf("worker media key is invalid")
 	}
 	expiresAt := time.Now().UTC().Add(platformworkermedia.SlotTTL)
-	return platformworkermedia.SignURL(base, t.secret, "PUT", key, contentType, expiresAt), expiresAt, nil
-}
-
-// ImageKeyFromURL recovers the exact key from a landed image URL.
-func (t *workerTransfer) ImageKeyFromURL(rawURL string) (string, error) {
-	if t == nil {
-		return "", fmt.Errorf("worker transfer is not configured")
-	}
-	return platformworkermedia.ParseKey(rawURL)
-}
-
-// VerifyLandedKey parses a landed image URL and enforces exact equality
-// with the minted slot key in one call. The Worker echoes upload_url
-// without its query, so no signature rides along to verify: safety comes
-// from this equality check (plus the PUT-time HMAC verified by the media
-// route and the slot-root check on the read path).
-func VerifyLandedKey(rawURL, expectedKey string) (string, error) {
-	key, err := platformworkermedia.ParseKey(rawURL)
-	if err != nil {
-		return "", fmt.Errorf("worker image URL does not match the presigned output slot: %v", err)
-	}
-	expectedKey = strings.TrimSpace(expectedKey)
-	if expectedKey == "" || strings.TrimSpace(key) != expectedKey {
-		return "", fmt.Errorf("worker image URL does not match the presigned output slot")
-	}
-	return key, nil
-}
-
-// VerifyLandedKey implements WorkerTransfer: parse plus exact-equality
-// against the minted slot key in one call.
-func (t *workerTransfer) VerifyLandedKey(rawURL, expectedKey string) (string, error) {
-	if t == nil {
-		return "", fmt.Errorf("worker transfer is not configured")
-	}
-	return VerifyLandedKey(rawURL, expectedKey)
-}
-
-// ReadLandedObject reads back bytes the Worker landed at the exact key.
-func (t *workerTransfer) ReadLandedObject(ctx context.Context, key string) ([]byte, string, error) {
-	if t == nil || t.objects == nil {
-		return nil, "", fmt.Errorf("worker object store is not configured")
-	}
-	key = strings.TrimSpace(key)
-	if !platformworkermedia.ValidSlotKey(key) {
-		return nil, "", fmt.Errorf("worker media key is invalid")
-	}
-	object, err := t.objects.ReadObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, key, workspacemedia.MaxUploadSizeBytes)
-	if err != nil {
-		return nil, "", fmt.Errorf("read worker landed object: %w", err)
-	}
-	if object == nil || len(object.Data) == 0 {
-		return nil, "", fmt.Errorf("worker landed object is empty")
-	}
-	contentType := strings.ToLower(strings.TrimSpace(object.ContentType))
-	if contentType == "" {
-		contentType = platformworkermedia.SlotContentType
-	}
-	return object.Data, contentType, nil
+	return &WorkerOutputSlot{
+		uploadURL: platformworkermedia.SignURL(base, t.secret, "PUT", key, platformworkermedia.SlotImagePolicy, expiresAt),
+		key:       key,
+		objects:   t.objects,
+	}, nil
 }

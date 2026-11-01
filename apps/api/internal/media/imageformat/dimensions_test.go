@@ -51,6 +51,16 @@ func TestInspectBytesRejectsHugePNGHeaderBeforeFullDecode(t *testing.T) {
 	}
 }
 
+func TestInspectCompleteChecksDimensionsBeforeDecodingBody(t *testing.T) {
+	_, err := InspectCompleteDetectedBytes(buildPNGConfigOnly(20000, 20000))
+	if err == nil || !strings.Contains(err.Error(), "图片尺寸超过限制") {
+		t.Fatalf("expected dimension-limit error before body decode, got %v", err)
+	}
+	if _, err := InspectCompleteDetectedBytes(buildPNGConfigOnly(1, 1)); err == nil {
+		t.Fatal("accepted a complete header without image body")
+	}
+}
+
 func TestInspectRejectsCorruptImageAndResetsReader(t *testing.T) {
 	reader := bytes.NewReader([]byte("not an image"))
 	_, err := Inspect(reader, ".png")

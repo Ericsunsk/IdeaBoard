@@ -1,5 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import worker from "./index.js";
 import { handleDryRun, handleGenerate } from "./handler.js";
 import type { Env } from "./contracts.js";
 
@@ -34,7 +35,7 @@ function mockFetchSuccess(expectedUpload: string) {
       u.startsWith("https://gateway.ai.cloudflare.com") ||
       u.startsWith("https://api.cloudflare.com/client/v4/accounts/")
     ) {
-      const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3])
+      const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
         .buffer as ArrayBuffer;
       return new Response(bytes, {
         status: 200,
@@ -304,4 +305,264 @@ describe("dry-run 自测", () => {
     );
     assert.equal(res.status, 400);
   });
+});
+
+test("invalid image roles fail before any fetch in generate and dry-run", async () => {
+  for (const mask_index of [-1, 2, 0.5, null]) {
+    const body = {
+      task_id: "roles",
+      provider: "fal",
+      model: "m",
+      prompt: "p",
+      images: ["https://media.test/1", "https://media.test/2"],
+      mask_index,
+      upload_url: "https://media.test/out",
+    };
+    const res = await handleGenerate(
+      req("/v1/generate", body),
+      env,
+      async () => {
+        throw new Error("must not fetch");
+      },
+    );
+    assert.equal(res.status, 400);
+    assert.equal(
+      (await handleDryRun(req("/v1/dry-run", body), env)).status,
+      400,
+    );
+  }
+});
+
+test("every Gateway transport enforces privacy/cache policy on outgoing requests", async () => {
+  for (const [provider, model, images] of [
+    ["fal", "flux", undefined],
+    ["openai", "dall-e-2", undefined],
+    ["openai", "dall-e-2", ["https://media.test/input"]],
+    ["workers-ai", "@cf/m", undefined],
+  ] as const) {
+    let upstream = 0;
+    const res = await handleGenerate(
+      req("/v1/generate", {
+        task_id: "policy",
+        provider,
+        model,
+        prompt: "p",
+        images,
+        upload_url: "https://media.test/output",
+        provider_options: {
+          "cf-aig-skip-cache": false,
+          "cf-aig-collect-log-payload": true,
+        },
+      }),
+      env,
+      async (url, init) => {
+        if (String(url) === "https://media.test/input")
+          return new Response(new Uint8Array([137, 80, 78, 71]), {
+            headers: { "content-type": "image/png" },
+          });
+        upstream++;
+        const headers = new Headers(init?.headers);
+        assert.equal(headers.get("cf-aig-skip-cache"), "true");
+        assert.equal(headers.get("cf-aig-collect-log-payload"), "false");
+        return new Response("rejected", { status: 400 });
+      },
+    );
+    assert.equal(res.status, 400);
+    assert.equal(upstream, 1);
+  }
+});
+
+test("JPEG and WebP upstream results PUT and report their actual MIME", async () => {
+  for (const [mime, raw] of [
+    ["image/jpeg", [255, 216, 255, 224, 0]],
+    ["image/webp", [...Buffer.from("RIFF0000WEBPVP8 ")]],
+  ] as const) {
+    for (const [provider, model] of [
+      ["workers-ai", "@cf/m"],
+      ["openai", "gpt-image-1"],
+      ["openai", "dall-e-3"],
+    ]) {
+      let put = 0;
+      const res = await handleGenerate(
+        req("/v1/generate", {
+          task_id: "mime",
+          provider,
+          model,
+          prompt: "p",
+          upload_url: "https://media.test/out",
+        }),
+        env,
+        async (url, init) => {
+          if (init?.method === "PUT") {
+            put++;
+            assert.equal(new Headers(init.headers).get("content-type"), mime);
+            assert.deepEqual(
+              new Uint8Array(init.body as ArrayBuffer),
+              new Uint8Array(raw),
+            );
+            return new Response(null, { status: 200 });
+          }
+          if (provider === "openai") {
+            return Response.json({
+              data: [{ b64_json: Buffer.from(raw).toString("base64") }],
+            });
+          }
+          return new Response(new Uint8Array(raw), {
+            headers: { "content-type": mime },
+          });
+        },
+      );
+      assert.equal(res.status, 200);
+      assert.equal(
+        ((await res.json()) as { content_type: string }).content_type,
+        mime,
+      );
+      assert.equal(put, 1);
+    }
+  }
+});
+
+test("all channels reject HTTP 202 before parsing or uploading", async () => {
+  for (const [provider, model] of [
+    ["workers-ai", "@cf/m"],
+    ["openai", "dall-e-2"],
+    ["fal", "flux"],
+    ["google", "nano-banana"],
+  ]) {
+    for (const binary of [false, true]) {
+      let puts = 0;
+      const res = await handleGenerate(
+        req("/v1/generate", {
+          task_id: "async",
+          provider,
+          model,
+          prompt: "p",
+          upload_url: "https://media.test/out",
+        }),
+        env,
+        async (_url, init) => {
+          if (init?.method === "PUT") {
+            puts++;
+            return new Response(null);
+          }
+          return binary
+            ? new Response(new Uint8Array([137, 80, 78, 71]), {
+                status: 202,
+                headers: { "content-type": "image/png" },
+              })
+            : Response.json(
+                { request_id: "queued", status: "IN_QUEUE" },
+                { status: 202 },
+              );
+        },
+      );
+      assert.equal(res.status, 422);
+      const body = (await res.json()) as {
+        status: string;
+        error: { code: string; upstream_status: number };
+      };
+      assert.equal(body.status, "failed");
+      assert.equal(body.error.code, "UNSUPPORTED_MODEL");
+      assert.equal(body.error.upstream_status, 202);
+      assert.equal(puts, 0);
+    }
+  }
+});
+
+test("Worker entry rejects null/array/primitive JSON on both endpoints", async () => {
+  for (const path of ["/v1/generate", "/v1/dry-run"]) {
+    for (const body of [null, [], 1, "text", false]) {
+      const res = await worker.fetch(req(path, body), env);
+      assert.equal(res.status, 400);
+      const result = (await res.json()) as {
+        task_id: string;
+        status: string;
+        error: { code: string };
+      };
+      assert.equal(result.task_id, "unknown");
+      assert.equal(result.status, "failed");
+      assert.equal(result.error.code, "BAD_REQUEST");
+    }
+  }
+});
+
+test("Worker entry catches async handler rejection without exposing error secrets", async () => {
+  const secret = "secret-error-token-do-not-expose";
+  const brokenEnv = {
+    ...env,
+    get CF_ACCOUNT_ID(): string {
+      throw new Error(secret);
+    },
+  };
+  const logs: string[] = [];
+  const previousLog = console.log;
+  console.log = (...args: unknown[]) => {
+    logs.push(args.join(" "));
+  };
+  try {
+    const res = await worker.fetch(
+      req("/v1/dry-run", {
+        task_id: "failure",
+        provider: "fal",
+        model: "flux",
+        prompt: "p",
+      }),
+      brokenEnv,
+    );
+    assert.equal(res.status, 500);
+    const text = await res.text();
+    assert.equal(JSON.parse(text).error.code, "ADAPTER_INTERNAL_ERROR");
+    assert.ok(!text.includes(secret));
+    assert.ok(!logs.join(" ").includes(secret));
+  } finally {
+    console.log = previousLog;
+  }
+});
+
+test("unexpected async fetch failure returns safe canonical JSON", async () => {
+  const previousFetch = globalThis.fetch;
+  const secret = "upstream-secret-in-throw";
+  globalThis.fetch = async () => {
+    throw new Error(secret);
+  };
+  try {
+    const res = await worker.fetch(
+      req("/v1/generate", {
+        task_id: "failure",
+        provider: "workers-ai",
+        model: "@cf/m",
+        prompt: "p",
+        upload_url: "https://media.test/out",
+      }),
+      env,
+    );
+    assert.equal(res.status, 500);
+    const text = await res.text();
+    assert.equal(JSON.parse(text).error.code, "ADAPTER_INTERNAL_ERROR");
+    assert.ok(!text.includes(secret));
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("invalid upstream image bytes never upload", async () => {
+  let puts = 0;
+  const res = await handleGenerate(
+    req("/v1/generate", {
+      task_id: "invalid-bytes",
+      provider: "workers-ai",
+      model: "@cf/m",
+      prompt: "p",
+      upload_url: "https://media.test/out",
+    }),
+    env,
+    async (_url, init) => {
+      if (init?.method === "PUT") puts++;
+      return new Response("<svg></svg>", {
+        headers: { "content-type": "image/png" },
+      });
+    },
+  );
+  assert.equal(res.status, 500);
+  assert.equal(puts, 0);
 });

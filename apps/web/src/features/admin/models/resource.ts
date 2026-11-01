@@ -5,7 +5,6 @@ import {
   listControlAIGatewayProviders,
   previewControlAIGatewayRoute,
   saveControlAIGatewayCatalog,
-  testControlAIGatewayConnection,
   updateControlAIGateway,
 } from '@/api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '@/api/http/contractKernel'
@@ -91,14 +90,6 @@ export interface AdminGatewayCatalog {
 export interface AdminGatewayConnection {
   get: () => Promise<GatewayConnectionSummary>
   update: (input: UpdateGatewayConfigRequest, options?: ControlMutationOptions) => Promise<void>
-  testConnection: (
-    input: {
-      base_url: string
-      secret?: string | undefined
-      model: string
-    },
-    options?: ControlMutationOptions,
-  ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
 }
 
 export interface AdminGatewayResource {
@@ -120,7 +111,6 @@ export function createAdminGatewayResource(): AdminGatewayResource {
     connection: {
       get: getGatewayConnection,
       update: updateGatewayConnection,
-      testConnection: testGatewayConnection,
     },
   }
 }
@@ -321,38 +311,4 @@ async function updateGatewayConnection(
   } catch (error) {
     throw withControlCopy(error, '保存 AI 网关配置失败')
   }
-}
-
-async function testGatewayConnection(
-  input: {
-    base_url: string
-    secret?: string | undefined
-    model: string
-  },
-  options: ControlMutationOptions = {},
-): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
-  let body: unknown
-  try {
-    body = await testControlAIGatewayConnection(
-      {
-        base_url: input.base_url,
-        ...(input.secret != null ? { secret: input.secret } : {}),
-        model: input.model,
-      },
-      { headers: buildControlMutationHeaders(options) },
-    )
-  } catch (error) {
-    throw withControlCopy(error, '网关连接测试失败')
-  }
-  const probe = requireContractData<{
-    reachable: boolean
-    latency_ms?: number
-    message?: string
-  }>(body, '网关连接测试失败')
-  const result: { success: boolean; latencyMs?: number; message?: string } = {
-    success: probe.reachable === true,
-  }
-  if (typeof probe.latency_ms === 'number') result.latencyMs = probe.latency_ms
-  if (typeof probe.message === 'string' && probe.message) result.message = probe.message
-  return result
 }

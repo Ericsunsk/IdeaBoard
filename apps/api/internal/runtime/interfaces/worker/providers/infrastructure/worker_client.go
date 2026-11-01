@@ -15,6 +15,7 @@ import (
 	runtimeports "ideaboard/api/internal/runtime/ports"
 
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/workerwire"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 )
 
@@ -24,9 +25,6 @@ const (
 	defaultWorkerMaxResponseBytes = 1 << 20
 	// defaultWorkerOutboundTarget names Worker egress in outbound logs/metrics.
 	defaultWorkerOutboundTarget = "edge-worker"
-	// workerGeneratePath is the single Worker endpoint. No provider
-	// segments, no path overrides: one road.
-	workerGeneratePath = "/v1/generate"
 )
 
 // WorkerClientConfig wires the ai-proxy Worker egress. Both fields are
@@ -121,49 +119,6 @@ func NewWorkerClient(cfg WorkerClientConfig) (*WorkerClient, error) {
 	}, nil
 }
 
-// workerWireRequest is the exact CanonicalImageRequest JSON body sent to
-// the Worker. Field names mirror apps/ai-proxy contracts.ts; keep them
-// stable (integration swaps only the base URL/secret, never the shape).
-type workerWireRequest struct {
-	TaskID          string                 `json:"task_id"`
-	Provider        string                 `json:"provider"`
-	Model           string                 `json:"model"`
-	Prompt          string                 `json:"prompt"`
-	Width           *int                   `json:"width,omitempty"`
-	Height          *int                   `json:"height,omitempty"`
-	Seed            *uint64                `json:"seed,omitempty"`
-	Images          []string               `json:"images,omitempty"`
-	ProviderOptions map[string]interface{} `json:"provider_options,omitempty"`
-	UploadURL       string                 `json:"upload_url"`
-}
-
-type workerWireSuccess struct {
-	TaskID      string  `json:"task_id"`
-	Status      string  `json:"status"`
-	Provider    string  `json:"provider"`
-	Model       string  `json:"model"`
-	ImageURL    string  `json:"image_url"`
-	ContentType string  `json:"content_type"`
-	Seed        *uint64 `json:"seed,omitempty"`
-	Receipt     struct {
-		UpstreamStatus int     `json:"upstream_status"`
-		Provider       string  `json:"provider"`
-		Model          string  `json:"model"`
-		LogID          *string `json:"log_id,omitempty"`
-		CacheStatus    *string `json:"cache_status,omitempty"`
-	} `json:"receipt"`
-}
-
-type workerWireFailure struct {
-	TaskID string `json:"task_id"`
-	Status string `json:"status"`
-	Error  struct {
-		Code           string `json:"code"`
-		Message        string `json:"message"`
-		UpstreamStatus *int   `json:"upstream_status,omitempty"`
-	} `json:"error"`
-}
-
 // Do sends one generation request: single-shot POST with the Worker secret
 // and the CanonicalImageRequest body. Non-2xx responses surface as
 // WorkerError (edge code + upstream status) so the executor maps failure
@@ -197,7 +152,7 @@ func (c *WorkerClient) Do(ctx context.Context, req runtimeports.WorkerRequest) (
 	if err != nil {
 		return runtimeports.WorkerResponse{}, fmt.Errorf("worker request encode failed: %w", err)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+workerGeneratePath, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+workerwire.GeneratePath, bytes.NewReader(body))
 	if err != nil {
 		return runtimeports.WorkerResponse{}, fmt.Errorf("worker request build failed: %w", err)
 	}
@@ -248,12 +203,15 @@ func (c *WorkerClient) Do(ctx context.Context, req runtimeports.WorkerRequest) (
 	return workerSuccessToResponse(resp, success), nil
 }
 
-func workerRequestToWire(req runtimeports.WorkerRequest) workerWireRequest {
-	wire := workerWireRequest{
-		TaskID:    strings.TrimSpace(req.TaskID),
-		Provider:  strings.ToLower(strings.TrimSpace(req.Provider)),
-		Model:     strings.TrimSpace(req.Model),
-		Prompt:    req.Prompt,
+func workerRequestToWire(req runtimeports.WorkerRequest) workerwire.GenerateRequest {
+	wire := workerwire.GenerateRequest{
+		ImageRequest: workerwire.ImageRequest{
+			TaskID:    strings.TrimSpace(req.TaskID),
+			Provider:  strings.ToLower(strings.TrimSpace(req.Provider)),
+			Model:     strings.TrimSpace(req.Model),
+			Prompt:    req.Prompt,
+			MaskIndex: req.MaskIndex,
+		},
 		UploadURL: strings.TrimSpace(req.UploadURL),
 	}
 	if req.Width > 0 {
@@ -291,7 +249,7 @@ func workerErrorFromStatus(taskID string, status int, body string, retryAfter ti
 // workerErrorFromBody parses a non-2xx Worker envelope into a WorkerError.
 // Unparseable bodies fall back to status-derived codes.
 func workerErrorFromBody(taskID string, status int, body []byte) error {
-	var failure workerWireFailure
+	var failure workerwire.Failure
 	if err := json.Unmarshal(body, &failure); err == nil && strings.TrimSpace(failure.Error.Code) != "" {
 		upstream := 0
 		if failure.Error.UpstreamStatus != nil {
@@ -306,24 +264,24 @@ func workerErrorFromBody(taskID string, status int, body []byte) error {
 	return workerErrorFromStatus(taskID, status, string(body), 0)
 }
 
-func decodeWorkerSuccess(body []byte, taskID string) (workerWireSuccess, error) {
-	var success workerWireSuccess
+func decodeWorkerSuccess(body []byte, taskID string) (workerwire.Success, error) {
+	var success workerwire.Success
 	if err := json.Unmarshal(body, &success); err != nil {
-		return workerWireSuccess{}, err
+		return workerwire.Success{}, err
 	}
 	if strings.TrimSpace(success.Status) != "completed" {
-		return workerWireSuccess{}, fmt.Errorf("worker status = %q, want completed", success.Status)
+		return workerwire.Success{}, fmt.Errorf("worker status = %q, want completed", success.Status)
 	}
 	if strings.TrimSpace(success.TaskID) != "" && strings.TrimSpace(success.TaskID) != taskID {
-		return workerWireSuccess{}, fmt.Errorf("worker task_id mismatch")
+		return workerwire.Success{}, fmt.Errorf("worker task_id mismatch")
 	}
 	if strings.TrimSpace(success.ImageURL) == "" {
-		return workerWireSuccess{}, fmt.Errorf("worker returned no image URL")
+		return workerwire.Success{}, fmt.Errorf("worker returned no image URL")
 	}
 	return success, nil
 }
 
-func workerSuccessToResponse(resp *http.Response, success workerWireSuccess) runtimeports.WorkerResponse {
+func workerSuccessToResponse(resp *http.Response, success workerwire.Success) runtimeports.WorkerResponse {
 	receipt := runtimeports.WorkerReceipt{
 		Model:          strings.TrimSpace(success.Receipt.Model),
 		Provider:       strings.TrimSpace(success.Receipt.Provider),

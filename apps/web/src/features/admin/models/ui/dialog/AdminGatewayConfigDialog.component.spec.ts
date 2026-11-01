@@ -14,7 +14,6 @@ vi.mock('../../../shared/session/feedback/toast', async (importOriginal) => ({
 const mockResource: AdminGatewayConnection = {
   get: vi.fn(),
   update: vi.fn(),
-  testConnection: vi.fn(),
 }
 
 describe('AdminGatewayConfigDialog', () => {
@@ -28,10 +27,6 @@ describe('AdminGatewayConfigDialog', () => {
       is_first_party: true,
     })
     vi.mocked(mockResource.update).mockResolvedValue(undefined)
-    vi.mocked(mockResource.testConnection).mockResolvedValue({
-      success: true,
-      message: '网关连接测试成功',
-    })
   })
 
   function renderDialog(
@@ -138,8 +133,7 @@ describe('AdminGatewayConfigDialog', () => {
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith({
-      base_url:
-        'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+      base_url: 'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
       account_id: '',
       gateway_id: '',
     })

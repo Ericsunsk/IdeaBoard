@@ -3,6 +3,10 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -103,11 +107,11 @@ func TestWorkerMediaHandoffLoopback(t *testing.T) {
 	// PUT output with bound content-type lands exactly.
 	key := "uploads/ws/abc/task-1/result-0.png"
 	putURL := workerMediaSignedURL("test-secret", http.MethodPut, key, "image/png", 5*time.Minute)
-	rec = workerMediaServe(t, router, http.MethodPut, putURL, []byte{1, 2, 3, 4}, "image/png")
+	rec = workerMediaServe(t, router, http.MethodPut, putURL, workerMediaImage(t, "image/png"), "image/png")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT status = %d, body = %q, want 200", rec.Code, rec.Body.String())
 	}
-	if !bytes.Equal(objects.data[key], []byte{1, 2, 3, 4}) || objects.ct[key] != "image/png" {
+	if !bytes.Equal(objects.data[key], workerMediaImage(t, "image/png")) || objects.ct[key] != "image/png" {
 		t.Fatalf("landed object mismatch: %v %q", objects.data[key], objects.ct[key])
 	}
 }
@@ -166,5 +170,80 @@ func TestWorkerMediaMissingObjectIsNotFound(t *testing.T) {
 	rec := workerMediaServe(t, router, http.MethodGet, getURL, nil, "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing GET status = %d, want 404", rec.Code)
+	}
+}
+
+func workerMediaImage(t *testing.T, mime string) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	switch mime {
+	case "image/jpeg":
+		if err := jpeg.Encode(&b, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
+			t.Fatal(err)
+		}
+	case "image/png":
+		if err := png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 1, 1))); err != nil {
+			t.Fatal(err)
+		}
+	case "image/webp":
+		data, err := base64.StdEncoding.DecodeString("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	return b.Bytes()
+}
+
+func TestWorkerMediaSignedImagePolicy(t *testing.T) {
+	const policy = "worker-image-v1"
+	key := "uploads/ws/a/task/result-0.png"
+	for _, mime := range []string{"image/png", "image/jpeg", "image/webp"} {
+		t.Run(mime, func(t *testing.T) {
+			objects := &workerMediaTestObjects{}
+			router := newWorkerMediaTestRouter("secret", objects)
+			signed := workerMediaSignedURL("secret", "PUT", key, policy, time.Minute)
+			data := workerMediaImage(t, mime)
+			rec := workerMediaServe(t, router, "PUT", signed, data, mime)
+			if rec.Code != 200 {
+				t.Fatalf("PUT %s: %d %s", mime, rec.Code, rec.Body.String())
+			}
+			if objects.ct[key] != mime || !bytes.Equal(objects.data[key], data) {
+				t.Fatal("incorrect stored MIME or bytes")
+			}
+			getURL := workerMediaSignedURL("secret", "GET", key, mime, time.Minute)
+			get := workerMediaServe(t, router, "GET", getURL, nil, "")
+			if get.Code != 200 || get.Header().Get("Content-Type") != mime || !bytes.Equal(get.Body.Bytes(), data) {
+				t.Fatal("readback mismatch")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name, mime string
+		data       []byte
+		mutate     func(string) string
+	}{
+		{"html", "text/html", []byte("<html>bad</html>"), nil},
+		{"svg", "image/svg+xml", []byte("<svg></svg>"), nil},
+		{"fake-png", "image/png", []byte("<html>bad</html>"), nil},
+		{"wrong-bytes", "image/png", workerMediaImage(t, "image/jpeg"), nil},
+		{"truncated", "image/png", []byte{137, 80, 78, 71, 13, 10, 26, 10}, nil},
+		{"header-only-png", "image/png", workerMediaImage(t, "image/png")[:33], nil},
+		{"body-truncated-jpeg", "image/jpeg", workerMediaImage(t, "image/jpeg")[:len(workerMediaImage(t, "image/jpeg"))-10], nil},
+		{"body-truncated-webp", "image/webp", workerMediaImage(t, "image/webp")[:len(workerMediaImage(t, "image/webp"))-3], nil},
+		{"tampered-policy", "image/jpeg", workerMediaImage(t, "image/jpeg"), func(s string) string { return strings.Replace(s, policy, "image%2Fjpeg", 1) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := &workerMediaTestObjects{}
+			router := newWorkerMediaTestRouter("secret", objects)
+			signed := workerMediaSignedURL("secret", "PUT", key, policy, time.Minute)
+			if tc.mutate != nil {
+				signed = tc.mutate(signed)
+			}
+			rec := workerMediaServe(t, router, "PUT", signed, tc.data, tc.mime)
+			if rec.Code == 200 || len(objects.data) != 0 {
+				t.Fatalf("invalid upload accepted: %d", rec.Code)
+			}
+		})
 	}
 }

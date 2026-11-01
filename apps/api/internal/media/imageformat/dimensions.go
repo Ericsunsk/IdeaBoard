@@ -41,6 +41,24 @@ func InspectDetectedBytes(data []byte) (Facts, error) {
 	return InspectBytes(data, ext)
 }
 
+// InspectCompleteDetectedBytes also decodes the image body, rejecting truncated
+// or corrupt pixel data. Callers must bound the encoded byte size first; the
+// existing dimension limits are checked before allocating the decoded image.
+func InspectCompleteDetectedBytes(data []byte) (Facts, error) {
+	facts, err := InspectDetectedBytes(data)
+	if err != nil {
+		return Facts{}, err
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return Facts{}, fmt.Errorf("decode image body: %w", err)
+	}
+	if decoded.Bounds().Dx() != facts.Width || decoded.Bounds().Dy() != facts.Height {
+		return Facts{}, errors.New("decoded image dimensions do not match header")
+	}
+	return facts, nil
+}
+
 // Inspect validates and describes an image from a seekable source without
 // forcing file-backed callers to allocate a second full-file byte slice.
 func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {

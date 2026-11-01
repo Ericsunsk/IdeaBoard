@@ -98,6 +98,33 @@ export async function fetchInputImage(
   };
 }
 
+// Bare base64 providers may omit format metadata; determine PNG/JPEG/WebP
+// from bytes rather than the request's desired format. The Go media route
+// performs full image-config validation before storage.
+export function outputContentType(bytes: ArrayBuffer): string {
+  const b = new Uint8Array(bytes);
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (
+    b.length >= 12 &&
+    String.fromCharCode(...b.subarray(0, 4)) === "RIFF" &&
+    String.fromCharCode(...b.subarray(8, 12)) === "WEBP"
+  )
+    return "image/webp";
+  if (
+    b.length >= 8 &&
+    b[0] === 137 &&
+    b[1] === 80 &&
+    b[2] === 78 &&
+    b[3] === 71 &&
+    b[4] === 13 &&
+    b[5] === 10 &&
+    b[6] === 26 &&
+    b[7] === 10
+  )
+    return "image/png";
+  throw new Error("unsupported output image bytes");
+}
+
 // presigned PUT 直传输出：exact key，原样 PUT，不改写 URL；失败抛 UploadError。
 export async function putOutput(
   uploadUrl: string,

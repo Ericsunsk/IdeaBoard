@@ -3,7 +3,11 @@
 
 import type { CanonicalImageRequest, Env } from "../../contracts.js";
 import type { FetchedInput } from "../../io.js";
-import type { UpstreamTarget, VendorInput } from "../index.js";
+import {
+  gatewayPolicyHeaders,
+  type UpstreamTarget,
+  type VendorInput,
+} from "../shared.js";
 import { buildFalInput, extractFalImage } from "./fal.js";
 import { buildOpenAiInput, extractOpenAiImage } from "./openai.js";
 
@@ -24,10 +28,12 @@ export function gatewayBase(env: Env): string {
 function gatewayHeaders(env: Env, json: boolean): Record<string, string> {
   return json
     ? {
+        ...gatewayPolicyHeaders(),
         "cf-aig-authorization": `Bearer ${env.CF_AIG_TOKEN}`,
         "Content-Type": "application/json",
       }
     : {
+        ...gatewayPolicyHeaders(),
         "cf-aig-authorization": `Bearer ${env.CF_AIG_TOKEN}`,
       };
 }
@@ -54,8 +60,9 @@ export function buildOpenAiTarget(
   env: Env,
   inputs: FetchedInput[],
 ): UpstreamTarget {
-  const vendor: VendorInput = buildOpenAiInput(req, inputs);
-  const isGenerations = vendor.path_source === "openai:images:generations";
+  const vendor = buildOpenAiInput(req, inputs);
+  // Payload form determines the operation; diagnostics are derived afterwards.
+  const isGenerations = !(vendor.body instanceof FormData);
   return {
     url: `${gatewayBase(env)}/${PROVIDER_SLUG_OPENAI}/${isGenerations ? OPENAI_GENERATIONS_PATH : OPENAI_EDITS_PATH}`,
     method: "POST",
@@ -65,7 +72,7 @@ export function buildOpenAiTarget(
         ? vendor.body
         : JSON.stringify(vendor.body),
     dryBody: vendor.dryBody,
-    path_source: vendor.path_source,
+    path_source: `openai:images:${isGenerations ? "generations" : "edits"}`,
   };
 }
 

@@ -1,4 +1,4 @@
-// gateway/fal vendor：fal input 字段映射 + 回包解析（逻辑原样搬迁，行为零变）。
+// gateway/fal vendor：fal input 字段映射 + 回包解析。
 // transport（host/headers/path）已收进 ./index.ts，本文件不碰 env。
 // 铁律：本文件只许出现 input 字段映射与回包解析，不许出现 host/auth/URL 拼接，
 // 不许 import 兄弟 vendor 与 transport 符号（providers.test.ts 静态锁死）。
@@ -6,6 +6,7 @@
 import type { CanonicalImageRequest } from "../../contracts.js";
 import type { FetchedInput } from "../../io.js";
 import {
+  splitImageRoles,
   UnsupportedModelError,
   UpstreamError,
   defaults,
@@ -13,7 +14,7 @@ import {
   isQueuePayload,
   type ExtractedImage,
   type VendorInput,
-} from "../index.js";
+} from "../shared.js";
 
 type FetchFn = typeof fetch;
 
@@ -30,21 +31,18 @@ export function buildFalInput(
     seed: req.seed,
     ...((req.provider_options ?? {}) as Record<string, unknown>),
   };
+  const { images, mask } = splitImageRoles(req, inputs);
   let pathSource = "fal:text-to-image";
-  if (inputs.length >= 1) {
-    // 不把 presigned URL 透传给上游：统一转 data URI，避免签名外泄。
-    // 约定：末张为 mask（单图模型忽略 mask_url，多图模型读 image_urls）。
-    const uris = inputs.map((i) => i.dataUri);
+  if (images.length > 0) {
+    const uris = images.map((i) => i.dataUri);
     body["image_url"] = uris[0];
-    body["image_urls"] =
-      uris.length === 1 ? [uris[0]] : uris.slice(0, -1).concat();
-    if (inputs.length >= 2) body["mask_url"] = uris[uris.length - 1];
-    else delete body["mask_url"];
-    pathSource = inputs.length >= 2 ? "fal:img2img+mask" : "fal:img2img";
+    body["image_urls"] = uris;
+    if (mask) body["mask_url"] = mask.dataUri;
+    pathSource = mask ? "fal:img2img+mask" : "fal:img2img";
   }
   return {
     body,
-    dryBody: dryBodyWithImagePlaceholders(body, inputs.length, true),
+    dryBody: dryBodyWithImagePlaceholders(body, inputs.length),
     path_source: pathSource,
   };
 }
@@ -76,7 +74,6 @@ export async function extractFalImage(
     );
   return {
     bytes: await imgRes.arrayBuffer(),
-    contentType: imgRes.headers.get("content-type") || "image/jpeg",
     seed: d?.seed,
   };
 }

@@ -19,8 +19,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
+	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
@@ -35,44 +35,25 @@ import (
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 )
 
-// liveDispatchTransfer is the test double for the presigned-media seam:
-// fake HMAC URLs, static input keys, canned landed bytes.
+// liveDispatchTransfer keeps only the object adapter in memory; output-slot
+// signing and trusted image acceptance use the production implementation.
 type liveDispatchTransfer struct {
-	secret string
-	puts   map[string][]byte
+	providerinfra.WorkerTransfer
+	puts map[string][]byte
 }
 
 func newLiveDispatchTransfer() *liveDispatchTransfer {
-	return &liveDispatchTransfer{secret: "test-secret", puts: map[string][]byte{}}
+	f := &liveDispatchTransfer{puts: map[string][]byte{}}
+	f.WorkerTransfer = providerinfra.NewWorkerTransfer(nil, f, "https://worker.example.test", "test-secret")
+	return f
 }
 
-func (f *liveDispatchTransfer) PresignInputGET(_ context.Context, _, _ string) (string, string, error) {
-	return "", "", errors.New("live dispatch has no media inputs")
-}
-
-func (f *liveDispatchTransfer) MintOutputKey(workspaceID, taskID string) string {
-	return platformworkermedia.MintOutputKey(workspaceID, taskID)
-}
-
-func (f *liveDispatchTransfer) PresignOutputPUT(key, contentType string) (string, time.Time, error) {
-	expiresAt := time.Now().UTC().Add(5 * time.Minute)
-	return platformworkermedia.SignURL("https://worker.example.test", f.secret, http.MethodPut, key, contentType, expiresAt), expiresAt, nil
-}
-
-func (f *liveDispatchTransfer) ImageKeyFromURL(rawURL string) (string, error) {
-	return platformworkermedia.ParseKey(rawURL)
-}
-
-func (f *liveDispatchTransfer) VerifyLandedKey(rawURL, expectedKey string) (string, error) {
-	return providerinfra.VerifyLandedKey(rawURL, expectedKey)
-}
-
-func (f *liveDispatchTransfer) ReadLandedObject(_ context.Context, key string) ([]byte, string, error) {
+func (f *liveDispatchTransfer) ReadObjectAtProfile(_ context.Context, _ string, key string, _ int64) (*storageports.StoredUploadObject, error) {
 	raw, ok := f.puts[key]
 	if !ok {
-		return nil, "", errors.New("live dispatch: landed object missing")
+		return nil, errors.New("live dispatch: landed object missing")
 	}
-	return raw, "image/png", nil
+	return &storageports.StoredUploadObject{ObjectKey: key, Data: raw, ContentType: "image/png"}, nil
 }
 
 // liveDispatchWorkerServer serves one canned Worker result in the real

@@ -94,8 +94,7 @@ export const MODELS_MESSAGES = {
   routeValid: '有效',
   routeInvalid: '无效',
   routeDryRunLabel: 'Worker 干跑:',
-  routeNote:
-    '💡 所有 AI 出图经由唯一 Edge Worker 出口；干跑只做校验与连通性探测，不计费、不落盘。',
+  routeNote: '💡 所有 AI 出图经由唯一 Edge Worker 出口；干跑只做校验与连通性探测，不计费、不落盘。',
   identityTitle: '模型身份与接入定义',
   identitySubtitle: 'Edge Worker 出图基础',
   identityIdLabel: '模型标识',

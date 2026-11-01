@@ -6,10 +6,7 @@
 
 import type { CanonicalImageRequest } from "../../contracts.js";
 import type { FetchedInput } from "../../io.js";
-import {
-  dryBodyWithImagePlaceholders,
-  type VendorInput,
-} from "../index.js";
+import { dryBodyWithImagePlaceholders, type VendorInput } from "../shared.js";
 
 export function buildOpenAiAirunInput(
   req: CanonicalImageRequest,
@@ -32,6 +29,8 @@ export function buildOpenAiAirunInput(
     body: input,
     dryBody: dryBodyWithImagePlaceholders(input, inputs.length),
     path_source:
-      inputs.length > 0 ? "airun:openai:gpt-image:edit" : "airun:openai:gpt-image",
+      inputs.length > 0
+        ? "airun:openai:gpt-image:edit"
+        : "airun:openai:gpt-image",
   };
 }

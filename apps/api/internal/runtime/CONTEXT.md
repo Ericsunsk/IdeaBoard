@@ -39,6 +39,15 @@ It is not a business context and must never decay into a wiring package; no busi
 - Invitation intents delegate to `tenancy/invitations.Service`, which owns trusted recipient identity resolution, pending-recipient reads, and the atomic invitation/membership, notification, and River mail-enqueue write. HTTP supplies only the actor and request input, never a caller-prepared recipient email or user binding. A runtime identity adapter joins the existing display, email-lookup, and user-directory readers; remote identity reads precede the write transaction. Auth outages may omit email facts, but only an existing matching user binding permits a decision without email; a trusted mismatching email still rejects it. HTTP never dispatches collaboration notifications after commit. Workspace mail jobs carry encrypted tokens and use the shared River client; Auth renders and sends through its internal invitation-mail contract.
 - Invitation display delegates to `tenancy/invitations.Reader`: participant collection, deduplication, optional enrichment and common projection belong to that module. The runtime adapter reads public identity and names in one local batch and reuses member-display projection for Auth email and avatars. Auth failure does not discard local names or public identities. HTTP maps scope field names and wire times; public token previews never expose invitee email. Required member projections remain fail-closed and do not share invitation display omission policy.
 - `interfaces/worker` owns queue consumption and provider execution adaptation only.
+  Its provider transfer module prepares a fixed-policy `WorkerOutputSlot`;
+  the slot owns exact-key binding, bounded object reads, complete image validation
+  and actual/stored/reported MIME agreement, returning only an accepted data URL.
+  Executors do not choose output policies or orchestrate acceptance checks.
+  Worker JSON requests, responses, endpoint paths and error codes are owned by
+  the neutral `platform/workerwire` module, shared with ModelRegistry. Runtime
+  keeps timeout, resilience, metrics and local execution metadata outside the wire.
+  The HTTP media adapter independently verifies HMAC scope and upload integrity;
+  HTTP and Worker adapters remain mutually isolated.
 - `adapters/billingregistry` owns the Workflow-to-Billing mapping adaptation.
 - `adapters/webdist` owns the embedded frontend SPA asset adaptation.
 

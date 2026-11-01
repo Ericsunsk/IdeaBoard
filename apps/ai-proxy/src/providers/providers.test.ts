@@ -1,20 +1,10 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import {
-  UnsupportedModelError,
-  buildTarget,
-  extractImage,
-  resolveChannel,
-} from "./index.js";
-import { extractAirunImage } from "./airun/index.js";
-import {
-  extractFalImage,
-  extractOpenAiImage,
-} from "./gateway/index.js";
-import { buildFalTarget, buildOpenAiTarget } from "./gateway/index.js";
+import { prepareRoute } from "./index.js";
+import { UnsupportedModelError, UpstreamError } from "./shared.js";
 import { maskSecrets } from "../io.js";
-import type { Env } from "../contracts.js";
+import type { CanonicalImageRequest, Env } from "../contracts.js";
 import type { FetchedInput } from "../io.js";
 
 const env: Env = {
@@ -35,69 +25,97 @@ function fakeInput(i: number): FetchedInput {
   };
 }
 
-describe("dispatch rules (channel first, vendor second)", () => {
-  test("google provider -> airun/google, model prefixed", () => {
-    const r = resolveChannel({ provider: "google", model: "nano-banana" });
-    assert.equal(r.channel, "airun");
-    assert.equal(r.vendor, "google");
-    assert.equal(r.model, "google/nano-banana");
-    assert.equal(r.migrated, undefined);
-  });
-
-  test("openai gpt-image -> airun/openai", () => {
-    const r = resolveChannel({ provider: "openai", model: "gpt-image-1" });
-    assert.equal(r.channel, "airun");
-    assert.equal(r.vendor, "openai");
-    assert.equal(r.model, "openai/gpt-image-1");
-  });
-
-  test("openai non-gpt-image -> gateway/openai", () => {
-    const r = resolveChannel({ provider: "openai", model: "dall-e-3" });
-    assert.equal(r.channel, "gateway");
-    assert.equal(r.vendor, "openai");
-  });
-
-  test("krea provider -> airun generic", () => {
-    const r = resolveChannel({ provider: "krea", model: "krea-3" });
-    assert.equal(r.channel, "airun");
-    assert.equal(r.vendor, "krea");
-    assert.equal(r.model, "krea/krea-3");
-  });
-
-  test("fal provider -> gateway/fal", () => {
-    const r = resolveChannel({ provider: "fal", model: "fal-ai/flux" });
-    assert.equal(r.channel, "gateway");
-    assert.equal(r.vendor, "fal");
-  });
-
-  test("workers-ai legacy slug -> airun migrated", () => {
-    const r = resolveChannel({ provider: "workers-ai", model: "@cf/m" });
-    assert.equal(r.channel, "airun");
-    assert.equal(r.vendor, "migrated");
-    assert.equal(r.migrated, true);
-  });
-
-  test("pool declaration wins over model prefix", () => {
-    const r = resolveChannel({
+describe("route selection through the prepared target", () => {
+  const cases = [
+    {
+      name: "google provider",
+      provider: "google",
+      model: "nano-banana",
+      suffix: "/ai/run",
+      bodyModel: "google/nano-banana",
+      source: "airun:google:text-to-image",
+    },
+    {
+      name: "openai gpt-image",
+      provider: "openai",
+      model: "gpt-image-1",
+      suffix: "/ai/run",
+      bodyModel: "openai/gpt-image-1",
+      source: "airun:openai:gpt-image",
+    },
+    {
+      name: "openai non-gpt-image",
+      provider: "openai",
+      model: "dall-e-3",
+      suffix: "/openai/images/generations",
+      bodyModel: "dall-e-3",
+      source: "openai:images:generations",
+    },
+    {
+      name: "krea provider",
+      provider: "krea",
+      model: "krea-3",
+      suffix: "/ai/run",
+      bodyModel: "krea/krea-3",
+      source: "airun:krea",
+    },
+    {
+      name: "fal provider",
+      provider: "fal",
+      model: "fal-ai/flux",
+      suffix: "/fal/fal-ai/flux",
+      source: "fal:text-to-image",
+    },
+    {
+      name: "workers-ai migration",
+      provider: "workers-ai",
+      model: "@cf/m",
+      suffix: "/ai/run",
+      bodyModel: "@cf/m",
+      source: "airun:migrated:workers-ai:text-to-image",
+    },
+    {
+      name: "pool declaration beats model prefix",
       provider: "fal",
       model: "google/nano-banana",
-    });
-    assert.equal(r.channel, "gateway");
-    assert.equal(r.vendor, "fal");
-  });
-
-  test("custom provider falls back to model prefix", () => {
-    const r = resolveChannel({
+      suffix: "/fal/google/nano-banana",
+      source: "fal:text-to-image",
+    },
+    {
+      name: "custom provider model prefix",
       provider: "custom-acme",
       model: "google/nano-banana",
+      suffix: "/ai/run",
+      bodyModel: "google/nano-banana",
+      source: "airun:google:text-to-image",
+    },
+  ];
+  for (const c of cases) {
+    test(c.name, () => {
+      const route = prepareRoute(
+        { task_id: "route", prompt: "p", provider: c.provider, model: c.model },
+        env,
+        [],
+      );
+      assert.ok(route.target.url.endsWith(c.suffix));
+      assert.equal(route.target.path_source, c.source);
+      if (c.bodyModel)
+        assert.equal(
+          JSON.parse(route.target.body as string).model,
+          c.bodyModel,
+        );
+      if (c.provider === "workers-ai")
+        assert.match(JSON.stringify(route.target.dryBody), /migration_note/);
     });
-    assert.equal(r.channel, "airun");
-    assert.equal(r.vendor, "google");
-  });
-
-  test("unknown provider/model -> UnsupportedModelError", () => {
+  }
+  test("unknown route fails before sending", () => {
     assert.throws(
-      () => resolveChannel({ provider: "nope", model: "nothing" }),
+      () =>
+        prepareRoute(
+          { task_id: "route", prompt: "p", provider: "nope", model: "nothing" },
+          env,
+          [],
+        ),
       UnsupportedModelError,
     );
   });
@@ -105,7 +123,7 @@ describe("dispatch rules (channel first, vendor second)", () => {
 
 describe("airun google target (/ai/run envelope)", () => {
   test("text-to-image envelope + host + CF token auth", () => {
-    const t = buildTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "google",
@@ -115,7 +133,7 @@ describe("airun google target (/ai/run envelope)", () => {
       },
       env,
       [],
-    );
+    ).target;
     assert.equal(
       t.url,
       "https://api.cloudflare.com/client/v4/accounts/acct123/ai/run",
@@ -136,7 +154,7 @@ describe("airun google target (/ai/run envelope)", () => {
   });
 
   test("img2img defaults match_input_image + data URI, dry redacted", () => {
-    const t = buildTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "google",
@@ -146,7 +164,7 @@ describe("airun google target (/ai/run envelope)", () => {
       },
       env,
       [fakeInput(0)],
-    );
+    ).target;
     assert.equal(t.path_source, "airun:google:img2img");
     const body = JSON.parse(t.body as string) as {
       model: string;
@@ -156,7 +174,7 @@ describe("airun google target (/ai/run envelope)", () => {
     assert.equal(body.input["aspect_ratio"], "match_input_image");
     assert.ok(
       Array.isArray(body.input["image_input"]) &&
-        ((body.input["image_input"] as string[])[0].startsWith("data:image/")),
+        (body.input["image_input"] as string[])[0].startsWith("data:image/"),
     );
     const dry = JSON.stringify(t.dryBody);
     assert.ok(!dry.includes("data:image/"));
@@ -166,7 +184,7 @@ describe("airun google target (/ai/run envelope)", () => {
   test("unknown provider_options rejected (additionalProperties:false)", () => {
     assert.throws(
       () =>
-        buildTarget(
+        prepareRoute(
           {
             task_id: "t",
             provider: "google",
@@ -177,7 +195,7 @@ describe("airun google target (/ai/run envelope)", () => {
           },
           env,
           [],
-        ),
+        ).target,
       UnsupportedModelError,
     );
   });
@@ -185,7 +203,7 @@ describe("airun google target (/ai/run envelope)", () => {
   test("invalid enum + over-limit inputs fail closed", () => {
     assert.throws(
       () =>
-        buildTarget(
+        prepareRoute(
           {
             task_id: "t",
             provider: "google",
@@ -196,12 +214,12 @@ describe("airun google target (/ai/run envelope)", () => {
           },
           env,
           [],
-        ),
+        ).target,
       UnsupportedModelError,
     );
     assert.throws(
       () =>
-        buildTarget(
+        prepareRoute(
           {
             task_id: "t",
             provider: "google",
@@ -211,7 +229,7 @@ describe("airun google target (/ai/run envelope)", () => {
           },
           env,
           [fakeInput(0), fakeInput(1), fakeInput(2), fakeInput(3)],
-        ),
+        ).target,
       UnsupportedModelError,
     );
   });
@@ -219,7 +237,7 @@ describe("airun google target (/ai/run envelope)", () => {
 
 describe("airun openai target (gpt-image)", () => {
   test("text-to-image: images omitted, size from width/height", () => {
-    const t = buildTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "openai",
@@ -231,7 +249,7 @@ describe("airun openai target (gpt-image)", () => {
       },
       env,
       [],
-    );
+    ).target;
     assert.equal(
       t.url,
       "https://api.cloudflare.com/client/v4/accounts/acct123/ai/run",
@@ -247,7 +265,7 @@ describe("airun openai target (gpt-image)", () => {
   });
 
   test("edit: images data URIs + quality passthrough (Merge)", () => {
-    const t = buildTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "openai",
@@ -258,14 +276,12 @@ describe("airun openai target (gpt-image)", () => {
       },
       env,
       [fakeInput(0)],
-    );
+    ).target;
     assert.equal(t.path_source, "airun:openai:gpt-image:edit");
     const body = JSON.parse(t.body as string) as {
       input: Record<string, unknown>;
     };
-    assert.ok(
-      ((body.input["images"] as string[])[0].startsWith("data:image/")),
-    );
+    assert.ok((body.input["images"] as string[])[0].startsWith("data:image/"));
     assert.equal(body.input["quality"], "high");
     assert.equal(body.input["background"], "opaque");
   });
@@ -273,7 +289,7 @@ describe("airun openai target (gpt-image)", () => {
 
 describe("airun migrated target (workers-ai legacy)", () => {
   test("@cf model via /ai/run + gateway id + dry-run note", () => {
-    const t = buildTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "workers-ai",
@@ -283,7 +299,7 @@ describe("airun migrated target (workers-ai legacy)", () => {
       },
       env,
       [],
-    );
+    ).target;
     assert.equal(
       t.url,
       "https://api.cloudflare.com/client/v4/accounts/acct123/ai/run",
@@ -299,7 +315,7 @@ describe("airun migrated target (workers-ai legacy)", () => {
 
 describe("gateway regression (behavior unchanged)", () => {
   test("fal sync endpoint only, never queue target", () => {
-    const t = buildFalTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "fal",
@@ -309,7 +325,7 @@ describe("gateway regression (behavior unchanged)", () => {
       },
       env,
       [fakeInput(0)],
-    );
+    ).target;
     assert.equal(
       t.url,
       "https://gateway.ai.cloudflare.com/v1/acct123/gw1/fal/fal-ai/fast-sdxl",
@@ -325,7 +341,7 @@ describe("gateway regression (behavior unchanged)", () => {
   });
 
   test("openai no images -> generations", () => {
-    const t = buildOpenAiTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "openai",
@@ -335,23 +351,24 @@ describe("gateway regression (behavior unchanged)", () => {
       },
       env,
       [],
-    );
+    ).target;
     assert.ok(t.url.endsWith("/openai/images/generations"));
     assert.equal(t.path_source, "openai:images:generations");
   });
 
   test("openai with images -> edits multipart", () => {
-    const t = buildOpenAiTarget(
+    const t = prepareRoute(
       {
         task_id: "t",
         provider: "openai",
         model: "dall-e-2",
+        mask_index: 1,
         prompt: "p",
         upload_url: "https://s3/x",
       },
       env,
       [fakeInput(0), fakeInput(1)],
-    );
+    ).target;
     assert.ok(t.url.endsWith("/openai/images/edits"));
     assert.equal(t.path_source, "openai:images:edits");
     assert.ok(t.body instanceof FormData);
@@ -366,8 +383,16 @@ describe("extractors (recorded fixtures, no network)", () => {
       status: 200,
       headers: { "content-type": "image/png" },
     });
-    const out = await extractAirunImage(res);
-    assert.equal(out.contentType, "image/png");
+    const out = await prepareRoute(
+      {
+        task_id: "extract",
+        prompt: "p",
+        provider: "workers-ai",
+        model: "@cf/m",
+      },
+      env,
+      [],
+    ).extractImage(res);
     assert.equal(out.bytes.byteLength, 3);
   });
 
@@ -385,29 +410,38 @@ describe("extractors (recorded fixtures, no network)", () => {
       }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
-    const out = await extractImage(
-      { provider: "google", model: "nano-banana" },
-      res,
-      fetchFn,
-    );
-    assert.equal(out.contentType, "image/png");
+    const out = await prepareRoute(
+      {
+        task_id: "extract",
+        prompt: "p",
+        provider: "google",
+        model: "nano-banana",
+      },
+      env,
+      [],
+    ).extractImage(res, fetchFn);
     assert.equal(out.bytes.byteLength, 4);
     assert.equal(out.seed, 42);
   });
 
   test("airun base64 result decoded natively", async () => {
-    const raw = new Uint8Array([1, 2, 3, 4]);
+    const raw = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
     const b64 = Buffer.from(raw).toString("base64");
     const res = new Response(JSON.stringify({ result: { image: b64 } }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
-    const out = await extractImage(
-      { provider: "openai", model: "gpt-image-1" },
-      res,
-    );
-    assert.equal(out.contentType, "image/png");
-    assert.equal(out.bytes.byteLength, 4);
+    const out = await prepareRoute(
+      {
+        task_id: "extract",
+        prompt: "p",
+        provider: "openai",
+        model: "gpt-image-1",
+      },
+      env,
+      [],
+    ).extractImage(res);
+    assert.equal(out.bytes.byteLength, 8);
   });
 
   test("airun queue payload fail-closed UNSUPPORTED_MODEL", async () => {
@@ -416,7 +450,17 @@ describe("extractors (recorded fixtures, no network)", () => {
       { status: 200, headers: { "content-type": "application/json" } },
     );
     await assert.rejects(
-      () => extractImage({ provider: "krea", model: "krea-3" }, res),
+      () =>
+        prepareRoute(
+          {
+            task_id: "extract",
+            prompt: "p",
+            provider: "krea",
+            model: "krea-3",
+          },
+          env,
+          [],
+        ).extractImage(res),
       UnsupportedModelError,
     );
   });
@@ -433,7 +477,15 @@ describe("extractors (recorded fixtures, no network)", () => {
         headers: { "content-type": "application/json" },
       },
     );
-    await assert.rejects(() => extractFalImage(res), UnsupportedModelError);
+    await assert.rejects(
+      () =>
+        prepareRoute(
+          { task_id: "extract", prompt: "p", provider: "fal", model: "flux" },
+          env,
+          [],
+        ).extractImage(res),
+      UnsupportedModelError,
+    );
   });
 
   test("fal 202 fail-closed", async () => {
@@ -444,7 +496,15 @@ describe("extractors (recorded fixtures, no network)", () => {
         headers: { "content-type": "application/json" },
       },
     );
-    await assert.rejects(() => extractFalImage(res), UnsupportedModelError);
+    await assert.rejects(
+      () =>
+        prepareRoute(
+          { task_id: "extract", prompt: "p", provider: "fal", model: "flux" },
+          env,
+          [],
+        ).extractImage(res),
+      UnsupportedModelError,
+    );
   });
 
   test("openai gateway missing data fail-closed UPSTREAM", async () => {
@@ -452,8 +512,20 @@ describe("extractors (recorded fixtures, no network)", () => {
       status: 200,
       headers: { "content-type": "application/json" },
     });
-    const { UpstreamError } = await import("./index.js");
-    await assert.rejects(() => extractOpenAiImage(res), UpstreamError);
+    await assert.rejects(
+      () =>
+        prepareRoute(
+          {
+            task_id: "extract",
+            prompt: "p",
+            provider: "openai",
+            model: "dall-e-3",
+          },
+          env,
+          [],
+        ).extractImage(res),
+      UpstreamError,
+    );
   });
 });
 
@@ -504,7 +576,7 @@ describe("iron rule: vendor files are input-only", () => {
         assert.ok(!src.includes(token), `${file} must not contain ${token}`);
       }
     });
-    test(`${file} imports only contracts/io/root`, () => {
+    test(`${file} imports only contracts/io/shared`, () => {
       const src = readFileSync(file, "utf8");
       const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map(
         (m) => m[1],
@@ -513,10 +585,210 @@ describe("iron rule: vendor files are input-only", () => {
         assert.ok(
           spec === "../../contracts.js" ||
             spec === "../../io.js" ||
-            spec === "../index.js",
+            spec === "../shared.js",
           `${file} must not import ${spec}`,
         );
       }
     });
   }
+});
+
+describe("explicit image roles", () => {
+  const req = {
+    task_id: "roles",
+    provider: "fal",
+    model: "flux",
+    prompt: "test",
+  };
+  test("Fal keeps every unmasked reference and only splits an explicit mask", () => {
+    const inputs = [fakeInput(1), fakeInput(2), fakeInput(3)];
+    const plain = JSON.parse(
+      prepareRoute(req, env, inputs).target.body as string,
+    );
+    assert.deepEqual(
+      plain.image_urls,
+      inputs.map((i) => i.dataUri),
+    );
+    assert.equal(plain.mask_url, undefined);
+    const masked = JSON.parse(
+      prepareRoute({ ...req, mask_index: 1 }, env, inputs).target
+        .body as string,
+    );
+    assert.deepEqual(masked.image_urls, [inputs[0].dataUri, inputs[2].dataUri]);
+    assert.equal(masked.mask_url, inputs[1].dataUri);
+  });
+  test("OpenAI edits refuses unsupported multiple references instead of dropping them", () => {
+    const r = { ...req, provider: "openai", model: "dall-e-2" };
+    assert.throws(
+      () => prepareRoute(r, env, [fakeInput(1), fakeInput(2)]).target,
+      UnsupportedModelError,
+    );
+    const target = prepareRoute({ ...r, mask_index: 1 }, env, [
+      fakeInput(1),
+      fakeInput(2),
+    ]).target;
+    assert.ok(target.body instanceof FormData);
+    assert.ok(target.body.get("mask") instanceof Blob);
+  });
+  test("Airun preserves references or rejects unsupported roles", () => {
+    const inputs = [fakeInput(1), fakeInput(2), fakeInput(3)];
+    for (const provider of ["google", "openai", "krea"]) {
+      const r = {
+        ...req,
+        provider,
+        model: provider === "openai" ? "gpt-image-1" : "m",
+      };
+      const body = JSON.parse(
+        prepareRoute(r, env, inputs).target.body as string,
+      ).input;
+      assert.deepEqual(
+        body.image_input ?? body.images ?? body.image_urls,
+        inputs.map((i) => i.dataUri),
+      );
+      assert.throws(
+        () => prepareRoute({ ...r, mask_index: 2 }, env, inputs).target,
+        UnsupportedModelError,
+      );
+    }
+    const migrated = { ...req, provider: "workers-ai", model: "@cf/m" };
+    assert.throws(
+      () => prepareRoute(migrated, env, inputs).target,
+      UnsupportedModelError,
+    );
+    const body = JSON.parse(
+      prepareRoute({ ...migrated, mask_index: 1 }, env, inputs.slice(0, 2))
+        .target.body as string,
+    ).input;
+    assert.equal(body.image_b64, inputs[0].base64);
+    assert.equal(body.mask_b64, inputs[1].base64);
+  });
+});
+
+test("base64 extractors preserve JPEG/WebP output bytes", async () => {
+  for (const raw of [
+    [255, 216, 255, 224, 0],
+    [...Buffer.from("RIFF0000WEBPVP8 ")],
+  ]) {
+    const b64 = Buffer.from(raw).toString("base64");
+    for (const model of ["gpt-image-1", "dall-e-3"]) {
+      const route = prepareRoute(
+        { task_id: "mime", prompt: "p", provider: "openai", model },
+        env,
+        [],
+      );
+      const out = await route.extractImage(
+        new Response(JSON.stringify({ data: [{ b64_json: b64 }] })),
+      );
+      assert.deepEqual(new Uint8Array(out.bytes), new Uint8Array(raw));
+    }
+  }
+});
+
+test("provider_options cannot smuggle image roles", () => {
+  for (const provider of ["fal", "openai", "workers-ai", "krea", "google"]) {
+    assert.throws(
+      () =>
+        prepareRoute(
+          {
+            task_id: "roles",
+            provider,
+            model: provider === "workers-ai" ? "@cf/m" : "m",
+            prompt: "p",
+            provider_options: { mask_url: "https://secret.test/mask" },
+          },
+          env,
+          [fakeInput(1)],
+        ).target,
+      UnsupportedModelError,
+    );
+  }
+});
+
+describe("prepared route preserves request/response pairing", () => {
+  for (const c of [
+    { provider: "workers-ai", model: "@cf/m", expected: "/ai/run" },
+    {
+      provider: "openai",
+      model: "dall-e-3",
+      expected: "/openai/images/generations",
+    },
+    { provider: "fal", model: "flux", expected: "/fal/flux" },
+  ]) {
+    test(
+      c.provider +
+        " keeps its decoder after request identity and diagnostic labels change",
+      async () => {
+        const req: CanonicalImageRequest = {
+          task_id: "paired",
+          prompt: "p",
+          provider: c.provider,
+          model: c.model,
+        };
+        const route = prepareRoute(req, env, []);
+        const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+        const b64 = Buffer.from(png).toString("base64");
+        const response =
+          c.provider === "workers-ai"
+            ? new Response(png, { headers: { "content-type": "image/png" } })
+            : new Response(
+                JSON.stringify(
+                  c.provider === "fal"
+                    ? { images: [{ url: "https://result.test/image" }] }
+                    : { data: [{ b64_json: b64 }] },
+                ),
+                { headers: { "content-type": "application/json" } },
+              );
+        req.provider = "unrecognized";
+        req.model = "changed-after-preparation";
+        route.target.path_source = "editorial-label-only";
+        let downloads = 0;
+        const fetchFn = (async (url: RequestInfo | URL) => {
+          downloads++;
+          assert.equal(String(url), "https://result.test/image");
+          return new Response(png, {
+            headers: { "content-type": "image/png" },
+          });
+        }) as typeof fetch;
+        assert.ok(route.target.url.endsWith(c.expected));
+        const out = await route.extractImage(response, fetchFn);
+        assert.deepEqual(new Uint8Array(out.bytes), png);
+        assert.equal(downloads, c.provider === "fal" ? 1 : 0);
+      },
+    );
+  }
+
+  test("OpenAI JSON and multipart operations stay independent of diagnostic labels", async () => {
+    for (const inputs of [[], [fakeInput(0)]]) {
+      const route = prepareRoute(
+        {
+          task_id: "operation",
+          prompt: "p",
+          provider: "openai",
+          model: "dall-e-2",
+        },
+        env,
+        inputs,
+      );
+      route.target.path_source = "renamed-diagnostic";
+      assert.equal(route.target.body instanceof FormData, inputs.length > 0);
+      assert.ok(
+        route.target.url.endsWith(
+          inputs.length ? "/images/edits" : "/images/generations",
+        ),
+      );
+      assert.equal(
+        route.target.headers["Content-Type"],
+        inputs.length ? undefined : "application/json",
+      );
+      const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+      const out = await route.extractImage(
+        new Response(
+          JSON.stringify({
+            data: [{ b64_json: Buffer.from(png).toString("base64") }],
+          }),
+        ),
+      );
+      assert.deepEqual(new Uint8Array(out.bytes), png);
+    }
+  });
 });

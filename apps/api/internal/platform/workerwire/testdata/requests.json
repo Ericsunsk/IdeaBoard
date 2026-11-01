@@ -1,0 +1,33 @@
+{
+  "full": {
+    "task_id": "wire-full",
+    "provider": "workers-ai",
+    "model": "@cf/contract-image",
+    "prompt": "contract prompt",
+    "negative_prompt": "no blur",
+    "width": 768,
+    "height": 512,
+    "steps": 0,
+    "guidance_scale": 0,
+    "seed": 0,
+    "images": ["https://media.test/mask?sig=mask", "https://media.test/reference?sig=reference"],
+    "mask_index": 0,
+    "provider_options": {"contract_option": "kept"},
+    "upload_url": "https://media.test/output/full?sig=output",
+    "public_url": "https://media.test/public/full"
+  },
+  "minimal": {
+    "task_id": "wire-minimal",
+    "provider": "workers-ai",
+    "model": "@cf/contract-image",
+    "prompt": "minimal prompt",
+    "upload_url": "https://media.test/output/minimal?sig=output"
+  },
+  "probe": {
+    "task_id": "probe",
+    "provider": "workers-ai",
+    "model": "@cf/contract-image",
+    "prompt": "probe",
+    "provider_options": {"contract_option": "kept", "api_key": "contract-private"}
+  }
+}

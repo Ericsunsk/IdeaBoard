@@ -14682,7 +14682,7 @@
       ]
     },
     "src/api/generated-query/control/control-platform/control-platform.ts": {
-      "sha256": "cf89060732852901738211326b14abf2cdc1b464bfa34349aa7ffde7d8d267ba",
+      "sha256": "475a0e1cf79b47d12ea884e02edb2a137268a0b7e03f2ec11442f6835ddd55fb",
       "exports": [
         "ApplyControlStorageProfileMutationError",
         "ApplyControlStorageProfileMutationResult",
@@ -15829,7 +15829,7 @@
       "exports": ["PaginatedControlWorkspaces"]
     },
     "src/api/generated-query/control/model/previewControlAIGatewayRouteBody.ts": {
-      "sha256": "88654df820f6d3fea87d476da723026553f8883ac16440feb235f70742751e04",
+      "sha256": "4d20db0c238fff17105ddfa67c141fb708915e96a6c2f6033b2ba6b509e8f69f",
       "exports": ["PreviewControlAIGatewayRouteBody"]
     },
     "src/api/generated-query/control/model/rateLimitedResponse.ts": {
@@ -15865,7 +15865,7 @@
       "exports": ["SupportChannelsSettingEnvelope"]
     },
     "src/api/generated-query/control/model/testControlAIGatewayConnectionBody.ts": {
-      "sha256": "a8c67f0a7d8e770905ed9e07dbe46f7206842e4f74aa1a82770ef05c6a0dda2c",
+      "sha256": "6566e2da3e07f8903d8c22cb6b6fdf44be022833672da6b3fc8a502833492175",
       "exports": ["TestControlAIGatewayConnectionBody"]
     },
     "src/api/generated-query/control/model/unauthorizedResponse.ts": {

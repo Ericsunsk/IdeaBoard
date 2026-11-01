@@ -1,16 +1,22 @@
 package providerinfra
 
-// 透传层只测组装：exact-key 渲染与 presign 装配经 WorkerTransfer seam 断言；
-// workermedia 签名/校验原语由 platform/workermedia 自测，此处不重复。
+// Output-slot tests cross the same acceptance seam as the executor; the
+// store is an in-memory adapter, while signing and image validation are real.
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"strings"
 	"testing"
 	"time"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/media/workspacemedia"
+	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 )
 
 type fakeWorkerAssetStore struct {
@@ -36,11 +42,15 @@ type errFakeWorkerAsset string
 func (e errFakeWorkerAsset) Error() string { return string(e) }
 
 type fakeWorkerObjects struct {
-	data map[string][]byte
-	ct   map[string]string
+	data     map[string][]byte
+	ct       map[string]string
+	reads    int
+	maxBytes int64
 }
 
-func (f *fakeWorkerObjects) ReadObjectAtProfile(_ context.Context, _ string, key string, _ int64) (*storageports.StoredUploadObject, error) {
+func (f *fakeWorkerObjects) ReadObjectAtProfile(_ context.Context, _ string, key string, maxBytes int64) (*storageports.StoredUploadObject, error) {
+	f.reads++
+	f.maxBytes = maxBytes
 	raw, ok := f.data[key]
 	if !ok {
 		return nil, errFakeWorkerAsset("object not found")
@@ -71,78 +81,171 @@ func testWorkerTransfer(objects *fakeWorkerObjects) *workerTransfer {
 	return &workerTransfer{assets: assets, objects: objects, origin: "https://api.example.test", secret: "test-secret"}
 }
 
-func TestMintWorkerOutputKeyAlignsWithMediaScheme(t *testing.T) {
-	got := MintWorkerOutputKey("ws_abc", "task-1")
-	if got != "uploads/ws/abc/task-1/result-0.png" {
-		t.Fatalf("key = %q, want uploads/ws/abc/task-1/result-0.png", got)
+func TestPrepareOutputBindsFixedImagePolicy(t *testing.T) {
+	transfer := testWorkerTransfer(nil)
+	slot, err := transfer.PrepareOutput("ws_abc", "task-1")
+	if err != nil {
+		t.Fatal(err)
 	}
-	got = MintWorkerOutputKey("", "")
-	if !strings.HasPrefix(got, "uploads/ws/") || !strings.HasSuffix(got, "/result-0.png") {
-		t.Fatalf("fallback key = %q, want uploads/ws/.../result-0.png", got)
+	verified, err := platformworkermedia.VerifyURL("test-secret", slot.UploadURL(), "PUT")
+	if err != nil {
+		t.Fatal(err)
 	}
-	got = MintWorkerOutputKey("ws_../evil", "task-1")
-	for _, segment := range strings.Split(got, "/") {
-		if segment == ".." {
-			t.Fatalf("traversal key = %q, want contained key", got)
-		}
+	if verified.Key != "uploads/ws/abc/task-1/result-0.png" || verified.ContentType != platformworkermedia.SlotImagePolicy {
+		t.Fatalf("unexpected slot binding: %+v", verified)
 	}
-	if !strings.HasPrefix(got, "uploads/ws/") {
-		t.Fatalf("traversal key = %q, want slot root", got)
+	if ttl := time.Until(verified.ExpiresAt); ttl <= 0 || ttl > platformworkermedia.SlotTTL {
+		t.Fatalf("slot ttl = %s", ttl)
+	}
+	if _, err := platformworkermedia.VerifyURL("test-secret", slot.UploadURL(), "GET"); err == nil {
+		t.Fatal("PUT slot accepted as GET")
 	}
 }
 
-func TestPresignOutputPUTBindsKeyAndContentType(t *testing.T) {
-	transfer := testWorkerTransfer(nil)
-	key := MintWorkerOutputKey("ws_abc", "task-1")
-	putURL, expiresAt, err := transfer.PresignOutputPUT(key, WorkerSlotContentType())
-	if err != nil {
-		t.Fatalf("PresignOutputPUT() error = %v", err)
-	}
-	if WorkerSlotContentType() != "image/png" {
-		t.Fatalf("slot content-type = %q, want image/png", WorkerSlotContentType())
-	}
-	if ttl := time.Until(expiresAt); ttl <= 0 || ttl > 6*time.Minute {
-		t.Fatalf("slot ttl = %s, want short positive validity", ttl)
-	}
-	for _, want := range []string{"/api/v1/worker/media/uploads/ws/abc/task-1/result-0.png", "ct=image%2Fpng", "exp=", "sig="} {
-		if !strings.Contains(putURL, want) {
-			t.Fatalf("put url = %q, want %q", putURL, want)
+func slotImage(t *testing.T, mime string) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	switch mime {
+	case "image/png":
+		if err := png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 1, 1))); err != nil {
+			t.Fatal(err)
 		}
+	case "image/jpeg":
+		if err := jpeg.Encode(&b, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
+			t.Fatal(err)
+		}
+	case "image/webp":
+		raw, err := base64.StdEncoding.DecodeString("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	default:
+		t.Fatalf("unsupported fixture MIME %s", mime)
 	}
-	recovered, err := transfer.ImageKeyFromURL(putURL)
-	if err != nil || recovered != key {
-		t.Fatalf("ImageKeyFromURL = %q, %v; want %q", recovered, err, key)
-	}
-	// Query-less landed URLs resolve too (the Worker echoes upload_url
-	// without its query).
-	bare := putURL
-	if idx := strings.Index(bare, "?"); idx >= 0 {
-		bare = bare[:idx]
-	}
-	if recovered, err := transfer.ImageKeyFromURL(bare); err != nil || recovered != key {
-		t.Fatalf("ImageKeyFromURL(bare) = %q, %v; want %q", recovered, err, key)
+	return b.Bytes()
+}
+
+func TestWorkerOutputSlotAcceptsActualImageFormats(t *testing.T) {
+	for _, mime := range []string{"image/png", "image/jpeg", "image/webp"} {
+		t.Run(mime, func(t *testing.T) {
+			objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
+			slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "format")
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := slotImage(t, mime)
+			verified, err := platformworkermedia.VerifyURL("test-secret", slot.UploadURL(), "PUT")
+			if err != nil {
+				t.Fatal(err)
+			}
+			objects.data[verified.Key], objects.ct[verified.Key] = data, mime
+			// Both the full signed URL and the query-stripped Worker echo bind to this slot.
+			for _, echoed := range []string{slot.UploadURL(), strings.Split(slot.UploadURL(), "?")[0]} {
+				got, err := slot.Accept(context.Background(), echoed, mime)
+				want := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+				if err != nil || got != want {
+					t.Fatalf("accept: %q, %v", got, err)
+				}
+			}
+			if objects.maxBytes != workspacemedia.MaxUploadSizeBytes {
+				t.Fatalf("unbounded read: %d", objects.maxBytes)
+			}
+		})
 	}
 }
 
-func TestVerifyLandedKeyEnforcesExactSlot(t *testing.T) {
-	transfer := testWorkerTransfer(nil)
-	key := MintWorkerOutputKey("ws_abc", "task-1")
-	putURL, _, err := transfer.PresignOutputPUT(key, WorkerSlotContentType())
+func TestWorkerOutputSlotRejectsOtherSlotsBeforeReading(t *testing.T) {
+	objects := &fakeWorkerObjects{}
+	transfer := testWorkerTransfer(objects)
+	slot, err := transfer.PrepareOutput("ws_test", "first")
 	if err != nil {
-		t.Fatalf("PresignOutputPUT() error = %v", err)
+		t.Fatal(err)
 	}
-	if _, err := transfer.VerifyLandedKey(putURL, key); err != nil {
-		t.Fatalf("VerifyLandedKey(match) error = %v", err)
+	other, err := transfer.PrepareOutput("ws_test", "second")
+	if err != nil {
+		t.Fatal(err)
 	}
-	other := MintWorkerOutputKey("ws_abc", "task-2")
-	if _, err := transfer.VerifyLandedKey(putURL, other); err == nil {
-		t.Fatal("VerifyLandedKey(other slot) accepted, want fail-closed")
+	for _, raw := range []string{other.UploadURL(), "https://api.example.test/other/x.png", ""} {
+		if _, err := slot.Accept(context.Background(), raw, "image/png"); err == nil {
+			t.Fatal("unbound image URL accepted")
+		}
 	}
-	if _, err := transfer.VerifyLandedKey(putURL, ""); err == nil {
-		t.Fatal("VerifyLandedKey(empty expected) accepted, want fail-closed")
+	if objects.reads != 0 {
+		t.Fatal("read object before exact slot verification")
 	}
-	if _, err := transfer.VerifyLandedKey("https://api.example.test/other/x.png", key); err == nil {
-		t.Fatal("VerifyLandedKey(off-route) accepted, want fail-closed")
+}
+
+func TestWorkerOutputSlotRejectsUntrustedImages(t *testing.T) {
+	for _, mime := range []string{"image/png", "image/jpeg", "image/webp"} {
+		data := slotImage(t, mime)
+		truncated := data[:len(data)-3]
+		if mime == "image/png" {
+			truncated = data[:33]
+		}
+		if _, _, err := image.DecodeConfig(bytes.NewReader(truncated)); err != nil {
+			t.Fatalf("incomplete config fixture: %v", err)
+		}
+		for name, tc := range map[string]struct {
+			data             []byte
+			stored, reported string
+		}{
+			"missing":           {nil, mime, mime},
+			"empty":             {[]byte{}, mime, mime},
+			"stored-mismatch":   {data, "image/gif", mime},
+			"reported-mismatch": {data, mime, "image/gif"},
+			"body-truncated":    {truncated, mime, mime},
+			"disguised":         {[]byte("<svg/>"), mime, mime},
+		} {
+			t.Run(mime+"/"+name, func(t *testing.T) {
+				objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
+				slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "invalid")
+				if err != nil {
+					t.Fatal(err)
+				}
+				verified, err := platformworkermedia.VerifyURL("test-secret", slot.UploadURL(), "PUT")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.data != nil {
+					objects.data[verified.Key] = tc.data
+				}
+				objects.ct[verified.Key] = tc.stored
+				if _, err := slot.Accept(context.Background(), slot.UploadURL(), tc.reported); err == nil {
+					t.Fatal("untrusted image accepted")
+				}
+			})
+		}
+	}
+}
+
+func TestWorkerOutputSlotEnforcesSizeEvenForInvalidStoreAdapter(t *testing.T) {
+	objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
+	slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "oversized")
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified, err := platformworkermedia.VerifyURL("test-secret", slot.UploadURL(), "PUT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects.data[verified.Key] = make([]byte, workspacemedia.MaxUploadSizeBytes+1)
+	objects.ct[verified.Key] = "image/png"
+	if _, err := slot.Accept(context.Background(), slot.UploadURL(), "image/png"); err == nil || !strings.Contains(err.Error(), "size limit") {
+		t.Fatalf("oversized read: %v", err)
+	}
+}
+
+func TestWorkerOutputSlotFailsClosedWithoutConfiguration(t *testing.T) {
+	for _, transfer := range []*workerTransfer{nil, {objects: &fakeWorkerObjects{}, secret: "test"}, {objects: &fakeWorkerObjects{}, origin: "https://api.test"}, {origin: "https://api.test", secret: "test"}} {
+		if _, err := transfer.PrepareOutput("ws_test", "task"); err == nil {
+			t.Fatal("unconfigured output slot prepared")
+		}
+	}
+	for _, slot := range []*WorkerOutputSlot{nil, {}} {
+		if _, err := slot.Accept(context.Background(), "", "image/png"); err == nil {
+			t.Fatal("unconfigured slot accepted image")
+		}
 	}
 }
 
@@ -162,20 +265,5 @@ func TestPresignInputGETResolvesAssetKey(t *testing.T) {
 	}
 	if _, _, err := transfer.PresignInputGET(context.Background(), "ws_test", "missing"); err == nil {
 		t.Fatal("missing asset accepted, want error")
-	}
-}
-
-func TestReadLandedObjectFailsClosed(t *testing.T) {
-	objects := &fakeWorkerObjects{data: map[string][]byte{"uploads/ws/a/task/result-0.png": {1, 2, 3}}, ct: map[string]string{"uploads/ws/a/task/result-0.png": "image/png"}}
-	transfer := testWorkerTransfer(objects)
-	data, ct, err := transfer.ReadLandedObject(context.Background(), "uploads/ws/a/task/result-0.png")
-	if err != nil || len(data) != 3 || ct != "image/png" {
-		t.Fatalf("read = %v, %q, %v", len(data), ct, err)
-	}
-	if _, _, err := transfer.ReadLandedObject(context.Background(), "uploads/ws/a/task/missing.png"); err == nil {
-		t.Fatal("missing object accepted, want error")
-	}
-	if _, _, err := transfer.ReadLandedObject(context.Background(), "../evil.png"); err == nil {
-		t.Fatal("traversal key accepted, want error")
 	}
 }

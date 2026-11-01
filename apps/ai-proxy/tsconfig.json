@@ -11,5 +11,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "wrangler.toml"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "wrangler.toml"]
 }

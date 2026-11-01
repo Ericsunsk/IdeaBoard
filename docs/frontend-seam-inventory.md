@@ -7782,11 +7782,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
@@ -7852,9 +7847,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 30,
+      "measuredFanIn": 29,
       "measuredFanOut": 4,
-      "targetFanIn": 30,
+      "targetFanIn": 29,
       "targetFanOut": 4,
       "ownershipScope": ["src/core/components/ActionButton.vue"],
       "publicExports": [
@@ -25656,7 +25651,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/auth/passwordPolicy.ts`                                             | canonical | core                       | 8       | 5 → 5                    | 1 → 1                     |
 | `src/core/auth/routePolicy.ts`                                                | canonical | core                       | 7       | 4 → 4                    | 0 → 0                     |
 | `src/core/auth/sessionPolicy.ts`                                              | canonical | core                       | 8       | 5 → 5                    | 1 → 1                     |
-| `src/core/components/ActionButton.vue`                                        | canonical | core                       | 4       | 30 → 30                  | 4 → 4                     |
+| `src/core/components/ActionButton.vue`                                        | canonical | core                       | 4       | 29 → 29                  | 4 → 4                     |
 | `src/core/components/ChartCard.vue`                                           | canonical | core                       | 1       | 2 → 2                    | 2 → 2                     |
 | `src/core/components/ChartPanel.vue`                                          | canonical | core                       | 2       | 2 → 2                    | 1 → 1                     |
 | `src/core/components/ChartRenderer.vue`                                       | canonical | core                       | 1       | 3 → 3                    | 3 → 3                     |

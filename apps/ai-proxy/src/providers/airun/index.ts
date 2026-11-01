@@ -4,6 +4,8 @@
 import type { CanonicalImageRequest, Env } from "../../contracts.js";
 import { decodeBase64Native, type FetchedInput } from "../../io.js";
 import {
+  gatewayPolicyHeaders,
+  splitImageRoles,
   UnsupportedModelError,
   UpstreamError,
   dryBodyWithImagePlaceholders,
@@ -12,7 +14,7 @@ import {
   type ExtractedImage,
   type UpstreamTarget,
   type VendorInput,
-} from "../index.js";
+} from "../shared.js";
 import { buildGoogleInput } from "./google.js";
 import { buildOpenAiAirunInput } from "./openai.js";
 
@@ -67,12 +69,15 @@ function buildMigratedInput(
     ...((req.provider_options ?? {}) as Record<string, unknown>),
   };
   let pathSource = "airun:migrated:workers-ai:text-to-image";
-  if (inputs.length >= 1) {
-    input["image_b64"] = inputs[0].base64;
+  const { images, mask } = splitImageRoles(req, inputs);
+  if (images.length > 1)
+    throw new UnsupportedModelError("workers-ai supports one input image");
+  if (images.length >= 1) {
+    input["image_b64"] = images[0].base64;
     pathSource = "airun:migrated:workers-ai:img2img";
   }
-  if (inputs.length >= 2) {
-    input["mask_b64"] = inputs[1].base64;
+  if (mask) {
+    input["mask_b64"] = mask.base64;
     pathSource = "airun:migrated:workers-ai:inpainting";
   }
   return {
@@ -99,6 +104,12 @@ function pickVendorInput(
   inputs: FetchedInput[],
   resolved: ChannelResolution,
 ): VendorInput {
+  splitImageRoles(req, inputs);
+  if (req.mask_index !== undefined && resolved.vendor !== "migrated") {
+    throw new UnsupportedModelError(
+      `airun ${resolved.vendor} does not support an explicit mask`,
+    );
+  }
   const build = AIRUN_INPUT_BUILDERS[resolved.vendor];
   if (build) return build(req, inputs);
   return buildGenericAirunInput(
@@ -125,6 +136,7 @@ export function buildAirunTarget(
   // Workers AI（@cf/）经 /ai/run 必须带网关 id；第三方模型不需要。
   if (resolved.model.startsWith("@cf/")) {
     headers["cf-aig-gateway-id"] = env.CF_GATEWAY_ID;
+    Object.assign(headers, gatewayPolicyHeaders());
   }
   const dryEnvelope: Record<string, unknown> = {
     model: resolved.model,
@@ -157,7 +169,7 @@ export async function extractAirunImage(
 ): Promise<ExtractedImage> {
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("image/")) {
-    return { bytes: await res.arrayBuffer(), contentType };
+    return { bytes: await res.arrayBuffer() };
   }
   const data = (await res.json().catch(() => null)) as {
     result?: unknown;
@@ -240,8 +252,7 @@ export async function extractAirunImage(
       payload.slice(5, payload.indexOf(";") > 5 ? payload.indexOf(";") : 5) ||
       "image/png";
     return {
-      bytes: await decodeBase64Native(payload, mime || "image/png"),
-      contentType: mime || "image/png",
+      bytes: await decodeBase64Native(payload, mime),
       ...(seed !== undefined ? { seed } : {}),
     };
   }
@@ -255,13 +266,12 @@ export async function extractAirunImage(
     }
     return {
       bytes: await imgRes.arrayBuffer(),
-      contentType: imgRes.headers.get("content-type") || "image/png",
       ...(seed !== undefined ? { seed } : {}),
     };
   }
+  const bytes = await decodeBase64Native(payload, "image/png");
   return {
-    bytes: await decodeBase64Native(payload, "image/png"),
-    contentType: "image/png",
+    bytes,
     ...(seed !== undefined ? { seed } : {}),
   };
 }

@@ -96,7 +96,6 @@ describe('AdminModelEditDialog subcomponents', () => {
             provider: 'fal',
             model: 'fal/flux-dev',
             isValid: true,
-            isReachable: true,
             message: 'Worker 干跑正常',
           },
         },
@@ -108,5 +107,4 @@ describe('AdminModelEditDialog subcomponents', () => {
       expect(screen.getByText('Worker 干跑正常')).toBeInTheDocument()
     })
   })
-
 })

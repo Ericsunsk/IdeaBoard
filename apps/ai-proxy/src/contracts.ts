@@ -1,10 +1,5 @@
-// CanonicalImageRequest：唯一的入口合同，只实现最终合同。
-// images 约定：presigned GET URL 数组，输入图在前、mask 在后。
-//   airun/google（nano-banana 系）：images 全量 -> image_input（data URI，≤3 张）。
-//   airun/openai（gpt-image 系）：images 全量 -> images（data URI）。
-//   airun/krea + workers-ai 迁移：images 全量 -> image_urls（data URI，P0 待首单确认）。
-//   gateway/fal: images 全量 -> image_urls（data URI），images[0] -> image_url，>=2 张时末张 -> mask_url
-//   gateway/openai: 无图 -> images/generations（JSON）；有图 -> images/edits（multipart，P0 状态：待首单真生成确认）。
+// images contains ordinary references and an optional explicitly indexed mask.
+// mask_index is zero-based; absent means every image is an ordinary reference.
 // provider 是 Service Model Pool 条目声明（registry slug，小写），model 是裸 model 名；
 // channel 判定以 provider 声明优先（见 src/providers/index.ts resolveChannel）。
 
@@ -37,6 +32,7 @@ export interface CanonicalImageRequest {
   guidance_scale?: number;
   seed?: number;
   images?: string[];
+  mask_index?: number;
   provider_options?: Record<string, unknown>;
   // generate 必填；dry-run 可选。
   upload_url?: string;

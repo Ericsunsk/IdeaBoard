@@ -272,3 +272,37 @@ func TestWorkerClientFuseAdmitsAndReleases(t *testing.T) {
 		t.Fatalf("fuse acquired=%d released=%d, want 1/1 on admit", fuse.acquired, fuse.released)
 	}
 }
+
+func TestWorkerWireExplicitMaskRole(t *testing.T) {
+	req := workerTestRequest()
+	req.Images = []string{"https://media.test/one", "https://media.test/two", "https://media.test/mask"}
+	raw, err := json.Marshal(workerRequestToWire(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]interface{}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := body["mask_index"]; ok {
+		t.Fatal("ordinary references acquired a mask")
+	}
+	index := 2
+	req.MaskIndex = &index
+	raw, err = json.Marshal(workerRequestToWire(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["mask_index"] != float64(2) || len(body["images"].([]interface{})) != 3 {
+		t.Fatalf("wrong roles: %s", raw)
+	}
+	for _, index := range []int{-1, 3} {
+		req.MaskIndex = &index
+		if req.Validate() == nil {
+			t.Fatalf("invalid mask index %d accepted", index)
+		}
+	}
+}

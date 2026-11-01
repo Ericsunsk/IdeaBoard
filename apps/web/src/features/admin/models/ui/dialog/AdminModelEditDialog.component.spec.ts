@@ -25,26 +25,27 @@ vi.mock('../../resource', async (importOriginal) => {
 describe('AdminModelEditDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    gatewayFakes.previewRoute.mockImplementation(async (input: { modelId: string; provider?: string }) => {
-      const provider = input.provider || ''
-      return {
-        provider: provider || '未指定',
-        model: input.modelId,
-        // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
-        valid: true,
-        // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
-        reachable: true,
-        status_code: 200,
-        latency_ms: 12,
-        message: 'Worker 干跑正常 (12ms, HTTP 200)',
-      }
-    })
+    gatewayFakes.previewRoute.mockImplementation(
+      async (input: { modelId: string; provider?: string }) => {
+        const provider = input.provider || ''
+        return {
+          provider: provider || '未指定',
+          model: input.modelId,
+          // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+          valid: true,
+          // eslint-disable-next-line governance/boolean-prefix -- Wire contract field.
+          reachable: true,
+          status_code: 200,
+          latency_ms: 12,
+          message: 'Worker 干跑正常 (12ms, HTTP 200)',
+        }
+      },
+    )
     gatewayFakes.listProviders.mockResolvedValue([
       { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
       { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
       { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
     ])
-
   })
 
   const sampleModel: AdminModelItem = {

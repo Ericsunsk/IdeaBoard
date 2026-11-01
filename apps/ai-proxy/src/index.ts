@@ -6,22 +6,21 @@ export default {
     try {
       const url = new URL(request.url);
       if (request.method === "POST" && url.pathname === "/v1/generate") {
-        return handleGenerate(request, env);
+        return await handleGenerate(request, env);
       }
       if (request.method === "POST" && url.pathname === "/v1/dry-run") {
-        return handleDryRun(request, env);
+        return await handleDryRun(request, env);
       }
       if (request.method === "GET" && url.pathname === "/health") {
         return Response.json({ ok: true });
       }
       return Response.json({ error: "Not Found" }, { status: 404 });
-    } catch (err) {
+    } catch {
       // 全局捕获：路由层之外的任何同步/异步抛错都收敛为 500，不裸奔。
       console.log(
         JSON.stringify({
           scope: "ai-proxy",
           code: "WORKER_UNHANDLED_ERROR",
-          message: (err as Error)?.message ?? "unknown fetch error",
         }),
       );
       return Response.json(
@@ -30,7 +29,7 @@ export default {
           status: "failed",
           error: {
             code: "ADAPTER_INTERNAL_ERROR",
-            message: (err as Error)?.message ?? "unknown worker error",
+            message: "internal worker error",
           },
         },
         { status: 500 },

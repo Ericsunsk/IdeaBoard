@@ -6,18 +6,14 @@ import type {
   GenerateSuccess,
   ImageProvider,
 } from "./contracts.js";
-import {
-  buildTarget,
-  extractImage,
-  receiptFromUpstream,
-  UnsupportedModelError,
-  UpstreamError,
-} from "./providers/index.js";
+import { prepareRoute, receiptFromUpstream } from "./providers/index.js";
+import { UnsupportedModelError, UpstreamError } from "./providers/shared.js";
 import {
   fetchInputImage,
   InputFetchError,
   maskSecrets,
   putOutput,
+  outputContentType,
   safeLog,
   UploadError,
 } from "./io.js";
@@ -72,14 +68,30 @@ function validateGenerate(req: CanonicalImageRequest): string | null {
   } catch {
     return "upload_url is invalid";
   }
+  const invalidImages = validateImages(req);
+  if (invalidImages) return invalidImages;
+  return null;
+}
+
+function validateImages(req: CanonicalImageRequest): string | null {
   if (req.images !== undefined) {
     if (!Array.isArray(req.images) || req.images.length === 0)
       return "images must be a non-empty array";
-    if (req.images.length > 4) return "images supports at most 4 inputs";
+    if (req.images.length - (req.mask_index === undefined ? 0 : 1) > 4)
+      return "images supports at most 4 references";
     for (const u of req.images) {
       if (typeof u !== "string" || u.length === 0)
         return "images must be URL strings";
     }
+  }
+  if (
+    req.mask_index !== undefined &&
+    (!Number.isInteger(req.mask_index) ||
+      req.mask_index < 0 ||
+      req.mask_index >= (req.images?.length ?? 0) ||
+      (req.images?.length ?? 0) < 2)
+  ) {
+    return "mask_index must identify one mask alongside an input image";
   }
   return null;
 }
@@ -93,13 +105,20 @@ export async function handleGenerate(
   if (!checkAuth(request, env)) return unauthorized();
   let req: CanonicalImageRequest;
   try {
-    req = (await request.json()) as CanonicalImageRequest;
+    const body: unknown = await request.json();
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return badRequest("unknown", "body must be a JSON object");
+    }
+    req = body as CanonicalImageRequest;
   } catch {
     return badRequest("unknown", "invalid JSON body");
   }
-  if (!checkAuth(request, env)) return unauthorized(req.task_id);
   const invalid = validateGenerate(req);
-  if (invalid) return badRequest(req.task_id ?? "unknown", invalid);
+  if (invalid)
+    return badRequest(
+      typeof req.task_id === "string" ? req.task_id : "unknown",
+      invalid,
+    );
 
   try {
     // 1. presigned GET 拉输入（上限 + content-type，失败 fail-closed）。
@@ -109,7 +128,8 @@ export async function handleGenerate(
         : [];
 
     // 2. 建上游目标（provider-specific slug 置顶常量）。
-    const target = buildTarget(req, env, inputs);
+    const route = prepareRoute(req, env, inputs);
+    const target = route.target;
 
     // 3. 调 AI Gateway（secret 只在 header，不进日志/body）。
     const upstreamRes = await fetchFn(target.url, {
@@ -119,30 +139,31 @@ export async function handleGenerate(
     });
     const receipt = receiptFromUpstream(upstreamRes, req.provider, req.model);
 
+    // queue 型（202 / queue payload）fail-closed 报 UNSUPPORTED_MODEL。
+    if (upstreamRes.status === 202) {
+      safeLog({
+        task_id: req.task_id,
+        provider: req.provider,
+        model: req.model,
+        code: "UNSUPPORTED_MODEL",
+        upstream_status: upstreamRes.status,
+        path_source: target.path_source,
+        duration_ms: Date.now() - start,
+      });
+      const fail: GenerateFailure = {
+        task_id: req.task_id,
+        status: "failed",
+        error: {
+          code: "UNSUPPORTED_MODEL",
+          message: "queue/async model is not supported (sync only)",
+          upstream_status: upstreamRes.status,
+        },
+      };
+      return Response.json(fail, { status: 422 });
+    }
+
     if (!upstreamRes.ok) {
       const text = await upstreamRes.text().catch(() => "");
-      // queue 型（202 / queue payload）fail-closed 报 UNSUPPORTED_MODEL。
-      if (upstreamRes.status === 202) {
-        safeLog({
-          task_id: req.task_id,
-          provider: req.provider,
-          model: req.model,
-          code: "UNSUPPORTED_MODEL",
-          upstream_status: upstreamRes.status,
-          path_source: target.path_source,
-          duration_ms: Date.now() - start,
-        });
-        const fail: GenerateFailure = {
-          task_id: req.task_id,
-          status: "failed",
-          error: {
-            code: "UNSUPPORTED_MODEL",
-            message: "queue/async model is not supported (sync only)",
-            upstream_status: upstreamRes.status,
-          },
-        };
-        return Response.json(fail, { status: 422 });
-      }
       safeLog({
         task_id: req.task_id,
         provider: req.provider,
@@ -171,11 +192,9 @@ export async function handleGenerate(
     }
 
     // 4. 统一抽图（二进制 <1ms 级不动 JS 大循环；base64 解码走原生层）。
-    const { bytes, contentType, seed } = await extractImage(
-      req,
-      upstreamRes,
-      fetchFn,
-    );
+    const { bytes, seed } = await route.extractImage(upstreamRes, fetchFn);
+
+    const contentType = outputContentType(bytes);
 
     // 5. presigned PUT 直传输出（exact key，原样 PUT）。
     await putOutput(req.upload_url as string, bytes, contentType, fetchFn);
@@ -187,7 +206,7 @@ export async function handleGenerate(
       model: req.model,
       image_url: req.public_url || (req.upload_url as string).split("?")[0],
       content_type: contentType,
-      ...((seed ?? req.seed !== undefined) ? { seed: seed ?? req.seed } : {}),
+      ...((seed ?? req.seed) !== undefined ? { seed: seed ?? req.seed } : {}),
       duration_ms: Date.now() - start,
       receipt,
     };
@@ -298,7 +317,7 @@ export async function handleGenerate(
       status: "failed",
       error: {
         code: "ADAPTER_INTERNAL_ERROR",
-        message: (err as Error)?.message || "unknown adapter error",
+        message: "internal adapter error",
       },
     };
     return Response.json(fail, { status: 500 });
@@ -312,7 +331,11 @@ export async function handleDryRun(
   if (!checkAuth(request, env)) return unauthorized();
   let req: CanonicalImageRequest;
   try {
-    req = (await request.json()) as CanonicalImageRequest;
+    const body: unknown = await request.json();
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return badRequest("unknown", "body must be a JSON object");
+    }
+    req = body as CanonicalImageRequest;
   } catch {
     return badRequest("unknown", "invalid JSON body");
   }
@@ -329,20 +352,20 @@ export async function handleDryRun(
     return badRequest(req.task_id, "upload_url must be a string");
   }
 
+  const invalidImages = validateImages(req);
+  if (invalidImages) return badRequest(req.task_id, invalidImages);
+
   // dry-run 不拉取 presigned GET、不调上游：image 字段统一占位，secret 全打码。
   const placeholderCount = req.images?.length ?? 0;
-  const placeholders = Array.from(
-    { length: Math.min(placeholderCount, 4) },
-    (_, i) => ({
-      bytes: new ArrayBuffer(0),
-      contentType: "image/png",
-      base64: `<input-image:${i}:redacted>`,
-      dataUri: `<input-image:${i}:redacted>`,
-    }),
-  );
+  const placeholders = Array.from({ length: placeholderCount }, (_, i) => ({
+    bytes: new ArrayBuffer(0),
+    contentType: "image/png",
+    base64: `<input-image:${i}:redacted>`,
+    dataUri: `<input-image:${i}:redacted>`,
+  }));
   let target;
   try {
-    target = buildTarget(req, env, placeholders);
+    target = prepareRoute(req, env, placeholders).target;
   } catch (err) {
     if (err instanceof UnsupportedModelError) {
       return badRequest(req.task_id, (err as Error).message);

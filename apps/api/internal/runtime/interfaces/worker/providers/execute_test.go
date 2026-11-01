@@ -1,20 +1,23 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/media/workspacemedia"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
@@ -24,10 +27,10 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-// fakeWorkerTransfer is the test double for the presigned-media seam: HMAC
-// URLs minted against the test server origin, asset keys resolved from a
-// static map, landed bytes kept in memory.
+// fakeWorkerTransfer uses the real slot implementation with in-memory asset
+// and object adapters, so executor tests cannot bypass acceptance validation.
 type fakeWorkerTransfer struct {
+	providerinfra.WorkerTransfer
 	origin string
 	secret string
 	assets map[string]fakeWorkerAsset
@@ -41,7 +44,7 @@ type fakeWorkerAsset struct {
 }
 
 func newFakeWorkerTransfer(origin string) *fakeWorkerTransfer {
-	return &fakeWorkerTransfer{
+	f := &fakeWorkerTransfer{
 		origin: origin,
 		secret: "test-secret",
 		assets: map[string]fakeWorkerAsset{
@@ -51,42 +54,23 @@ func newFakeWorkerTransfer(origin string) *fakeWorkerTransfer {
 		puts:  map[string][]byte{},
 		putCT: map[string]string{},
 	}
+	f.WorkerTransfer = providerinfra.NewWorkerTransfer(f, f, origin, f.secret)
+	return f
 }
-
-func (f *fakeWorkerTransfer) PresignInputGET(_ context.Context, _, publicAssetID string) (string, string, error) {
-	// Test simplification: inputs resolve by public asset id alone (the
-	// production transfer scopes by workspace too).
+func (f *fakeWorkerTransfer) GetAsset(_ context.Context, _, publicAssetID string) (*workspacemedia.Asset, error) {
 	asset, ok := f.assets[strings.TrimSpace(publicAssetID)]
 	if !ok {
-		return "", "", errors.New("fake: unknown input asset")
+		return nil, errors.New("fake: unknown input asset")
 	}
-	signed := platformworkermedia.SignURL(f.origin, f.secret, http.MethodGet, asset.key, asset.mime, time.Now().UTC().Add(5*time.Minute))
-	return signed, asset.key, nil
+	return &workspacemedia.Asset{StorageKey: asset.key, MIMEType: asset.mime}, nil
 }
 
-func (f *fakeWorkerTransfer) MintOutputKey(workspaceID, taskID string) string {
-	return providerinfra.MintWorkerOutputKey(workspaceID, taskID)
-}
-
-func (f *fakeWorkerTransfer) PresignOutputPUT(key, contentType string) (string, time.Time, error) {
-	expiresAt := time.Now().UTC().Add(5 * time.Minute)
-	return platformworkermedia.SignURL(f.origin, f.secret, http.MethodPut, key, contentType, expiresAt), expiresAt, nil
-}
-
-func (f *fakeWorkerTransfer) ImageKeyFromURL(rawURL string) (string, error) {
-	return platformworkermedia.ParseKey(rawURL)
-}
-
-func (f *fakeWorkerTransfer) VerifyLandedKey(rawURL, expectedKey string) (string, error) {
-	return providerinfra.VerifyLandedKey(rawURL, expectedKey)
-}
-
-func (f *fakeWorkerTransfer) ReadLandedObject(_ context.Context, key string) ([]byte, string, error) {
+func (f *fakeWorkerTransfer) ReadObjectAtProfile(_ context.Context, _ string, key string, _ int64) (*storageports.StoredUploadObject, error) {
 	raw, ok := f.puts[key]
 	if !ok {
-		return nil, "", errors.New("fake: landed object missing")
+		return nil, errors.New("fake: landed object missing")
 	}
-	return raw, f.putCT[key], nil
+	return &storageports.StoredUploadObject{ObjectKey: key, Data: raw, ContentType: f.putCT[key]}, nil
 }
 
 // fakeWorkerHTTPObjects backs the real media HTTP handler in tests.
@@ -129,12 +113,13 @@ type fakeWorkerServer struct {
 	fetchedInputs int
 	respond       func(taskID, uploadURL string) (int, string)
 	rawPNG        []byte
+	outputType    string
 }
 
 func newFakeWorkerServer(t *testing.T, inputPNG []byte) *fakeWorkerServer {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	fw := &fakeWorkerServer{t: t, rawPNG: inputPNG, capturedBody: map[string]interface{}{}}
+	fw := &fakeWorkerServer{t: t, rawPNG: inputPNG, outputType: "image/png", capturedBody: map[string]interface{}{}}
 	objects := &fakeWorkerHTTPObjects{
 		data: map[string][]byte{
 			"uploads/ws/test/asset_input1/input.png": inputPNG,
@@ -202,12 +187,12 @@ func (fw *fakeWorkerServer) serveGenerate(c *gin.Context) {
 		c.String(http.StatusBadRequest, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"BAD_REQUEST","message":"upload_url is required"}}`)
 		return
 	}
-	putReq, err := http.NewRequest(http.MethodPut, uploadURL, strings.NewReader("PNG:"+base64.StdEncoding.EncodeToString(fw.rawPNG)))
+	putReq, err := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(fw.rawPNG))
 	if err != nil {
 		c.String(http.StatusBadGateway, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put build failed"}}`)
 		return
 	}
-	putReq.Header.Set("Content-Type", "image/png")
+	putReq.Header.Set("Content-Type", fw.outputType)
 	putResp, err := http.DefaultClient.Do(putReq)
 	if err != nil {
 		c.String(http.StatusBadGateway, `{"task_id":"`+taskID+`","status":"failed","error":{"code":"UPLOAD_FAILED","message":"put failed"}}`)
@@ -223,7 +208,7 @@ func (fw *fakeWorkerServer) serveGenerate(c *gin.Context) {
 		imageURL = imageURL[:idx]
 	}
 	c.Header("Content-Type", "application/json")
-	c.String(http.StatusOK, `{"task_id":"`+taskID+`","status":"completed","provider":"openai","model":"gpt-image-1","image_url":"`+imageURL+`","content_type":"image/png","receipt":{"upstream_status":200,"provider":"openai","model":"gpt-image-1"}}`)
+	c.String(http.StatusOK, `{"task_id":"`+taskID+`","status":"completed","provider":"openai","model":"gpt-image-1","image_url":"`+imageURL+`","content_type":"`+fw.outputType+`","receipt":{"upstream_status":200,"provider":"openai","model":"gpt-image-1"}}`)
 }
 
 type stubCustomParamsReader struct {
@@ -309,8 +294,8 @@ func TestCallWorkerAPISuccess(t *testing.T) {
 	// Exact-key presigned PUT: key aligns with future Media scheme,
 	// content-type bound, short TTL.
 	uploadURL, _ := fw.capturedBody["upload_url"].(string)
-	wantKey := providerinfra.MintWorkerOutputKey("", "task-prompt")
-	for _, want := range []string{"/api/v1/worker/media/" + wantKey, "ct=image%2Fpng", "exp=", "sig="} {
+	wantKey := platformworkermedia.MintOutputKey("", "task-prompt")
+	for _, want := range []string{"/api/v1/worker/media/" + wantKey, "ct=worker-image-v1", "exp=", "sig="} {
 		if !strings.Contains(uploadURL, want) {
 			t.Fatalf("upload_url = %q, want %q", uploadURL, want)
 		}
@@ -379,6 +364,9 @@ func TestCallWorkerAPIWithInputsAndMask(t *testing.T) {
 	images, _ := fw.capturedBody["images"].([]interface{})
 	if len(images) != 2 {
 		t.Fatalf("images = %v, want 2 presigned GETs", fw.capturedBody["images"])
+	}
+	if fw.capturedBody["mask_index"] != float64(1) {
+		t.Fatalf("missing explicit mask role: %v", fw.capturedBody)
 	}
 	if fw.fetchedInputs != 2 {
 		t.Fatalf("fetched inputs = %d, want 2", fw.fetchedInputs)
@@ -542,5 +530,68 @@ func TestCallWorkerAPISendsPlannedSize(t *testing.T) {
 	// 512x256 custom at 2k quality scales to 1024x512.
 	if fw.capturedBody["width"] != float64(1024) || fw.capturedBody["height"] != float64(512) {
 		t.Fatalf("size = %v/%v, want 1024/512", fw.capturedBody["width"], fw.capturedBody["height"])
+	}
+}
+
+func TestCallWorkerUsesActualOutputMIME(t *testing.T) {
+	var jpg bytes.Buffer
+	if err := jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
+		t.Fatal(err)
+	}
+	webp, err := base64.StdEncoding.DecodeString("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for mime, data := range map[string][]byte{"image/jpeg": jpg.Bytes(), "image/webp": webp} {
+		t.Run(mime, func(t *testing.T) {
+			fw := newFakeWorkerServer(t, data)
+			defer fw.server.Close()
+			fw.outputType = mime
+			executor := workerTestExecutor(fw, nil)
+			result, err := executor.callWorker(context.Background(), "task-mime", "generation", "ws_test", "fal", "flux", "p", providerTaskParams{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+			if result.ImageURL != want {
+				t.Fatalf("output data URL MIME or bytes mismatch: %s", result.ImageURL)
+			}
+			key := platformworkermedia.MintOutputKey("ws_test", "task-mime")
+			if fw.transfer.putCT[key] != mime {
+				t.Fatalf("stored MIME %q", fw.transfer.putCT[key])
+			}
+		})
+	}
+}
+
+func TestCallWorkerRejectsTruncatedLandedImages(t *testing.T) {
+	var jpg bytes.Buffer
+	if err := jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
+		t.Fatal(err)
+	}
+	webp, err := base64.StdEncoding.DecodeString("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for mime, data := range map[string][]byte{"image/png": buildTinyPNGBytes(t)[:33], "image/jpeg": jpg.Bytes()[:jpg.Len()-10], "image/webp": webp[:len(webp)-3]} {
+		t.Run(mime, func(t *testing.T) {
+			// The attack retains a complete dimension header but omits image body.
+			if _, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil {
+				t.Fatalf("fixture has no complete config: %v", err)
+			}
+			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+			defer fw.server.Close()
+			key := platformworkermedia.MintOutputKey("ws_test", "truncated")
+			fw.transfer.puts[key] = data
+			fw.transfer.putCT[key] = mime
+			fw.respond = func(taskID, uploadURL string) (int, string) {
+				return 200, `{"task_id":"` + taskID + `","status":"completed","image_url":"` + strings.Split(uploadURL, "?")[0] + `","content_type":"` + mime + `"}`
+			}
+			executor := workerTestExecutor(fw, nil)
+			_, err := executor.callWorker(context.Background(), "truncated", "generation", "ws_test", "fal", "flux", "p", providerTaskParams{}, nil)
+			if err == nil {
+				t.Fatal("truncated landed image accepted")
+			}
+		})
 	}
 }

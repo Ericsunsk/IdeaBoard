@@ -11,8 +11,8 @@
 //      fal/ 进 gateway；workers-ai/、@cf/ 进 airun（migrated）；openai/ 非 gpt-image
 //      进 gateway/openai；都未命中直接 UnsupportedModelError（422）。
 //
-// ESM 约束：本文件顶层 import 子模块 builder；子模块回引本文件的共享符号仅限
-// 函数体内运行时使用，求值期无顶层触碰。
+// 每次 prepareRoute 只选择一次 channel/vendor，target 与 decoder 保持配对。
+// shared 只含纯类型和策略；channel/vendor 不反向依赖本分发根。
 
 import type {
   CanonicalImageRequest,
@@ -28,130 +28,17 @@ import {
   extractOpenAiImage,
 } from "./gateway/index.js";
 
-export type Channel = "airun" | "gateway";
-
-export interface ChannelResolution {
-  channel: Channel;
-  // channel 内 vendor：airun 下为 "google" | "openai" | "krea" | "migrated"，
-  // gateway 下为 "fal" | "openai"。
-  vendor: string;
-  // airun envelope 用的完整 model id（author/model 或 @cf/... 原样）。
-  model: string;
-  // workers-ai 旧 slug 迁移标记：dry-run 必须标注。
-  migrated?: boolean;
-}
-
-export class UpstreamError extends Error {
-  upstreamStatus: number;
-  constructor(message: string, upstreamStatus: number) {
-    super(message);
-    this.name = "UpstreamError";
-    this.upstreamStatus = upstreamStatus;
-  }
-}
-
-// queue 型一律 fail-closed 报 UNSUPPORTED_MODEL（绝不轮询）。
-export class UnsupportedModelError extends Error {
-  upstreamStatus?: number;
-  constructor(message: string, upstreamStatus?: number) {
-    super(message);
-    this.name = "UnsupportedModelError";
-    this.upstreamStatus = upstreamStatus;
-  }
-}
-
-export interface UpstreamTarget {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  // generate 用：string（JSON）或 FormData（gateway openai edits multipart）。
-  body: string | FormData;
-  // dry-run 用：可 JSON 序列化的脱敏描述（bytes 占位，不含密钥）。
-  dryBody: unknown;
-  path_source: string;
-}
-
-// vendor 返回：纯 input 映射结果，不含 host/auth/URL。
-export interface VendorInput {
-  // airun vendor 恒为可 JSON 序列化 record；gateway openai 可为 FormData。
-  body: Record<string, unknown> | FormData;
-  dryBody: unknown;
-  path_source: string;
-}
-
-export interface ExtractedImage {
-  bytes: ArrayBuffer;
-  contentType: string;
-  seed?: number;
-}
+import {
+  UnsupportedModelError,
+  type ChannelResolution,
+  type ExtractedImage,
+  type UpstreamTarget,
+} from "./shared.js";
 
 type FetchFn = typeof fetch;
 
-export function defaults(req: CanonicalImageRequest): {
-  width: number;
-  height: number;
-} {
-  return { width: req.width ?? 1024, height: req.height ?? 1024 };
-}
-
-export function isQueuePayload(data: unknown): boolean {
-  if (!data || typeof data !== "object") return false;
-  const d = data as Record<string, unknown>;
-  // fal queue / 通用 queue 形态：有 request_id 但无 image，又带 queue/status 字段。
-  if (typeof d["request_id"] === "string") {
-    const hasImage =
-      (d["images"] !== undefined && d["images"] !== null) ||
-      (d["image"] !== undefined && d["image"] !== null) ||
-      (d["output"] !== undefined && d["output"] !== null) ||
-      (d["data"] !== undefined && d["data"] !== null);
-    if (!hasImage) return true;
-  }
-  const status = d["status"];
-  if (typeof status === "string") {
-    const s = status.toUpperCase();
-    if (
-      s.includes("QUEUE") ||
-      s === "IN_PROGRESS" ||
-      s === "IN_QUEUE" ||
-      s === "PENDING" ||
-      s === "PROCESSING"
-    ) {
-      return true;
-    }
-  }
-  if (d["queue_position"] !== undefined) return true;
-  return false;
-}
-
-export function dryBodyWithImagePlaceholders(
-  body: Record<string, unknown>,
-  inputCount: number,
-  isFal = false,
-): unknown {
-  if (inputCount === 0) return body;
-  const clone: Record<string, unknown> = { ...body };
-  // data URI / base64 绝不进 dry-run：统一占位。
-  for (const k of [
-    "image_b64",
-    "mask_b64",
-    "image_url",
-    "mask_url",
-    "image_urls",
-    "image_input",
-    "images",
-  ]) {
-    if (clone[k] !== undefined) {
-      clone[k] = Array.isArray(clone[k])
-        ? (clone[k] as unknown[]).map((_, i) => `<input-image:${i}:redacted>`)
-        : `<input-image:redacted>`;
-    }
-  }
-  void isFal;
-  return clone;
-}
-
 // channel 判定：先 provider 声明，后模型前缀回落。规则见文件头。
-export function resolveChannel(req: {
+function resolveChannel(req: {
   provider: string;
   model: string;
 }): ChannelResolution {
@@ -242,23 +129,19 @@ interface ProviderEntry {
 }
 const PROVIDER_REGISTRY: Record<string, ProviderEntry> = {
   "airun:google": {
-    buildTarget: (req, env, inputs, resolved) =>
-      buildAirunTarget(req, env, inputs, resolved),
+    buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
   "airun:openai": {
-    buildTarget: (req, env, inputs, resolved) =>
-      buildAirunTarget(req, env, inputs, resolved),
+    buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
   "airun:krea": {
-    buildTarget: (req, env, inputs, resolved) =>
-      buildAirunTarget(req, env, inputs, resolved),
+    buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
   "airun:migrated": {
-    buildTarget: (req, env, inputs, resolved) =>
-      buildAirunTarget(req, env, inputs, resolved),
+    buildTarget: buildAirunTarget,
     extractImage: extractAirunImage,
   },
   "gateway:fal": {
@@ -270,36 +153,29 @@ const PROVIDER_REGISTRY: Record<string, ProviderEntry> = {
     extractImage: extractOpenAiImage,
   },
 };
-function providerEntry(resolved: ChannelResolution): ProviderEntry | undefined {
-  return PROVIDER_REGISTRY[`${resolved.channel}:${resolved.vendor}`];
+export interface ProviderRoute {
+  readonly target: UpstreamTarget;
+  readonly extractImage: ExtractImageFn;
 }
 
-export function buildTarget(
+// A route binds request transport and response interpretation in one selection.
+// Callers never need to supply provider/model again to decode its response.
+export function prepareRoute(
   req: CanonicalImageRequest,
   env: Env,
   inputs: FetchedInput[],
-): UpstreamTarget {
+): ProviderRoute {
   const resolved = resolveChannel(req);
-  const entry = providerEntry(resolved);
+  const entry = PROVIDER_REGISTRY[`${resolved.channel}:${resolved.vendor}`];
   if (!entry) {
     throw new UnsupportedModelError(
       `unsupported provider/model: ${req.provider}/${req.model}`,
     );
   }
-  return entry.buildTarget(req, env, inputs, resolved);
-}
-
-export async function extractImage(
-  req: Pick<CanonicalImageRequest, "provider" | "model">,
-  res: Response,
-  fetchFn: FetchFn = fetch,
-): Promise<ExtractedImage> {
-  const resolved = resolveChannel(req);
-  const entry = providerEntry(resolved);
-  if (!entry) {
-    throw new UnsupportedModelError(`unsupported provider: ${req.provider}`);
-  }
-  return entry.extractImage(res, fetchFn);
+  return {
+    target: entry.buildTarget(req, env, inputs, resolved),
+    extractImage: entry.extractImage,
+  };
 }
 
 export function receiptFromUpstream(

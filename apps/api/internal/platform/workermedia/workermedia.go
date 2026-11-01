@@ -23,14 +23,27 @@ const (
 	// RoutePrefix is the public HMAC media route serving the Worker handoff
 	// (no session auth; HMAC query only).
 	RoutePrefix = "/api/v1/worker/media/"
-	// SlotContentType binds every output slot.
+	// SlotContentType is the legacy exact-PNG binding. New outputs use SlotImagePolicy.
 	SlotContentType = "image/png"
+	// SlotImagePolicy binds a fixed, versioned PNG/JPEG/WebP allowlist to
+	// the HMAC token. It is not a MIME wildcard or a stored content type.
+	SlotImagePolicy = "worker-image-v1"
 	// SlotTTL bounds every presigned URL (short validity).
 	SlotTTL = 5 * time.Minute
 	// SlotKeyRoot aligns slots with the future Media key scheme
 	// (workspacemedia SlotKey root: uploads/ws/<ws>/<upload>/<file>).
 	SlotKeyRoot = "uploads/ws/"
 )
+
+// AllowedOutputContentType deliberately excludes SVG, HTML and other formats.
+func AllowedOutputContentType(contentType string) bool {
+	switch contentType {
+	case "image/png", "image/jpeg", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
 
 // MintOutputKey renders the exact storage key for the single result:
 // uploads/ws/<ws-suffix>/<task-suffix>/result-0.png. Workspace and task ids
@@ -158,11 +171,10 @@ func VerifyURL(secret, rawURL, method string) (Verified, error) {
 // without its presigned query.
 //
 // Deprecated: parsing alone performs no signature check. Production must
-// use VerifyURL for signed URLs, or VerifyLandedKey (in
-// runtime/interfaces/worker/providers/infrastructure) for query-stripped
-// landed URLs where parse plus exact-equality with the minted slot key
-// happen in one call. Kept for the presigned-media seam internals and
-// test doubles only.
+// use VerifyURL for signed URLs. Query-stripped output echoes must only
+// be consumed by WorkerOutputSlot.Accept, which binds the exact slot key
+// before reading and validating the complete image. Kept for handoff
+// internals and test adapters only.
 func ParseKey(rawURL string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || parsed == nil {

@@ -2,7 +2,6 @@ package providers
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/telemetry"
-	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
@@ -298,9 +296,16 @@ func (c *Executor) callWorker(
 		}
 		inputURLs = append(inputURLs, signed)
 	}
-	// Single presigned PUT for the output: exact key, content-type bound.
-	outputKey := c.transfer.MintOutputKey(workspaceID, taskID)
-	uploadURL, _, err := c.transfer.PresignOutputPUT(outputKey, providerinfra.WorkerSlotContentType())
+	var maskIndex *int
+	if params.Canonical != nil && params.Canonical.Media != nil && params.Canonical.Media.Mask != nil {
+		mask := params.Canonical.Media.Mask
+		if mask.AssetID > 0 || strings.TrimSpace(mask.PublicAssetID) != "" {
+			i := len(inputURLs) - 1
+			maskIndex = &i
+		}
+	}
+	// The slot owns the output key, signed policy and trusted acceptance.
+	slot, err := c.transfer.PrepareOutput(workspaceID, taskID)
 	if err != nil {
 		return providerCallResult{}, err
 	}
@@ -322,8 +327,9 @@ func (c *Executor) callWorker(
 		Height:          height,
 		Seed:            seed,
 		Images:          inputURLs,
+		MaskIndex:       maskIndex,
 		ProviderOptions: providerOptions,
-		UploadURL:       uploadURL,
+		UploadURL:       slot.UploadURL(),
 		Feature:         feature,
 		Timeout:         timeout,
 	})
@@ -333,19 +339,10 @@ func (c *Executor) callWorker(
 		}
 		return providerCallResult{Receipt: resp.Receipt}, fmt.Errorf("worker image call failed: %w", err)
 	}
-	// Exact-key verification in one call: the landed URL must resolve to
-	// the minted slot key (query-stripped echo carries no signature; the
-	// PUT-time HMAC was verified by the media route).
-	landedKey, err := c.transfer.VerifyLandedKey(resp.ImageURL, outputKey)
+	dataURL, err := slot.Accept(ctx, resp.ImageURL, resp.ContentType)
 	if err != nil {
 		return providerCallResult{Receipt: resp.Receipt}, err
 	}
-	landedBytes, landedContentType, err := c.transfer.ReadLandedObject(ctx, landedKey)
-	if err != nil {
-		return providerCallResult{Receipt: resp.Receipt}, err
-	}
-	_ = landedContentType
-	dataURL := "data:" + providerinfra.WorkerSlotContentType() + ";base64," + base64.StdEncoding.EncodeToString(landedBytes)
 	preview := strings.TrimSpace(resp.RawPreview)
 	if preview == "" || strings.Contains(preview, "base64,") {
 		preview = providerRawOutputPreview("1 worker image")

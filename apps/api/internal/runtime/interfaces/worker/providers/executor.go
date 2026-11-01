@@ -145,8 +145,8 @@ func workerWorkspaceID(params providerTaskParams) string {
 }
 
 // workerInputRefs flattens canonical media refs in Worker order (inputs,
-// references, original, mask last). The Worker maps images[0] to the edit
-// input and images[1] to the mask.
+// references, original, mask last). callWorker explicitly identifies the mask
+// with MaskIndex; multiple ordinary references never imply a mask.
 func workerInputRefs(params providerTaskParams) []tasks.MediaRef {
 	if params.Canonical == nil || params.Canonical.Media == nil {
 		return nil
