@@ -28,6 +28,13 @@ reject_mutation() {
 reject_mutation .github/workflows/docker-images.yml 's/force_full: true/force_full: false/' 'An incremental CI pass cannot authorize publishing'
 reject_mutation .github/workflows/docker-images.yml '/      - verify-source/d' 'Publishing must wait for full source verification'
 reject_mutation .github/workflows/auth.yml 's/inputs.source_commit || github.sha/github.sha/' 'auth.yml must checkout the exact verified source'
+reject_mutation .github/workflows/auth.yml '\#      - uses: ./.github/actions/setup-go#,+2d' 'Auth must use the canonical Go setup'
+reject_mutation .github/workflows/auth.yml '/      - name: Prepare Go contract test/,+2d' 'Missing step: Prepare Go contract test'
+reject_mutation .github/workflows/auth.yml "s/go test -run '\^\$' .\/internal\/identity\/auth/go version/" 'Auth must compile the Go contract before its runtime deadline'
+reject_mutation .github/workflows/auth.yml 's/name: Test Auth$/name: Auth test placeholder/; s/name: Lint Auth$/name: Test Auth/; s/name: Auth test placeholder/name: Lint Auth/' 'Auth must set up and compile Go before running contract assertions'
+reject_mutation .github/workflows/auth.yml '/      - name: Prepare Go contract test/a\
+        continue-on-error: true
+' 'Auth contract preparation failures must fail verification'
 reject_mutation .github/workflows/ci.yml 's/run_sqlc: .*/run_sqlc: false/' 'API must consume its precise check requirement'
 reject_mutation .github/workflows/ci.yml '/          BROWSER_SMOKE_REQUIRED:/d' 'Browser smoke must use the explicit runtime-impact flag'
 reject_mutation .github/workflows/ci.yml 's#./scripts/ci-baseline.sh#./scripts/untrusted-baseline.sh#' 'Incremental CI must use the trusted ancestor resolver'

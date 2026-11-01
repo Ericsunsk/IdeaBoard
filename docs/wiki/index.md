@@ -8,4 +8,4 @@
 
 ## Operations
 
-- [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis and local CI evidence, including unresolved gates.
+- [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, and the 2026-11-01 Auth cold-cache CI failure.

@@ -40,6 +40,13 @@ jobs:
       - name: Lint Auth
         working-directory: apps/auth
         run: npm run lint
+      - uses: ./.github/actions/setup-go
+        with:
+          build-cache-scope: auth-contract
+      # Keep cold dependency downloads and compilation outside the live contract's 60s budget.
+      - name: Prepare Go contract test
+        working-directory: apps/api
+        run: go test -run '^$' ./internal/identity/auth
       - name: Test Auth
         working-directory: apps/auth
         run: npm test

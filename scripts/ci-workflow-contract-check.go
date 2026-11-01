@@ -269,6 +269,30 @@ func checkReusableWorkflows(root string) {
 
 	auth := loadWorkflow(root, "auth.yml")
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
+	authQuality := object(object(auth, "jobs"), "quality")
+	prepareGo := requireStep(authQuality, "Prepare Go contract test")
+	requireEqual(prepareGo["working-directory"], "apps/api", "Auth contract preparation must use the API module")
+	requireEqual(prepareGo["run"], "go test -run '^$' ./internal/identity/auth", "Auth must compile the Go contract before its runtime deadline")
+	rejectKey(prepareGo, "if", "Auth contract preparation must not be skipped")
+	rejectKey(prepareGo, "continue-on-error", "Auth contract preparation failures must fail verification")
+	goSetupIndex, prepareIndex, authTestIndex := -1, -1, -1
+	for index, step := range steps(authQuality) {
+		if step["uses"] == "./.github/actions/setup-go" {
+			reject(goSetupIndex != -1, "Auth must configure Go once")
+			goSetupIndex = index
+			requireEqual(object(step, "with")["build-cache-scope"], "auth-contract", "Auth must isolate its Go contract build cache")
+			rejectKey(step, "if", "Auth Go setup must not be skipped")
+			rejectKey(step, "continue-on-error", "Auth Go setup failures must fail verification")
+		}
+		if step["name"] == "Prepare Go contract test" {
+			prepareIndex = index
+		}
+		if step["name"] == "Test Auth" {
+			authTestIndex = index
+		}
+	}
+	reject(goSetupIndex < 0, "Auth must use the canonical Go setup")
+	reject(!(goSetupIndex < prepareIndex && prepareIndex < authTestIndex), "Auth must set up and compile Go before running contract assertions")
 
 	realtime := loadWorkflow(root, "realtime.yml")
 	requireEqual(object(realtime, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Realtime workflow must not upload Docker build records")

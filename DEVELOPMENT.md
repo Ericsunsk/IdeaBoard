@@ -258,6 +258,13 @@ go install "golang.org/x/tools/cmd/deadcode@$(go list -m -f '{{.Version}}' golan
 
 ### CI parity gate
 
+Auth 的 live Go↔Fastify contract test 会调用 Go API 的真实 `ServiceClient`。
+冷环境先按 `apps/api/go.mod` 配置 Go，再运行
+`cd apps/api && go test -run '^$' ./internal/identity/auth`，最后运行
+`cd apps/auth && npm test`。Auth CI 使用共享 `setup-go` action 与独立
+`auth-contract` build cache，并在 `Test Auth` 前执行同一编译步骤；依赖下载和
+编译不占用 live contract 的 60 秒 deadline，测试断言仍由完整 `npm test` 执行。
+
 Frontend 函数长度检查使用 `governance/function-length`：每个函数最多 100 行自身代码，空行和纯注释不计，嵌套函数体由各自的检查负责。仅 `.spec.ts` 中从 Vitest 导入的 `describe` 分组回调豁免；`it`、hooks、测试 helper 和生产函数仍接受检查。`complexity ≤ 15`、`max-depth ≤ 4` 保持独立约束。完整组件/工厂体积仍通过 `npm run audit:complexity` 报告，避免把单函数检查误当作整个模块的复杂度指标。
 
 GitHub 只暴露一个稳定的 required check：`CI Gate`。PR 与 `main` push 基于当前 checkout 的已成功 CI 祖先计算累计变更，覆盖失败提交遗留的改动；找不到可信祖先、历史不完整或 GitHub API 不可用时回退全量。手动 CI 与发布前验证始终使用全量模式，同时解析同一可信比较基线；全量决定测试范围，不跳过 OpenAPI/migration risk 的历史审查。若无法取得可信祖先，测试仍执行全量，所选历史审查门禁明确失败，不能以 `HEAD`、上一失败提交或空比较绕过。已成功验证的当前 source commit 可作为全量重验的比较基线。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
