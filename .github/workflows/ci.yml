@@ -257,3 +257,7 @@ jobs:
           PR_SIZE_GUARD_REQUIRED: 'true'
           PR_SIZE_GUARD_RESULT: ${{ needs.pr-size-guard.result }}
         run: ./scripts/ci-gate.sh
+
+      - name: Report pipeline measurements
+        if: always()
+        uses: ./.github/actions/pipeline-metrics

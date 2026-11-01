@@ -33,6 +33,10 @@ jobs:
       - name: Verify CI orchestration contracts
         run: bash scripts/run-all-self-tests.sh
 
+      - name: Verify derived dependency consumers
+        working-directory: apps/api
+        run: go run ../../scripts/ci-dependency-map-check.go --json "${RUNNER_TEMP}/ci-dependency-map.json"
+
       - name: Check env schema and example drift
         run: bash scripts/env-schema-check.sh
 

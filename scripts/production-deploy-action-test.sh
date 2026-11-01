@@ -117,6 +117,32 @@ grep -Fq -- '| Failed stage | `none` |' "${GITHUB_STEP_SUMMARY}" || fail 'succes
 
 SOURCE_COMMIT='' run_action || fail 'valid existing release failed without a preflight source commit'
 
+# v2 manifests must validate component provenance before any SSH credential setup.
+write_manifest
+PYTHONDONTWRITEBYTECODE=1 python3 - "${root}/scripts/release-artifacts.py" "${RELEASE_MANIFEST}" <<'PYTHON'
+import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location("engine", sys.argv[1])
+engine = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(engine)
+path = pathlib.Path(sys.argv[2])
+m = json.loads(path.read_text())
+m.update(schema_version=2, release_kind="production", workflow={"name":"docker-images.yml","run_id":"10"},
+         cosign={"certificate_identity":engine.identity(m["repository"],m["ref"]),"certificate_oidc_issuer":engine.ISSUER})
+m["components"] = {}
+for name, image in m["images"].items():
+    item = engine.base_component(m["repository"],m["commit"],m["tag"],"10",name,"sha256:"+"a"*64,m["ref"])
+    item.update(image=image,name=name,ref=image,digest=image.rsplit("@",1)[1])
+    m["components"][name] = item
+path.write_text(json.dumps(m))
+PYTHON
+run_action || fail 'valid v2 component provenance failed'
+cp "${RELEASE_MANIFEST}" "${fixture}/valid-v2.json"
+for mutation in '.components.api.certificate_identity = "https://attacker"' '.components.api.image = .images.auth' 'del(.components.realtime)' '.release_kind = "build-only"'; do
+  jq "$mutation" "${fixture}/valid-v2.json" > "${RELEASE_MANIFEST}"
+  if run_action; then fail "invalid component provenance accepted: $mutation"; fi
+  [[ ! -e "${RUNNER_TEMP}/keygen-args" && ! -e "${RUNNER_TEMP}/ssh-args" ]] || fail 'invalid component provenance reached SSH'
+done
+
 for mutation in \
   '.tag = "v1.2.4"' \
   '.ref = "refs/heads/main"' \

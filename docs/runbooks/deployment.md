@@ -128,9 +128,9 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 只复用目标 commit 在本仓库 canonical `ci.yml`、`main` push 中已完成且成功的 `CI Gate`；同时校验 run 的 repository、event、workflow path 与 SHA，不重复运行 source test suites。main CI 按受影响的 context 验证，未知影响或可信基线不可用时保留 full fallback。发布随后构建、扫描、签名并发布五张同 commit 的 immutable `sha-<commit>` images，不混用其他批次镜像。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
+Docker Images workflow 只复用目标 commit 在本仓库 canonical `ci.yml`、`main` push 中已完成且成功的 `CI Gate`；同时校验 run 的 repository、event、workflow path 与 SHA，不重复运行 source test suites。main CI 按受影响的 context 验证，未知影响或可信基线不可用时保留 full fallback。发布先按 component 计算 build-input fingerprint，只重建输入变化的 image；其余 component 仅在上一成功发布提供可信 source run、tag→commit、相同输入与精确 Cosign signer identity 时复用 immutable digest。Fingerprint 覆盖整个 tracked build context、Dockerfile/ignore、target/platform 和发布构建步骤，Auth/Realtime 还覆盖 canonical Node pin。旧版、缺失、歧义或不兼容证据回退五张全部构建。每张新建或复用 image 都以最新 Grype database 扫描，只有新建 digest 重新签名；五个 component 齐全才生成 schema v2 manifest。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用，以及每个 component 的 `input_fingerprint`、原始 `source_commit` / `source_tag` / `source_run_id`、platform/target 和精确 Cosign OIDC identity。顶层 commit 表示本次部署 checkout；原始 component commit 可不同，但必须为该 checkout 的祖先且构建输入完全一致。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
 
-严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后通过 SSH stdin 发送 deployment protocol、只读 `INFISICAL_TOKEN` 和原始 manifest。VPS entrypoint 在内存中读取 token，从对应 checkout 运行 Infisical CLI，注入 `prod` 的 `/` 与 `/ai-proxy`，再执行 Cosign 验签、backup、migration、health、smoke 和 release state。token 不写入 manifest、临时文件、日志或命令参数，CLI 后的 deployment process 不保留 token；GitHub Actions 不读取应用业务 secret。
+严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后通过 SSH stdin 发送 deployment protocol、只读 `INFISICAL_TOKEN` 和原始 manifest。VPS entrypoint 在读取业务 secret 前校验 source tags、ancestry 与实际 build inputs，再从对应 checkout 运行 Infisical CLI，注入 `prod` 的 `/` 与 `/ai-proxy`，再执行 Cosign 验签、backup、migration、health、smoke 和 release state。token 不写入 manifest、临时文件、日志或命令参数，CLI 后的 deployment process 不保留 token；GitHub Actions 不读取应用业务 secret。
 
 如果既有 image 已成功构建但 Production deployment 失败，请在 Actions 中运行 [Deploy Existing Production Release](../../.github/workflows/deploy-production.yml)，只填写失败发布的 strict SemVer `release_tag`。该 workflow 从对应 GitHub Release 下载原始 `release-manifest.json`，校验五张 immutable digest 后直接执行部署，不包含 image build、scan、sign 或 push。它与常规 Production deployment 共用 `production-deployment` concurrency，并仍需 `production` Environment approval；Migration 阶段或之后的失败不会自动重试。
 
@@ -165,7 +165,7 @@ restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <p
 
 `VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。业务 secret 由 Infisical Cloud 分发，不复制到 GitHub Environment；GitHub 只持上述只读 token。PostgreSQL owner credential 留在 VPS root-only `/var/lib/ideaboard/owner.env`，GHCR runtime credential 继续使用 VPS Docker credential store。
 
-自动部署要求 VPS 保留 `/opt/stacks/ideaboard` Git checkout，并安装 Infisical CLI、Docker Compose 和 Cosign。Fresh Database 首次部署由既有 `ensure_env_file` 在 `0700` state directory 中创建 `0600` owner file；加密的 `docker/.env` 仍为离线 fallback，不需要为 Cloud 首次部署解密。若已有 `ideaboard_postgres-data` volume 而 owner file 缺失，entrypoint 会拒绝部署；必须先通过可信本机通道恢复同一 PostgreSQL owner 口令，不能生成新口令替代。已有 encrypted owner source 的迁移也只迁出 owner 值，不复制业务 secret、不自动 reset 数据库。
+自动部署要求 VPS 保留 `/opt/stacks/ideaboard` Git checkout，并安装 Python 3、Infisical CLI、Docker Compose 和 Cosign；v2 manifest 的 source tags 会从 origin 精确 fetch 后复核 commit 与 ancestry。Fresh Database 首次部署由既有 `ensure_env_file` 在 `0700` state directory 中创建 `0600` owner file；加密的 `docker/.env` 仍为离线 fallback，不需要为 Cloud 首次部署解密。若已有 `ideaboard_postgres-data` volume 而 owner file 缺失，entrypoint 会拒绝部署；必须先通过可信本机通道恢复同一 PostgreSQL owner 口令，不能生成新口令替代。已有 encrypted owner source 的迁移也只迁出 owner 值，不复制业务 secret、不自动 reset 数据库。
 
 发布时创建并 push 严格 SemVer tag：
 
@@ -582,7 +582,7 @@ ideaboard update --manifest release-manifest.json
 ideaboard rollback --to previous
 ```
 
-脚本会把 previous manifest 中的五张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+脚本会把 previous manifest 中的五张 image digest 写回 image 配置、重新 pull/验签、启动服务并跑 smoke gate。v2 source manifest 使用各 component 的原始 signer identity，且所验 digest 必须与实际部署配置一致，禁止用另一组 provenance 覆盖 rollback image。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 确认最近 backup：
 

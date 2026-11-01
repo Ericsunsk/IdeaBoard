@@ -508,10 +508,34 @@ func checkRelease(root string, release workflow) {
 	requireEqual(buildInputs["tags"], "${{ steps.image.outputs.immutable_tag }}", "Image build must consume the prepared immutable tag")
 	prepareImage := requireStep(object(jobs, "publish-images"), "Prepare image name")
 	prepareImageEnv := object(prepareImage, "env")
-	requireEqual(prepareImageEnv["IMAGE_NAME"], "${{ matrix.image.name }}", "Image name must be passed through step env")
+	requireEqual(prepareImageEnv["IMAGE_NAME"], "${{ matrix.name }}", "Image name must be passed through step env")
 	requireEqual(prepareImageEnv["SOURCE_COMMIT"], "${{ needs.preflight.outputs.source_commit }}", "Image commit must be passed through step env")
 	prepareImageRun := stringValue(prepareImage["run"])
 	requireContains(prepareImageRun, "immutable_tag=ghcr.io/${repository}/ideaboard-${IMAGE_NAME}:sha-${SOURCE_COMMIT}", "Images must use immutable commit tags")
+	plan := requireStep(preflight, "Plan component images")
+	requireContains(stringValue(plan["run"]), "./scripts/prepare-release-plan.sh release-plan.json", "Release must authenticate prior component provenance before planning")
+	requireEqual(object(plan, "env")["RELEASE_REF"], "${{ github.ref }}", "Component signer identity must bind the actual workflow ref")
+	publish := object(jobs, "publish-images")
+	requireEqual(object(publish, "strategy")["matrix"], "${{ fromJSON(needs.preflight.outputs.matrix) }}", "Release must consume the verified component plan")
+	for _, name := range []string{"Build and push image", "Sign image digest"} {
+		requireEqual(requireStep(publish, name)["if"], "matrix.action == 'build'", "Only rebuilt components may be built and signed")
+	}
+	reusedSignature := requireStep(publish, "Verify reused component signature")
+	requireEqual(reusedSignature["if"], "matrix.action == 'reuse'", "Reused components require signature verification")
+	for _, required := range []string{`--certificate-identity "${CERTIFICATE_IDENTITY}"`, `--certificate-oidc-issuer "${CERTIFICATE_ISSUER}"`, `"${IMAGE}"`} {
+		requireContains(stringValue(reusedSignature["run"]), required, "Reused signature must bind the exact signed digest and identity")
+	}
+	for _, name := range []string{"Update Grype vulnerability database", "Scan linux/arm64 image"} {
+		step := requireStep(publish, name)
+		rejectKey(step, "if", "Every built or reused image must pass the current vulnerability scan")
+		rejectKey(step, "continue-on-error", "Image security failures must block release")
+	}
+	rejectKey(reusedSignature, "continue-on-error", "Image security failures must block release")
+	scan := requireStep(publish, "Scan linux/arm64 image")
+	requireEqual(object(scan, "env")["IMAGE"], "${{ steps.resolved.outputs.ref }}", "Scanning must consume the resolved immutable digest")
+	aggregate := object(jobs, "aggregate-release-manifest")
+	requireEqual(object(requireStep(aggregate, "Checkout manifest implementation"), "with")["fetch-depth"], uint64(0), "Manifest validation needs source tags and ancestry")
+	requireContains(stringValue(requireStep(aggregate, "Generate release manifest")["run"]), "scripts/release-artifacts.py manifest", "Complete manifest must use the provenance owner")
 
 	deploy := object(jobs, "deploy-production")
 	requireEqual(object(deploy, "concurrency")["cancel-in-progress"], false, "Production deployments must not cancel in progress")

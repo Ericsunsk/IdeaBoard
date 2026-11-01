@@ -273,7 +273,11 @@ GitHub 只暴露一个稳定的 required check：`CI Gate`。PR 与 `main` push 
 
 Repo-local actions 按实际调用方分类；例如部署 action 只触发 Ops/部署契约检查，Node setup 不触发完整 API tests，Go setup 同时覆盖 API、Auth 的 Go contract 与 migration integration。Ops workflow、classifier、workflow contract checker 和 baseline/gate 自测只选择 Ops；Ops 自测验证分类、调度和失败处理规则，不重跑未改动的应用。`ci.yml`、baseline resolver 与 gate implementation 改变验证范围或结果语义，仍选择全部 context。应用间共享 contract、依赖与未知路径继续保留相应 fanout。日常源代码变更不额外构建 preview images；Dockerfile、依赖等 packaging 输入变化仍验证镜像构建。正式发布在镜像构建、签名与发布之前，只复用同一 source commit 的可信 canonical `main` push CI 成功结果；preflight 验证 workflow、event、repository、完整 SHA 与成功 `CI Gate`，不再次运行应用 suite，也不能使用其他 SHA 或 PR check 替代。Dependency audit 由各应用门禁负责，周一 `security.yml` 继续执行全量 dependency audits。
 
-`CI Gate` 的 Step Summary 会列出本次实际选中的 verification lanes 及结果；耗时以 GitHub Actions 原生 job timing 为事实源。优化 CI 前先对最近多次相同改动类型的运行取基线，重点比较 API race shards、Web Quality 与 Browser Smoke，不以单次 cache hit 或总时长推断收益。
+`CI Gate` 的 Step Summary 会列出本次实际选中的 verification lanes 及结果。CI Gate 与 release 结束阶段运行共享 `pipeline-metrics` action，读取 Actions 原生 run/jobs 和最近至多 10 个 completed push runs，在 Step Summary 与保留 30 天的 `pipeline-metrics` artifact 中报告 elapsed time、已知 runner seconds/minutes、首次失败 step 延迟和历史 median/p95。尚未完成、缺时间戳的 allocation 明确标为 unknown，不计作零；runner allocation 不代表账单金额。采集或 artifact 失败只影响观测，不改变验证门禁；没有新增周期全量验证。
+
+`scripts/ci-dependency-map-check.go` 从 reusable workflows/local actions 的实际消费者、Go AST 静态跨 context 路径和 TypeScript tracked path literals 派生依赖边，逐条检验 classifier 是否覆盖消费者；Ops 同时输出 JSON evidence。它不声称覆盖动态依赖，新的动态 contract 仍须登记 ownership 并补 fixture。`apps/api/go.mod` / `go.sum` 同时覆盖 Auth 的 Go contract、Ops checker 与 Migration Integration。在 `apps/api` 运行 `go run ../../scripts/ci-dependency-map-check.go --json /tmp/ci-dependencies.json` 可复核。
+
+优化收益先对相同改动类型的多次运行取基线，不以单次 cache hit 或总时长推断。Component image reuse 与 v2 provenance 的发布、验签、回滚 contract 见 [deployment runbook](docs/runbooks/deployment.md)。
 
 修改 CI classifier、workflow 或 repo-local setup actions 后，先运行本地 contract tests：
 

@@ -268,7 +268,9 @@ dependency_output="$(printf '%s\n' apps/web/package-lock.json apps/api/go.sum | 
 
 assert_output_line "${dependency_output}" 'web=true'
 assert_output_line "${dependency_output}" 'api=true'
-assert_output_line "${dependency_output}" 'auth=false'
+assert_output_line "${dependency_output}" 'auth=true'
+assert_output_line "${dependency_output}" 'migration_integration=true'
+assert_output_line "${dependency_output}" 'ops=true'
 assert_output_line "${dependency_output}" 'realtime=false'
 assert_output_line "${dependency_output}" 'docker=true'
 

@@ -50,6 +50,10 @@ runs:
         [[ "${RELEASE_TAG}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || exit 1
         [[ -z "${SOURCE_COMMIT}" || "${SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || exit 1
         test -s "${RELEASE_MANIFEST}"
+        if jq -e '.schema_version == 2 or has("components")' "${RELEASE_MANIFEST}" > /dev/null; then
+          python3 scripts/release-artifacts.py validate --manifest "${RELEASE_MANIFEST}" \
+            --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}"
+        fi
         jq -e \
           --arg expected_tag "${RELEASE_TAG}" \
           --arg expected_commit "${SOURCE_COMMIT}" \

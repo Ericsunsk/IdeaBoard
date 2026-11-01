@@ -29,6 +29,13 @@ reject_mutation .github/workflows/docker-images.yml 's#./scripts/release-eligibi
 reject_mutation .github/workflows/docker-images.yml '/      - preflight/d' 'Image publication must depend on preflight'
 reject_mutation .github/workflows/docker-images.yml 's/persist-credentials: false/persist-credentials: true/' 'Release checkout must not persist credentials'
 reject_mutation .github/workflows/docker-images.yml '/          GH_TOKEN:/d' 'Release fetch must use the scoped GitHub token'
+reject_mutation .github/workflows/docker-images.yml 's#./scripts/prepare-release-plan.sh#./scripts/untrusted-plan.sh#' 'Release must authenticate prior component provenance before planning'
+reject_mutation .github/workflows/docker-images.yml "s/if: matrix.action == 'reuse'/if: false/" 'Reused components require signature verification'
+reject_mutation .github/workflows/docker-images.yml '/      - name: Scan linux\/arm64 image/a\
+        if: false
+' 'Every built or reused image must pass the current vulnerability scan'
+reject_mutation .github/workflows/docker-images.yml 's/--certificate-identity /--certificate-identity-regexp /' 'Reused signature must bind the exact signed digest and identity'
+reject_mutation .github/workflows/docker-images.yml '/      - name: Checkout manifest implementation/,/      - name: Download component image plan/s/fetch-depth: 0/fetch-depth: 1/' 'Manifest validation needs source tags and ancestry'
 reject_mutation .github/workflows/docker-images.yml '/          infisical-token:/d' 'Deployment must consume Production connection input infisical-token'
 reject_mutation .github/actions/deploy-production/action.yml '/        INFISICAL_TOKEN:/d' 'Deployment must stream the scoped Infisical token through process env'
 reject_mutation .github/workflows/auth.yml 's/inputs.source_commit || github.sha/github.sha/' 'auth.yml must checkout the exact verified source'

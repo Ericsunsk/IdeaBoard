@@ -100,7 +100,22 @@ exec "$@"
 EOF
   chmod +x "${seed}/scripts/deploy-stack.sh"
   chmod +x "${seed}/scripts/infisical-run.sh"
-  git -C "${seed}" add scripts/deploy-stack.sh scripts/infisical-run.sh
+  cp "${script_dir}/release-artifacts.py" "${seed}/scripts/release-artifacts.py"
+  mkdir -p "${seed}/.github/workflows" "${seed}/apps/api" "${seed}/apps/auth" "${seed}/apps/realtime"
+  printf '22\n' > "${seed}/.node-version"
+  cat > "${seed}/.github/workflows/docker-images.yml" <<'EOF'
+jobs:
+  publish-images:
+    steps:
+      - name: Build and push image
+        uses: fixture
+  aggregate-release-manifest:
+    steps: []
+EOF
+  for component in api auth realtime; do
+    printf 'FROM scratch AS runtime\nFROM scratch AS migrator\n' > "${seed}/apps/${component}/Dockerfile"
+  done
+  git -C "${seed}" add .
   git -C "${seed}" commit -qm 'test release'
   git -C "${seed}" tag v1.2.3
   git -C "${seed}" tag release-1.2.3
@@ -393,6 +408,49 @@ test_missing_automation_result_fails_closed() {
   [[ "${output}" != *'RAW-DEPLOY-SECRET-MARKER'* ]] || fail 'raw output reached the SSH caller'
 }
 
+test_v2_provenance_is_verified_before_secret_injection() {
+  setup_release_fixture v2-provenance
+  python3 - "${stack}" "${manifest}" "${script_dir}/release-artifacts.py" <<'PYTHON'
+import importlib.util, json, pathlib, sys
+stack, destination, engine_path = map(pathlib.Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("engine", engine_path)
+engine = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(engine)
+commit = engine.git(stack, "rev-parse", "refs/tags/v1.2.3^{commit}").decode().strip()
+plan = engine.make_plan(stack, "Ericsunsk/IdeaBoard", commit, "v1.2.3", "10")
+metadata = {name:engine.component_metadata(plan, name, "sha256:"+"a"*64) for name in engine.COMPONENTS}
+destination.write_text(json.dumps(engine.make_manifest(plan, metadata, stack)))
+PYTHON
+  local output
+  output="$(run_entrypoint < "${manifest}" 2>&1)"
+  [[ "$output" == '{"result":"success","stage":"complete","recovery_hint":"none"}' ]] || fail 'valid v2 manifest did not deploy'
+  python3 - "${stack}" "${manifest}" "${script_dir}/release-artifacts.py" <<'PYTHON'
+import importlib.util, json, pathlib, sys
+stack, destination, engine_path = map(pathlib.Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("engine", engine_path)
+engine = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(engine)
+previous = json.loads(destination.read_text())
+commit = engine.git(stack, "rev-parse", "refs/tags/v1.2.4^{commit}").decode().strip()
+plan = engine.make_plan(stack, "Ericsunsk/IdeaBoard", commit, "v1.2.4", "11", previous)
+assert all(item["action"] == "reuse" for item in plan["components"].values())
+metadata = {name:engine.component_metadata(plan, name) for name in engine.COMPONENTS}
+destination.write_text(json.dumps(engine.make_manifest(plan, metadata, stack)))
+PYTHON
+  git -C "${stack}" tag -d v1.2.3 > /dev/null
+  output="$(run_entrypoint < "${manifest}" 2>&1)"
+  [[ "$output" == '{"result":"success","stage":"complete","recovery_hint":"none"}' ]] || fail 'reused source tag was not fetched and validated'
+  git -C "${stack}" rev-parse --verify refs/tags/v1.2.3 > /dev/null
+  rm -f "${capture}/args" "${capture}/injection"
+  jq '.components.api.input_fingerprint = ("sha256:" + ("b" * 64))' "${manifest}" > "${fixture_root}/invalid.json"
+  if output="$(run_entrypoint < "${fixture_root}/invalid.json" 2>&1)"; then
+    fail 'invalid v2 source fingerprint deployed'
+  fi
+  [[ ! -e "${capture}/injection" && ! -e "${capture}/args" ]] || fail 'invalid provenance reached Infisical or deploy'
+  [[ "$output" == *'component source provenance or build inputs are invalid'* ]] || fail 'missing provenance rejection'
+}
+
+test_v2_provenance_is_verified_before_secret_injection
 test_valid_manifest_reaches_deploy_command
 test_missing_malformed_and_oversized_tokens_are_rejected
 test_existing_database_requires_persisted_owner

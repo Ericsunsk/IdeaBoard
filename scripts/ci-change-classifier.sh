@@ -14,7 +14,7 @@ while IFS= read -r changed_path; do
     # Verification tooling is exercised by Ops; it does not change app runtimes.
     .github/workflows/ops.yml | scripts/ci-change-classifier* | scripts/ci-workflow-contract* | scripts/ci-baseline-test.sh | scripts/ci-gate-test.sh) ops=true ;;
     .github/workflows/ci.yml | scripts/ci-baseline* | scripts/ci-gate*) mark_all_contexts ;;
-    .github/actions/deploy-production/* | .github/actions/setup-grype/*) ops=true ;;
+    .github/actions/deploy-production/* | .github/actions/setup-grype/* | .github/actions/pipeline-metrics/*) ops=true ;;
     .github/actions/setup-go/*) mark_api_all; auth=true; migration_integration=true; ops=true ;;
     .github/actions/setup-node/* | .github/actions/npm-ci/* | .node-version) mark_node_consumers ;;
     .github/actions/*) mark_all_contexts ;;
@@ -50,7 +50,7 @@ while IFS= read -r changed_path; do
     apps/web/package.json | apps/web/package-lock.json) web=true; web_audit=true ;;
     apps/auth/package.json | apps/auth/package-lock.json) auth=true; auth_audit=true; docker=true; browser_smoke=true ;;
     apps/realtime/package.json | apps/realtime/package-lock.json) realtime=true; realtime_audit=true; docker=true; browser_smoke=true ;;
-    apps/api/go.mod | apps/api/go.sum) mark_api_all; api_audit=true; api_images=true; docker=true; browser_smoke=true ;;
+    apps/api/go.mod | apps/api/go.sum) auth=true; migration_integration=true; ops=true; mark_api_all; api_audit=true; api_images=true; docker=true; browser_smoke=true ;;
     apps/api/*_test.go) mark_api ;;
     apps/api/*.go) mark_api; api_build=true; browser_smoke=true ;;
     apps/web/*) web=true ;;

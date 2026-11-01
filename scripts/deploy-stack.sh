@@ -1656,6 +1656,11 @@ apply_update_manifest() {
   [[ -n "$checkout_commit" ]] || die "release manifest deployment requires a Git checkout"
   [[ "$checkout_commit" == "$commit" ]] || \
     die "stack checkout commit $checkout_commit does not match release manifest commit $commit"
+  if jq -e '.schema_version == 2 or has("components")' "$manifest_file" >/dev/null; then
+    (cd "$ROOT_DIR" && python3 scripts/release-artifacts.py validate --manifest "$manifest_file" \
+      --repository "$(json_string_field repository "$manifest_file")" --commit "$commit" --verify-inputs) || \
+      die "release component provenance does not match checkout inputs"
+  fi
   echo "Applying release manifest${tag:+ tag: $tag}${commit:+ commit: $commit}"
   set_env_value IDEABOARD_API_IMAGE "$api_image"
   set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
@@ -1755,6 +1760,15 @@ run_previous_rollback() {
 
   DEPLOY_STAGE="rollback-restore-env"
   restore_previous_image_refs
+  local previous_source_manifest
+  previous_source_manifest="$(jq -r '.source_manifest.local_copy // empty' "$PREVIOUS_RELEASE_FILE")"
+  if [[ -n "$previous_source_manifest" && -f "$previous_source_manifest" ]] && \
+    jq -e '.schema_version == 2' "$previous_source_manifest" >/dev/null; then
+    python3 "$ROOT_DIR/scripts/release-artifacts.py" validate --manifest "$previous_source_manifest" \
+      --repository "$(json_string_field repository "$previous_source_manifest")" || \
+      die "previous release component provenance is invalid"
+    DEPLOY_SOURCE_MANIFEST_COPY="$previous_source_manifest"
+  fi
   capture_deploy_image_refs
 
   DEPLOY_STAGE="preflight"
@@ -1840,6 +1854,7 @@ cosign_verify_enabled() {
 
 verify_image_signature() {
   local image_ref="$1"
+  local exact_identity="${2:-}" exact_issuer="${3:-}"
   local identity_regexp
   local oidc_issuer
   local source_repo
@@ -1864,9 +1879,14 @@ verify_image_signature() {
   oidc_issuer="$(env_value COSIGN_CERTIFICATE_OIDC_ISSUER)"
   oidc_issuer="${oidc_issuer:-https://token.actions.githubusercontent.com}"
 
+  local identity_args=(--certificate-identity-regexp "$identity_regexp")
+  if [[ -n "$exact_identity" ]]; then
+    identity_args=(--certificate-identity "$exact_identity")
+    oidc_issuer="$exact_issuer"
+  fi
   echo "Verifying image signature: $image_ref"
   if ! cosign verify \
-    --certificate-identity-regexp "$identity_regexp" \
+    "${identity_args[@]}" \
     --certificate-oidc-issuer "$oidc_issuer" \
     "$image_ref" >/dev/null; then
     echo "Error: Image signature verification failed for $image_ref." >&2
@@ -1876,6 +1896,21 @@ verify_image_signature() {
 }
 
 verify_image_signatures() {
+  if [[ -n "${DEPLOY_SOURCE_MANIFEST_COPY:-}" ]] && \
+    jq -e '.schema_version == 2' "$DEPLOY_SOURCE_MANIFEST_COPY" >/dev/null; then
+    local component image identity issuer variable
+    for component in api api-migrate auth auth-migrate realtime; do
+      image="$(jq -er --arg key "$component" '.images[$key]' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+      variable="$(printf '%s' "$component" | tr '[:lower:]-' '[:upper:]_')"
+      [[ "$(env_value "IDEABOARD_${variable}_IMAGE")" == "$image" ]] || \
+        die "release component provenance does not match deployed $component image"
+      identity="$(jq -er --arg key "$component" '.components[$key].certificate_identity' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+      issuer="$(jq -er --arg key "$component" '.components[$key].certificate_oidc_issuer' "$DEPLOY_SOURCE_MANIFEST_COPY")"
+      verify_image_signature "$image" "$identity" "$issuer" || return 1
+    done
+    DEPLOY_COSIGN_GATE="passed"
+    return
+  fi
   verify_image_signature "$(env_value IDEABOARD_API_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"

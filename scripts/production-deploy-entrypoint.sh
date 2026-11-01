@@ -48,7 +48,7 @@ validate_image_ref() {
 (( $# == 0 )) || die 'command arguments are not accepted'
 [[ -z "${SSH_ORIGINAL_COMMAND:-}" ]] || die 'SSH commands are not accepted'
 
-for required_command in git head jq flock mktemp docker infisical; do
+for required_command in git head jq flock mktemp docker infisical python3; do
   command -v "${required_command}" >/dev/null 2>&1 || die "missing command: ${required_command}"
 done
 
@@ -118,6 +118,22 @@ git -C "${STACK_DIR}" checkout --detach "${commit}" >/dev/null 2>&1 || \
   die 'release checkout failed'
 [[ "$(git -C "${STACK_DIR}" rev-parse HEAD 2>/dev/null)" == "${commit}" ]] || \
   die 'detached checkout does not match manifest commit'
+
+if jq -e '.schema_version == 2 or has("components")' "${MANIFEST_FILE}" >/dev/null; then
+  (cd "${STACK_DIR}" && python3 scripts/release-artifacts.py validate \
+    --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
+    --commit "${commit}" --tag "${tag}") >/dev/null 2>&1 || \
+    die 'component source provenance is invalid'
+  while IFS= read -r source_tag; do
+    [[ "${source_tag}" == "${tag}" ]] && continue
+    git -C "${STACK_DIR}" fetch --no-tags origin "+refs/tags/${source_tag}:refs/tags/${source_tag}" \
+      >/dev/null 2>&1 || die 'component source tag fetch failed'
+  done < <(jq -r '.components[].source_tag' "${MANIFEST_FILE}" | sort -u)
+  (cd "${STACK_DIR}" && python3 scripts/release-artifacts.py validate \
+    --manifest "${MANIFEST_FILE}" --repository "${EXPECTED_REPOSITORY}" \
+    --commit "${commit}" --tag "${tag}" --verify-inputs) >/dev/null 2>&1 || \
+    die 'component source provenance or build inputs are invalid'
+fi
 
 deploy_command="${STACK_DIR}/scripts/deploy-stack.sh"
 [[ -x "${deploy_command}" ]] || die 'release deployment command is unavailable'

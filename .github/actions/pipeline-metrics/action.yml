@@ -1,0 +1,20 @@
+name: Pipeline Metrics
+description: Report native Actions timings and allocated runner duration without billing assumptions
+runs:
+  using: composite
+  steps:
+    - name: Collect pipeline measurements
+      id: metrics
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: ./scripts/collect-ci-observability.sh "${RUNNER_TEMP}/pipeline-metrics"
+    - name: Upload pipeline measurements
+      if: steps.metrics.outcome == 'success'
+      continue-on-error: true
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: pipeline-metrics
+        path: ${{ runner.temp }}/pipeline-metrics/metrics.json
+        retention-days: 30
