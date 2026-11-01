@@ -467,17 +467,16 @@ describe('UserAccountMenu', () => {
   })
 
   it('places configured support channels after language and links the QR code safely', async () => {
-    const supportChannels: import('@/api/supportChannels').SupportChannel[] =
-      [
-        {
-          id: 'discord',
-          name: 'Discord',
-          kind: 'discord',
-          url: 'https://discord.gg/example',
-          enabled: true,
-          sort_order: 0,
-        },
-      ]
+    const supportChannels: import('@/api/supportChannels').SupportChannel[] = [
+      {
+        id: 'discord',
+        name: 'Discord',
+        kind: 'discord',
+        url: 'https://discord.gg/example',
+        enabled: true,
+        sort_order: 0,
+      },
+    ]
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: 'Account', command: vi.fn() },
       { key: 'logout', label: 'Sign out', tone: 'danger', command: vi.fn() },

@@ -49,9 +49,7 @@ function defaultWorkspacePort(): BoardScopeWorkspacePort {
 let workspacePort: BoardScopeWorkspacePort = defaultWorkspacePort()
 let stopWorkspaceResidency: (() => void) | null = null
 
-export function setBoardScopeWorkspacePortForTests(
-  port: Partial<BoardScopeWorkspacePort>,
-): void {
+export function setBoardScopeWorkspacePortForTests(port: Partial<BoardScopeWorkspacePort>): void {
   stopWorkspaceResidency?.()
   workspacePort = { ...workspacePort, ...port }
   stopWorkspaceResidency = workspacePort.subscribeSelectionChange(advanceResidency)

@@ -1,0 +1,9 @@
+# Exact, explicitly reviewed contract transitions. Tabs separate the five fields:
+# spec path, trusted base commit, base SHA-256, reviewed head SHA-256, review reference.
+# 2026-11-01: repository owner accepted these eight Control API errors:
+# - Model Pool entries[].provider becomes required (ADR-0012).
+# - Remove GET/PUT /platform/ai-gateway and its brand-logo, detect-models,
+#   models-reference operations (manual catalog and Worker-owned egress).
+# - test-connection.model becomes required and nonempty (two error checks).
+# Additional changes or a different comparison base require their own review.
+apps/api/openapi.control.yaml	ffce04c119d2df3215bf38a392c866227f397ed7	8f26144f560c4b9969c1b3579a9388afa9f6d5e2fa7f7b42050676c28a3c1b5e	eb503cee4894739fbd91edcf4a977a197f547bc23e159f5b1985ba758d4aaedb	2026-11-01:owner-approved:ADR-0012:issue-957

@@ -23,7 +23,4 @@ export { useAutoResizeTextarea } from './composer/useAutoResizeTextarea'
 
 export { default as NodeInputThumbnail } from './media/NodeInputThumbnail.vue'
 export { useImageInputSlots } from './media/useImageInputSlots'
-export {
-  useSortableMediaInputs,
-  type SortableMediaInput,
-} from './media/useSortableMediaInputs'
+export { useSortableMediaInputs, type SortableMediaInput } from './media/useSortableMediaInputs'

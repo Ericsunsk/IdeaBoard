@@ -5,7 +5,11 @@ import {
 } from '@/api/media/mediaWorkspaceScope'
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { LibraryDropHit, LibrarySaveModule, LibrarySaveSubmitResult } from '../../../../library'
+import type {
+  LibraryDropHit,
+  LibrarySaveModule,
+  LibrarySaveSubmitResult,
+} from '../../../../library'
 import { useFlowNodeDragInteractions } from './useFlowNodeDragInteractions'
 import { i18n } from '../../../../../core/i18n'
 

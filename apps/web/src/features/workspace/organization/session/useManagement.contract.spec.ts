@@ -203,9 +203,7 @@ describe('Organization management interface', () => {
     expect(management.organization.value?.name).toBe('Acme')
     expect(management.isRenaming.value).toBe(true)
     expect(management.renameError.value).toBeNull()
-    expect(toast.error).toHaveBeenCalledWith(
-      'Could not rename the organization. Please try again.',
-    )
+    expect(toast.error).toHaveBeenCalledWith('Could not rename the organization. Please try again.')
     await management.commitRename()
     expect(management.organization.value?.name).toBe('Renamed')
     expect(management.isRenaming.value).toBe(false)
@@ -320,9 +318,7 @@ describe('Organization management interface', () => {
     expect(management.organization.value?.name).toBe('Acme')
     expect(getOrganizationScopeStore().scope.value.kind).toBe('organization')
     expect(onScopeExit).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining('unsettled tasks or funds'),
-    )
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('unsettled tasks or funds'))
   })
   it('hides old identity facts and does not apply an old identity mutation to the new viewer', async () => {
     let finish!: () => void

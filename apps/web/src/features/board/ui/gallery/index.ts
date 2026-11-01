@@ -19,9 +19,4 @@ export {
 // Styling, Skin & Contracts
 export { blankBoardPreviewSurfaceClass } from './styling/skin'
 export { formatCatalogDate } from './styling/format'
-export type {
-  CatalogEntry,
-  CatalogSortMode,
-  Catalog,
-  CatalogNavigation,
-} from './styling/contract'
+export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './styling/contract'

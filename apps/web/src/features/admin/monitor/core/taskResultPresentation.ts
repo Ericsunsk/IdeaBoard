@@ -1,8 +1,5 @@
 import { calcDurationSeconds, formatDurationSeconds } from '@/core/utils/dateTime'
-import {
-  sanitizeApiErrorMessage,
-  sanitizeTaskErrorMessage,
-} from '@/core/utils/errorMessages'
+import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '@/core/utils/errorMessages'
 import { i18n } from '@/core/i18n'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl, getSafeTaskResultImageUrls } from './taskResultImages'

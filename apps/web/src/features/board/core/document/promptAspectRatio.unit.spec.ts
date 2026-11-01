@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  normalizePromptAspectRatio,
-  resolvePromptAspectRatioValue,
-} from './promptAspectRatio'
+import { normalizePromptAspectRatio, resolvePromptAspectRatioValue } from './promptAspectRatio'
 
 describe('promptAspectRatio', () => {
   it('normalizes invalid or unknown aspect ratio to default auto', () => {

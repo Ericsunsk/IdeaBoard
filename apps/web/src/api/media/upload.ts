@@ -8,7 +8,11 @@ import {
 } from '../generated-query/public/workspace-media/workspace-media'
 import { uploadAvatar as uploadAvatarTransport } from '../generated-query/public/user/user'
 import type { CompleteUploadRequest, CreateUploadRequest } from '../generated-query/public/model'
-import { buildContractRequestHeaders, newRequestId, requireContractData } from '../http/contractKernel'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../http/contractKernel'
 import { withSignal } from '../../core/utils/request'
 import { assertOpaqueId, isOpaqueIdWithPrefix } from '../../core/utils/opaqueIds'
 import { isRecord } from '../../core/utils/guards'

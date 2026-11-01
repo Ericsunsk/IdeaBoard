@@ -191,7 +191,10 @@ describe('workspaceMembersResource writes', () => {
       grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'nope', role: 'member' }),
     ).rejects.toBeInstanceOf(WorkspaceMemberPayloadError)
     await expect(
-      grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'usr_x', role: 'super' as 'member' }),
+      grantOrganizationWorkspaceMember(WORKSPACE_ID, {
+        userId: 'usr_x',
+        role: 'super' as 'member',
+      }),
     ).rejects.toBeInstanceOf(WorkspaceMemberPayloadError)
     await expect(
       changeWorkspaceMemberRole(WORKSPACE_ID, 'usr_x', { role: 'owner ' as 'member' }),

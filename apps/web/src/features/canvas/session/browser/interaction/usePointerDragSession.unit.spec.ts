@@ -1,6 +1,10 @@
 import { effectScope } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { usePointerDragSession, type PointerDragSessionContext, type PointerDragSessionController } from './usePointerDragSession'
+import {
+  usePointerDragSession,
+  type PointerDragSessionContext,
+  type PointerDragSessionController,
+} from './usePointerDragSession'
 
 type DragPayload = {
   id: string

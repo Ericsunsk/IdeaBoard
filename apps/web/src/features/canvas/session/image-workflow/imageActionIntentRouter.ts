@@ -14,10 +14,7 @@ import {
 import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type { FlowSnapshotParamPatch } from '../../session/flow-adapter'
 import { i18n } from '../../../../core/i18n'
-import {
-  ACTIVE_NODE_PANEL_KIND,
-  type ActiveNodePanel,
-} from '../../ui/screens/controllers'
+import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from '../../ui/screens/controllers'
 import type { RetouchMode } from '../../tools/retouch'
 
 type FusionPromptParamPatch = Extract<

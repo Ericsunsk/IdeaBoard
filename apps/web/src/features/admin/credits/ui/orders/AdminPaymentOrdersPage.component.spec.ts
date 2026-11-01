@@ -166,7 +166,9 @@ describe('AdminPaymentOrdersPage', () => {
 
     await user.click(screen.getAllByRole('button', { name: `查看订单 ${orderNumber}` })[0]!)
     // 行内锚点已删除：失败只走 toast，对话框保持打开。
-    await expectToastFeedback(toast, 'network unavailable', screen, ['支付订单详情加载失败，请重试。'])
+    await expectToastFeedback(toast, 'network unavailable', screen, [
+      '支付订单详情加载失败，请重试。',
+    ])
     expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
   })
 

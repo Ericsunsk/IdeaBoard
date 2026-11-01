@@ -39,9 +39,22 @@ export const billingRecordsQueryKeys = {
   all: ['workspace', 'billing', 'records'] as const,
   // Scalar-only key: workspace + account + identity + scope. Never embed a
   // scope object so key equality stays referentially stable across renders.
-  list: (workspaceId: string, billingAccountId: string, identity: string, consumptionScope: string) =>
-    ['workspace', 'billing', 'records', workspaceId, billingAccountId, identity, consumptionScope] as const,
-};
+  list: (
+    workspaceId: string,
+    billingAccountId: string,
+    identity: string,
+    consumptionScope: string,
+  ) =>
+    [
+      'workspace',
+      'billing',
+      'records',
+      workspaceId,
+      billingAccountId,
+      identity,
+      consumptionScope,
+    ] as const,
+}
 
 // Named handover-scope matcher for billing-records keys: the single owner of
 // the ['workspace','billing','records', workspaceId, billingAccountId,

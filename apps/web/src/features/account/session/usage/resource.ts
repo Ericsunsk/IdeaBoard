@@ -49,7 +49,16 @@ export const usageQueryKeys = {
     consumptionScope: string,
     range: UsageRange,
   ) =>
-    ['workspace', 'usage', 'current', workspaceId, billingAccountId, identity, consumptionScope, range] as const,
+    [
+      'workspace',
+      'usage',
+      'current',
+      workspaceId,
+      billingAccountId,
+      identity,
+      consumptionScope,
+      range,
+    ] as const,
 }
 
 // Named handover-scope matcher for usage keys: the single owner of the

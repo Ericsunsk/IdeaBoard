@@ -199,7 +199,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Production dead-code scan        | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode ./...`                                                                                     |
 | Test reachability dead-code scan | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode -test ./...`                                                                               |
 | Schema snapshot generation（本地）     | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                                                                    |
-| Schema Release check（CI/release）     | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease`                                                     |
+| Schema Release check（CI/release）     | `cd apps/api && BASE_SHA='<verified-ci-ancestor>' API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease`                                                     |
 | sqlc regeneration（query-only）        | `cd apps/api && go tool sqlc generate`                                                                                                                                           |
 | Auth build                       | `cd apps/auth && npm run build`                                                                                                                                                  |
 | Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
@@ -328,7 +328,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [executionContract.ts](./apps/web/src/features/canvas/core/execution/executionContract.ts)                   | 前端 workflow feature contract      |
 | [generationIntent.ts](./apps/web/src/features/canvas/session/image-workflow/generationIntent.ts)             | Prompt/node execution orchestration |
 | [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
-| [workspaceEventStream.ts](./apps/web/src/api/workspaceEventStream.ts)                                        | Task SSE events                     |
+| [workspaceEventStream.ts](./apps/web/src/api/realtime/workspaceEventStream.ts)                               | Task SSE events                     |
 | [features.go](./apps/api/internal/workflow/features.go)                                                      | 后端 canonical feature contract     |
 
 ### Task runtime
@@ -383,7 +383,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | [store.go](./apps/api/internal/billing/infrastructure/postgres/store.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
 | [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)                     | Billing domain language、SKU namespace 与 snapshot invariants                                    |
-| [settle.go](./apps/api/internal/tasking/workspacetasks/settle.go) | Task Quote、Readiness、Submit Hold 与 terminal settlement 编排 |
+| [workspacetasks/](./apps/api/internal/tasking/application/workspacetasks/) | Task Quote、Readiness、Submit Hold 与 terminal settlement 编排 |
 
 Workflow feature、Task payload 和媒体输入的 canonical contract 见 [DESIGN.md](./DESIGN.md) §2；新增或修改能力时同步前端 execution contract、OpenAPI、Go workflow validation、Admin prompt config 和 runbook。
 

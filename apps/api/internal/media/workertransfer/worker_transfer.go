@@ -1,4 +1,4 @@
-package providerinfra
+package workertransfer
 
 import (
 	"context"

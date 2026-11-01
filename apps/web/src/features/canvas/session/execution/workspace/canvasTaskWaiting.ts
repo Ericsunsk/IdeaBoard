@@ -7,10 +7,7 @@
 
 import { isWorkspaceTaskGoneError } from '@/api/tasks/workspaceTaskTransport'
 import { waitWorkspaceTaskTerminal } from '@/api/tasks/workspaceTaskWaiter'
-import {
-  isWorkspaceTaskTerminal,
-  type WorkspaceTaskItem,
-} from '@/api/tasks/workspaceTaskContract'
+import { isWorkspaceTaskTerminal, type WorkspaceTaskItem } from '@/api/tasks/workspaceTaskContract'
 import type { WorkspaceTaskOutputRef } from '@/api/tasks/workspaceTaskContract'
 import { i18n } from '../../../../../core/i18n'
 import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'

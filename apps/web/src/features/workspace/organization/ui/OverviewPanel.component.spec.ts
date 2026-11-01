@@ -135,9 +135,7 @@ describe('Organization overview presentation', () => {
     await user.type(screen.getByPlaceholderText('Organization name'), 'Acme')
     await user.click(screen.getByRole('button', { name: 'Confirm closure' }))
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('unsettled tasks or funds'),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('unsettled tasks or funds')),
     )
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Restore organization' })).toBeNull()

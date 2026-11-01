@@ -417,7 +417,8 @@ const contextMenu = ref<{
 } | null>(null)
 
 onClickOutside(
-  () => (folderContextMenuRef.value?.$el instanceof HTMLElement ? folderContextMenuRef.value.$el : null),
+  () =>
+    folderContextMenuRef.value?.$el instanceof HTMLElement ? folderContextMenuRef.value.$el : null,
   () => {
     if (contextMenu.value) {
       closeFolderMenu(false)

@@ -21,8 +21,7 @@ export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
         billing.walletScope.value.identity,
       ),
     ),
-    queryFn: ({ queryKey, signal }) =>
-      fetchCreditWallet(queryKey[3], signal, queryKey[4]),
+    queryFn: ({ queryKey, signal }) => fetchCreditWallet(queryKey[3], signal, queryKey[4]),
     enabled: billing.isReady,
     ...accountScoped(),
   })

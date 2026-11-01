@@ -140,8 +140,7 @@ export default {
       acceptConfirm: 'Accept ownership of this workspace? You will become the owner.',
       rejectConfirm: 'Decline the ownership transfer for this workspace?',
       cancelConfirm: 'Withdraw the ownership transfer invitation?',
-      recipientNotice:
-        'You received an invitation to take over ownership of this workspace.',
+      recipientNotice: 'You received an invitation to take over ownership of this workspace.',
       invites: 'Ownership transfer invitations',
       inviteParties: '{from} → {to}',
       expiresNote: 'Valid for 7 days; can be resent after expiry.',

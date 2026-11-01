@@ -21,7 +21,10 @@ describe('Billing pricing feedback', () => {
   it('joins failed tabs and formatted details without re-formatting', () => {
     const feedback = useBillingPricingFeedback()
 
-    feedback.combinedSaveFailed(['定价设置', 'Model'], ['发布价格失败，请重试', '保存模型池失败，请重试'])
+    feedback.combinedSaveFailed(
+      ['定价设置', 'Model'],
+      ['发布价格失败，请重试', '保存模型池失败，请重试'],
+    )
     expect(toast.error).toHaveBeenCalledWith(
       '部分配置保存失败，请重试（定价设置、Model）：发布价格失败，请重试；保存模型池失败，请重试',
     )

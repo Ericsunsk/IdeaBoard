@@ -571,6 +571,9 @@ func MediaAssetID(t *testing.T, data any) string {
 		t.Fatalf("asset dto = %T, want object", data)
 	}
 	id, _ := dto["id"].(string)
+	if !contract.IsAssetID(id) {
+		t.Fatalf("asset id = %q, want asset_ shape", id)
+	}
 	return id
 }
 

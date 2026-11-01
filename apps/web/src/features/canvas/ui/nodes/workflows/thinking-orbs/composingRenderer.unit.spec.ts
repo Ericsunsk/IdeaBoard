@@ -81,7 +81,8 @@ describe('composing orb renderer', () => {
     for (let index = 0; index < lightGrays.length; index += 1) {
       expect(Math.abs(darkGrays[index]! + lightGrays[index]! - 255)).toBeLessThanOrEqual(1)
     }
-    const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
+    const average = (values: number[]) =>
+      values.reduce((sum, value) => sum + value, 0) / values.length
     expect(Math.abs(average(darkGrays) - average(lightGrays))).toBeGreaterThan(10)
   })
 })

@@ -184,7 +184,8 @@ model 名（无 `@path`、无空白；裸名内部的嵌套斜杠如 openrouter 
 `vendor/model` 予以保留）。Decision-2 的其余语义不变：一个 Model 仍可出现
 在多个 Service 的 pool 中；pool entry 仍无 priority/fallback/weight。
 
-持久层（`20261111000000_model_pool_provider_split.sql`，
+持久层（原 `20261111000000_model_pool_provider_split.sql`，现合并入
+`20261113000000_baseline.sql`；
 `schema/fragments/modelpool.sql`）：唯一键由
 `(service, model)` 变为 `(service, provider, model)`，并新增 3 个 CHECK —
 `provider` 长度 1–64、`provider NOT LIKE '%/%'/'%@%'/'% %'`、`model NOT LIKE

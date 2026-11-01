@@ -23,13 +23,13 @@
 #
 # Environment:
 #   OASDIFF_VERSION            pinned oasdiff release (default v1.32.1)
-#   OPENAPI_BREAKING_LABELS    comma-joined PR labels; the exact label
-#                              openapi-breaking-approved makes the gate pass
-#                              a note (intentional contract breaks stay
-#                              reviewable instead of silently blocked)
+# Reviewed breaks are recorded in scripts/openapi-breaking-reviews.tsv with
+# the exact base commit and SHA-256 of both contract snapshots. The comparison
+# still runs; a record applies to that spec/range only, on PRs and pushes alike.
+# PR labels never skip comparison or approve other contract changes.
 #
-# Exit 0: no breaking changes (or nothing to compare). Exit 1: breaking
-# changes, or a live head spec is missing (fail loudly, never skip).
+# Exit 0: no unreviewed breaking changes (or nothing to compare). Exit 1:
+# unreviewed changes, or a live head spec is missing (fail loudly, never skip).
 # Other non-zero statuses are errors from oasdiff or its setup.
 
 set -euo pipefail
@@ -51,28 +51,6 @@ if [[ $# -ge 2 && -n "${2:-}" ]]; then
 else
 	SPEC_FILES=("${DEFAULT_SPECS[@]}")
 fi
-APPROVED_LABEL="openapi-breaking-approved"
-PR_LABELS=()
-if [[ -n "${OPENAPI_BREAKING_LABELS:-}" ]]; then
-	IFS=',' read -r -a PR_LABELS <<<"${OPENAPI_BREAKING_LABELS}"
-fi
-APPROVAL_PRESENT=false
-if [[ -n "${OPENAPI_BREAKING_LABELS:-}" ]]; then
-	for label in "${PR_LABELS[@]}"; do
-		label="${label#"${label%%[![:space:]]*}"}"
-		label="${label%"${label##*[![:space:]]}"}"
-		if [[ "${label}" == "${APPROVED_LABEL}" ]]; then
-			APPROVAL_PRESENT=true
-			break
-		fi
-	done
-fi
-
-if [[ "${APPROVAL_PRESENT}" == true ]]; then
-	echo "openapi-breaking-check: skipped (${APPROVED_LABEL} label present)"
-	exit 0
-fi
-
 if [[ -z "${BASE_REF}" || "${BASE_REF}" =~ ^0+$ ]]; then
 	echo "openapi-breaking-check: skipped (no base ref; workflow_dispatch without history)"
 	exit 0
@@ -87,6 +65,35 @@ for spec in "${SPEC_FILES[@]}"; do
 		exit 1
 	fi
 done
+
+snapshot_sha256() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum "$1"
+	else
+		shasum -a 256 "$1"
+	fi | awk '{print $1}'
+}
+
+reviewed_break() {
+	local reviews="${SCRIPT_DIR}/openapi-breaking-reviews.tsv"
+	[[ -f "${reviews}" ]] || return 1
+	local base_commit base_hash head_hash
+	base_commit="$(git rev-parse "${BASE_REF}^{commit}")" || return 1
+	base_hash="$(snapshot_sha256 "$2")" || return 1
+	head_hash="$(snapshot_sha256 "$1")" || return 1
+	awk -F '\t' -v spec="$1" -v commit="${base_commit}" -v before="${base_hash}" -v after="${head_hash}" '
+		/^[[:space:]]*(#|$)/ { next }
+		NF != 5 || $1 == "" || length($2) != 40 || $2 ~ /[^0-9a-f]/ ||
+		length($3) != 64 || $3 ~ /[^0-9a-f]/ ||
+		length($4) != 64 || $4 ~ /[^0-9a-f]/ || $5 == "" { invalid = 1; next }
+		$1 == spec && $2 == commit && $3 == before && $4 == after { matched = 1; review = $5 }
+		END {
+			if (invalid) { print "openapi-breaking-check: invalid review record" > "/dev/stderr"; exit 1 }
+			if (!matched) exit 1
+			print review
+		}
+	' "${reviews}"
+}
 
 workdir="$(mktemp -d)"
 cleanup_path "${workdir}"
@@ -118,8 +125,12 @@ for spec in "${SPEC_FILES[@]}"; do
 			echo "openapi-breaking-check: no breaking changes in ${spec}"
 			;;
 		1)
-			echo "openapi-breaking-check: BREAKING changes detected in ${spec}" >&2
-			breaking_specs+=("${spec}")
+			if review="$(reviewed_break "${spec}" "${base_file}")"; then
+				echo "openapi-breaking-check: reviewed breaking changes in ${spec} (${review})"
+			else
+				echo "openapi-breaking-check: BREAKING changes detected in ${spec}" >&2
+				breaking_specs+=("${spec}")
+			fi
 			;;
 		*)
 			echo "openapi-breaking-check: oasdiff failed on ${spec} with exit status ${status}" >&2
@@ -131,10 +142,9 @@ done
 if [[ "${#breaking_specs[@]}" -gt 0 ]]; then
 	echo ""
 	echo "openapi-breaking-check: BREAKING OpenAPI changes detected in: ${breaking_specs[*]}" >&2
-	echo "If the break is intentional, have a reviewer add the '${APPROVED_LABEL}'" >&2
-	echo "label and re-run; otherwise keep the contract backward compatible" >&2
-	echo "(additive paths/optional fields only)." >&2
+	echo "Keep the contract backward compatible, or obtain explicit review of the" >&2
+	echo "exact base commit and contract snapshots in scripts/openapi-breaking-reviews.tsv." >&2
 	exit 1
 fi
 
-echo "openapi-breaking-check: no breaking changes"
+echo "openapi-breaking-check: no unreviewed breaking changes"

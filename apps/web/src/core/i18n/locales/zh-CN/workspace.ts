@@ -206,8 +206,7 @@ export default {
     statusClosed: '已永久关闭',
     closedNote: '该组织已永久关闭，无法恢复访问、消费及剩余点数，账单历史保留。',
     closeTitle: '关闭组织',
-    closeHint:
-      '永久关闭该组织。全部成员将失去访问权限，剩余点数将作废。此操作不可恢复。',
+    closeHint: '永久关闭该组织。全部成员将失去访问权限，剩余点数将作废。此操作不可恢复。',
     closeReasonPlaceholder: '关闭原因（可选）',
     closeAction: '关闭组织',
     closeConfirmAction: '确认关闭',

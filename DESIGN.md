@@ -19,6 +19,10 @@
 
 新增文档前先问：它回答的主问题是否已经由上表覆盖。能合并就合并，避免创建第二事实源。
 
+过程性计划、审计清单和逐步执行记录只服务对应工作；已确认的待办使用 GitHub Issues 跟踪，长期生效的规则回写上表中的 canonical 文档。工作结束后移除独立过程文档，历史通过 Git 追溯；Wiki 只保留有日期和来源的决策、经验与必要验证缺口，不复制造成结论的执行日志。
+
+可复用的调研来源、benchmark 使用说明、验收和运维手册按其用途保留。脚本或测试直接读取的 Markdown 是 active contract，清理前必须核对消费者，不能仅凭名称、篇幅或生成内容判定为过程产物。
+
 ## 系统形态
 
 IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、Worker 出口（ai-proxy）和 Media Storage 协作。AccountPool 已退役，见 [ADR-0009](./docs/adr/0009-accountpool-retirement.md)。

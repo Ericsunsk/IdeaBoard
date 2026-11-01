@@ -24,7 +24,7 @@ Orval output (`public/` + `control/` per `apps/web/orval.config.ts`) lives under
   - `src/api/realtime/`: workspaceEventStream (SSE).
   - `src/api/media/`: mediaAssetUrls (pure URL generation), mediaAssetMetadata (HTTP/cache/invalidation transport), mediaWorkspaceScope, mediaAssetDelivery, upload.
   - `src/api/tasks/`: workspaceTaskContract, workspaceTaskTransport, workspaceTaskWaiter, workspaceTasks.
-  Media delivery composables (`useMediaAssetDelivery`) live in `src/core/media/` to keep `src/api` strictly free of Vue reactive lifecycle.
+    Media delivery composables (`useMediaAssetDelivery`) live in `src/core/media/` to keep `src/api` strictly free of Vue reactive lifecycle.
 - `api/generated-query` Orval output (`public/` + `control/`); never hand-edited; route pages never call directly.
 
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)

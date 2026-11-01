@@ -13,10 +13,7 @@ import {
   getListControlUsersQueryKey,
   listControlUsers,
 } from '@/api/generated-query/control/control-users/control-users'
-import type {
-  ControlUser,
-  ListControlUsersParams,
-} from '@/api/generated-query/control/model'
+import type { ControlUser, ListControlUsersParams } from '@/api/generated-query/control/model'
 import { stripUndefined } from '@/api/http/stripUndefined'
 import { normalizePageSize, PAGE_SIZES } from '@/core/config/pagination'
 import { useAdminCursorCollection } from '../../shared'

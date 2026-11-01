@@ -16,7 +16,9 @@
         class="flex min-w-0 items-center gap-1.5"
         :class="entry.enabled ? undefined : 'opacity-55'"
       >
-        <AdminMono class="truncate text-xs text-foreground">{{ formatPoolModelId(entry) }}</AdminMono>
+        <AdminMono class="truncate text-xs text-foreground">{{
+          formatPoolModelId(entry)
+        }}</AdminMono>
         <span class="flex shrink-0 items-center gap-0.5">
           <AdminMono
             v-for="resolution in entry.resolutions"

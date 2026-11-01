@@ -382,7 +382,8 @@ module.exports = {
       },
       to: {
         path: '^src/features/admin/(?:credits|models|monitor|prompts|settings|statistics)/',
-        pathNot: '^src/features/admin/(?:credits|models|monitor|prompts|settings|statistics)/index\\.ts$',
+        pathNot:
+          '^src/features/admin/(?:credits|models|monitor|prompts|settings|statistics)/index\\.ts$',
       },
     },
   ],

@@ -4,8 +4,8 @@
 
 ## Decisions
 
-- [Wiki Location](decisions/wiki-location.md) — docs/wiki/ 选址与公约。
+- [Wiki Location](decisions/wiki-location.md) — Wiki location, conventions, and process-document retention.
 
 ## Operations
 
-- [Static Analysis Baseline](operations/static-analysis-baseline.md) — 静态分析基线、分应用结果与清理复核记录。
+- [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis and local CI evidence, including unresolved gates.

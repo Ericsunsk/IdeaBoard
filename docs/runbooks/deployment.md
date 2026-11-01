@@ -496,7 +496,7 @@ attempt 间隔为 River 默认指数 backoff + jitter。各队列的 depth/lag �
 
 日志默认脱敏：`internal/platform/applog` 对 credential/token/secret 类 key 直接 `[REDACTED]`，并擦除 value 中 `password=`/`token=` 对与 `scheme://user:password@host` 形态。排障贴日志时仍不要粘贴整段 DSN 或整块 env。
 
-OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oasdiff 对比 base→head，error 级 breaking（删 path/operation、新增必填、删响应字段、收紧 enum）直接失败； additive 变更通过。确属 intentional 的契约 breaking（如退役整域）由 reviewer 加 `openapi-breaking-approved` label 豁免。本地复现：`./scripts/openapi-breaking-check.sh <base-sha>`。
+OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oasdiff 对比可信 base→head，error 级 breaking（删 path/operation、新增必填、删响应字段、收紧 enum）默认失败；additive 变更通过。确属 intentional 的 breaking 须经明确审核，并在 `scripts/openapi-breaking-reviews.tsv` 记录 spec 路径、可信 base commit、base/head 文件 SHA-256 和审核来源。门禁仍执行实际比较，仅认可完全匹配的已审查转换；不同 spec、base 或文件内容的 breaking 继续失败。该记录同时适用于 PR 和 push，PR label 不再跳过比较。本地复现：`./scripts/openapi-breaking-check.sh <base-sha>`。
 
 ### Payments 事故处理
 

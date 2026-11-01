@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/media/workertransfer"
 	"ideaboard/api/internal/media/workspacemedia"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -30,7 +31,7 @@ import (
 // fakeWorkerTransfer uses the real slot implementation with in-memory asset
 // and object adapters, so executor tests cannot bypass acceptance validation.
 type fakeWorkerTransfer struct {
-	providerinfra.WorkerTransfer
+	workertransfer.WorkerTransfer
 	origin string
 	secret string
 	assets map[string]fakeWorkerAsset
@@ -54,7 +55,7 @@ func newFakeWorkerTransfer(origin string) *fakeWorkerTransfer {
 		puts:  map[string][]byte{},
 		putCT: map[string]string{},
 	}
-	f.WorkerTransfer = providerinfra.NewWorkerTransfer(f, f, origin, f.secret)
+	f.WorkerTransfer = workertransfer.NewWorkerTransfer(f, f, origin, f.secret)
 	return f
 }
 func (f *fakeWorkerTransfer) GetAsset(_ context.Context, _, publicAssetID string) (*workspacemedia.Asset, error) {

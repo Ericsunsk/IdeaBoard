@@ -324,7 +324,8 @@ function isCanvasCoreGraph(relativePath: string): boolean {
  * fail the check with a cleanup prompt.
  */
 function collectCanvasKeepStale(
-  exists: (relativePath: string) => boolean = (relativePath) => existsSync(join(SRC_ROOT, relativePath)),
+  exists: (relativePath: string) => boolean = (relativePath) =>
+    existsSync(join(SRC_ROOT, relativePath)),
 ): string[] {
   return [...CANVAS_CORE_GRAPH_STUTTER_KEEP].filter((relativePath) => !exists(relativePath)).sort()
 }
@@ -343,7 +344,9 @@ function genericKeepStillHits(relativePath: string): boolean {
   const fileName = relativePath.split('/').at(-1) ?? ''
   // keptGenericOwnership holds both directories (`core/utils`) and files
   // (`lib/utils.ts`): directories judge by their own name, files by stem.
-  const name = fileName.includes('.') ? ((fileName.split('.')[0] ?? '').toLowerCase()) : fileName.toLowerCase()
+  const name = fileName.includes('.')
+    ? (fileName.split('.')[0] ?? '').toLowerCase()
+    : fileName.toLowerCase()
   const singular = name.endsWith('s') ? name.slice(0, -1) : name
   return GENERIC_NAMES.has(name) || GENERIC_NAMES.has(singular)
 }
@@ -1121,21 +1124,14 @@ function runSelfTest(): void {
     ],
     [
       'canvas-graph-future-stutter-still-flagged',
-      checkAntiStutterStem(
-        'features/canvas/core/graph/graphFoo.ts',
-        'graphFoo',
-        'anti-stutter',
-      )?.kind,
+      checkAntiStutterStem('features/canvas/core/graph/graphFoo.ts', 'graphFoo', 'anti-stutter')
+        ?.kind,
       'anti-stutter',
     ],
     // --- Canvas graph keep staleness -----------------------------------
     // Keep entries with no file on disk fail with a cleanup prompt (probe
     // injected so the negative control never touches the worktree).
-    [
-      'canvas-keep-stale-clean',
-      collectCanvasKeepStale(() => true),
-      [],
-    ],
+    ['canvas-keep-stale-clean', collectCanvasKeepStale(() => true), []],
     [
       'canvas-keep-stale-detects-missing',
       collectCanvasKeepStale(
@@ -1723,11 +1719,7 @@ function runSelfTest(): void {
       ),
       true,
     ],
-    [
-      'keep-multifamily-unneeded',
-      multiFamilyKeepStillHits('export type Single = string'),
-      false,
-    ],
+    ['keep-multifamily-unneeded', multiFamilyKeepStillHits('export type Single = string'), false],
     [
       'keep-barrel-still-hits',
       barrelKeepStillHits('export const total = (a, b) => a + b\n', 'features/example/index.ts'),

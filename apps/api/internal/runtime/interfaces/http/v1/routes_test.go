@@ -185,7 +185,7 @@ func pgAccessUpload(t *testing.T, f *v1MediaAccessPGFixture, creator int64, boar
 	if status != http.StatusOK {
 		t.Fatalf("complete = %d %v, want 200", status, payload)
 	}
-	return v1testsupport.MediaAssetID(t, v1testsupport.Data(t, payload))
+	return v1testsupport.MediaAssetID(t, v1testsupport.Data(t, payload).(map[string]any)["asset"])
 }
 
 // ---- merged from (base helpers_test.go) ----

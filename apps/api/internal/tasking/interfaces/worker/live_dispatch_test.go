@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/media/workertransfer"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
@@ -39,13 +40,13 @@ import (
 // liveDispatchTransfer keeps only the object adapter in memory; output-slot
 // signing and trusted image acceptance use the production implementation.
 type liveDispatchTransfer struct {
-	providerinfra.WorkerTransfer
+	workertransfer.WorkerTransfer
 	puts map[string][]byte
 }
 
 func newLiveDispatchTransfer() *liveDispatchTransfer {
 	f := &liveDispatchTransfer{puts: map[string][]byte{}}
-	f.WorkerTransfer = providerinfra.NewWorkerTransfer(nil, f, "https://worker.example.test", "test-secret")
+	f.WorkerTransfer = workertransfer.NewWorkerTransfer(nil, f, "https://worker.example.test", "test-secret")
 	return f
 }
 

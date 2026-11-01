@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/generation/routing"
 	identityreconciliation "ideaboard/api/internal/identity/users/application/reconciliation"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
+	"ideaboard/api/internal/media/workertransfer"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/memberquotas"
 	modelregistrydomain "ideaboard/api/internal/modelregistry/domain"
@@ -322,7 +323,7 @@ func NewAppTaskRuntime(
 	if err != nil {
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
 	}
-	workspaceTransfer := providerinfra.NewWorkerTransfer(workspaceMedia, services.storageService, cfg.PublicOrigins.Web, cfg.Worker.Edge.Secret)
+	workspaceTransfer := workertransfer.NewWorkerTransfer(workspaceMedia, services.storageService, cfg.PublicOrigins.Web, cfg.Worker.Edge.Secret)
 	workspaceWorkerExec := providers.NewExecutor(workspaceProviderMaterializer, workerFactory, modelCustomParams, workspaceTransfer)
 	// Provider ingestion is complete; the renderer verifies workspace assets
 	// before settlement and owns reference-safe compensation after confirmed Fail.

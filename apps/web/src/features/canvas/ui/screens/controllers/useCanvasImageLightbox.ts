@@ -4,10 +4,7 @@ import {
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
 } from '../../../../../core/config/runtimeUrls.ts'
-import {
-  getMediaAssetMetadata,
-  resolveMediaAssetOriginalURL,
-} from '@/api/media/mediaAssetDelivery'
+import { getMediaAssetMetadata, resolveMediaAssetOriginalURL } from '@/api/media/mediaAssetDelivery'
 import { readImageNaturalSize } from '../../../../../core/media/imageDimensions.ts'
 import { resolveMotionTiming } from '../../../../../core/motion/motionPolicy'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'

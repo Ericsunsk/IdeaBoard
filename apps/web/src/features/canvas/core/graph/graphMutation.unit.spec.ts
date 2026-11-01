@@ -25,11 +25,7 @@ import {
   getDraftGroupIdForNode,
 } from './graphMutation'
 import { createStateFromSnapshot } from './graphStoreState'
-import {
-  toCanvasGraphEdgeId,
-  toCanvasGraphGroupId,
-  toCanvasGraphNodeId,
-} from './graphStoreIds'
+import { toCanvasGraphEdgeId, toCanvasGraphGroupId, toCanvasGraphNodeId } from './graphStoreIds'
 import type { CanvasGraphStoreState, CanvasGraphTransactionDraft } from './graphStoreTypes'
 
 const GROUP_GEOMETRY = { x: 20, y: 20, width: 700, height: 360 }

@@ -32,7 +32,8 @@ const rosterTransport = vi.hoisted(() => ({
 }))
 
 vi.mock('@/features/account/session/accountWorkspace', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/features/account/session/accountWorkspace')>()
+  const actual =
+    await importOriginal<typeof import('@/features/account/session/accountWorkspace')>()
   return {
     ...actual,
     workspaceMembersQueryOptions: () => ({

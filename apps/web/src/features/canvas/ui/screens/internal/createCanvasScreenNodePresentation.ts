@@ -1,6 +1,9 @@
 import { computed, type Ref } from 'vue'
 import type { NodeProps } from '@vue-flow/core'
-import { ACTIVE_NODE_PANEL_KIND, type useFlowActiveNodePanels } from '../controllers/useFlowActiveNodePanels'
+import {
+  ACTIVE_NODE_PANEL_KIND,
+  type useFlowActiveNodePanels,
+} from '../controllers/useFlowActiveNodePanels'
 import type { useImageStageRegistry } from '../../../session/flow-adapter'
 import {
   createFusionNodePresentationResolver,

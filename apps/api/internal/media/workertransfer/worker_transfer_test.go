@@ -1,4 +1,4 @@
-package providerinfra
+package workertransfer
 
 // Output-slot tests cross the same acceptance seam as the executor; the
 // store is an in-memory adapter, while signing and image validation are real.

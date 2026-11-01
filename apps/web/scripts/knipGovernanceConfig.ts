@@ -170,7 +170,12 @@ export function symbolReaches(
   })
 }
 
-export function namedConsumer(root: string, consumer: string, target: string, name: string): boolean {
+export function namedConsumer(
+  root: string,
+  consumer: string,
+  target: string,
+  name: string,
+): boolean {
   let text = fs.readFileSync(path.join(root, consumer), 'utf8')
   if (consumer.endsWith('.vue'))
     text = [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]

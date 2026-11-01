@@ -83,9 +83,7 @@ describe('ClaimPage', () => {
     const { user } = renderClaimPage()
 
     expect(await screen.findByText('Invalid invitation link')).toBeVisible()
-    expect(
-      screen.getByText(/The invitation link is missing or malformed/),
-    ).toBeVisible()
+    expect(screen.getByText(/The invitation link is missing or malformed/)).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Back to home' }))
     expect(mocks.routerPush).toHaveBeenCalledWith('/')
@@ -117,9 +115,7 @@ describe('ClaimPage', () => {
     renderClaimPage()
 
     expect(await screen.findByText('Invitation expired')).toBeVisible()
-    expect(
-      screen.getByText(/This invitation link has expired/),
-    ).toBeVisible()
+    expect(screen.getByText(/This invitation link has expired/)).toBeVisible()
   })
 
   it('renders already accepted state when invitation status is accepted', async () => {
@@ -193,9 +189,7 @@ describe('ClaimPage', () => {
 
     await user.click(acceptBtn)
     await waitFor(() => expect(mocks.acceptToken).toHaveBeenCalledWith('tok_valid'))
-    await waitFor(() =>
-      expect(toast.success).toHaveBeenCalledWith('You joined Acme Design.'),
-    )
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('You joined Acme Design.'))
     expect(mocks.routerPush).toHaveBeenCalledWith('/user/boards')
   })
 

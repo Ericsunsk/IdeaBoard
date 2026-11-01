@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
+	"ideaboard/api/internal/media/workertransfer"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -51,7 +51,7 @@ type Executor struct {
 	resultMaterializer taskmedia.ResultMaterializer
 	workerFactory      runtimeports.WorkerClientFactory
 	customParams       runtimeports.ModelCustomParamsReader
-	transfer           providerinfra.WorkerTransfer
+	transfer           workertransfer.WorkerTransfer
 }
 
 // ProviderExecutor is the internal name used by provider adapter files.
@@ -65,7 +65,7 @@ func NewExecutor(
 	resultMaterializer taskmedia.ResultMaterializer,
 	workerFactory runtimeports.WorkerClientFactory,
 	customParams runtimeports.ModelCustomParamsReader,
-	transfer providerinfra.WorkerTransfer,
+	transfer workertransfer.WorkerTransfer,
 ) *Executor {
 	return &Executor{
 		resultMaterializer: resultMaterializer,

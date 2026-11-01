@@ -19,7 +19,11 @@ import type {
   PaginatedWorkspaceTasks,
   QuoteWorkspaceTaskRequest,
 } from '../generated-query/public/model'
-import { buildContractRequestHeaders, newRequestId, requireContractData } from '../http/contractKernel'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../http/contractKernel'
 import { PAGE_SIZES } from '../../core/config/pagination'
 import {
   assertWorkspaceTaskId,

@@ -90,11 +90,7 @@
             <MoreHoriz class="size-[18px]" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="end"
-          @close-auto-focus="onMenuCloseAutoFocus"
-        >
+        <DropdownMenuContent side="top" align="end" @close-auto-focus="onMenuCloseAutoFocus">
           <DropdownMenuItem
             v-for="item in menuItems"
             :key="item.label"
@@ -169,7 +165,9 @@ const ownerAvatarEntry = computed(() => {
   return { userId, avatar_url: props.board.ownerAvatarUrl ?? undefined }
 })
 const ownerAvatarSrc = computed(() =>
-  ownerAvatarEntry.value ? resolveMemberAvatar(ownerAvatarEntry.value, currentUser.value) : undefined,
+  ownerAvatarEntry.value
+    ? resolveMemberAvatar(ownerAvatarEntry.value, currentUser.value)
+    : undefined,
 )
 const ownerAvatarInitial = computed(() =>
   ownerAvatarEntry.value ? resolveMemberInitial(ownerAvatarEntry.value) : 'U',
@@ -279,11 +277,7 @@ function onRenameBlur(event: FocusEvent) {
   }
   if (typeof document !== 'undefined') {
     const active = document.activeElement
-    if (
-      active instanceof Node &&
-      active !== document.body &&
-      cardRootEl.value?.contains(active)
-    ) {
+    if (active instanceof Node && active !== document.body && cardRootEl.value?.contains(active)) {
       return
     }
   }

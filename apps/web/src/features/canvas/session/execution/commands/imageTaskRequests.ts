@@ -7,10 +7,7 @@ import type {
   GenerationExecutionPlan,
   PreparedFusionExecutionPlan,
 } from '../planning/imageExecutionPlan'
-import {
-  resolveOutpaintPixelGeometry,
-  type OutpaintRect,
-} from '../../../tools/outpaint/core'
+import { resolveOutpaintPixelGeometry, type OutpaintRect } from '../../../tools/outpaint/core'
 import {
   buildExecutionTaskRequest,
   EXECUTION_SERVICE,

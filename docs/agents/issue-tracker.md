@@ -7,24 +7,27 @@ Issues and PRDs for this repository live in GitHub Issues for `Ericsunsk/IdeaBoa
 - Repo: `Ericsunsk/IdeaBoard`
 - Remote: `https://github.com/Ericsunsk/IdeaBoard`
 
-Prefer inferring the repository from `git remote -v`; `gh` does this automatically inside the clone.
+Prefer inferring the repository from `git remote -v`.
+Before the first issue creation in a session, verify the target with
+`gh repo view --json nameWithOwner`; it must be `Ericsunsk/IdeaBoard`.
 
 ## Issue Operations
 
-- Create: `gh issue create --title "..." --body "..."`
-- View: `gh issue view <number> --comments`
+- Create: `gh issue create --title "..." --body-file <path>`
+- View: `gh issue view <number> --json number,title,body,labels,comments`
 - List: `gh issue list --state open --json number,title,body,labels,comments`
-- Comment: `gh issue comment <number> --body "..."`
+- Comment: `gh issue comment <number> --body-file <path>`
 - Label: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`
-- Close: `gh issue close <number> --comment "..."`
+- Close: post the explanation as a comment, then run `gh issue close <number>`.
 
-Use a heredoc or file for multi-line bodies.
+Use a file for multiline bodies. Comment separately before closing:
+`gh issue close --comment` can discard the comment when the issue is already closed.
 
 ## Pull Requests as a Triage Surface
 
 **PRs as a request surface: no.**
 
-Do not include pull requests in the `triage` queue. If this repository later accepts external PRs as feature requests, update this setting before triaging them.
+Do not include pull requests in the `triage` queue.
 
 ## Skill Phrases
 
@@ -33,15 +36,7 @@ Do not include pull requests in the `triage` queue. If this repository later acc
 
 ## Triage Labels
 
-| Label             | Meaning                        |
-| ----------------- | ------------------------------ |
-| `needs-triage`    | Maintainer evaluation required |
-| `needs-info`      | Waiting on reporter            |
-| `ready-for-agent` | Fully specified and AFK-ready  |
-| `ready-for-human` | Requires human implementation  |
-| `wontfix`         | Will not be actioned           |
-
-Apply these tracker labels exactly when a skill names the corresponding triage role.
+Use the role-to-label mapping in `docs/agents/triage-labels.md`.
 
 ## Wayfinding Operations
 

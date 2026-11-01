@@ -67,10 +67,7 @@ import {
   createOAuthProviderSettingsResource,
   type OAuthProviderSettingsResource,
 } from '../../../session/oauth/resource'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '@/core/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '@/core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'

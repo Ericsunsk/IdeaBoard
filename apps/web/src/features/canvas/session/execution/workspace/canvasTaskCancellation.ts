@@ -9,10 +9,7 @@
 
 import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../core/utils/workspaceId'
-import {
-  cancelWorkspaceTask,
-  isWorkspaceTaskGoneError,
-} from '@/api/tasks/workspaceTaskTransport'
+import { cancelWorkspaceTask, isWorkspaceTaskGoneError } from '@/api/tasks/workspaceTaskTransport'
 import { taskCancellationIdempotencyKey } from '@/api/http/idempotencyKey'
 import { i18n } from '../../../../../core/i18n'
 import { getWorkspaceSelectionStore as getDefaultWorkspaceSelectionStore } from '../../../../workspace'

@@ -394,8 +394,6 @@ describe('admin credit command DTO assembly', () => {
   })
 
   it('rejects invalid command inputs before DTO assembly', () => {
-    expect(() =>
-      buildAdminCreditCommandRequest({ kind: 'grant', amountCredits: 1 }),
-    ).toThrow()
+    expect(() => buildAdminCreditCommandRequest({ kind: 'grant', amountCredits: 1 })).toThrow()
   })
 })

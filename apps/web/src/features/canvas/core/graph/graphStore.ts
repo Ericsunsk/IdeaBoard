@@ -72,11 +72,7 @@ export {
   type CanvasGraphTransactionSummary,
 } from './graphStoreTypes'
 export { CanvasGraphTransaction } from './graphTransactionPort'
-export {
-  toCanvasGraphEdgeId,
-  toCanvasGraphGroupId,
-  toCanvasGraphNodeId,
-} from './graphStoreIds'
+export { toCanvasGraphEdgeId, toCanvasGraphGroupId, toCanvasGraphNodeId } from './graphStoreIds'
 
 export class CanvasGraphStore {
   private state: CanvasGraphStoreState

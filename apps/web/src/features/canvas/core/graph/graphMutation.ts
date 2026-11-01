@@ -11,11 +11,7 @@ import {
   removeGroupFromIndexes,
 } from './graphStoreIndexes'
 import { getNodeKind } from './graphStoreState'
-import {
-  toCanvasGraphEdgeId,
-  toCanvasGraphGroupId,
-  toCanvasGraphNodeId,
-} from './graphStoreIds'
+import { toCanvasGraphEdgeId, toCanvasGraphGroupId, toCanvasGraphNodeId } from './graphStoreIds'
 import type {
   CanvasGraphEdgeId,
   CanvasGraphEdgeRecord,

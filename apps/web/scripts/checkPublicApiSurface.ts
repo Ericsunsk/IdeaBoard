@@ -241,7 +241,8 @@ const EXPECTED_FEATURE_BARRELS = [
 const INTENTIONAL_FLATS: Record<string, string> = {
   admin: 'vertical contexts own per-area resource boundaries; no single feature barrel',
   canvas: 'intra-feature seams are the declared inventory entry barrels; no root barrel by design',
-  notification: 'scoped notification center UI is directly imported as an async component in canvas chrome; no root barrel',
+  notification:
+    'scoped notification center UI is directly imported as an async component in canvas chrome; no root barrel',
 }
 
 /** Flag feature roots missing a barrel without a documented exception. */

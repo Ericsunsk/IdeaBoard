@@ -20,7 +20,9 @@ export async function fetchWorkspaceInviteByToken(
 ): Promise<WorkspaceInvitePreview> {
   const trimmed = token.trim()
   if (!trimmed) throw new Error('Token is required')
-  const response = await getWorkspaceInviteByTokenRequest(trimmed, { ...withSignal(options?.signal) })
+  const response = await getWorkspaceInviteByTokenRequest(trimmed, {
+    ...withSignal(options?.signal),
+  })
   return response.data
 }
 
@@ -31,7 +33,9 @@ export async function acceptWorkspaceInviteByToken(
 ): Promise<WorkspaceMember> {
   const trimmed = token.trim()
   if (!trimmed) throw new Error('Token is required')
-  const response = await acceptWorkspaceInviteByTokenRequest(trimmed, { ...withSignal(options?.signal) })
+  const response = await acceptWorkspaceInviteByTokenRequest(trimmed, {
+    ...withSignal(options?.signal),
+  })
   return response.data
 }
 
@@ -42,7 +46,9 @@ export async function declineWorkspaceInviteByToken(
 ): Promise<WorkspaceInviteAck> {
   const trimmed = token.trim()
   if (!trimmed) throw new Error('Token is required')
-  const response = await declineWorkspaceInviteByTokenRequest(trimmed, { ...withSignal(options?.signal) })
+  const response = await declineWorkspaceInviteByTokenRequest(trimmed, {
+    ...withSignal(options?.signal),
+  })
   return response.data
 }
 

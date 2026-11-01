@@ -9,9 +9,9 @@
 
 | Rank | 锁 / Fence | 实现位置 |
 | ---- | ---------- | -------- |
-| L0 | 幂等 fence：`task_submission_idempotency` PK (`ON CONFLICT DO NOTHING`)；`pg_advisory_xact_lock(idempotency_key)`；Service Model Pool per-service advisory lock | `internal/db/queries/workspace_tasks.sql:314`；`internal/db/migrations/20261108000000_baseline.sql:execute_credit_command_v3`；`internal/generation/catalog/catalog.go:396` |
+| L0 | 幂等 fence：`task_submission_idempotency` PK (`ON CONFLICT DO NOTHING`)；`pg_advisory_xact_lock(idempotency_key)`；Service Model Pool per-service advisory lock | `internal/db/queries/workspace_tasks.sql:314`；`internal/db/migrations/20261113000000_baseline.sql:execute_credit_command_v3`；`internal/generation/catalog/catalog.go:396` |
 | L1 | `workspaces` 行 `FOR UPDATE`（membership 守卫）。Settlement submit 中它必须在 L0 claim insert 之前：claim 的 workspace FK 会先取同行的 `FOR KEY SHARE`，再升级 `FOR UPDATE` 即与并发提交互锁（40P01，#917）。守卫锁先行则同 workspace 提交在入口串行，claim 仍在 Quote/Hold 之前守住重放 | `internal/db/queries/workspaces.sql:21`，经 `LockWorkspaceMemberships` |
-| L2 | 领域行（稳定顺序内）：`boards` 行 `FOR UPDATE`（多 board 按 `public_id ASC`）；`credit_wallets` 行 `FOR UPDATE` 后 `credit_accounts ORDER BY id FOR UPDATE`；`tasks` 行经状态翻转 `UPDATE` | `internal/db/queries/workspace_boards.sql:105,121,163`；`20261108000000_baseline.sql:execute_credit_command_v3`；`internal/db/queries/workspace_tasks.sql:126,139,169` |
+| L2 | 领域行（稳定顺序内）：`boards` 行 `FOR UPDATE`（多 board 按 `public_id ASC`）；`credit_wallets` 行 `FOR UPDATE` 后 `credit_accounts ORDER BY id FOR UPDATE`；`tasks` 行经状态翻转 `UPDATE` | `internal/db/queries/workspace_boards.sql:105,121,163`；`20261113000000_baseline.sql:execute_credit_command_v3`；`internal/db/queries/workspace_tasks.sql:126,139,169` |
 | L3 | 派生/引用行（无外序要求，但必须在 L2 之后）：`task_billing_*`、`board_document_media_refs`、`board_memberships`、`task_outputs`、`river_job`、`ai_search_operations` marker、`event outbox` | 各 store 的 `*InTx` 实现 |
 
 ## 各事务锁序表（读代码确认）
@@ -38,7 +38,7 @@ Settlement 的参与者由 `Service` 的事务能力接口直接持有；`s.subm
 
 ### 5. Billing / Credits caller-owned Tx：调用方拥有 commit/rollback，参与者只借用
 
-`credits/composition.go`（`Service.SettlementInTx`/`PaymentInTx`/`GrantsInTx`/`AdministrativeInTx`）/`CommandsInTx`（无 Service 场景，payments 用它）只把 `tx` 包成窄面 `ports` face，绝不 begin/commit。`execute_credit_command_v3`（`20261108000000_baseline.sql`）内部锁序：advisory → `credit_holds`/`credit_charges`/原交易行 `FOR UPDATE`（correction 回查原交易）→ `credit_wallets FOR UPDATE` → `credit_accounts ORDER BY id FOR UPDATE`→ 写 transaction/postings。`Quote(ctx, tx, ...)` 永远无锁，可放在 Hold 前任意位置；`Restriction` 创建/释放先锁 Wallet 行（`create/release_credit_wallet_restriction`）。同构例子：vision settlement（`searchcatalog/application/vision_settlement.go:30`）：advisory → operation 行 `FOR UPDATE` → `Quote(ctx, tx, ...)` → `SettlementInTx(tx).Hold` → insert；terminal 先 `FOR UPDATE` operation 行再 Capture/Release。
+`credits/composition.go`（`Service.SettlementInTx`/`PaymentInTx`/`GrantsInTx`/`AdministrativeInTx`）/`CommandsInTx`（无 Service 场景，payments 用它）只把 `tx` 包成窄面 `ports` face，绝不 begin/commit。`execute_credit_command_v3`（`20261113000000_baseline.sql`）内部锁序：advisory → `credit_holds`/`credit_charges`/原交易行 `FOR UPDATE`（correction 回查原交易）→ `credit_wallets FOR UPDATE` → `credit_accounts ORDER BY id FOR UPDATE`→ 写 transaction/postings。`Quote(ctx, tx, ...)` 永远无锁，可放在 Hold 前任意位置；`Restriction` 创建/释放先锁 Wallet 行（`create/release_credit_wallet_restriction`）。同构例子：vision settlement（`searchcatalog/application/vision_settlement.go:30`）：advisory → operation 行 `FOR UPDATE` → `Quote(ctx, tx, ...)` → `SettlementInTx(tx).Hold` → insert；terminal 先 `FOR UPDATE` operation 行再 Capture/Release。
 
 ## 新增跨 store 事务必须遵守的规则
 

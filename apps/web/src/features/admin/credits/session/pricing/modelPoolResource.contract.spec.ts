@@ -77,7 +77,10 @@ describe('Admin Model Pool resource', () => {
     await expect(
       replaceAdminModelPool(
         sku,
-        { version: 2, entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] }] },
+        {
+          version: 2,
+          entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] }],
+        },
         options,
       ),
     ).resolves.toEqual({
@@ -142,7 +145,11 @@ describe('Admin Model Pool resource', () => {
   })
 
   it('lists catalog models through the injected lister', async () => {
-    const resource = createAdminModelPoolResource(async () => [{ id: 'first', name: 'First', provider: 'a' }])
-    await expect(resource.listCatalogModels()).resolves.toEqual([{ id: 'first', name: 'First', provider: 'a' }])
+    const resource = createAdminModelPoolResource(async () => [
+      { id: 'first', name: 'First', provider: 'a' },
+    ])
+    await expect(resource.listCatalogModels()).resolves.toEqual([
+      { id: 'first', name: 'First', provider: 'a' },
+    ])
   })
 })

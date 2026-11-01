@@ -6,9 +6,7 @@ import {
   resolveNotificationDerivedState,
 } from './notificationDisplay'
 
-function makeNotification(
-  overrides: Partial<NotificationDTO> & { id: string },
-): NotificationDTO {
+function makeNotification(overrides: Partial<NotificationDTO> & { id: string }): NotificationDTO {
   return {
     type: 'workspace_invite',
     title: 'Invite',
@@ -24,18 +22,22 @@ function makeNotification(
 
 describe('notificationDisplay', () => {
   it('reads the invite decision from the payload invite_status', () => {
-    expect(
-      readPayloadInviteDecision(makeNotification({ id: 'a' })),
-    ).toBeNull()
+    expect(readPayloadInviteDecision(makeNotification({ id: 'a' }))).toBeNull()
     expect(
       readPayloadInviteDecision(
-        makeNotification({ id: 'b', action_payload: { invite_id: 'inv_1', invite_status: 'accepted' } }),
+        makeNotification({
+          id: 'b',
+          action_payload: { invite_id: 'inv_1', invite_status: 'accepted' },
+        }),
       ),
     ).toBe('joined')
     for (const terminal of ['declined', 'cancelled', 'expired']) {
       expect(
         readPayloadInviteDecision(
-          makeNotification({ id: `d-${terminal}`, action_payload: { invite_id: 'inv_1', invite_status: terminal } }),
+          makeNotification({
+            id: `d-${terminal}`,
+            action_payload: { invite_id: 'inv_1', invite_status: terminal },
+          }),
         ),
       ).toBe('declined')
     }
@@ -75,7 +77,10 @@ describe('notificationDisplay', () => {
     const pending = makeNotification({ id: 'n', action_payload: { invite_id: 'inv_1' } })
     const viaLocal = resolveNotificationDerivedState(pending, 'joined')
     const viaPayload = resolveNotificationDerivedState(
-      makeNotification({ id: 'n', action_payload: { invite_id: 'inv_1', invite_status: 'accepted' } }),
+      makeNotification({
+        id: 'n',
+        action_payload: { invite_id: 'inv_1', invite_status: 'accepted' },
+      }),
     )
     expect(viaLocal.inviteDecision).toBe('joined')
     expect(viaLocal.pill).toEqual(viaPayload.pill)
@@ -96,9 +101,9 @@ describe('notificationDisplay', () => {
     expect(merged).toHaveLength(2)
     expect(merged[0]?.status).toBe('read')
     expect(merged[0]?.read_at).toBe('2026-01-01T00:00:00.000Z')
-    expect(
-      (merged[0]?.action_payload as Record<string, unknown> | undefined)?.invite_status,
-    ).toBe('accepted')
+    expect((merged[0]?.action_payload as Record<string, unknown> | undefined)?.invite_status).toBe(
+      'accepted',
+    )
     // Untouched items keep identity
     expect(merged[1]).toBe(items[1])
     // Base list is never mutated
