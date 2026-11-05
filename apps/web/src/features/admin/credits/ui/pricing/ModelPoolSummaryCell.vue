@@ -41,7 +41,7 @@ import { BILLING_PRICING_MESSAGES } from './messages'
 
 // Compact per-Service Model Pool summary: one row per Model with its
 // supported resolution badges (`Model A [1K][2K][4K]`). Disabled entries
-// stay visible but dimmed; an empty pool renders 未配置.
+// stay visible but dimmed; an empty pool renders 未设置.
 const props = withDefaults(
   defineProps<{
     displayName: string

@@ -6,6 +6,7 @@ import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
   makeBoardState,
+  primeAuthenticatedWorkspace,
   type MockWorkspaceBoardApiState,
 } from '../../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
@@ -123,22 +124,11 @@ function addRemoteBoard(params: {
   })
 }
 
-function primeAuthenticatedWorkspace() {
-  setStoredAuth({
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'tester',
-    avatar: '',
-    role: 'user',
-  })
-  resetWorkspaceSelectionStore()
-  getWorkspaceSelectionStore().select(WORKSPACE_ID)
-}
-
 describe('boardSync', () => {
   beforeEach(() => {
     localStorage.clear()
     clearStoredAuth()
-    primeAuthenticatedWorkspace()
+    primeAuthenticatedWorkspace(WORKSPACE_ID)
     vi.clearAllMocks()
     apiState = createMockWorkspaceBoardApiState()
     mocks.request.mockImplementation(createMockWorkspaceBoardApiRequest(apiState))

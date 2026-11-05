@@ -83,7 +83,7 @@ defineExpose({ stageElement })
 
 .node-stage-frame::after {
   position: absolute;
-  z-index: 10;
+  z-index: var(--canvas-z-stage);
   inset: 0;
   border-radius: inherit;
   box-shadow: inset 0 0 0 1.5px var(--node-stage-frame-active-border);

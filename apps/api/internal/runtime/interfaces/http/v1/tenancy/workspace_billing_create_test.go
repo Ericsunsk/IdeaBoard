@@ -74,7 +74,17 @@ func (f *stubBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID 
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       f.personal.InternalID,
 		BillingAccountPublicID: f.personal.PublicID,
-		Shared:                 workspacePublicID != "",
+		OwnerType:              f.personal.OwnerType,
+	}, nil
+}
+
+func (f *stubBillingAccounts) ResolveFundsForActor(_ context.Context, workspacePublicID string, _ int64) (funds.Identity, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return funds.Identity{
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       f.personal.InternalID,
+		BillingAccountPublicID: f.personal.PublicID,
 		OwnerType:              f.personal.OwnerType,
 	}, nil
 }

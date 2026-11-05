@@ -76,7 +76,7 @@ describe('site branding helpers', () => {
           logo_url: sameOriginPrivateURL,
         }),
       ),
-    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
+    ).toBe('logoInvalid')
   })
 
   it('resolves each stored logo key to its own display URL', () => {
@@ -104,25 +104,25 @@ describe('site branding helpers', () => {
         project_name: 'IdeaBoard',
         logo_url: SITE_BRANDING_LOGO_ROUTE_PATH,
       }),
-    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
+    ).toBe('logoInvalid')
     expect(
       validateSiteBrandingSetting({
         project_name: '',
         logo_url: '',
       }),
-    ).toBe('项目名称不能为空')
+    ).toBe('nameRequired')
     expect(
       validateSiteBrandingSetting({
         project_name: '名'.repeat(SITE_BRANDING_PROJECT_NAME_MAX_CHARS + 1),
         logo_url: '',
       }),
-    ).toBe(`项目名称不能超过 ${SITE_BRANDING_PROJECT_NAME_MAX_CHARS} 个字符`)
+    ).toBe('nameTooLong')
     expect(
       validateSiteBrandingSetting({
         project_name: 'IdeaBoard',
         logo_url: 'javascript:alert(1)',
       }),
-    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
+    ).toBe('logoInvalid')
   })
 
   it('allows only empty, canonical storage keys, and http logo URLs', () => {

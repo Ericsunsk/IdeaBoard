@@ -14,7 +14,10 @@
       </template>
 
       <!-- 第 1 列：Service (service 图标 + slug + 请求清晰度) -->
-      <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.serviceColumn"
+        :style="{ width: adminMonitorColumnWidths.service }"
+      >
         <template #body="{ data }">
           <AdminMono as="div" class="flex items-center gap-1.5 text-xs text-foreground">
             <component
@@ -40,7 +43,10 @@
       </AdminColumn>
 
       <!-- 模型列：实际解析模型 -->
-      <AdminColumn header="Model" :style="{ width: adminMonitorColumnWidths.model }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.modelColumn"
+        :style="{ width: adminMonitorColumnWidths.model }"
+      >
         <template #body="{ data }">
           <AdminMono
             class="truncate text-xs text-foreground"
@@ -52,21 +58,30 @@
       </AdminColumn>
 
       <!-- 第 3 列：Status (复用 Events 表状态 Token 胶囊与点) -->
-      <AdminColumn header="Status" :style="{ width: adminMonitorColumnWidths.status }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.statusColumn"
+        :style="{ width: adminMonitorColumnWidths.status }"
+      >
         <template #body="{ data }">
           <TaskStatusCell :row="data" />
         </template>
       </AdminColumn>
 
       <!-- 结果列：最多 3 张缩略图，超出 +N，点击进详情 -->
-      <AdminColumn header="Result" :style="{ width: adminMonitorColumnWidths.result }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.resultColumn"
+        :style="{ width: adminMonitorColumnWidths.result }"
+      >
         <template #body="{ data }">
           <TaskResultCell :row="data" @inspect="emit('showDetail', $event)" />
         </template>
       </AdminColumn>
 
       <!-- 第 5 列：Message (事件 Prompt / 诊断内容，服务名前缀已由 Service 列承载) -->
-      <AdminColumn header="Message" :style="{ width: adminMonitorColumnWidths.message }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.messageColumn"
+        :style="{ width: adminMonitorColumnWidths.message }"
+      >
         <template #body="{ data }">
           <AdminMono
             as="div"
@@ -79,7 +94,10 @@
       </AdminColumn>
 
       <!-- 花费列：实际扣账 Idea 数 -->
-      <AdminColumn header="Credits" :style="{ width: adminMonitorColumnWidths.credits }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.creditsColumn"
+        :style="{ width: adminMonitorColumnWidths.credits }"
+      >
         <template #body="{ data }">
           <AdminMono class="text-xs whitespace-nowrap text-foreground tabular-nums">
             {{ data.credits || 0 }} <span class="text-muted-foreground">Idea</span>
@@ -117,7 +135,10 @@
       </AdminColumn>
 
       <!-- 耗时列：完成时间 - 创建时间，未完成展示占位 -->
-      <AdminColumn header="Duration" :style="{ width: adminMonitorColumnWidths.duration }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.durationColumn"
+        :style="{ width: adminMonitorColumnWidths.duration }"
+      >
         <template #body="{ data }">
           <AdminMono class="text-xs whitespace-nowrap text-foreground tabular-nums">
             {{ formatTaskDuration(data) }}
@@ -145,7 +166,10 @@
       </AdminColumn>
 
       <!-- 第 10 列：More (更多图标，点击进详情弹窗；演示模式用本地数据预览) -->
-      <AdminColumn header="More" :style="{ width: adminMonitorColumnWidths.more }">
+      <AdminColumn
+        :header="MONITOR_MESSAGES.moreColumn"
+        :style="{ width: adminMonitorColumnWidths.more }"
+      >
         <template #body="{ data }">
           <div class="flex items-center justify-start">
             <button

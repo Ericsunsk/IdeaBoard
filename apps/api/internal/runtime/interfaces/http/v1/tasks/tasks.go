@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
@@ -26,7 +25,6 @@ import (
 	taskdomain "ideaboard/api/internal/tasking/domain"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/tenancy"
-	"ideaboard/api/internal/tenancy/funds"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 
@@ -45,37 +43,23 @@ type (
 	WorkspaceTaskSnapshotSaver  = taskports.RoutingSnapshotSaver
 )
 
-type QuoteBillingAccountReader interface {
-	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
-}
-
-type QuoteWalletReader interface {
-	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
-}
-
-type QuoteQuotaReader interface {
-	CheckQuotaForQuote(ctx context.Context, billingAccountID, userID int64, amount int64, reservedAt time.Time) error
-}
-
 type ContractV1TaskDeps struct {
-	Tasks                    WorkspaceTaskReadStore
-	TaskLifecycle            WorkspaceTaskLifecycleStore
-	TaskBilling              WorkspaceTaskBillingStore
-	TaskQuoter               WorkspaceTaskQuoter
-	TaskHolder               WorkspaceTaskHolder
-	TaskQueue                WorkspaceTaskEnqueuer
-	TaskAssets               WorkspaceTaskAssetReader
-	TaskPreparer             *taskservice.WorkspacePreparer
-	TaskAcceptance           taskports.SubmissionAuthorizer
-	TaskRouter               *routing.RoutingResolver
-	TaskSnapshotSaver        WorkspaceTaskSnapshotSaver
-	TaskBillingAccounts      taskports.TxBillingAccountResolver
-	TaskSubmissionClaims     taskports.TxSubmissionClaimStore
-	TaskQuotas               taskports.TxMemberQuotaChecker
-	TaskTracer               taskports.SettlementTracer
-	TaskQuoteBillingAccounts QuoteBillingAccountReader
-	TaskQuoteWallets         QuoteWalletReader
-	TaskQuoteQuotas          QuoteQuotaReader
+	Tasks                WorkspaceTaskReadStore
+	TaskLifecycle        WorkspaceTaskLifecycleStore
+	TaskBilling          WorkspaceTaskBillingStore
+	TaskQuoter           WorkspaceTaskQuoter
+	TaskHolder           WorkspaceTaskHolder
+	TaskQueue            WorkspaceTaskEnqueuer
+	TaskAssets           WorkspaceTaskAssetReader
+	TaskPreparer         *taskservice.WorkspacePreparer
+	TaskAcceptance       taskports.SubmissionAuthorizer
+	TaskRouter           *routing.RoutingResolver
+	TaskSnapshotSaver    WorkspaceTaskSnapshotSaver
+	TaskBillingAccounts  taskports.TxBillingAccountResolver
+	TaskSubmissionClaims taskports.TxSubmissionClaimStore
+	TaskQuotas           taskports.TxMemberQuotaChecker
+	TaskTracer           taskports.SettlementTracer
+	TaskReadiness        taskports.ReadinessChecker
 }
 
 type Deps struct {
@@ -854,19 +838,21 @@ type v1QuoteTaskBody struct {
 
 // quoteWorkspaceTask is the preflight seam: it returns an immutable price
 // snapshot with no persistence (separate from authoritative create). It
-// spends no Credits, but it resolves the SAME stable Billing Account
-// submit would hold (#917) and applies the same consumption eligibility:
-// workspace membership (404 task_not_found when hidden), the Board
-// generate gate when data.board_id is present (404 board_not_found, 409
-// board_archived, 403 task_forbidden), the shared pool availability
-// decision (422 service_resolution_unavailable), and the Wallet funds
-// gate (402 task_insufficient_credits vs 403 billing_wallet_restricted,
-// mirroring the submit Hold mapping, including the frozen passthrough).
-// Financial management alone grants no Board standing: a caller without
-// Board generate capability fails here exactly as on submit. The snapshot
-// stays price-only (no balances ride it); callers refresh the accurate
-// account balance through the workspace billing reads, which resolve the
-// same stable account.
+// spends no Credits, but it resolves the SAME actor payer submit would
+// hold (payer = actor, #973/#980) and applies the same consumption
+// eligibility: workspace membership (404 task_not_found when hidden), the
+// Board generate gate when data.board_id is present (404 board_not_found,
+// 409 board_archived, 403 task_forbidden), the shared pool availability
+// decision (422 service_resolution_unavailable), and the Wallet funds gate
+// on the actor's account (402 task_insufficient_credits vs 403
+// billing_wallet_restricted, mirroring the submit Hold mapping, including
+// the frozen passthrough). Personal scopes skip the member quota check
+// (no quota concept); Organization scopes enforce the same cap submit
+// enforces. Financial management alone grants no Board standing: a caller
+// without Board generate capability fails here exactly as on submit. The
+// snapshot stays price-only (no balances ride it); callers refresh the
+// accurate account balance through the workspace billing reads, which
+// resolve the same actor account.
 func (h *Handler) quoteWorkspaceTask(c *gin.Context) {
 	// Quotes price server-side funds state: strict binding stays (unknown
 	// fields 400, enforcing the #847 workflow_kind rename like submit).
@@ -881,96 +867,22 @@ func (h *Handler) quoteWorkspaceTask(c *gin.Context) {
 		if body.Data.Resolution != nil && strings.TrimSpace(*body.Data.Resolution) != "" {
 			resolution = strings.TrimSpace(*body.Data.Resolution)
 		}
-		// Board generate gate first (same BoardPolicy submit decision as
-		// the settlement transaction): Viewers never read ready.
-		boardID := strings.TrimSpace(body.Data.BoardID)
-		if boardID != "" {
-			if err := taskdomain.ValidateBoardID(boardID); err != nil {
-				renderTaskError(c, err)
-				return
-			}
-			workspaceRole, ok := h.taskWorkspaceRoleString(c.Request.Context(), workspace, identityPrincipal.UserID())
-			if !ok {
-				contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, runtimehttp.MsgControlNotFound8)
-				c.Abort()
-				return
-			}
-			authorizer := h.taskBoardsAuthorizer()
-			if authorizer == nil {
-				renderTaskError(c, errors.New("tasks: board authorizer unavailable"))
-				return
-			}
-			access, err := authorizer.ResolveBoardAccess(c.Request.Context(), workspace.PublicID, boardID, identityPrincipal.UserID(), workspaceRole)
-			if err != nil {
-				renderTaskError(c, err)
-				return
-			}
-			var facts taskdomain.BoardTaskFacts
-			if access != nil {
-				facts = taskdomain.BoardTaskFacts{
-					CanRead: access.CanRead, CanGenerate: access.CanGenerate,
-					CanWrite: access.CanWrite, Archived: access.Archived,
-				}
-			}
-			switch taskdomain.BoardPolicy.Check(facts, taskdomain.BoardOpSubmit) {
-			case taskdomain.BoardDecisionAllow:
-			case taskdomain.BoardDecisionArchived:
-				renderTaskError(c, taskdomain.ErrBoardArchived)
-				return
-			case taskdomain.BoardDecisionForbidden:
-				renderTaskError(c, taskdomain.ErrForbidden)
-				return
-			default:
-				renderTaskError(c, taskdomain.ErrBoardNotFound)
-				return
-			}
-		}
-		// Same stable payer submit would hold: no owner-wallet fallback.
-		if h.deps.Tasks.TaskQuoteBillingAccounts == nil || h.deps.Tasks.TaskQuoteWallets == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable25)
-			c.Abort()
+		if h.deps.Tasks.TaskReadiness == nil {
+			renderTaskError(c, taskdomain.ErrSettlementUnavailable)
 			return
 		}
-		account, err := h.deps.Tasks.TaskQuoteBillingAccounts.ResolveFunds(c.Request.Context(), workspace.PublicID)
-		if err != nil {
-			billing.RenderBillingAccountError(c, err)
-			return
-		}
-		accountID := account.BillingAccountID
-		service := h.taskService()
-		snapshot, err := service.Quote(c.Request.Context(), taskdomain.QuoteParams{
-			Service: strings.TrimSpace(body.Data.Service), Quantity: quantity, Resolution: resolution,
+		snapshot, err := h.deps.Tasks.TaskReadiness.Check(c.Request.Context(), taskports.ReadinessParams{
+			WorkspaceID: workspace.PublicID, ActorUserID: identityPrincipal.UserID(),
+			BoardID: body.Data.BoardID, Service: strings.TrimSpace(body.Data.Service), Quantity: quantity, Resolution: resolution,
 		})
 		if err != nil {
-			renderTaskError(c, err)
-			return
-		}
-		// Funds gate on the resolved account (submit Hold parity via
-		// taskdomain.CheckFundsGate): active restrictions deny first,
-		// then sufficiency. Frozen and missing wallets pass through
-		// exactly as the submit Hold maps them (no second mapping to drift).
-		wallet, err := h.deps.Tasks.TaskQuoteWallets.GetWallet(c.Request.Context(), accountID)
-		if err != nil {
-			if errors.Is(err, domain.ErrWalletRestricted) {
-				renderTaskError(c, taskdomain.ErrWalletRestricted)
-				return
-			}
-			renderTaskError(c, err)
-			return
-		}
-		if err := taskdomain.CheckFundsGate(wallet.Available, snapshot.TotalCredits, len(wallet.ActiveRestrictions) > 0); err != nil {
-			renderTaskError(c, err)
-			return
-		}
-		// Member quota gate (#946: same cap submit enforces, reported
-		// here as not-ready before any Hold). Unlimited (nil reader or
-		// no quota row) passes through; over-cap renders 403
-		// member_quota_exhausted via renderTaskError.
-		if h.deps.Tasks.TaskQuoteQuotas != nil && snapshot.TotalCredits > 0 {
-			if err := h.deps.Tasks.TaskQuoteQuotas.CheckQuotaForQuote(c.Request.Context(), accountID, identityPrincipal.UserID(), snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+			var fundsError *taskports.FundsResolutionError
+			if errors.As(err, &fundsError) {
+				billing.RenderBillingAccountError(c, fundsError)
+			} else {
 				renderTaskError(c, err)
-				return
 			}
+			return
 		}
 		contract.RenderSuccess(c, v1TaskBillingSnapshotDTO{
 			SKU: snapshot.SKU, DisplayName: snapshot.DisplayName,

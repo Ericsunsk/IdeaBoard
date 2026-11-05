@@ -34,7 +34,7 @@ func IngestImage(ctx context.Context, sessions SessionStore, objects MediaObject
 	if len(params.Data) == 0 || int64(len(params.Data)) > MaxUploadSizeBytes {
 		return nil, NewFieldValidationError("size_bytes")
 	}
-	facts, err := imageformat.InspectDetectedBytes(params.Data)
+	facts, err := imageformat.InspectCompleteDetectedBytes(params.Data)
 	if err != nil {
 		return nil, fmt.Errorf("workspacemedia: inspect image (%w): %w", err, NewFieldValidationError("file"))
 	}

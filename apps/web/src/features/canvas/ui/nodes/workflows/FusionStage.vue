@@ -267,7 +267,7 @@ function getBlendWeightBadgeStyle(index: number) {
 .fusion-node-connection-layer {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
   pointer-events: none;
 }
 
@@ -297,7 +297,7 @@ function getBlendWeightBadgeStyle(index: number) {
 .fusion-node-slots {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
 }
 
 .fusion-node-stage.is-active .fusion-node-ray,
@@ -313,7 +313,7 @@ function getBlendWeightBadgeStyle(index: number) {
   height: 112px;
   stroke-width: 0.6;
   translate: -50% -50%;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
   pointer-events: none;
   color: var(--canvas-text-subtle);
 }
@@ -347,7 +347,7 @@ function getBlendWeightBadgeStyle(index: number) {
 .fusion-blend-layer {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: var(--canvas-z-local-top);
   pointer-events: none;
 }
 

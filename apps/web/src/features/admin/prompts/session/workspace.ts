@@ -208,7 +208,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       return {
         canSave: false,
         isDirty: false,
-        message: '提示词配置已刷新，请重新选择',
+        message: '提示词设置已刷新，请重新选择',
         severity: 'error',
       }
     }

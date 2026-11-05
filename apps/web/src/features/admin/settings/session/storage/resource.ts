@@ -111,10 +111,10 @@ async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
 
 async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
   return loadControlSetting(listControlStorageProfiles, {
-    fallback: '加载存储配置失败',
+    fallback: '加载存储设置失败',
     domainMessages: {
-      control_not_found: '加载存储配置失败',
-      not_found: '加载存储配置失败',
+      control_not_found: '加载存储设置失败',
+      not_found: '加载存储设置失败',
     },
     map: (data: { profiles: GeneratedStorageProfile[] }) =>
       (data.profiles ?? []).map(normalizeGeneratedProfile),
@@ -138,16 +138,16 @@ async function saveAdminStorageProfile(
         ))
     const saved = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
       body,
-      '保存存储配置失败',
+      '保存存储设置失败',
     )
     return {
       message: saved.message,
       profile: normalizeGeneratedProfile(saved.profile),
     }
   } catch (error) {
-    throw withControlCopy(error, '保存存储配置失败', {
-      control_not_found: '保存存储配置失败',
-      not_found: '保存存储配置失败',
+    throw withControlCopy(error, '保存存储设置失败', {
+      control_not_found: '保存存储设置失败',
+      not_found: '保存存储设置失败',
     })
   }
 }

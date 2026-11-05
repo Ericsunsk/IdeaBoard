@@ -24,6 +24,11 @@ Balance container owned by one Billing Account. Projection of Ledger.
 _Avoid_: funds pool, balance account
 Owner: `apps/api/internal/credits/CONTEXT.md`
 
+**Member Quota**:
+Consumption limit for one Business User across Workspaces sharing an Organization Billing Account. Personal consumption has no Member Quota.
+_Avoid_: balance, sub-wallet, grant
+Owner: `apps/api/internal/memberquotas/CONTEXT.md`
+
 **Tenant Workspace**:
 Isolation boundary for Boards, Tasks, Library and Media. Records consumption position, holds no balance.
 _Avoid_: Canvas Workspace, Workspace Shell, team
@@ -67,6 +72,11 @@ Owner: `apps/api/internal/media/storage/CONTEXT.md`
 **Task**:
 Durable unit of AI work. Insert plus River enqueue in one transaction.
 _Avoid_: River Job as Task, Attempt as Task, Execution Plan as Task
+Owner: `apps/api/internal/tasking/CONTEXT.md`
+
+**Task Readiness**:
+Advisory assessment of whether an Actor can submit a Task. It reserves no Credits or work; submission remains authoritative.
+_Avoid_: Credit Hold, Task reservation
 Owner: `apps/api/internal/tasking/CONTEXT.md`
 
 **Execution Plan**:

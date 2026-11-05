@@ -39,6 +39,13 @@ function toMenuStatus(status: WorkspaceSelectionStatus): UserAccountMenuWorkspac
       return 'ready'
     case 'empty':
       return 'empty'
+    case 'disabled':
+      // Anonymous readers never fire the list query: surface the idle empty
+      // state so guests stay silent instead of toasting the load fallback.
+      return 'empty'
+    case 'hidden':
+    case 'forbidden':
+    case 'error':
     default:
       return 'error'
   }

@@ -23,7 +23,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue'
 import { KeyframesMinus, KeyframesPlus } from '@iconoir/vue'
-import { createPageChromeRoundControlClass } from '../../../../core/lib/pageChrome'
+import { pageChromeClasses } from '../../../../core/lib/pageChrome'
+import { cn } from '../../../../lib/utils'
 import { createPopoverMotionTransition } from '../../../../core/motion/popoverMotion'
 import type { CanvasSelectionGroupAction } from '../../session/graph-editing/groupContracts'
 
@@ -36,7 +37,8 @@ const emit = defineEmits<{
   (event: 'activate'): void
 }>()
 
-const actionButtonClass = createPageChromeRoundControlClass(
+const actionButtonClass = cn(
+  pageChromeClasses.roundControl,
   'canvas-selection-group-action-button',
   'canvas-tool-tooltip-trigger',
 )
@@ -60,7 +62,7 @@ const actionIcon = computed(() =>
 .canvas-selection-group-action-layer {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: var(--canvas-z-action);
   pointer-events: none;
 }
 
@@ -72,8 +74,8 @@ const actionIcon = computed(() =>
 }
 
 .canvas-selection-group-action-icon {
-  width: var(--canvas-chrome-icon-size);
-  height: var(--canvas-chrome-icon-size);
+  width: var(--page-chrome-icon-size, 19px);
+  height: var(--page-chrome-icon-size, 19px);
   display: block;
 }
 </style>

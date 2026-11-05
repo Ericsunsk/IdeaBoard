@@ -1,7 +1,14 @@
+import { getTaskStatusDefinition } from '../core/status'
 import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../resource'
 
 // Pure execution-attempt presentation labels for the task result dialog.
 // No component state, no i18n plumbing: same input, same string.
+//
+// 任务五态（pending/running/completed/failed/cancelled）文案与 tone 单源于
+// `core/status`（与表格 TaskStatusCell 同源），此处只做薄委托；requeued 作为
+// 第六定义同样收进 `core/status`，未知态透传（trajectory 文案保持中文）。
+
+// Pure execution-attempt presentation labels for the task result dialog.
 export function getDetailExecutionProviderLabel(task: AdminMonitorDetailModel) {
   return task.latest_execution?.provider || '-'
 }
@@ -17,28 +24,13 @@ export function getAttemptProviderLabel(attempt: AdminMonitorExecutionAttempt) {
 }
 
 export function getAttemptStatusLabel(status: string) {
-  return (
-    {
-      running: '执行中',
-      completed: '已完成',
-      failed: '失败',
-      requeued: '已重试',
-      cancelled: '已取消',
-    }[status] || status
-  )
+  return getTaskStatusDefinition(status).text
 }
 
 export function getAttemptStatusTone(
   status: string,
 ): 'success' | 'danger' | 'warning' | 'neutral' | 'info' {
-  const variantByStatus: Record<string, 'success' | 'danger' | 'warning' | 'neutral' | 'info'> = {
-    running: 'info',
-    completed: 'success',
-    failed: 'danger',
-    requeued: 'warning',
-    cancelled: 'neutral',
-  }
-  return variantByStatus[status] || 'neutral'
+  return getTaskStatusDefinition(status).tone
 }
 
 export function getAttemptStageLabel(stage: string) {

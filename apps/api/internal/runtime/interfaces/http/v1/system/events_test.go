@@ -16,7 +16,9 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
 	taskdomain "ideaboard/api/internal/tasking/domain"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/testsupport"
@@ -172,9 +174,12 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 			TaskBillingAccounts: v1FakeBillingAccounts{},
 			// #917: the preflight resolves the same fixture account submit
 			// holds and gates the same fixture funds.
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         newV1FakeQuoteWallets(),
-			TaskAcceptance:           &v1TxSubmissionAcceptance{boards: &boardtaskaccess.Authorizer{Store: boardsStore}, assets: taskAssets},
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: store},
+				Boards:     &boardtaskaccess.Authorizer{Store: boardsStore}, Quoter: quoter, Resolver: allowTestPoolResolver(),
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: newV1FakeQuoteWallets(), Quotas: nil,
+			}),
+			TaskAcceptance: &v1TxSubmissionAcceptance{boards: &boardtaskaccess.Authorizer{Store: boardsStore}, assets: taskAssets},
 		},
 		Boards:   boardsStore,
 		Library:  ContractV1LibraryDeps{Store: libStore},

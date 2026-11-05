@@ -7,91 +7,13 @@ import type {
   BoardRenameResult,
 } from './commands'
 import { createBoardCommands } from './commands'
-import type { WorkspaceBoardMeta } from '../adapters/boardsResource'
-import { makeBoardMeta as makeBoard } from '../../testing'
-
-function makeDeps(): BoardCommandDependencies {
-  return {
-    createBoard: vi.fn(() => makeBoard('created-board', 'Untitled')),
-    getBoard: vi.fn((boardId: string) => makeBoard(boardId, 'Board')),
-    renameBoard: vi.fn((boardId: string, nextName: string) => makeBoard(boardId, nextName.trim())),
-    duplicateBoard: vi.fn(() => makeBoard('copy-board', 'Source Copy')),
-    deleteBoard: vi.fn(() => true),
-    isNameTaken: vi.fn(() => false),
-    duplicateBoardState: vi.fn(() => true),
-    deleteBoardState: vi.fn(() => true),
-    syncBoard: vi.fn(async () => undefined),
-    syncRenameBoard: vi.fn(async () => undefined),
-    syncDeleteBoard: vi.fn(async () => undefined),
-    hydrateBoards: vi.fn(async () => ({ isOk: true as const })),
-    getSyncConflictKind: vi.fn((error: unknown) => {
-      if (typeof error !== 'object' || !error) return null
-      const record = error as { status?: unknown; code?: unknown }
-      if (record.code === 'board_idempotency_conflict') return 'idempotency-conflict' as const
-      if (record.status === 409 || record.code === 'board_revision_conflict') {
-        return 'revision-conflict' as const
-      }
-      return null
-    }),
-    isNotFoundError: vi.fn((error: unknown) => {
-      return typeof error === 'object' && !!error && 'status' in error && error.status === 404
-    }),
-    clearSyncRollback: vi.fn(),
-    isMutationCurrent: vi.fn(() => true),
-    resolveWorkspace: vi.fn(() => 'ws_test123'),
-    fetchSourceDocument: vi.fn(async () => ({
-      boardId: 'source-board',
-      revision: 2,
-      schemaVersion: 4,
-      document: {},
-      updatedAt: 300,
-    })),
-    createServerBoard: vi.fn(
-      async (_workspaceId: string, name: string): Promise<WorkspaceBoardMeta> => ({
-        id: 'board-server-1',
-        name,
-        revision: 1,
-        schemaVersion: 4,
-        createdAt: 100,
-        updatedAt: 200,
-        contentVersion: '',
-        previewScene: null,
-        // A minted board carries the server access fact (none, creator-only).
-        capabilities: { read: true, write: true, manage: true, generate: true },
-        accessState: 'private',
-        workspaceAccess: 'none',
-        isCreator: true,
-        hasDirectGrant: false,
-        creatorUserId: 'usr_creator',
-      }),
-    ),
-    archiveServerBoard: vi.fn(async (): Promise<WorkspaceBoardMeta> => ({
-      id: 'board-server-1',
-      name: 'Untitled',
-      revision: 1,
-      schemaVersion: 4,
-      createdAt: 100,
-      updatedAt: 200,
-      contentVersion: '',
-      previewScene: null,
-      capabilities: { read: true, write: true, manage: true, generate: true },
-      accessState: 'private',
-      workspaceAccess: 'none',
-      isCreator: true,
-      hasDirectGrant: false,
-      creatorUserId: 'usr_creator',
-    })),
-    registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
-      makeBoard(input.id, input.name),
-    ),
-  }
-}
+import { makeCommandDeps } from '../../testing'
 
 describe('boardCommands', () => {
   let deps: BoardCommandDependencies
 
   beforeEach(() => {
-    deps = makeDeps()
+    deps = makeCommandDeps()
   })
 
   it('creates the board on the server first, then syncs the minted identity', async () => {
@@ -105,6 +27,74 @@ describe('boardCommands', () => {
     expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
   })
+
+  it('initializes before navigation and publishes only after navigation settles', async () => {
+    const commands = createBoardCommands(deps)
+    const openBoard = vi.fn(async () => {
+      expect(deps.initializeServerBoard).toHaveBeenCalledOnce()
+      expect(deps.registerServerBoard).not.toHaveBeenCalled()
+    })
+    expect(await commands.createAndOpen({ openBoard })).toMatchObject({ isOk: true })
+    expect(openBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.registerServerBoard).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }))
+    expect(deps.createBoard).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+  })
+
+  it('does not navigate or publish when initialization fails, preserving the original failure', async () => {
+    const error = new Error('seed failed')
+    vi.mocked(deps.initializeServerBoard!).mockRejectedValueOnce(error)
+    vi.mocked(deps.archiveServerBoard!).mockRejectedValueOnce(new Error('cleanup failed'))
+    const openBoard = vi.fn()
+    expect(await createBoardCommands(deps).createAndOpen({ openBoard })).toMatchObject({
+      isOk: false,
+      reason: 'sync-failed',
+      error,
+    })
+    expect(openBoard).not.toHaveBeenCalled()
+    expect(deps.registerServerBoard).not.toHaveBeenCalled()
+    expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
+  })
+
+  it('publishes the readable board but reports a failed navigation', async () => {
+    const error = new Error('navigation failed')
+    const openBoard = vi.fn(async () => {
+      throw error
+    })
+    expect(await createBoardCommands(deps).createAndOpen({ openBoard })).toMatchObject({
+      isOk: false,
+      reason: 'navigation-failed',
+      error,
+    })
+    expect(deps.registerServerBoard).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }))
+    expect(deps.archiveServerBoard).not.toHaveBeenCalled()
+  })
+
+  it.each(['mint', 'initialize', 'navigate'])(
+    'archives only the captured new board when scope moves during %s',
+    async (phase) => {
+      if (phase === 'mint')
+        vi.mocked(deps.createServerBoard!).mockImplementationOnce(async () => {
+          vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
+          return (await import('../../testing')).makeServerMeta()
+        })
+      if (phase === 'initialize')
+        vi.mocked(deps.initializeServerBoard!).mockImplementationOnce(async (_workspace, board) => {
+          vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
+          return board
+        })
+      const openBoard = vi.fn(async () => {
+        if (phase === 'navigate') vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
+      })
+      expect(await createBoardCommands(deps).createAndOpen({ openBoard })).toEqual({
+        isOk: false,
+        reason: 'scope-changed',
+      })
+      expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
+      expect(deps.registerServerBoard).not.toHaveBeenCalled()
+      if (phase !== 'navigate') expect(openBoard).not.toHaveBeenCalled()
+    },
+  )
 
   it('cleans up local meta and state when create remote sync fails', async () => {
     const error = new Error('network failed')
@@ -295,6 +285,8 @@ describe('boardCommands', () => {
       workspaceAccess: 'none',
       isCreator: true,
       hasDirectGrant: false,
+      creatorUserId: 'usr_creator',
+      ownerAvatarUrl: undefined,
     })
   })
 

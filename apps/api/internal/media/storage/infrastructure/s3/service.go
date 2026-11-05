@@ -196,7 +196,7 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 }
 
 func (s *S3CompatibleService) UploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
-	facts, err := imageformat.InspectDetectedBytes(data)
+	facts, err := imageformat.InspectCompleteDetectedBytes(data)
 	if err != nil {
 		return nil, fmt.Errorf(errorrender.MsgUploadBytesWithConfigRef, err)
 	}

@@ -346,13 +346,17 @@
 .editing-controls-slider-row__range--hue::-webkit-slider-thumb {
   border: 2px solid #ffffff;
   background: transparent;
-  box-shadow: 0 0 0 1px color-mix(in srgb, rgb(39 41 50) 22%, transparent);
+  /* Hairline separation from the hue gradient: fixed-black Tier 2 media ink
+     at the same 22% alpha (no raw rgb intent, no Tier 1 leak; the white
+     border + iOS gradient hexes stay under the documented hex allowance in
+     checkStyleGovernance.ts). */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-media-scrim) 22%, transparent);
 }
 
 .editing-controls-slider-row__range--hue::-moz-range-thumb {
   border: 2px solid #ffffff;
   background: transparent;
-  box-shadow: 0 0 0 1px color-mix(in srgb, rgb(39 41 50) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-media-scrim) 22%, transparent);
 }
 
 .editing-controls-slider-row__range--tonal {

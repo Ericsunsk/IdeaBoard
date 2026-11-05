@@ -404,15 +404,13 @@ func (s *OrganizationStore) orgMutationContext(ctx context.Context, q *dbsqlc.Qu
 	return actorRole, int(owners), nil
 }
 
-// ListOrganizationMembers lists direct organization members ordered by user id.
+// ListOrganizationMembers lists all direct organization members ordered by user id.
 func (s *OrganizationStore) ListOrganizationMembers(ctx context.Context, organizationPublicID string) ([]*tenancy.OrganizationMember, error) {
 	organization, err := s.GetOrganization(ctx, organizationPublicID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.dbWithContext(ctx).q.ListOrganizationMembers(ctx, dbsqlc.ListOrganizationMembersParams{
-		OrganizationID: organization.InternalID, RowLimit: maxTenancyRows,
-	})
+	rows, err := s.dbWithContext(ctx).q.ListOrganizationMembers(ctx, organization.InternalID)
 	if err != nil {
 		return nil, err
 	}

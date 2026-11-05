@@ -75,7 +75,8 @@ vi.mock('@/features/account/session/quota/useMemberQuotaSection', () => ({
     pickTargetUser: vi.fn(),
     pickTargetPeriod: vi.fn(),
     saveQuota: vi.fn(),
-    clearQuota: vi.fn(),
+    memberRole: () => null,
+    canAdjustTarget: () => false,
   }),
 }))
 

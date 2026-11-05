@@ -1,8 +1,9 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { renderWithUser, screen, waitFor } from '@/test/render'
 import { mockAppToast } from '@/test/toast'
+import { setUserLocale } from '@/core/i18n'
 import AdminBrandingCard from './AdminBrandingCard.vue'
 
 vi.mock('../../../../../../core/composables/useAppToast')
@@ -21,6 +22,10 @@ const cropDialogStub = {
 
 describe('AdminBrandingCard', () => {
   let queryClient: QueryClient
+
+  afterEach(async () => {
+    await setUserLocale('en')
+  })
 
   beforeEach(() => {
     mockAppToast()
@@ -55,6 +60,23 @@ describe('AdminBrandingCard', () => {
     expect(previewImage).not.toHaveClass('object-contain')
     expect(container.querySelector('.ib-brand-mark__logo')).not.toBeNull()
   })
+
+  it.each(['en', 'es', 'ko'] as const)(
+    'keeps branding validation Chinese under %s',
+    async (locale) => {
+      await setUserLocale(locale)
+      const toast = mockAppToast()
+      const { user } = renderWithUser(AdminBrandingCard, {
+        global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+      })
+
+      const projectName = await screen.findByDisplayValue('IdeaBoard Brand')
+      await user.clear(projectName)
+      await user.click(screen.getByRole('button', { name: '保存' }))
+
+      expect(toast.error).toHaveBeenCalledWith('项目名称不能为空')
+    },
+  )
 
   it('allows clearing the logo url', async () => {
     const { user } = renderWithUser(AdminBrandingCard, {

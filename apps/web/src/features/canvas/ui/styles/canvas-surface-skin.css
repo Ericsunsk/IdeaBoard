@@ -84,7 +84,9 @@ body.canvas-overscroll-guard {
   --canvas-accent-glow: var(--color-canvas-accent-glow);
   --canvas-accent-soft: color-mix(in srgb, var(--color-canvas-accent) 12%, transparent);
   --canvas-accent-soft-strong: color-mix(in srgb, var(--color-canvas-accent) 16%, transparent);
-  --canvas-accent-wash: var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08));
+  /* Tonal-range wash rides the shared tool wash token directly: the token is
+     always declared (theme + canvas tiers), so no local rgba fallback. */
+  --canvas-accent-wash: var(--color-canvas-accent-wash);
   --canvas-accent-outline: var(--color-canvas-accent-border-soft);
   --flow-edge-color: var(--color-canvas-edge);
   --flow-edge-selected-color: var(--color-canvas-edge-selected);
@@ -95,6 +97,35 @@ body.canvas-overscroll-guard {
   --flow-edge-dasharray: 5;
   /* Execution edges need a continuous cycle rather than a finite interaction duration. */
   --flow-edge-running-duration: 0.5s;
+
+  /*
+   * ── Canvas Layer Order (ascending; values are the contract) ──
+   * Screen-level layers (positioned under `.canvas-surface-skin`):
+   * flow-wrap 2 < overlays 3 < overlay-top 4 < action 5 < minimap 6 <
+   * stage frames 10 < flow nodes 20 < node chrome 21 < node handles 24 <
+   * node menus 30 < screen chrome 100 (`--canvas-chrome-z-index`) <
+   * chrome board menu 140 (`--canvas-chrome-menu-z-index`).
+   * Node/panel-local layers reuse 1–3 inside isolated stacking contexts
+   * (node shells, stages, sliders, histograms, resize handles): local-base 1,
+   * local-raised 2, local-top 3. Flow/adapter-owned layers keep their
+   * file-local vars (`--canvas-vue-flow-z`, `--canvas-selection-group-z`,
+   * `--canvas-group-frame-*-z` in canvas-vue-flow-adapter-skin.css).
+   * The marketing landing page keeps local `z-[1]`/`z-[5]`: it renders
+   * outside `.canvas-surface-skin`, so skin vars do not resolve there.
+   */
+  --canvas-z-flow-wrap: 2;
+  --canvas-z-overlay: 3;
+  --canvas-z-overlay-top: 4;
+  --canvas-z-action: 5;
+  --canvas-z-minimap: 6;
+  --canvas-z-stage: 10;
+  --canvas-z-node: 20;
+  --canvas-z-node-chrome: 21;
+  --canvas-z-node-handle: 24;
+  --canvas-z-node-menu: 30;
+  --canvas-z-local-base: 1;
+  --canvas-z-local-raised: 2;
+  --canvas-z-local-top: 3;
 
   background: var(--canvas-surface-page-bg);
 }

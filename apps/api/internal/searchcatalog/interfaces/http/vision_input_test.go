@@ -17,32 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestParseHTTPSVisionImageURL(t *testing.T) {
-	for _, good := range []string{
-		"https://images.unsplash.com/photo-1",
-		"https://images.pexels.com/photo-2",
-		"https://cdn.example/photo-3?w=800",
-		"https://example.com:443/photo-4",
-		"https://evil.example/x",
-	} {
-		if _, ok := parseHTTPSVisionImageURL(good); !ok {
-			t.Fatalf("parse %q = false, want true", good)
-		}
-	}
-	for _, bad := range []string{
-		"",
-		"http://images.unsplash.com/x",
-		"https://images.unsplash.com:8080/x",
-		"https://user@example.com/x",
-		"data:image/png;base64,abcd",
-		"not a url",
-	} {
-		if _, ok := parseHTTPSVisionImageURL(bad); ok {
-			t.Fatalf("parse %q = true, want false", bad)
-		}
-	}
-}
-
 func TestMultipartVisionInputReaderIsAllOrNothing(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

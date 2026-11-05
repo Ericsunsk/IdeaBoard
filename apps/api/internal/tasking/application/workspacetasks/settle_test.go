@@ -1612,7 +1612,10 @@ func (c *reservationTimeChecks) CheckQuotaInTx(_ context.Context, _ pgx.Tx, _, _
 }
 
 func TestSubmitPersistsTheReservationPeriodCheckedByQuota(t *testing.T) {
-	env := openAtomicEnv(t, 20)
+	// Organization scope: the quota check runs in the settlement (Personal
+	// scopes skip it per #973/#974), so the reservation timestamp the
+	// check observes must equal the persisted quoted_at.
+	env := openQuotaOrgEnv(t)
 	reservedAt := time.Date(2025, 1, 31, 23, 59, 59, 999000000, time.UTC)
 	checks := &reservationTimeChecks{}
 	deps := env.serviceDeps

@@ -26,7 +26,7 @@ describe('Billing pricing feedback', () => {
       ['发布价格失败，请重试', '保存模型池失败，请重试'],
     )
     expect(toast.error).toHaveBeenCalledWith(
-      '部分配置保存失败，请重试（定价设置、Model）：发布价格失败，请重试；保存模型池失败，请重试',
+      '部分设置保存失败，请重试（定价设置、Model）：发布价格失败，请重试；保存模型池失败，请重试',
     )
   })
 
@@ -34,6 +34,6 @@ describe('Billing pricing feedback', () => {
     const feedback = useBillingPricingFeedback()
 
     feedback.combinedSaveFailed(['定价设置'], [])
-    expect(toast.error).toHaveBeenCalledWith('部分配置保存失败，请重试（定价设置）')
+    expect(toast.error).toHaveBeenCalledWith('部分设置保存失败，请重试（定价设置）')
   })
 })

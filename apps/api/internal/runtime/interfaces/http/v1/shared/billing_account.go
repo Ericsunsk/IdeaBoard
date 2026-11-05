@@ -18,6 +18,13 @@ import (
 // on shared+kernel, never on each other (billing keeps a compat alias).
 type AccountStore interface {
 	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
+	// ResolveFundsForActor is the read-only payer seam (payer = actor,
+	// #973/#978): the Organization pool for org workspaces, else the
+	// viewer's own Personal account. Billing overview, balance, usage,
+	// and billing-records reads use it so Personal members each see
+	// their own (BillingAccount, User) column; manager/write paths keep
+	// the owner-based ResolveFunds.
+	ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error)
 	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
 	// GetBillingAccountByInternalID resolves the stable ba_ funds identity
 	// for a beneficiary account (#921): reward redemption credits the

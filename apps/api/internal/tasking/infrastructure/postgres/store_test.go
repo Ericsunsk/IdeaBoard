@@ -8,6 +8,7 @@ import (
 	"fmt"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	taskdomain "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"reflect"
@@ -212,22 +213,22 @@ func TestResolveBillingAccountInTxRejectsClosedOrganization(t *testing.T) {
 		t.Fatalf("create organization workspace: %v", err)
 	}
 
-	resolve := func() (int64, error) {
+	resolve := func() (int64, string, error) {
 		tx, err := db.BeginTx(ctx, pgx.TxOptions{})
 		if err != nil {
 			t.Fatalf("begin transaction: %v", err)
 		}
 		defer tx.Rollback(ctx)
-		return tasks.ResolveBillingAccountInTx(ctx, tx, workspace.PublicID)
+		return tasks.ResolveBillingAccountInTx(ctx, tx, workspace.PublicID, ownerID)
 	}
 
-	if accountID, err := resolve(); err != nil || accountID <= 0 {
-		t.Fatalf("open organization account resolution = %d, %v; want a valid account", accountID, err)
+	if accountID, ownerType, err := resolve(); err != nil || accountID <= 0 || ownerType != funds.OwnerTypeOrganization {
+		t.Fatalf("open organization account resolution = (%d, %v, %v); want a valid organization account", accountID, ownerType, err)
 	}
 	if _, err := db.Exec(ctx, `UPDATE organizations SET closed_at = now() WHERE internal_id = $1`, organization.InternalID); err != nil {
 		t.Fatalf("close organization: %v", err)
 	}
-	if accountID, err := resolve(); accountID != 0 || !errors.Is(err, taskdomain.ErrNotFound) {
+	if accountID, _, err := resolve(); accountID != 0 || !errors.Is(err, taskdomain.ErrNotFound) {
 		t.Fatalf("closed organization account resolution = %d, %v; want not found", accountID, err)
 	}
 }

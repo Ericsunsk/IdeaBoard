@@ -83,7 +83,7 @@ export const accountTabRegistry = [
         icon: Coins,
         pane: {
           component: RechargePane,
-          props: ({ active, paymentReturn }) => ({ active, paymentReturn }),
+          props: ({ active, paymentReturn }) => ({ isActive: active, paymentReturn }),
         },
       },
       {

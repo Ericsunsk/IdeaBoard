@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/db/dbutil/testscope"
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -125,11 +126,12 @@ func (s *txTestStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, work
 	return s.TransitionForRetry(ctx, workspaceID, taskID, newToken)
 }
 
-// ResolveBillingAccountInTx serves the stable funds identity seam from a
-// fixed fixture account: fake settlement spends the fixture account, never
-// an owner wallet.
-func (s *txTestStore) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
-	return 9101, nil
+// ResolveBillingAccountInTx serves the payer seam from a fixed fixture
+// account: fake settlement spends the fixture account with the actor pinned
+// by the caller, never derived from the workspace owner. shared=false marks the
+// Personal scope so quota assertions exercise the production skip branch.
+func (s *txTestStore) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, _ int64) (int64, string, error) {
+	return 9101, funds.OwnerTypeWorkspace, nil
 }
 
 func (s *txTestStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim SubmissionClaim) (*SubmissionClaim, bool, error) {

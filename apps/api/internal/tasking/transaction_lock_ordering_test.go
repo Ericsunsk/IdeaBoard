@@ -108,7 +108,7 @@ func TestTransactionLockOrdering(t *testing.T) {
 		assertCallOrder(t, "settle_tx.go:createInTx", body, []string{
 			"s.acceptance.AuthorizeSubmission(ctx, tx, input)",
 			"s.submissionClaims.ClaimSubmissionInTx(ctx, tx, claim)",
-			"s.billingAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)",
+			"s.billingAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID, input.OwnerUserID)",
 			"s.resolver.ResolveInTx(ctx, tx, kind, resolution)",
 			"s.quoter.QuoteInTx(ctx, tx, kind, resolution, quantity)",
 			"s.holder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID",

@@ -128,7 +128,8 @@ vi.mock('../../session/quota/useMemberQuotaSection', () => ({
     pickTargetUser: vi.fn(),
     pickTargetPeriod: vi.fn(),
     saveQuota: vi.fn(),
-    clearQuota: vi.fn(),
+    memberRole: () => null,
+    canAdjustTarget: () => false,
   }),
 }))
 const DialogTitleStub = defineComponent({

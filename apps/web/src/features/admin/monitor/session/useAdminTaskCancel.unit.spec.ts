@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AdminTaskRow } from './useAdminTaskList'
+import { makeAdminMonitorTask } from '@/test/factories'
 import { useAdminTaskCancel } from './useAdminTaskCancel'
 
 const mocks = vi.hoisted(() => ({
@@ -40,10 +40,10 @@ describe('useAdminTaskCancel', () => {
       confirm,
       feedback,
     })
-    const runningTask = makeTask('running')
+    const runningTask = makeAdminMonitorTask({ status: 'running' })
 
     expect(commands.isCancellableTask(runningTask)).toBe(true)
-    expect(commands.isCancellableTask(makeTask('completed'))).toBe(false)
+    expect(commands.isCancellableTask(makeAdminMonitorTask({ status: 'completed' }))).toBe(false)
 
     await commands.requestCancelTask(runningTask)
     expect(confirm.confirm).toHaveBeenCalledTimes(1)
@@ -72,27 +72,10 @@ describe('useAdminTaskCancel', () => {
       feedback,
     })
 
-    await commands.requestCancelTask(makeTask('running'))
+    await commands.requestCancelTask(makeAdminMonitorTask({ status: 'running' }))
 
     expect(confirm.confirm).toHaveBeenCalledTimes(1)
     expect(mocks.cancelAdminTaskByID).not.toHaveBeenCalled()
     expect(feedback.taskCancelled).not.toHaveBeenCalled()
   })
 })
-
-function makeTask(status: AdminTaskRow['status']): AdminTaskRow {
-  return {
-    task_id: 'task-a',
-    user_public_id: '00000000-0000-0000-0000-000000000042',
-    user_display_name: 'User 42',
-    prompt: 'prompt',
-    service: 'render',
-    credits: 0,
-    priority: 2,
-    status,
-    error_msg: '',
-    result: '',
-    created_at: '2026-07-29T00:00:00Z',
-    completed_at: null,
-  }
-}

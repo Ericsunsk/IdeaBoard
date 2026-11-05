@@ -1,6 +1,7 @@
 import { computed, nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '../../shared'
+import { makeAdminMonitorTask } from '@/test/factories'
 import type {
   ApiResponseAdminTaskListData,
   AdminMonitorListItem,
@@ -79,28 +80,28 @@ describe('useMonitor polling', () => {
       name: 'pending only',
       pending: 1,
       running: 0,
-      rows: [makeTask(TaskStatus.completed, 1)],
+      rows: [makeAdminMonitorTask({ status: TaskStatus.completed, task_id: 'task-1' })],
       isActive: true,
     },
     {
       name: 'running only',
       pending: 0,
       running: 1,
-      rows: [makeTask(TaskStatus.completed, 1)],
+      rows: [makeAdminMonitorTask({ status: TaskStatus.completed, task_id: 'task-1' })],
       isActive: true,
     },
     {
       name: 'mixed pending and running',
       pending: 2,
       running: 3,
-      rows: [makeTask(TaskStatus.running, 2)],
+      rows: [makeAdminMonitorTask({ status: TaskStatus.running, task_id: 'task-2' })],
       isActive: true,
     },
     {
       name: 'idle with a stale running row',
       pending: 0,
       running: 0,
-      rows: [makeTask(TaskStatus.running, 2)],
+      rows: [makeAdminMonitorTask({ status: TaskStatus.running, task_id: 'task-2' })],
       isActive: false,
     },
   ])(
@@ -322,23 +323,6 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
     expect(monitor.error.value).toBe(error)
   })
 })
-
-function makeTask(status: string, id: number): AdminMonitorListItem {
-  return {
-    task_id: `task-${id}`,
-    user_public_id: '00000000-0000-0000-0000-000000000001',
-    user_display_name: 'User 1',
-    prompt: `prompt-${id}`,
-    service: 'render',
-    credits: 0,
-    priority: 2,
-    status,
-    error_msg: '',
-    result: '',
-    created_at: '2026-06-10T00:00:00.000Z',
-    completed_at: null,
-  }
-}
 
 function makeTaskList(
   list: AdminMonitorListItem[],

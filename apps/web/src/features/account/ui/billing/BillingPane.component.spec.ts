@@ -194,20 +194,6 @@ describe('BillingPane', () => {
     expect(loadMore).toHaveBeenCalledOnce()
   })
 
-  it('names the shared balance account behind the records', () => {
-    useBillingRecordsMock.mockReturnValue(
-      makeBillingState({
-        billingAccountId: ref('ba_1'),
-        isShared: ref(true),
-        records: ref([makeRecord()]),
-      }),
-    )
-
-    renderPane()
-
-    expect(screen.getByRole('status')).toHaveTextContent('ba_1')
-  })
-
   it('renders the restricted state for billing_account_forbidden instead of a retryable load error', async () => {
     const retryInitial = vi.fn().mockResolvedValue(undefined)
     const forbidden = new Error('forbidden') as Error & { code: string }

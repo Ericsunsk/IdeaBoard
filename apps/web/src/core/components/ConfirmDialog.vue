@@ -4,7 +4,7 @@
     <AlertDialogPortal>
       <AlertDialogOverlay :class="adminConfirmOverlayMaskClass" />
       <AlertDialogContent
-        class="fixed top-[50%] left-[50%] z-admin-dialog grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-overlay border border-border bg-popover text-card-foreground p-6 shadow-admin-dialog overlay-dialog-motion"
+        class="fixed top-[50%] left-[50%] z-admin-confirm grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-overlay border border-border bg-popover text-card-foreground p-6 shadow-admin-dialog overlay-dialog-motion"
       >
         <div class="flex flex-col gap-2">
           <AlertDialogTitle class="text-admin-title font-bold text-foreground">
@@ -67,7 +67,7 @@
           </p>
           <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The typed-confirm input carries its accessible name via aria-label -->
           <Input
-            :id="confirmInputId"
+            id="confirm-typed-input"
             v-model="confirmInput"
             size="sm"
             class="h-9 text-sm bg-background"
@@ -164,10 +164,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const confirmPreset = dialogShellPresets.confirm
 
-// Mirrors the admin overlay mask (theme tokens only); core must not import
-// the admin feature barrel, so the literal lives here for the admin branch.
+// Mirrors the admin confirm overlay mask (theme tokens only); core must not
+// import the admin feature barrel, so the literal lives here for the admin
+// branch. The confirm tier sits above the config dialog and popover tiers.
 const adminConfirmOverlayMaskClass =
-  'fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion'
+  'fixed inset-0 z-admin-confirm bg-scrim backdrop-blur-xs overlay-mask-motion'
 
 // Controlled mode (user surfaces pass `isVisible`); global mode (admin shell
 // mounts bare `<ConfirmDialog surface="admin" />`) reads the shared singleton.
@@ -197,7 +198,6 @@ const resolvedLoading = computed(() =>
 // delete): the caller passes the exact expected text and the confirm control
 // stays disabled until the input matches. Callers without
 // `expectedConfirmText` keep the direct confirm.
-const confirmInputId = 'confirm-typed-input'
 const confirmInput = ref('')
 watch([() => props.isVisible, () => activeConfirm.value?.open], () => {
   confirmInput.value = ''

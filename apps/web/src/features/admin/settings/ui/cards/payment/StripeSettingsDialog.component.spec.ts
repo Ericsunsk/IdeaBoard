@@ -67,7 +67,7 @@ describe('StripeSettingsDialog', () => {
     const apiKey = screen.getByLabelText('Stripe API Key') as HTMLInputElement
     expect(apiKey.value).toBe('')
     expect(apiKey).toHaveAttribute('type', 'password')
-    expect(apiKey).toHaveAttribute('placeholder', '已配置，留空则保持不变')
+    expect(apiKey).toHaveAttribute('placeholder', '已设置，留空则保持不变')
     expect(screen.getByText('支持 sk_ 或 rk_ 格式。')).toBeVisible()
     expect(screen.queryByDisplayValue('sk_test_secret')).not.toBeInTheDocument()
   })
@@ -85,7 +85,7 @@ describe('StripeSettingsDialog', () => {
     })
     const { user } = renderDialog()
 
-    await screen.findByText('尚未配置')
+    await screen.findByText('尚未设置')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(await screen.findByText('请输入 Stripe API Key')).toBeVisible()

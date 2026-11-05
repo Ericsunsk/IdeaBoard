@@ -9,9 +9,14 @@
       <p :class="catalogClasses.pageSubtitle">{{ t('board.subtitle') }}</p>
 
       <section :class="catalogClasses.toolbar">
-        <Button type="button" :class="catalogClasses.createButton" @click="createAndOpenBoard">{{
-          t('board.newCanvas')
-        }}</Button>
+        <Button
+          type="button"
+          :class="catalogClasses.createButton"
+          :is-loading="isCreatePending"
+          :is-disabled="isCreatePending"
+          @click="createAndOpenBoard"
+          >{{ t('board.newCanvas') }}</Button
+        >
         <label :class="catalogClasses.searchWrap">
           <Search :class="catalogClasses.searchIcon" />
           <span class="sr-only">{{ t('board.searchLabel') }}</span>
@@ -116,7 +121,13 @@
       </section>
 
       <section v-else :class="catalogClasses.boardsGrid">
-        <button type="button" :class="catalogClasses.createCard" @click="createAndOpenBoard">
+        <button
+          type="button"
+          :class="catalogClasses.createCard"
+          :disabled="isCreatePending"
+          :aria-busy="isCreatePending"
+          @click="createAndOpenBoard"
+        >
           <div :class="catalogClasses.createPreview">
             <div :class="catalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
@@ -146,7 +157,7 @@
             @toggle-menu="toggleBoardMenu(board.id)"
             @rename-action="startRename(board)"
             @duplicate-action="duplicateBoard(board.id)"
-            @share-action="onShareBoardIntent(board.id)"
+            @share-action="openShare(board.id)"
             @delete-action="requestDelete(board)"
             @rename-input="updateRenameDraft"
             @commit-rename="commitRename"
@@ -208,7 +219,8 @@ import {
   SelectViewport,
 } from '@/components/ui/select'
 import { appOverlayMenuSideOffset } from '../../../../../theme/appOverlayMenu'
-import { createPageChromeRoundControlClass } from '../../../../../core/lib/pageChrome'
+import { pageChromeClasses } from '../../../../../core/lib/pageChrome'
+import { cn } from '../../../../../lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from '../controllers'
 import ShareDialog from '../../share/ShareDialog.vue'
@@ -217,7 +229,7 @@ import { useUserStore } from '../../../../auth'
 
 const router = useRouter()
 const { t } = useI18n()
-const rangeToggleControlClass = createPageChromeRoundControlClass()
+const rangeToggleControlClass = cn(pageChromeClasses.roundControl)
 const sharePanel = useSharePanel()
 // Page seam owns auth + workspace reads; gallery leaves receive them as props.
 const userStore = useUserStore()
@@ -226,7 +238,7 @@ useWorkspaceSelection()
 const controller = useCatalog({
   navigation: {
     openBoard(boardId) {
-      void router.push({ path: USER_CANVAS_PATH, query: { boardId } })
+      return router.push({ path: USER_CANVAS_PATH, query: { boardId } })
     },
     shareBoard(boardId) {
       onShareBoardIntent(boardId)
@@ -250,6 +262,7 @@ const {
   isDeleteDialogVisible,
   pendingDeleteBoard,
   isDeletePending,
+  isCreatePending,
 } = controller.viewModel
 const {
   setSearchKeyword: onSearchInput,
@@ -265,6 +278,7 @@ const {
   cancelRename,
   reloadCatalog,
   openBoardFromCard,
+  openShare,
   requestDelete,
   closeDeleteDialog,
   handleDeleteDialogHidden,

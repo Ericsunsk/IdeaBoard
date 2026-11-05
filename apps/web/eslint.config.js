@@ -434,7 +434,14 @@ export default tseslint.config(
   {
     // Test render stubs are colocated with the specs that shape them by design;
     // one-component-per-file governs production component organization, not tests.
-    files: ['src/test/**/*.{ts,tsx}', 'src/**/*.spec.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    // Feature-local shared render seams (`testing.ts` beside the spec) follow
+    // the same colocation rule.
+    files: [
+      'src/test/**/*.{ts,tsx}',
+      'src/**/*.spec.{ts,tsx}',
+      'src/**/*.test.{ts,tsx}',
+      'src/**/testing.{ts,tsx}',
+    ],
     rules: {
       'vue/one-component-per-file': 'off',
     },

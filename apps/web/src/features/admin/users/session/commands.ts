@@ -121,7 +121,7 @@ export function useAdminUserCommands(
   const banModalDescription = computed(() =>
     banUserContext.value
       ? `您即将对用户 ${banUserContext.value.displayName} 实施强制访问限制。`
-      : '请选择用户后再配置访问限制。',
+      : '请选择用户后再设置访问限制。',
   )
 
   function openUserActionMenu(user: AdminUserCommandTarget) {

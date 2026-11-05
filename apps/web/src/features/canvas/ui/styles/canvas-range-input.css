@@ -1,4 +1,14 @@
 @layer base {
+  /*
+   * Range-track contract (base owner). The runnable-track background resolves
+   * `--canvas-range-track-background` → `--canvas-range-track-color` →
+   * `--canvas-surface-muted`; the thumb resolves `--canvas-range-thumb-color`
+   * → `--canvas-range-fill-color` → `--canvas-accent`. Three owners override
+   * locally without forking the chain: editing-controls (hue rainbow +
+   * tonal gradients), ImageActionMenu strength rows (accent-outline wash +
+   * fill color), and ImageInpaintChrome (inline JS gradient). New range
+   * styling belongs to one of these owners; do not redefine the chain.
+   */
   :root {
     --canvas-range-input-height: 22px;
     --canvas-range-track-height: 4px;

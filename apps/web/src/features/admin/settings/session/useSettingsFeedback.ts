@@ -1,5 +1,10 @@
 import { defineFeedback, formatAdminDisplayError, useAdminToast } from '../../shared/index'
 import { unsupportedUploadImageMessage } from '@/core/utils/imageUploadSupport'
+import {
+  SITE_BRANDING_LOGO_URL_MAX_LENGTH,
+  SITE_BRANDING_PROJECT_NAME_MAX_CHARS,
+  type SiteBrandingValidationError,
+} from '@/core/composables/useSiteBranding'
 
 type AdminSettingFeedback = {
   loadFailed: (error: unknown) => void
@@ -48,6 +53,17 @@ export type AdminAccessSettingsFeedback = {
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
 export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
+const ADMIN_BRANDING_VALIDATION_COPY = {
+  nameRequired: '项目名称不能为空',
+  nameTooLong: `项目名称不能超过 ${SITE_BRANDING_PROJECT_NAME_MAX_CHARS} 个字符`,
+  logoTooLong: `Logo 地址不能超过 ${SITE_BRANDING_LOGO_URL_MAX_LENGTH} 个字符`,
+  logoInvalid: 'Logo 地址必须为空、站内 Logo 链接或 http(s) URL',
+} satisfies Record<SiteBrandingValidationError, string>
+
+export function formatAdminBrandingValidation(error: SiteBrandingValidationError | ''): string {
+  return error ? ADMIN_BRANDING_VALIDATION_COPY[error] : ''
+}
+
 const ADMIN_BRANDING_SETTINGS_COPY = {
   loadFailed: { error: '加载系统设置失败' },
   validationFailed: { errorText: (message: string) => message },
@@ -72,17 +88,17 @@ const ADMIN_ACCESS_SETTINGS_COPY = {
 }
 
 const ADMIN_MAIL_SETTINGS_COPY = {
-  loadFailed: { error: '加载邮件配置失败' },
-  saved: { success: '邮件配置已保存，请发送 Test Email' },
-  saveFailed: { error: '保存邮件配置失败' },
+  loadFailed: { error: '加载邮件设置失败' },
+  saved: { success: '邮件设置已保存，请发送 Test Email' },
+  saveFailed: { error: '保存邮件设置失败' },
   testSent: { success: 'Test Email 已发送' },
   testFailed: { error: '发送 Test Email 失败' },
-  cleared: { success: '邮件配置已删除' },
-  clearFailed: { error: '删除邮件配置失败' },
+  cleared: { success: '邮件设置已删除' },
+  clearFailed: { error: '删除邮件设置失败' },
 }
 
 const ADMIN_SEARCH_PROVIDER_COPY = {
-  loadFailed: { error: '加载图片搜索供应商配置失败' },
+  loadFailed: { error: '加载图片搜索供应商设置失败' },
   keySaved: {
     success: (providerLabel: string, wasEnabled: boolean) =>
       wasEnabled

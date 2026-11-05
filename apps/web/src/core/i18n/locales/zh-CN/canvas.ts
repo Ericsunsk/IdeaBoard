@@ -36,7 +36,6 @@ export default {
     cancelled: '任务已取消',
     cancelledWithPartialResults: '任务已取消（有部分结果，已保留在画布上）。',
     progressTimeout: '耗时超出预期，请稍后查看。',
-    progressDataInvalid: '任务进度数据异常，请重试。',
     failedGeneric: '图像生成失败，请重试。',
   },
   minimap: {
@@ -44,7 +43,6 @@ export default {
   },
   controls: {
     prompt: '提示词',
-    promptPlaceholder: '输入你的创意想法...',
     send: '应用',
     free: '免费',
     selectImageCountTooltip: '选择生成数量',
@@ -133,10 +131,8 @@ export default {
   },
   contextMenu: {
     label: '画布节点操作',
-    addNode: '+ {title} 节点',
   },
   execution: {
-    missingBoardIdMask: '缺少画布 ID，无法上传蒙版。',
     markInpaintAreaFirst: '请先标记需要重绘的区域。',
     recoveryFailed: '恢复图像结果失败，请重试。',
     canvasSaveFailedProgressLost: '画布保存失败，刷新页面可能会丢失任务进度。',
@@ -154,7 +150,6 @@ export default {
     fusionNodeMissing: '融合节点不存在。',
     fusionNeedsTwoImages: '融合至少需要 2 张图片。',
     fusionInputsInvalid: '融合输入图片无效。',
-    imageMissingUrl: '图片缺少链接。',
     outpaintMissingOriginalSize: '画面扩展缺少原始图片尺寸。',
   },
   tools: {
@@ -162,7 +157,6 @@ export default {
     imageNotEditable: '该图片不支持编辑。',
     noEditableLayers: '没有可应用的可编辑图层。',
     autoConnectFailed: '图片已创建，但自动连线失败，请手动连线。',
-    applyEditFailed: '应用编辑失败。',
     maskPromptPlaceholder: '描述如何重绘选区',
     optionalPromptPlaceholder: '可选指令说明',
     outpaintPromptPlaceholder: '输入画面扩展提示词',
@@ -175,10 +169,6 @@ export default {
     connectionWriteFailedWarning: '连线写入画布失败，请刷新后重试。',
     deleteWriteFailedWarning: '删除写入画布失败，请刷新后重试。',
     deleteApplyFailedWarning: '应用删除失败，请刷新画布后重试。',
-    connectRequiredInputLabel: '连接 {label}',
-    connectRequiredInputsLabel: '连接 {count} 个输入',
-    waitForInputLabel: '等待 {label}',
-    waitForInputsLabel: '等待 {count} 个输入',
   },
   handles: {
     inputDirectionLabel: '输入',

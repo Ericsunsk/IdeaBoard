@@ -184,7 +184,7 @@ async function selectLogo(key: AdminBrandLogoKey | 'auto') {
     }
     hide()
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存品牌 Logo 配置失败')
+    toast.error(error instanceof Error ? error.message : '保存品牌 Logo 设置失败')
   } finally {
     isSaving.value = false
   }

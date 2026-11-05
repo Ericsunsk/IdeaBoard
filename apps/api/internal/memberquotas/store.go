@@ -166,10 +166,15 @@ func (s *Store) ListQuotas(ctx context.Context, billingAccountID int64) ([]Quota
 }
 
 // CheckQuotaInTx enforces the member's remaining quota inside the
-// caller's settlement transaction (Task submit / Vision reserve). It runs
-// in the same transaction after the Quote and before the Hold, using
-// reservedAt for its window:
+// caller's Organization-scope settlement transaction (Task submit /
+// Vision reserve). It runs in the same transaction after the Quote and
+// before the Hold, using reservedAt for its window:
 //
+//  0. Organization-only fence (#975): the Billing Account must be
+//     Organization-backed. Personal scopes carry no quota concept and
+//     their callers skip this check; a Personal account reaching it
+//     fails closed with ErrPersonalQuotaUnsupported (never silently
+//     unlimited, never ErrQuotaExhausted).
 //  1. Organization Owners short-circuit to unlimited: the check locks
 //     nothing and allows immediately, so an Owner row (even a capped one
 //     left by an earlier write) never gates consumption.
@@ -200,7 +205,7 @@ func (s *Store) CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID,
 	if amount <= 0 {
 		return nil
 	}
-	if owner, err := isOrganizationOwner(ctx, tx, billingAccountID, userID); err != nil {
+	if owner, err := loadOrgOwner(ctx, tx, billingAccountID, userID); err != nil {
 		return err
 	} else if owner {
 		return nil
@@ -217,13 +222,17 @@ func (s *Store) CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID,
 	return checkQuotaUsage(ctx, tx, row, amount, reservedAt)
 }
 
-// CheckQuotaForQuote is the preflight (non-transactional) read check for
-// quote/readiness: current committed usage + amount vs the cap. It cannot
-// fence concurrent submits (only the settlement-transaction check does
-// that); it reports not-ready early so callers see the quota reason
-// before spending a Hold. A nil pool, unknown member, or unlimited quota
-// allows; over-cap returns ErrQuotaExhausted. Organization Owners
-// short-circuit to unlimited, mirroring CheckQuotaInTx.
+// CheckQuotaForQuote is the Organization-scope preflight (non-transactional)
+// read check for quote/readiness: current committed usage + amount vs the
+// cap. It cannot fence concurrent submits (only the settlement-transaction
+// check does that); it reports not-ready early so callers see the quota
+// reason before spending a Hold. Over-cap returns ErrQuotaExhausted.
+// Organization Owners short-circuit to unlimited, mirroring CheckQuotaInTx.
+// Personal scopes carry no quota concept and fail closed with
+// ErrPersonalQuotaUnsupported (never silently unlimited, never
+// ErrQuotaExhausted): callers skip Personal scopes before reaching here,
+// and a store without a pool cannot prove Organization scope, so it fails
+// closed the same way instead of silently allowing.
 func (s *Store) CheckQuotaForQuote(ctx context.Context, billingAccountID, userID int64, amount int64, reservedAt time.Time) error {
 	if reservedAt.IsZero() {
 		return errors.New("memberquotas: reservation time is required")
@@ -231,15 +240,18 @@ func (s *Store) CheckQuotaForQuote(ctx context.Context, billingAccountID, userID
 	if amount <= 0 {
 		return nil
 	}
-	if s == nil || s.q == nil || billingAccountID <= 0 || userID <= 0 {
-		return nil
+	if billingAccountID <= 0 || userID <= 0 {
+		return ErrQuotaNotFound
 	}
-	if s.db != nil {
-		if owner, err := isOrganizationOwner(ctx, s.db, billingAccountID, userID); err != nil {
-			return err
-		} else if owner {
-			return nil
-		}
+	if s == nil || s.q == nil || s.db == nil {
+		// No pool to prove Organization scope: fail closed as
+		// Organization-only (Personal callers must never silently pass).
+		return ErrPersonalQuotaUnsupported
+	}
+	if owner, err := loadOrgOwner(ctx, s.db, billingAccountID, userID); err != nil {
+		return err
+	} else if owner {
+		return nil
 	}
 	row, err := s.q.GetMemberQuota(ctx, dbsqlc.GetMemberQuotaParams{
 		BillingAccountID: billingAccountID, UserID: userID,
@@ -251,6 +263,18 @@ func (s *Store) CheckQuotaForQuote(ctx context.Context, billingAccountID, userID
 		return err
 	}
 	return checkQuotaUsage(ctx, s.db, row, amount, reservedAt)
+}
+
+// loadOrgOwner enforces the Organization-only fence and reports the Owner
+// short-circuit in one step: Organization Owners stay unlimited without
+// touching the quota row. It is shared by the settlement lock check and the
+// quote preflight; row fetching (FOR UPDATE vs plain) stays with the
+// callers so lock semantics never change.
+func loadOrgOwner(ctx context.Context, q consumptionread.Queryer, billingAccountID, userID int64) (bool, error) {
+	if err := requireOrganizationAccount(ctx, q, billingAccountID); err != nil {
+		return false, err
+	}
+	return isOrganizationOwner(ctx, q, billingAccountID, userID)
 }
 
 // checkQuotaUsage applies the same cap policy after the caller fetches or locks its row.
@@ -313,6 +337,25 @@ func int64PtrOrNil(v pgtype.Int8) *int64 {
 	}
 	out := v.Int64
 	return &out
+}
+
+// requireOrganizationAccount enforces the Org-only fence (#975): the
+// Billing Account must be Organization-backed. Personal accounts (no
+// organization_id) fail closed with ErrPersonalQuotaUnsupported (never
+// silently unlimited, never ErrQuotaExhausted); missing accounts read as
+// ErrQuotaNotFound. Database failures fail closed via the returned error.
+func requireOrganizationAccount(ctx context.Context, q consumptionread.Queryer, billingAccountID int64) error {
+	var org pgtype.Int8
+	if err := q.QueryRow(ctx, `SELECT organization_id FROM billing_accounts WHERE internal_id = $1`, billingAccountID).Scan(&org); err != nil {
+		if database.IsNotFound(err) {
+			return ErrQuotaNotFound
+		}
+		return err
+	}
+	if !org.Valid {
+		return ErrPersonalQuotaUnsupported
+	}
+	return nil
 }
 
 // isOrganizationOwner reports whether userID holds the Owner role on the

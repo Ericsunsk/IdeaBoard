@@ -103,7 +103,6 @@ export default {
     retryLoad: '重试加载',
     loadMore: '加载更多',
     unknownTime: '未知时间',
-    sharedAccount: '共享余额账户 {account}：该账户下的所有工作区显示同一余额。',
     forbiddenTitle: '无查看权限',
     forbiddenDescription: '当前角色无法查看这些记录，请联系工作区或账单管理员。',
     kinds: {
@@ -135,7 +134,6 @@ export default {
     rangeWeek: '本周',
     rangeMonth: '本月',
     rangeYear: '本年',
-    sharedAccount: '共享账户 {account} 的用量。',
     forbiddenTitle: '无查看权限',
     forbiddenDescription: '当前角色无法查看该用量，请联系工作区或账单管理员。',
     genericError: '请稍后重试。',

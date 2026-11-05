@@ -93,17 +93,8 @@
 
   /* ── Page surface tokens ─────────────────────────────────── */
   --color-page-dot: var(--palette-dark-border);
-  --color-page-chrome-border: var(--color-board-card-border);
-  --color-page-chrome-border-hover: var(--color-board-card-border-hover);
-  --color-page-chrome-bg: var(--color-board-control-bg);
-  --color-page-chrome-bg-hover: var(--accent-hover);
-  --color-page-chrome-color: var(--color-board-card-action);
-  --color-page-chrome-color-hover: var(--color-board-card-action-hover);
-  --color-page-chrome-color-disabled: var(--color-board-card-text);
-  --color-page-chrome-focus-ring: var(--color-board-focus-ring);
   --shadow-page-chrome: none;
   --page-chrome-icon-size: 19px;
-  --canvas-chrome-icon-size: var(--page-chrome-icon-size);
   --spacing-overlay-gutter: var(--primitive-size-10);
   --color-overlay-bg: var(--popover);
   --color-overlay-border: var(--palette-dark-border);
@@ -132,10 +123,19 @@
   --blur-glass: var(--primitive-blur-12);
   --blur-overlay: var(--primitive-blur-40);
 
-  /* Fixed white overlay line + hero ring (media scrim chrome keeps light ink). */
+  /* Fixed white overlay line + hero ring + hero floating shadows (media chrome
+     keeps light ink; hero shadows float over imagery in both modes). */
   --color-overlay-scrim-line: var(--primitive-neutral-0-alpha-15);
   --color-home-hero-ring: var(--primitive-neutral-0-alpha-95);
   --shadow-home-hero-ring: 0 0 18px var(--primitive-neutral-0-alpha-86);
+  --shadow-home-hero-note:
+    0 18px 48px color-mix(in srgb, var(--primitive-home-shadow-note) 8%, transparent);
+  --shadow-home-hero-starburst:
+    0 12px 20px color-mix(in srgb, var(--primitive-home-shadow-gold) 18%, transparent);
+  --shadow-home-hero-apparel:
+    0 26px 28px color-mix(in srgb, var(--primitive-home-shadow-slate) 8%, transparent);
+  --shadow-home-hero-portrait:
+    0 28px 26px color-mix(in srgb, var(--primitive-home-shadow-ink) 10%, transparent);
 
   /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: var(--palette-dark-0);

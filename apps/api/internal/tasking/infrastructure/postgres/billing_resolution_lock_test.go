@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 )
 
@@ -71,12 +72,12 @@ func TestOrganizationBillingResolutionDoesNotDeadlockWorkspaceDeletion(t *testin
 	// DeleteWorkspace now holds the Billing Account lock and waits on our
 	// Workspace. Resolving the already-provisioned payer must stay read-only,
 	// not try to acquire that account lock in the opposite order.
-	accountID, resolveErr := NewStore(db).ResolveBillingAccountInTx(ctx, submit, workspace.PublicID)
+	accountID, ownerType, resolveErr := NewStore(db).ResolveBillingAccountInTx(ctx, submit, workspace.PublicID, ownerID)
 	if err := submit.Rollback(ctx); err != nil {
 		t.Fatalf("finish submission transaction: %v", err)
 	}
 	deleteErr := <-deleted
-	if resolveErr != nil || accountID <= 0 {
+	if resolveErr != nil || accountID <= 0 || ownerType != funds.OwnerTypeOrganization {
 		t.Fatalf("resolve payer while deletion waits = %d, %v; want a stable account without reverse locking", accountID, resolveErr)
 	}
 	if deleteErr != nil {

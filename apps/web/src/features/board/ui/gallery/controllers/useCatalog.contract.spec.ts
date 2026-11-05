@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { WorkspaceBoardMeta } from '../../../session/adapters/boardsResource'
-import { makeBoardMeta as makeBoard } from '../../../testing'
+import { makeBoardMeta as makeBoard, makeServerMeta } from '../../../testing'
 
 describe('Boards Catalog public interface', () => {
   afterEach(() => {
@@ -14,6 +13,11 @@ describe('Boards Catalog public interface', () => {
     const boards = ref([makeBoard('board-1', 'Original', 10)])
     const scope = ref<string | null>('user-1')
     const hydrate = vi.fn().mockResolvedValue({ isOk: true as const })
+    const createdBoard = makeBoard('created-board', 'Created', 20)
+    const createAndOpen = vi.fn(async ({ openBoard }) => {
+      await openBoard(createdBoard.id)
+      return { isOk: true as const, board: createdBoard }
+    })
     const create = vi.fn().mockResolvedValue({
       isOk: true as const,
       board: makeBoard('created-board', 'Created', 20),
@@ -53,7 +57,7 @@ describe('Boards Catalog public interface', () => {
       catalogSyncFailed: vi.fn(),
       catalogReloaded: vi.fn(),
     }
-    const navigation = { openBoard: vi.fn() }
+    const navigation = { openBoard: vi.fn(async (_boardId: string) => undefined) }
 
     vi.doMock('../../../session/catalog/repository', () => ({
       useBoardRepository: () => ({
@@ -62,14 +66,21 @@ describe('Boards Catalog public interface', () => {
           byId: computed(() => new Map(boards.value.map((board) => [board.id, board]))),
           scope,
         },
-        commands: { create, delete: deleteBoard, duplicate, hydrate, rename },
+        commands: {
+          create,
+          createAndOpen,
+          delete: deleteBoard,
+          duplicate,
+          hydrate,
+          rename,
+        },
         dispose: vi.fn(),
       }),
     }))
     vi.doMock('./useBoardFeedback', () => ({ useBoardFeedback: () => feedback }))
 
-    const { createCatalog } = await import('./useCatalog')
-    const catalog = createCatalog({ navigation })
+    const { useCatalog } = await import('./useCatalog')
+    const catalog = useCatalog({ navigation })
 
     await catalog.commands.initialize()
     expect(hydrate).toHaveBeenCalledOnce()
@@ -77,7 +88,22 @@ describe('Boards Catalog public interface', () => {
     catalog.commands.setSearchKeyword('original')
     expect(catalog.viewModel.visibleBoards.value.map((board) => board.id)).toEqual(['board-1'])
 
-    await catalog.commands.createAndOpenBoard()
+    const { createDeferred } = await import('../../../../../test/deferred')
+    const pendingCreate = createDeferred<void>()
+    createAndOpen.mockImplementationOnce(async ({ openBoard }) => {
+      await pendingCreate.promise
+      await openBoard(createdBoard.id)
+      return { isOk: true as const, board: createdBoard }
+    })
+    const firstCreate = catalog.commands.createAndOpenBoard()
+    const secondCreate = catalog.commands.createAndOpenBoard()
+    expect(catalog.viewModel.isCreatePending.value).toBe(true)
+    expect(createAndOpen).toHaveBeenCalledOnce()
+    pendingCreate.resolve()
+    await Promise.all([firstCreate, secondCreate])
+    expect(catalog.viewModel.isCreatePending.value).toBe(false)
+    expect(createAndOpen).toHaveBeenCalledOnce()
+    expect(create).not.toHaveBeenCalled()
     expect(navigation.openBoard).toHaveBeenCalledWith('created-board')
 
     await catalog.commands.duplicateBoard('board-1')
@@ -110,27 +136,17 @@ describe('Boards Catalog public interface', () => {
   it.todo('delete/create failure branches')
 })
 
-async function sceneCatalogFixture(): Promise<WorkspaceBoardMeta> {
+async function sceneCatalogFixture() {
   const { parsePreviewScene } = await import('../../../core/preview/scene')
   const fixture =
     await import('../../../../../../../api/internal/boards/previewscene/testdata/mixed.json')
   const scene = parsePreviewScene(fixture.scene)!
-  return {
-    id: 'board-1',
-    name: 'Board',
-    revision: 1,
-    schemaVersion: 4,
+  return makeServerMeta('board-1', 'Board', {
     createdAt: 1,
     updatedAt: 1,
     contentVersion: 'cv-1',
     previewScene: scene,
-    capabilities: { read: true, write: true, manage: true, generate: true },
-    accessState: 'private' as const,
-    workspaceAccess: 'none' as const,
-    isCreator: true,
-    hasDirectGrant: false,
-    creatorUserId: 'usr_creator',
-  }
+  })
 }
 
 describe('Catalog scene reads', () => {
@@ -163,8 +179,8 @@ describe('Catalog scene reads', () => {
     }))
     vi.doMock('./useBoardFeedback', () => ({ useBoardFeedback: () => ({}) }))
     const read = vi.spyOn(queryClient, 'fetchQuery')
-    const { createCatalog } = await import('./useCatalog')
-    const catalog = createCatalog({ navigation: { openBoard: vi.fn() } })
+    const { useCatalog } = await import('./useCatalog')
+    const catalog = useCatalog({ navigation: { openBoard: async (_boardId: string) => undefined } })
     try {
       expect(catalog.viewModel.workspaceId.value).toBe('ws_first')
       const first = catalog.viewModel.sceneMap.value['board-1']

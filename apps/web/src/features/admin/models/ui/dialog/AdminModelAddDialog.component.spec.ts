@@ -149,7 +149,7 @@ describe('AdminModelAddDialog', () => {
     renderDialog({ existingModels: [] })
 
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('网关未配置任何 Provider')).toBeInTheDocument()
+    expect(await within(dialog).findByText('网关未设置任何 Provider')).toBeInTheDocument()
   })
 
   it('retries when the provider list fails to load', async () => {

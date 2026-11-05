@@ -5,3 +5,4 @@ export {
   primeAuthenticatedWorkspace,
   selectWorkspace,
 } from './syncFixtures'
+export { makeCommandDeps, makeServerMeta } from './commandFixtures'

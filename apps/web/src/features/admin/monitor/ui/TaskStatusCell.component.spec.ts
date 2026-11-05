@@ -25,8 +25,8 @@ describe('TaskStatusCell', () => {
   it('renders the metric pill for known statuses', () => {
     renderWithUser(TaskStatusCell, { props: { row: makeRow({ status: 'failed' }) } })
 
-    // 方案 A：载体统一 StatusBadge，文案收敛中文（core/status 单源）。
-    expect(screen.getByText('失败')).toBeInTheDocument()
+    // 方案 A：载体统一 StatusBadge，文案收敛英文（core/status 单源）。
+    expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
   it('falls back to raw status text for unknown statuses', () => {

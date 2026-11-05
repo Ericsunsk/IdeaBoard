@@ -2,6 +2,7 @@ package testsupport
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -68,19 +69,43 @@ func (allowAllV1PoolStore) ListPoolInTx(_ context.Context, _ pgx.Tx, service str
 	return allowAllV1PoolStore{}.ListPool(context.Background(), service)
 }
 
-type FakeBillingAccounts struct{}
-
-func (FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
-	return 7001, nil
+type FakeBillingAccounts struct {
+	// Personal forces the Personal scope shape (workspace owner type) so
+	// Personal preflight/submit tests prove the Org-only quota gate skips
+	// without consulting the checker. Zero value keeps organization scope
+	// for the existing Org fixtures.
+	Personal bool
 }
 
-func (FakeBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID string) (funds.Identity, error) {
+// actorAccountFor names the per-actor Personal account: 8000+actor, never
+// the shared pool. Org scopes (Personal=false) keep the shared 7001 pool.
+func actorAccountFor(actorUserID int64) int64 { return 8000 + actorUserID }
+
+func (f FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, actorUserID int64) (int64, string, error) {
+	if f.Personal {
+		return actorAccountFor(actorUserID), funds.OwnerTypeWorkspace, nil
+	}
+	return 7001, funds.OwnerTypeOrganization, nil
+}
+
+func (f FakeBillingAccounts) ResolveFundsForActor(_ context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
+	if f.Personal {
+		account := actorAccountFor(actorUserID)
+		return funds.Identity{
+			WorkspaceInternalID:    7001,
+			WorkspacePublicID:      workspacePublicID,
+			BillingAccountID:       account,
+			BillingAccountPublicID: fmt.Sprintf("ba_actor%07d", actorUserID),
+			OwnerType:              tenancypg.BillingOwnerWorkspace,
+		}, nil
+	}
+	ownerType := tenancypg.BillingOwnerOrganization
 	return funds.Identity{
 		WorkspaceInternalID:    7001,
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       7001,
 		BillingAccountPublicID: "ba_quote0000001",
-		OwnerType:              tenancypg.BillingOwnerWorkspace,
+		OwnerType:              ownerType,
 	}, nil
 }
 

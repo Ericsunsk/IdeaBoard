@@ -290,7 +290,9 @@
       </section>
 
       <section class="min-w-0">
-        <div class="text-admin-caption font-bold text-muted-foreground">Fingerprint</div>
+        <div class="text-admin-caption font-bold text-muted-foreground">
+          {{ CREDIT_HEALTH_MESSAGES.queueDrawerFingerprint }}
+        </div>
         <div
           class="mt-2 break-all rounded-control border border-border bg-muted/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-muted-foreground"
         >

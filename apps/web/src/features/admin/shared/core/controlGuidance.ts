@@ -10,7 +10,7 @@ export function adminControlUnavailable(feature: string): AdminControlUnavailabl
     'monitor-stream': '实时监控流暂不可用，将按轮询刷新。',
     'reward-codes': '奖励码管理暂不可用。',
     'reward-redemptions': '奖励兑换记录暂不可用。',
-    'oauth-providers': 'OAuth 供应商配置暂不可用。',
+    'oauth-providers': 'OAuth 供应商设置暂不可用。',
     'logo-upload': 'Logo 上传暂不可用，请直接填写 Logo 地址后保存。',
     'gateway-detection': '模型探测暂不可用。',
     'gateway-preview': '路由透视暂不可用。',

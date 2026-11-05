@@ -8,7 +8,7 @@
   >
     <div
       v-if="shouldShowImageInputRow"
-      class="prompt-text-composer-image-row node-tool-surface node-input-thumbnail-contract variant-standard relative z-[3] grid justify-between gap-1.5 overflow-visible [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
+      class="prompt-text-composer-image-row node-tool-surface node-input-thumbnail-contract variant-standard relative z-[var(--canvas-z-overlay)] grid justify-between gap-1.5 overflow-visible [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
     >
       <NodeInputThumbnail
         v-for="item in visibleImageInputs"

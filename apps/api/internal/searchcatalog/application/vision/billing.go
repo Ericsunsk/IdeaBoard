@@ -128,9 +128,10 @@ type VisionBillingService struct {
 	vision   *VisionSearchService
 	accounts VisionBillingAccountResolver
 	// quotas enforces the member cross-workspace consumption quota
-	// inside the reservation transaction (#946: after Quote, before
-	// Hold, same snapshot). Nil means no quota enforcement
-	// (unlimited).
+	// inside the reservation transaction (#946, Org-only per #973/#977:
+	// after Quote, before Hold, same snapshot, Organization scopes only;
+	// Personal scopes bill the actor with no quota concept and skip it).
+	// Nil means no quota enforcement (unlimited).
 	quotas VisionQuotaChecker
 }
 
@@ -160,11 +161,12 @@ func (s *VisionBillingService) SetQuotaChecker(checker VisionQuotaChecker) {
 	s.quotas = checker
 }
 
-// Extract bills one vision call to the consuming Workspace's stable
-// Billing Account (#918): the submitter stays the real initiator (Actor
+// Extract bills one vision call to the submitter's own settlement payer
+// (#973/#977 payer = actor): the submitter stays the real initiator (Actor
 // on every Command), the Workspace is the consumption location, and the
-// resolved account is the only payer. There is no personal-wallet
-// fallback on this path.
+// actor's Personal account (personal workspaces) or the shared
+// Organization pool (org workspaces, unchanged) is the only payer. Personal
+// scopes never fall back to another wallet on this path.
 func (s *VisionBillingService) Extract(ctx context.Context, workspacePublicID string, userID int64, idempotencyKey string, input searchdomain.VisionInput) (VisionBillingResult, error) {
 	if s == nil || s.pool == nil || s.catalog == nil || s.credits == nil || s.vision == nil {
 		return VisionBillingResult{}, searchdomain.ErrVisionUnavailable

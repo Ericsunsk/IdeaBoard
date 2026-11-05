@@ -9,14 +9,15 @@
 // the typed settlement face (SettlementInTx) via credits.Service; this package never touches the
 // Ledger or balance projections directly.
 //
-// Settlement identity (#918): every operation persists the triple
+// Settlement identity (#918, payer = actor per #973/#977): every operation persists the triple
 // (submitter user_id, consumption workspace_id, payer billing_account_id)
-// resolved through the stable #915 chain inside the reservation
+// resolved through the payer-aware actor chain inside the reservation
 // transaction. Capture, Release, and background reconciliation converge on
 // the STORED payer; they never re-resolve from the live Owner or
 // membership, so handovers and departures mid-flight cannot move the
 // money. The member cross-workspace quota (#946) joins this same
-// transaction after Quote and before Hold.
+// transaction after Quote and before Hold for Organization scopes only;
+// Personal scopes bill the actor with no quota concept and skip the check.
 package vision
 
 import (
@@ -31,6 +32,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/settlement"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -134,12 +136,15 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	if err != nil {
 		return visionReservation{}, ErrVisionPricingUnavailable
 	}
-	// Member quota gate (#946): after Quote, before Hold, in
-	// this same reservation transaction. The ledger Hold that follows is
-	// the reservation; terminal Capture/Release needs no re-check and
-	// in-flight operations converge on their submit-time facts.
-	// A nil checker means unlimited.
-	if s.quotas != nil && quote.TotalCredits > 0 {
+	// Member quota gate (#946, Org-only per #973/#977): after Quote,
+	// before Hold, in this same reservation transaction. The ledger Hold
+	// that follows is the reservation; terminal Capture/Release needs no
+	// re-check and in-flight operations converge on their submit-time
+	// facts. Personal scopes bill the actor with no quota concept, so the
+	// settlement skips the check instead of enforcing a default.
+	// OwnerType organization is the funds-resolution org-pool fact: the
+	// single quota scope source. A nil checker means unlimited.
+	if s.quotas != nil && quote.TotalCredits > 0 && identity.OwnerType == funds.OwnerTypeOrganization {
 		if err := s.quotas.CheckQuotaInTx(ctx, tx, identity.BillingAccountID, userID, quote.TotalCredits, quote.QuotedAt); err != nil {
 			return visionReservation{}, err
 		}

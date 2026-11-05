@@ -10,390 +10,343 @@
         variant="outline"
         size="sm"
         class="h-8 shrink-0 px-3"
-        :aria-expanded="isManageOpen"
-        @click="toggleManage"
+        :disabled="isListLoading || hasListError"
+        @click="quota.openCreateDialog"
       >
-        {{ isManageOpen ? t('workspace.limits.manageHide') : t('workspace.limits.manageShow') }}
+        {{ t(tableKeys.createAction) }}
       </Button>
     </div>
 
-    <!-- Usage overview: every member reads these rows. Management forms stay
-      behind the local toggle for managers only (backend enforces 403).
-      Personal collaboration (#952): collaborator consumption charges the
-      holder's shared Personal account with the real operator on each record;
-      one (account, user) quota aggregates that member across all workspaces
-      of the account. New members default to unlimited; invites never gate
-      on a default (#953). Organization Owner is always unlimited (Owner sets
-      Admin, Owner/Admin set Member). -->
+    <!-- Usage overview: Org-only card (ADR-0042 §2: Personal carries no quota
+      concept, only Organization scopes aggregate by (Organization Billing
+      Account, User) with Owner always unlimited). Every member reads these
+      rows; management UI (overview totals, quota table, adjust entry) is
+      managers-only; backend enforces 403. New members default to unlimited;
+      invites never gate on a default. Owner sets Admin, Owner/Admin set
+      Member. -->
 
-    <p class="m-0 mt-3 text-admin-meta leading-normal text-muted-foreground" aria-live="polite">
+    <p class="m-0 mt-2 truncate text-admin-meta leading-body text-muted-foreground">
       {{ t('workspace.quota.sharedAccountNote') }}
     </p>
 
-    <!-- Member cross-workspace quota: self usage -->
-    <div
-      v-if="quota.isSelfLoading.value"
-      class="mt-3 flex min-h-24 flex-col items-center justify-center gap-2"
-      aria-live="polite"
-    >
-      <Spinner class="size-6 text-primary" />
-      <span class="text-admin-meta text-muted-foreground">
-        {{ t('common.actions.loading') }}
-      </span>
-    </div>
-
-    <div
-      v-else-if="quota.hasSelfError.value"
-      class="mt-3 flex min-h-24 flex-col items-center justify-center gap-2"
-      aria-live="polite"
-    >
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        class="h-8 shrink-0 px-3"
-        @click="quota.retrySelf()"
+    <!-- Non-managers keep the read-only self usage block (the member list is
+      a manager-only read; members read only their own row). -->
+    <template v-if="!quota.canManage.value">
+      <div
+        v-if="quota.isSelfLoading.value || quota.hasSelfError.value"
+        class="mt-3 flex min-h-24 flex-col items-center justify-center gap-2"
+        aria-live="polite"
       >
-        {{ t('common.actions.retry') }}
-      </Button>
-    </div>
-
-    <div v-else-if="quota.selfQuota.value" class="mt-3 flex min-w-0 flex-col gap-3">
-      <div class="flex items-center justify-between gap-2">
-        <h4 class="m-0 text-admin-body font-semibold text-foreground">
-          {{ t('workspace.quota.title') }}
-        </h4>
-        <span class="text-admin-meta text-muted-foreground">
-          {{ periodLabel(quota.selfQuota.value.period) }}
-        </span>
+        <template v-if="quota.isSelfLoading.value">
+          <Spinner class="size-6 text-primary" />
+          <span class="text-admin-meta text-muted-foreground">
+            {{ t('common.actions.loading') }}
+          </span>
+        </template>
+        <Button
+          v-else
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-8 shrink-0 px-3"
+          @click="quota.retrySelf()"
+        >
+          {{ t('common.actions.retry') }}
+        </Button>
       </div>
 
-      <p class="m-0 mt-2 text-admin-content text-foreground" aria-live="polite">
-        <template v-if="quota.selfQuota.value.limitCredits != null">
-          {{
-            t('workspace.quota.usedOf', {
-              used: quota.selfQuota.value.usedCredits,
-              limit: quota.selfQuota.value.limitCredits,
-            })
-          }}
-        </template>
-        <template v-else>
-          {{ t('workspace.quota.usedUnlimited', { used: quota.selfQuota.value.usedCredits }) }}
-        </template>
-      </p>
-      <p
-        v-if="quota.selfQuota.value.remainingCredits != null"
-        class="m-0 mt-0.5 text-admin-meta text-muted-foreground"
-      >
-        {{ t('workspace.quota.remaining', { remaining: quota.selfQuota.value.remainingCredits }) }}
-      </p>
-      <p
-        v-if="quota.selfQuota.value.periodStart && quota.selfQuota.value.periodEnd"
-        class="m-0 mt-0.5 text-admin-meta text-muted-foreground"
-      >
-        {{
-          t('workspace.quota.periodRange', {
-            start: quota.selfQuota.value.periodStart,
-            end: quota.selfQuota.value.periodEnd,
-          })
-        }}
-      </p>
-      <p
-        v-if="quota.isSelfExhausted.value"
-        class="m-0 mt-2 text-admin-meta leading-normal text-destructive"
-        role="alert"
-      >
-        {{ t('workspace.quota.exhausted') }}
-      </p>
-      <p v-if="!quota.canManage.value" class="m-0 mt-2 text-admin-meta text-muted-foreground">
-        {{ t('workspace.quota.managerOnly') }}
-      </p>
-    </div>
-
-    <!-- Management forms (managers only, behind the local toggle) -->
-    <template v-if="isManageOpen && quota.canManage.value">
-      <!-- Member quota list + editor -->
-      <div class="mt-3 flex flex-col gap-2">
-        <div
-          v-if="quota.isListLoading.value"
-          class="flex min-h-16 flex-col items-center justify-center gap-2"
-          aria-live="polite"
-        >
-          <Spinner class="size-5 text-primary" />
+      <div v-else-if="quota.selfQuota.value" class="mt-3 flex min-w-0 flex-col gap-3">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="m-0 text-admin-body font-semibold text-foreground">
+            {{ t('workspace.quota.title') }}
+          </h4>
+          <span class="text-admin-meta text-muted-foreground">
+            {{ periodLabel(quota.selfQuota.value.period) }}
+          </span>
         </div>
 
-        <div
-          v-else-if="quota.hasListError.value"
-          class="flex min-h-16 flex-col items-center justify-center gap-2"
-          aria-live="polite"
+        <p class="m-0 mt-2 text-admin-content text-foreground" aria-live="polite">
+          <template v-if="quota.selfQuota.value.limitCredits != null">
+            {{
+              t('workspace.quota.usedOf', {
+                used: quota.selfQuota.value.usedCredits,
+                limit: quota.selfQuota.value.limitCredits,
+              })
+            }}
+          </template>
+          <template v-else>
+            {{ t('workspace.quota.usedUnlimited', { used: quota.selfQuota.value.usedCredits }) }}
+          </template>
+        </p>
+        <p
+          v-if="quota.selfQuota.value.remainingCredits != null"
+          class="m-0 mt-0.5 text-admin-meta text-muted-foreground"
         >
+          {{
+            t('workspace.quota.remaining', { remaining: quota.selfQuota.value.remainingCredits })
+          }}
+        </p>
+        <p
+          v-if="quota.selfQuota.value.periodStart && quota.selfQuota.value.periodEnd"
+          class="m-0 mt-0.5 text-admin-meta text-muted-foreground"
+        >
+          {{
+            t('workspace.quota.periodRange', {
+              start: quota.selfQuota.value.periodStart,
+              end: quota.selfQuota.value.periodEnd,
+            })
+          }}
+        </p>
+        <p
+          v-if="quota.isSelfExhausted.value"
+          class="m-0 mt-2 text-admin-meta leading-body text-destructive"
+          role="alert"
+        >
+          {{ t('workspace.quota.exhausted') }}
+        </p>
+        <p class="m-0 mt-2 text-admin-meta text-muted-foreground">
+          {{ t('workspace.quota.managerOnly') }}
+        </p>
+      </div>
+    </template>
+
+    <!-- Managers: overview totals, member usage table, adjust entry. -->
+    <template v-else>
+      <div
+        v-if="isOverviewLoading"
+        class="mt-3"
+        role="status"
+        :aria-label="t('common.actions.loading')"
+      >
+        <Skeleton class="h-4 w-24" />
+      </div>
+      <!-- Overview keeps only the non-derivable alert: exhausted count is the
+        one signal worth surfacing above the table (managed/used totals repeat
+        table rows). Hidden when zero so the card stays a single container. -->
+      <p
+        v-else-if="overview.exhaustedCount > 0"
+        class="m-0 mt-3 text-admin-meta leading-body text-destructive"
+        aria-live="polite"
+      >
+        {{ t(tableKeys.overviewExhausted, { count: overview.exhaustedCount }) }}
+      </p>
+
+      <AdminAlert v-if="hasListError" severity="error" class="mt-3">
+        <div class="flex items-center justify-between gap-2">
+          <span>{{ t('workspace.quota.loadFailed') }}</span>
           <Button
             type="button"
             variant="outline"
             size="sm"
             class="h-8 shrink-0 px-3"
-            @click="quota.retryList()"
+            @click="quota.retryList"
           >
             {{ t('common.actions.retry') }}
           </Button>
         </div>
+      </AdminAlert>
 
-        <div v-else class="flex flex-col gap-2">
-          <p
-            v-if="quota.quotas.value.length === 0"
-            class="m-0 text-admin-meta text-muted-foreground"
+      <AdminTable
+        v-if="isTableVisible"
+        :value="rows"
+        data-key="userId"
+        scrollable
+        sticky-header
+        :scroll-aria-label="t(tableKeys.tableLabel)"
+        :table-aria-label="t(tableKeys.tableLabel)"
+        :loading="isListLoading"
+        :skeleton-rows="3"
+        :row-disabled="isOwnerRow"
+        frame-class="mt-3"
+      >
+        <template #empty>
+          <AdminEmptyState
+            :title="t(tableKeys.emptyTitle)"
+            :description="t(tableKeys.emptyDescription)"
           >
-            {{ t('workspace.quota.noQuotas') }}
-          </p>
-          <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
-            <li
-              v-for="row in quota.quotas.value"
-              :key="row.userId"
-              class="flex items-center justify-between gap-2"
-            >
-              <div class="min-w-0">
-                <p
-                  class="m-0 truncate text-admin-meta font-medium text-foreground"
-                  :title="row.userId"
-                >
-                  {{ quota.memberLabel(row.userId) }}
-                </p>
-                <p class="m-0 mt-0.5 text-admin-meta text-muted-foreground">
-                  <span>
-                    <template v-if="row.limitCredits != null">
-                      {{
-                        t('workspace.quota.usedOf', {
-                          used: row.usedCredits,
-                          limit: row.limitCredits,
-                        })
-                      }}
-                    </template>
-                    <template v-else>
-                      {{ t('workspace.quota.usedUnlimited', { used: row.usedCredits }) }}
-                    </template>
-                  </span>
-                  <span>{{ periodLabel(row.period) }}</span>
-                </p>
-              </div>
+            <template #actions>
               <Button
-                v-if="row.period !== 'unlimited'"
                 type="button"
-                variant="outline"
                 size="sm"
-                class="h-8 shrink-0 px-3"
-                :is-disabled="quota.isSaving.value"
-                @click="quota.clearQuota(row.userId)"
+                :disabled="isListLoading || hasListError"
+                @click="quota.openCreateDialog"
               >
-                {{ t('workspace.quota.setUnlimited') }}
+                {{ t(tableKeys.createFirst) }}
               </Button>
-            </li>
-          </ul>
-
-          <div class="mt-1 flex flex-col gap-2">
-            <label :for="quotaMemberSelectId" class="text-admin-meta font-medium text-foreground">
-              {{ t('workspace.quota.memberLabel') }}
-            </label>
-            <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The trigger carries its accessible name via :aria-label; the rule cannot see through the Select primitive. -->
-            <Select
-              :model-value="quota.targetUserId.value"
-              :disabled="quota.isSaving.value"
-              @update:model-value="quota.pickTargetUser($event)"
-            >
-              <SelectTrigger
-                :id="quotaMemberSelectId"
-                size="sm"
-                class="w-full cursor-pointer gap-1.5"
-                :aria-label="t('workspace.quota.memberLabel')"
-              >
-                <SelectValue :placeholder="t('workspace.quota.pickMember')">
-                  {{ selectedMemberLabel }}
-                </SelectValue>
-                <SelectIcon>
-                  <NavArrowDown class="size-3.5 shrink-0" aria-hidden="true" />
-                </SelectIcon>
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                align="start"
-                :side-offset="appOverlayMenuSideOffset"
-              >
-                <SelectViewport>
-                  <SelectItem
-                    v-for="userId in quota.memberOptions.value"
-                    :key="userId"
-                    :value="userId"
-                  >
-                    <SelectItemText>{{ quota.memberLabel(userId) }}</SelectItemText>
-                  </SelectItem>
-                </SelectViewport>
-              </SelectContent>
-            </Select>
-
-            <label :for="quotaPeriodSelectId" class="text-admin-meta font-medium text-foreground">
-              {{ t('workspace.quota.periodLabel') }}
-            </label>
-            <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The trigger carries its accessible name via :aria-label; the rule cannot see through the Select primitive. -->
-            <Select
-              :model-value="quota.targetPeriod.value"
-              :disabled="quota.isSaving.value"
-              @update:model-value="quota.pickTargetPeriod($event)"
-            >
-              <SelectTrigger
-                :id="quotaPeriodSelectId"
-                size="sm"
-                class="w-full cursor-pointer gap-1.5"
-                :aria-label="t('workspace.quota.periodLabel')"
-              >
-                <SelectValue>{{ periodLabel(quota.targetPeriod.value) }}</SelectValue>
-                <SelectIcon>
-                  <NavArrowDown class="size-3.5 shrink-0" aria-hidden="true" />
-                </SelectIcon>
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                align="start"
-                :side-offset="appOverlayMenuSideOffset"
-              >
-                <SelectViewport>
-                  <SelectItem value="daily">
-                    <SelectItemText>{{ t('workspace.quota.periodDaily') }}</SelectItemText>
-                  </SelectItem>
-                  <SelectItem value="weekly">
-                    <SelectItemText>{{ t('workspace.quota.periodWeekly') }}</SelectItemText>
-                  </SelectItem>
-                  <SelectItem value="monthly">
-                    <SelectItemText>{{ t('workspace.quota.periodMonthly') }}</SelectItemText>
-                  </SelectItem>
-                  <SelectItem value="fixed">
-                    <SelectItemText>{{ t('workspace.quota.periodFixed') }}</SelectItemText>
-                  </SelectItem>
-                  <SelectItem value="unlimited">
-                    <SelectItemText>{{ t('workspace.quota.periodUnlimited') }}</SelectItemText>
-                  </SelectItem>
-                </SelectViewport>
-              </SelectContent>
-            </Select>
-
-            <template v-if="quota.targetPeriod.value !== 'unlimited'">
-              <label :for="quotaLimitInputId" class="text-admin-meta font-medium text-foreground">
-                {{ t('workspace.quota.limitLabel') }}
-              </label>
-              <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The limit input carries its accessible name via aria-label; the rule cannot see through the Input primitive. -->
-              <Input
-                :id="quotaLimitInputId"
-                v-model="quota.limitDraft.value"
-                size="sm"
-                class="h-9 min-w-0 flex-1 bg-background text-admin-meta"
-                :disabled="quota.isSaving.value"
-                :aria-label="t('workspace.quota.limitLabel')"
-                inputmode="numeric"
-                @keydown.enter="quota.saveQuota()"
-              />
             </template>
-            <div class="flex shrink-0 gap-2">
-              <Button
-                type="button"
-                size="sm"
-                class="h-9 px-4"
-                :is-loading="quota.isSaving.value"
-                :is-disabled="quota.isSaving.value"
-                @click="quota.saveQuota()"
-              >
-                {{ quota.isSaving.value ? t('workspace.quota.saving') : t('workspace.quota.save') }}
-              </Button>
-            </div>
-          </div>
-          <!-- 客户端字段级校验（未选成员/配额非法）仍行内提示；服务端持久化
-            失败只走 toast（见 useMemberQuotaSection.persistQuota）。 -->
-          <p
-            v-if="quota.saveError.value"
-            class="m-0 text-admin-meta leading-normal text-destructive"
-            role="alert"
-          >
-            {{ quota.saveError.value }}
-          </p>
-        </div>
-      </div>
+          </AdminEmptyState>
+        </template>
+
+        <AdminColumn
+          field="userId"
+          :header="t(tableKeys.headerMember)"
+          :style="{ minWidth: '160px' }"
+        >
+          <template #body="{ data }">
+            <p
+              class="m-0 truncate text-admin-meta font-medium text-foreground"
+              :title="data.userId"
+            >
+              {{ data.label }}
+            </p>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn field="period" :header="t(tableKeys.headerPeriod)" :style="{ width: '80px' }">
+          <template #body="{ data }">
+            {{ periodLabel(data.period) }}
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="usedCredits"
+          :header="t(tableKeys.headerUsedTotal)"
+          :style="{ width: '96px' }"
+        />
+
+        <AdminColumn
+          field="remainingCredits"
+          :header="t(tableKeys.headerRemaining)"
+          :style="{ width: '96px' }"
+        >
+          <template #body="{ data }">
+            {{ data.remainingCredits ?? t(tableKeys.unlimitedDash) }}
+          </template>
+        </AdminColumn>
+
+        <AdminColumn field="status" :header="t(tableKeys.headerStatus)" :style="{ width: '110px' }">
+          <template #body="{ data }">
+            <QuotaStatusBadge :status="data.status" />
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          v-if="quota.canManage.value"
+          field="actions"
+          :header="t(tableKeys.headerActions)"
+          :style="{ width: '80px' }"
+        >
+          <template #body="{ data }">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="h-8 shrink-0 px-3"
+              :is-disabled="!quota.canAdjustTarget(data.userId) || quota.isSaving.value"
+              :aria-label="`${t(tableKeys.adjustAction)} ${data.label}`"
+              @click="quota.openEditDialog(data)"
+            >
+              {{ t(tableKeys.adjustAction) }}
+            </Button>
+          </template>
+        </AdminColumn>
+      </AdminTable>
     </template>
   </section>
+
+  <MemberQuotaEditDialog
+    :is-visible="quota.editor.value.isVisible"
+    :mode="quota.editor.value.mode"
+    :members="quota.editor.value.members"
+    :member="quota.editor.value.member"
+    :period="quota.editor.value.period"
+    :limit="quota.editor.value.limit"
+    :is-pending="quota.isSaving.value"
+    :field-error="quota.editor.value.error"
+    @update:is-visible="quota.closeEditDialog"
+    @update:member="quota.pickTargetUser"
+    @update:period="quota.pickTargetPeriod"
+    @update:limit="quota.setLimitDraft"
+    @submit="quota.submitEditDialog"
+  />
+
+  <!-- The session owns unlimited confirmation and the subsequent save. -->
+  <ConfirmDialog
+    surface="user"
+    :is-visible="quota.confirmation.value.isVisible"
+    :title="quota.confirmation.value.title"
+    :message="quota.confirmation.value.message"
+    :confirm-label="quota.confirmation.value.confirmLabel"
+    :intent="quota.confirmation.value.intent"
+    :is-loading="quota.confirmation.value.isLoading"
+    @update:is-visible="quota.dismissConfirmation"
+    @confirm="quota.confirmUnlimited()"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NavArrowDown } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectIcon,
-  SelectItem,
-  SelectItemText,
-  SelectTrigger,
-  SelectValue,
-  SelectViewport,
-} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
-import { useFailureToast } from '@/core/composables/useFailureToast'
-import { appOverlayMenuSideOffset } from '@/theme/appOverlayMenu'
-import { useMemberQuotaSection } from '@/features/account'
+import ConfirmDialog from '@/core/components/ConfirmDialog.vue'
+import { useMemberQuotaSettings } from '../../session/useMemberQuotaSettings'
+import { AdminAlert, AdminColumn, AdminEmptyState, AdminTable } from '@/features/admin/shared'
 import {
   quotaPeriodLabelKey,
   type MemberQuotaPeriod,
 } from '@/features/account/session/quota/resource'
 import { accountCardPanelClass } from '@/features/account'
+import { buildMemberQuotaView, type MemberQuotaRow } from './memberQuotaTableColumns'
+import { MEMBER_QUOTA_TABLE_KEYS } from './quotaKeys'
+import QuotaStatusBadge from './QuotaStatusBadge.vue'
+import MemberQuotaEditDialog from './MemberQuotaEditDialog.vue'
 
 const props = withDefaults(
   defineProps<{
     workspaceId: string
+    // Org-only contract (ADR-0042 §2): Personal carries no quota concept, so
+    // callers mount this card only for Organization workspaces. Required
+    // string, never null; the call-site v-if is the single guard.
+    organizationId: string
     canManage?: boolean | undefined
     isExpanded?: boolean | undefined
+    currentUserId?: string | null | undefined
   }>(),
   {
     canManage: false,
     isExpanded: true,
+    currentUserId: null,
   },
 )
 
 const { t } = useI18n()
 
-// The management toggle only flips local visibility (never persisted,
-// never optimistic); the gate itself reuses the quota controller's
-// server-resolved canManage capability.
-const isManageOpen = ref(false)
+const tableKeys = MEMBER_QUOTA_TABLE_KEYS
 
-const quota = useMemberQuotaSection({
+const quota = useMemberQuotaSettings({
   workspaceId: () => props.workspaceId,
+  organizationId: () => props.organizationId,
   canManage: () => props.canManage,
   isExpanded: () => props.isExpanded,
-  isListEnabled: () => isManageOpen.value,
+  currentUserId: () => props.currentUserId,
 })
 
-useFailureToast(
-  () => quota.hasSelfError.value,
-  () => t('workspace.quota.loadFailed'),
-)
-useFailureToast(
-  () => quota.hasListError.value,
-  () => t('workspace.quota.loadFailed'),
+const isListLoading = quota.isListLoading
+const hasListError = quota.hasListError
+
+const view = computed(() =>
+  buildMemberQuotaView(
+    quota.quotas.value,
+    (userId) => quota.memberLabel(userId),
+    (userId) => quota.memberRole(userId),
+  ),
 )
 
-function toggleManage(): void {
-  isManageOpen.value = !isManageOpen.value
+const rows = computed(() => view.value.rows)
+
+const overview = computed(() => ({ exhaustedCount: view.value.exhaustedCount }))
+
+const isOverviewLoading = computed(() => isListLoading.value && quota.quotas.value.length === 0)
+
+const isTableVisible = computed(() => !hasListError.value || rows.value.length > 0)
+
+function isOwnerRow(row: MemberQuotaRow): boolean {
+  return row.role === 'owner'
 }
-
-const quotaMemberSelectId = `member-quota-member-${props.workspaceId}`
-const quotaPeriodSelectId = `member-quota-period-${props.workspaceId}`
-const quotaLimitInputId = `member-quota-limit-${props.workspaceId}`
 
 function periodLabel(period: MemberQuotaPeriod): string {
   return t(quotaPeriodLabelKey(period))
 }
-
-const selectedMemberLabel = computed(() => {
-  const userId = quota.targetUserId.value.trim()
-  if (!userId) return ''
-  return quota.memberLabel(userId)
-})
 </script>

@@ -73,16 +73,19 @@ Token ownership:
   (`--background`, `--card`, `--foreground`, `--border`, `--primary`,
   `--muted`, `--chart-*`, `--sidebar-*`, and state variants) with explicit
   light + dark assignments; Tier 2 domain light overrides (brand, board,
-  auth, toast, overlay, page-chrome, home, scrollbar, mask), with default dark
-  values and utility keys in the `theme.css` `@theme` bridge. Bare names are
+  auth, toast, overlay, home, scrollbar, mask), with default dark
+  values and utility keys in the `theme.css` `@theme` bridge. Page chrome
+  (`--color-page-chrome-*`) is single-source: it resolves through the
+  mode-aware board-card roles, so one dark declaration serves both modes
+  with no light twin. Bare names are
   the runtime roles; the matching standard `--color-*` names exist only as
   `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
 - Tier 2b (`tokens/admin.css`): Admin-distinct operational density,
   table/dialog/popover chrome, chart, and status roles with bounded Admin
   consumer scope (see ADR-0016).
 - Tier 3 (`tokens/canvas.css` + feature skins): canvas-scoped roles
-  referencing Tier 2 only, including workspace, tool, text, tooltip, and
-  progress roles.
+  referencing Tier 2 only, including workspace, tool, text, and tooltip
+  roles.
 - Motion (`tokens/motion.css` + `core/motion/motionPolicy.ts`): single
   control/enter/exit/feedback/image policy (160/280/280/160/200ms); CSS, JS, and
   reduced-motion stay in sync.

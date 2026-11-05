@@ -21,7 +21,8 @@ var (
 	// ErrPresignInvalidObjectKey is returned when the requested object key is empty or invalid.
 	ErrPresignInvalidObjectKey = errors.New("presign: object key is invalid")
 
-	// ErrPresignTTLTooLong is returned when the requested TTL exceeds MaxPresignTTL.
+	// ErrPresignTTLTooLong is retained for wire compatibility; TTLs now
+	// clamp to PresignTTL without an error.
 	ErrPresignTTLTooLong = errors.New("presign: ttl exceeds maximum cap")
 
 	// ErrPresignUnsupportedProvider is returned when the storage provider does not support provider hand-off.

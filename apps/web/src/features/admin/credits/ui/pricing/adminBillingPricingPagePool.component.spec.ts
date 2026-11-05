@@ -245,7 +245,7 @@ describe('AdminBillingPricingPage model pools', () => {
       expect(publishRequests).toBe(1)
       expect(replaceRequests).toBe(1)
     })
-    expect(toast.success).toHaveBeenCalledWith('配置已保存')
+    expect(toast.success).toHaveBeenCalledWith('设置已保存')
   })
 
   it('does not repeat a successful price publish when the pool save is retried', async () => {
@@ -303,7 +303,7 @@ describe('AdminBillingPricingPage model pools', () => {
     // 组合保存部分失败仅 toast 命名失败部分，不写 inline，避免双通知重复。
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
     const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
-    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).toContain('部分设置保存失败，请重试')
     expect(combinedToast).not.toContain('请根据提示')
     expect(combinedToast).toContain('Model')
     expect(combinedToast).toContain('pool unavailable')
@@ -357,7 +357,7 @@ describe('AdminBillingPricingPage model pools', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
     const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
-    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).toContain('部分设置保存失败，请重试')
     expect(combinedToast).not.toContain('请根据提示')
     expect(combinedToast).toContain('定价设置')
     expect(combinedToast).toContain('pricing unavailable')
@@ -408,7 +408,7 @@ describe('AdminBillingPricingPage model pools', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
     const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
-    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).toContain('部分设置保存失败，请重试')
     expect(combinedToast).not.toContain('请根据提示')
     expect(combinedToast).toContain('Model')
     expect(combinedToast).toContain('模型池已被更新，请刷新后重试')

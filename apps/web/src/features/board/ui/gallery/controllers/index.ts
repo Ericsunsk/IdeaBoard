@@ -1,4 +1,5 @@
 // Gallery controllers narrow seam: views consume controller modules
 // through here, never the controller files directly.
-export { formatCatalogDate, useCatalog } from './useCatalog'
-export type { CatalogSortMode } from './useCatalog'
+export { useCatalog } from './useCatalog'
+export { formatCatalogDate } from '../styling/format'
+export type { CatalogSortMode } from '../styling/contract'

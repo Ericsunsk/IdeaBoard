@@ -19,7 +19,6 @@ import (
 	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/tenancy/workspacefacts"
 
 	"github.com/jackc/pgx/v5"
@@ -238,61 +237,61 @@ func resolveWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID 
 }
 
 // resolveBillingAccount returns the workspace billing account (1:1),
-// provisioning it on demand through the canonical tenancy helper. Task
+// provisioning it on demand through the funds kernel. Task
 // inserts must never fail on a missing billing account; full billing
 // lifecycle stays in #804.
 func resolveBillingAccount(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64) (int64, error) {
-	created, err := tenancypg.EnsureBillingAccountForWorkspaceWithQueries(ctx, q, workspaceInternalID)
+	row, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, q, workspaceInternalID)
 	if err != nil {
 		return 0, err
 	}
-	return created.InternalID, nil
+	return row.InternalID, nil
 }
 
-// ResolveBillingAccountInTx resolves the stable funds identity inside the
-// caller's settlement transaction (#915 resolution, #916 funds identity).
-// It satisfies tasks.TxBillingAccountResolver so submit-time Holds
-// spend the resolved account instead of an owner wallet. The fixed
-// creation-scope order lives in tenancy/funds (single order
-// implementation); this stays a thin adapter that applies the
-// closed-organization gate and maps funds errors onto the tasking
-// not-found sentinel.
-func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
+// ResolveBillingAccountInTx resolves the settlement payer inside the
+// caller's settlement transaction (#915 resolution, #916 funds identity,
+// payer = actor per #973/#974). It satisfies
+// tasks.TxBillingAccountResolver so submit-time Holds spend the actor's
+// account, never the workspace owner's. The fixed payer order lives in
+// tenancy/funds (actor-aware order implementation); this stays a thin
+// adapter that applies the closed-organization gate and maps funds errors
+// onto the tasking not-found sentinel.
+func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (int64, string, error) {
 	if tx == nil {
-		return 0, fmt.Errorf("tasking postgres: settlement transaction is nil")
+		return 0, "", fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
 	q := s.q.WithTx(tx)
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	if !contract.IsValidPublicID(contract.PrefixWorkspace, workspacePublicID) {
-		return 0, tasks.ErrNotFound
+		return 0, "", tasks.ErrNotFound
 	}
 	workspace, err := q.GetWorkspaceByPublicID(ctx, workspacePublicID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, tasks.ErrNotFound
+			return 0, "", tasks.ErrNotFound
 		}
-		return 0, err
+		return 0, "", err
 	}
 	if workspace.OrganizationID.Valid {
 		closed, err := workspacefacts.IsOrganizationClosed(ctx, q, workspacePublicID)
 		if err != nil {
-			return 0, err
+			return 0, "", err
 		}
 		if closed {
-			return 0, tasks.ErrNotFound
+			return 0, "", tasks.ErrNotFound
 		}
 	}
-	identity, err := funds.ResolveByPublicIDWithQueries(ctx, dbsqlc.New(tx), workspacePublicID)
+	identity, err := funds.ResolveByPublicIDForActorWithQueries(ctx, dbsqlc.New(tx), workspacePublicID, actorUserID)
 	if err != nil {
 		if errors.Is(err, tenancy.ErrBillingWorkspaceInvalid) || errors.Is(err, tenancy.ErrBillingNotFound) {
-			return 0, tasks.ErrNotFound
+			return 0, "", tasks.ErrNotFound
 		}
-		return 0, err
+		return 0, "", err
 	}
 	if identity.BillingAccountID <= 0 {
-		return 0, tasks.ErrNotFound
+		return 0, "", tasks.ErrNotFound
 	}
-	return identity.BillingAccountID, nil
+	return identity.BillingAccountID, identity.OwnerType, nil
 }
 
 // loadOutputs reads ordered output refs for one task row.

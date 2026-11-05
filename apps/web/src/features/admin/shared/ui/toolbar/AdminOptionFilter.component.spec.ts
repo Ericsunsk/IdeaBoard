@@ -12,7 +12,7 @@ import AdminOptionFilter from './AdminOptionFilter.vue'
 describe('AdminOptionFilter', () => {
   const options = [
     { label: '全部状态', value: 'all' },
-    { label: '已配置', value: 'configured' },
+    { label: '已设置', value: 'configured' },
   ]
 
   it('advertises combobox semantics rather than a hand-rolled listbox', () => {
@@ -37,7 +37,7 @@ describe('AdminOptionFilter', () => {
         label: '筛选提示词状态',
       },
     })
-    expect(screen.getByRole('combobox', { name: '筛选提示词状态' })).toHaveTextContent('已配置')
+    expect(screen.getByRole('combobox', { name: '筛选提示词状态' })).toHaveTextContent('已设置')
   })
 
   it('marks the trigger active only when a real filter is applied', () => {
@@ -97,6 +97,6 @@ describe('AdminOptionFilter', () => {
     expect(screen.getByRole('combobox', { name: '筛选提示词状态' })).toHaveTextContent('全部状态')
 
     await rerender({ modelValue: 'configured' })
-    expect(screen.getByRole('combobox', { name: '筛选提示词状态' })).toHaveTextContent('已配置')
+    expect(screen.getByRole('combobox', { name: '筛选提示词状态' })).toHaveTextContent('已设置')
   })
 })

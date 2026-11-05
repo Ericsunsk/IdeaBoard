@@ -49,7 +49,7 @@ export default {
     preconditionRequired: 'Access state is outdated. The latest state is shown.',
     boardArchived: 'This board is archived and cannot accept this operation.',
     memberUnknown: 'This member is no longer available.',
-    invalidRequest: 'This access configuration is invalid.',
+    invalidRequest: 'This access setting is invalid.',
     actionFailed: 'Could not complete the action. Try again.',
     membersUnavailable: 'Members could not be loaded.',
     retry: 'Retry',

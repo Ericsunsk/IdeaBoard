@@ -1,6 +1,7 @@
 package workspacetasks
 
 import (
+	"context"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
@@ -115,3 +116,9 @@ type TaskOutputStore = taskports.TaskOutputStore
 type TaskBillingStore = taskports.TaskBillingStore
 type RoutingSnapshotSaver = taskports.RoutingSnapshotSaver
 type SubmissionAuthorizer = taskports.SubmissionAuthorizer
+
+// Price/routing policy tests exercise the private planner; eligibility tests
+// use Readiness.Check, the same interface production callers consume.
+func priceQuoteForTest(ctx context.Context, service *Service, params QuoteParams) (BillingSnapshot, error) {
+	return NewReadiness(ReadinessDeps{Quoter: service.quoter, Resolver: service.resolver}).priceQuote(ctx, params)
+}

@@ -202,6 +202,37 @@ describe('BoardCard motion browser contract', () => {
     }
   })
 
+  it('animates a card inserted while browsing the list manually', async () => {
+    const { shouldShow, article, unmount } = renderListCard(false)
+    try {
+      shouldShow.value = true
+      await nextTick()
+      // The manual enter runs through the enter transition at the boundary.
+      await expect
+        .poll(() => article()?.classList.contains('board-card-enter-active') ?? false, {
+          interval: 10,
+        })
+        .toBe(true)
+      const entering = article()!
+      expect(entering.classList.contains('board-card-enter-from')).toBe(true)
+      expect(styleOf(entering).transitionProperty).toContain('opacity')
+
+      // The enter converges to the visible final state.
+      await expect
+        .poll(() => {
+          const card = article()
+          if (!card) throw new Error('card missing during enter')
+          if (card.className.includes('-from') || card.className.includes('-active')) {
+            throw new Error('enter still running')
+          }
+          return styleOf(card).opacity
+        })
+        .toBe('1')
+    } finally {
+      unmount()
+    }
+  })
+
   it('removes transform motion but keeps the final card state visible when reduced-motion is preferred', async () => {
     await setMotion(true)
     expect(matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true)

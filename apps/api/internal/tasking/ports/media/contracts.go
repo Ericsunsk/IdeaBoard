@@ -76,6 +76,4 @@ type StoredObject struct {
 	Filename    string
 	ContentType string
 	Data        []byte
-	MIMEType    string
-	Ext         string
 }

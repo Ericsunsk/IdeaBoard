@@ -79,6 +79,10 @@ function createHarness(initialBoards: BoardMeta[] = rangeBoards(), repository?: 
     commands: {
       hydrate: vi.fn(async () => ({ isOk: true as const })),
       create: vi.fn(async () => ({ isOk: true as const, board: makeBoardMeta('created') })),
+      createAndOpen: vi.fn(async ({ openBoard }) => {
+        await openBoard('created')
+        return { isOk: true as const, board: makeBoardMeta('created') }
+      }),
       rename: vi.fn(async ({ boardId, nextName }) => ({
         isOk: true as const,
         board: makeBoardMeta(boardId, nextName),
@@ -89,7 +93,7 @@ function createHarness(initialBoards: BoardMeta[] = rangeBoards(), repository?: 
     observeDocument: vi.fn(() => vi.fn()),
     dispose: vi.fn(),
   }
-  const navigation: CatalogNavigation = { openBoard: vi.fn() }
+  const navigation: CatalogNavigation = { openBoard: vi.fn(async (_boardId: string) => undefined) }
   const feedback: BoardFeedback = {
     createFailed: vi.fn(),
     renameValidationFailed: vi.fn(),
@@ -205,10 +209,13 @@ describe('galleryController range', () => {
 
     await harness.controller.commands.createAndOpenBoard()
 
-    expect(harness.catalog.commands.create).toHaveBeenCalledTimes(1)
+    expect(harness.catalog.commands.createAndOpen).toHaveBeenCalledTimes(1)
     // The creation command carries no range or ACL fact: the server fixes
     // the none default whatever range the gallery showed.
-    expect(harness.catalog.commands.create).toHaveBeenCalledWith()
+    expect(harness.catalog.commands.createAndOpen).toHaveBeenCalledWith({
+      openBoard: expect.any(Function),
+    })
+    expect(harness.catalog.commands.create).not.toHaveBeenCalled()
     expect(harness.navigation.openBoard).toHaveBeenCalledWith('created')
     expect(harness.controller.viewModel.range.value).toBe('personal')
     expect(readPersistedGalleryRange()).toBe('personal')
@@ -217,7 +224,7 @@ describe('galleryController range', () => {
   test('keeps the current range when creation fails', async () => {
     const harness = createHarness()
     harness.controller.commands.setRange('team')
-    vi.mocked(harness.catalog.commands.create).mockResolvedValueOnce({
+    vi.mocked(harness.catalog.commands.createAndOpen).mockResolvedValueOnce({
       isOk: false,
       reason: 'sync-failed',
       board: makeBoardMeta('failed'),

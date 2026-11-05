@@ -76,7 +76,9 @@
                     role="status"
                   >
                     <span class="font-semibold text-foreground">{{
-                      emptyTitle || t('common.states.empty')
+                      // Admin 空态固定中文：Admin 面板只服务中文运营语境，
+                      // 不走 i18n 回退（各语言 common.states.empty 文案不一）。
+                      emptyTitle || '暂无数据'
                     }}</span>
                     <span v-if="emptyDescription" class="mt-1 text-sm text-muted-foreground">{{
                       emptyDescription
@@ -153,7 +155,6 @@
 
 <script setup lang="ts" generic="TRow extends object">
 import { computed, useSlots, type HTMLAttributes, type VNode } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { NavArrowDown } from '@iconoir/vue'
 import { cn } from '@/lib/utils'
 import AdminButton from '../AdminButton.vue'
@@ -243,13 +244,12 @@ const emit = defineEmits<{
 
 defineOptions({ inheritAttrs: false })
 
-const { t } = useI18n()
 const slots = useSlots()
 
 const tableClass = 'w-full min-w-full border-collapse text-left'
 const scrollRegionRole = computed(() => (props.scrollAriaLabel ? 'region' : undefined))
 const hasExpansionSlot = computed(() => Boolean(slots.expansion))
-// 对标 AdminModelAddDialog 手写表 thead：sticky 定位 + 背景 token，默认关闭零影响。
+// stickyHeader 收敛在共享原子内：sticky 定位 + 背景 token，默认关闭零影响。
 const stickyHeaderClass = computed(() =>
   props.stickyHeader ? 'sticky top-0 z-admin-sticky bg-muted/80 backdrop-blur-xs' : undefined,
 )

@@ -87,16 +87,26 @@ type TxHolder interface {
 	ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error)
 }
 
-// TxBillingAccountResolver resolves the stable funds identity inside the
-// settlement transaction (#915 resolution, #916 funds identity). Production
-// implements it on the postgres task Store; tests stub it.
+// TxBillingAccountResolver resolves the settlement payer inside the
+// settlement transaction (#915 resolution, #916 funds identity, payer =
+// actor for Personal scopes per #973/#974). Production implements it on
+// the postgres task Store; tests stub it.
+//
+// The actor rides explicitly: Personal scopes resolve the actor's own
+// deterministic Personal account (fail-closed, never the workspace owner's
+// or another wallet); Organization scopes resolve the shared pool.
+// ownerType reports the Organization-pool fact (organization) versus the
+// Personal actor account (workspace) so the settlement skips the member
+// quota check on Personal scopes while keeping the Organization check.
 type TxBillingAccountResolver interface {
-	ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error)
+	ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (billingAccountID int64, ownerType string, err error)
 }
 
 // TxMemberQuotaChecker enforces the member cross-workspace consumption
 // quota inside the settlement transaction (#946). Production implements
-// it on the memberquotas Store; tests stub it.
+// it on the memberquotas Store; tests stub it. The settlement calls it
+// for Organization scopes only; Personal scopes skip it (no quota
+// concept, #973/#974).
 type TxMemberQuotaChecker interface {
 	CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID, userID int64, amount int64, reservedAt time.Time) error
 }

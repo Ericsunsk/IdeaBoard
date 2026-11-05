@@ -27,9 +27,12 @@ describe('taskResultLabels', () => {
   })
 
   it('maps attempt status, stage, and variant with passthrough fallback', () => {
-    expect(getAttemptStatusLabel('failed')).toBe('失败')
+    // 任务五态走 core/status 单源（英文，与表格同文）；requeued 等专有态保留中文。
+    expect(getAttemptStatusLabel('failed')).toBe('Failed')
+    expect(getAttemptStatusLabel('requeued')).toBe('已重试')
     expect(getAttemptStatusLabel('mystery')).toBe('mystery')
     expect(getAttemptStatusTone('failed')).toBe('danger')
+    expect(getAttemptStatusTone('requeued')).toBe('warning')
     expect(getAttemptStatusTone('mystery')).toBe('neutral')
     expect(getAttemptStageLabel('queued')).toBe('排队中')
     expect(getAttemptStageLabel('mystery')).toBe('mystery')

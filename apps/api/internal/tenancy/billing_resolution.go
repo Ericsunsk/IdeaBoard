@@ -102,7 +102,6 @@ type BillingAccount struct {
 	// WorkspaceInternalID is the resolving workspace (consumption location).
 	WorkspaceInternalID int64
 	WorkspacePublicID   string
-	Shared              bool
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }

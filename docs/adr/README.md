@@ -25,7 +25,7 @@ deployment constraints、data ownership 或 durable technology choices 的决策
 - `Deprecated`: decision 已不再推荐，但没有单一 ADR 替代它。
 - `Superseded by ADR-NNNN`: later ADR 已替代该 decision。
 
-读资金池旧 ADR（0025–0033）前先读 [ADR-0038](./0038-personal-organization-billing-model.md)：Resolution 部分以 0038 为准，旧实现仅作历史理解。
+读资金池旧 ADR（0025–0033）前先读 [ADR-0038](./0038-personal-organization-billing-model.md) 与 [ADR-0042](./0042-personal-payer-is-actor.md)：Organization 部分以 0038 为准，Personal payer=actor 以 0042 为准，旧实现仅作历史理解。
 
 不要改写 accepted history 来隐藏已经变化的 decision。当变化原因值得保留时，新增
 ADR，并把旧 ADR 标记为 superseded。

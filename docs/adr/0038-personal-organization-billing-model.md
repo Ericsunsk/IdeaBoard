@@ -4,6 +4,8 @@ status: accepted
 
 # ADR-0038：Personal 与 Organization 资金池及 Workspace 归属
 
+> Superseded（Personal 部分）：本 ADR §1 中 Personal 共享池表述与 §3 中 Personal 按 holder 汇总与管理表述，被 [ADR-0042](./0042-personal-payer-is-actor.md) 以 supersede 方式取代，当前 Personal 资金语义（payer = actor，Personal 无限额）以 0042 为准。§2（组织角色与内容访问）与 §4（Organization 永久关闭与余额）继续有效。
+
 产品规则已接受，项目尚未上线、没有存量用户或资金。账户范围、组织角色、Personal 协作、成员额度与 Workspace Budget 退役已随 #950–#954 落地。2026-10-23 决定将原可恢复关闭改为永久关闭：关闭前二次确认，关闭后不再恢复组织或余额使用权，不自动退款或转入 Personal。#955 验收永久关闭，#956 验收完整资金池模型；本 ADR 记录目标合同，实现验收以对应 issue 为准。
 
 ## Context
@@ -20,7 +22,7 @@ status: accepted
 - Personal 与 Organization 账户相互独立；加入 Organization 不合并、不迁移 Personal 余额。
 - 每个 Workspace 创建时永久归属 Personal 或 Organization 之一，消费从该账户扣除。Workspace 不持有独立钱包或余额；不支持 Workspace 间真实余额转账、账户间资金拨款或创建后切换资金归属。
 - 新建 Workspace 时可选择 Personal 或当前 Organization；用户没有 Organization 时隐藏 Organization 选项，并提供创建 Organization 的入口。创建 Organization 不改变既有 Workspace 的 Personal 归属。
-- Organization 下所有 Workspace 共用该 Organization 账户余额；同一用户所有 Personal Workspace 共用其 Personal 账户余额。
+- Organization 下所有 Workspace 共用该 Organization 账户余额；~~同一用户所有 Personal Workspace 共用其 Personal 账户余额。~~（Superseded：Personal 范围 payer = actor，详见 ADR-0042；本句 Organization 部分继续有效。）
 - Personal `Default` 是不可邀请成员的个人空间。Organization `Default` 是组织管理入口，不是内容 Workspace，不承载画布或消费。
 - 删除 Workspace 不改变其资金账户余额；历史账务与结算快照保留。
 
@@ -43,8 +45,8 @@ status: accepted
 - 保留额度周期 `unlimited`、`daily`、`weekly`、`monthly`、`fixed`。额度是消费限制，不是子钱包、余额或资金预拨。
 - Organization Member 的额度以 `(Organization Billing Account, User)` 为范围，在该 Organization 所有 Workspace 间汇总；新 Member 默认 `unlimited`，邀请不要求预先配置默认额度。
 - Owner 永远 `unlimited`。Owner 可设置 Admin 的额度；Owner/Admin 可设置 Member 的额度；Admin 不能设置 Owner 或 Admin 的额度。
-- Personal Default 不可邀请。Personal 下其他 Workspace 可邀请协作者，其消费扣 Personal Billing Account。额度以 `(Personal Billing Account, User)` 为范围跨 Workspace 汇总，由 Personal 账户持有人管理；未配置时默认 `unlimited`。
-- Personal Workspace Owner/Admin 可直接邀请和移除协作者，无需 Personal 账户持有人逐次审批。新协作者默认 `unlimited`，相关消费由 Personal 账户承担；账户持有人之后可设置额度。
+- Personal Default 不可邀请。（以下 Personal 消费与额度表述 Superseded，见 ADR-0042：）~~Personal 下其他 Workspace 可邀请协作者，其消费扣 Personal Billing Account。额度以 `(Personal Billing Account, User)` 为范围跨 Workspace 汇总，由 Personal 账户持有人管理；未配置时默认 `unlimited`。~~ Personal 范围 payer = actor：谁提交谁付款；Personal 无任何限额概念。
+- Personal Workspace Owner/Admin 可直接邀请和移除协作者，无需 Personal 账户持有人逐次审批。（以下 Superseded，见 ADR-0042：）~~新协作者默认 `unlimited`，相关消费由 Personal 账户承担；账户持有人之后可设置额度。~~ Personal 范围无额度、无管理、无耗尽。
 - 达到消费额度时，阻止该用户发起新的消费；额度限制与账户可用余额共同生效。
 - 移除成员或协作者不得删除历史账务事实；重入同一资金范围时沿用该成员既有额度与消费历史，除非有明确管理操作修改。
 
@@ -72,6 +74,7 @@ status: accepted
 - 本 ADR 取代 [ADR-0035](./0035-member-cross-workspace-consumption-quota.md) 中额度按任意 Billing Account 聚合的范围表述；保留五种周期、submit-time 归属、并发防护、退款修正和失败收敛机制，目标额度主体限定为 Personal 或 Organization。
 - 本 ADR 取代 [ADR-0037](./0037-account-default-member-quota.md) 的未配置默认额度时邀请 fail-closed 规则；新成员默认不限额，邀请不依赖默认额度配置。
 - [ADR-0036](./0036-studio-handover-and-delete-funds-retention.md) 的不可变账务历史、显式 Owner 交接和删除期间保护继续适用；Organization 永久关闭与资金规则由本 ADR 取代或补充。
+- 本 ADR §1 中 Personal 共享池表述与 §3 中 Personal 按 holder 汇总与管理表述，被 [ADR-0042](./0042-personal-payer-is-actor.md) 以 supersede 方式取代（§2 组织角色与内容访问、§4 永久关闭与余额继续有效）。
 
 以上是决策关系；旧实现已按上述票号删除，旧 ADR 描述的实现合同仅作历史理解，当前产品合同以本 ADR 为准。
 

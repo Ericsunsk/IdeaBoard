@@ -16,7 +16,7 @@
 
 .retouch-histogram-plot__marker {
   position: absolute;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
   top: 0;
   bottom: calc(var(--retouch-histogram-marker-size, 12px) * -0.36);
   box-sizing: border-box;
@@ -37,7 +37,7 @@
 
 .retouch-histogram-plot__range-input {
   position: absolute;
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
   inset: 0;
   width: 100%;
   height: 100%;
@@ -71,7 +71,7 @@
   border: var(--retouch-panel-border-width, 1px) solid var(--canvas-accent-strong);
   border-radius: var(--radius-pill);
   /* Paper-white instrument dot shared with curve points (see control-points). */
-  background: var(--retouch-control-point-bg, #ffffff);
+  background: var(--retouch-control-point-bg);
   transform: translateX(-50%);
   pointer-events: none;
 }

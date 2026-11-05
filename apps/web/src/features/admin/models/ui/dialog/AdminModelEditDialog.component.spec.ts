@@ -201,7 +201,7 @@ describe('AdminModelEditDialog', () => {
     await user.type(within(dialog).getByLabelText(/显示名称/), 'Test Model')
     await user.type(within(dialog).getByLabelText(/提供商 \(Provider\)/), 'Test')
 
-    // 展开高级配置
+    // 展开高级设置
     const advancedBtn = within(dialog).getByRole('button', { name: /高级参数微调/ })
     await user.click(advancedBtn)
 

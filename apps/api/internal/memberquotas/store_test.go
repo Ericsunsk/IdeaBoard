@@ -69,33 +69,43 @@ func openQuotaEnv(t *testing.T) *quotaEnv {
 	if err := pool.QueryRow(ctx, `INSERT INTO users (display_name, storage_uid, role, status) VALUES ('quota-user-b', $1, 'user', 1) RETURNING id`, uidB).Scan(&userB); err != nil {
 		t.Fatalf("seed quota user b: %v", err)
 	}
+	// Org-backed (#975: MemberQuotas is Org-only): one Organization with
+	// two workspaces sharing the Organization pool account, plus an
+	// independent second Organization pool for the isolation test. No
+	// organization memberships are seeded (both users read as non-owners,
+	// so the normal cap path is exercised).
+	var orgID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO organizations (public_id, name) VALUES ($1, 'quota-org') RETURNING internal_id`, fmt.Sprintf("org_quota%04d", quotaTestSeq)).Scan(&orgID); err != nil {
+		t.Fatalf("seed quota organization: %v", err)
+	}
 	ws := fmt.Sprintf("ws_quota%04d", quotaTestSeq)
 	var wsID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (public_id, owner_user_id, name) VALUES ($1, $2, 'quota-ws') RETURNING internal_id`, ws, userA).Scan(&wsID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (public_id, organization_id, owner_user_id, name) VALUES ($1, $2, NULL, 'quota-ws') RETURNING internal_id`, ws, orgID).Scan(&wsID); err != nil {
 		t.Fatalf("seed quota workspace: %v", err)
 	}
-	// Second workspace sharing the same Billing Account (explicit link):
-	// the member's consumption in both spaces accumulates into one quota.
+	// Second workspace sharing the same Organization pool: the member's
+	// consumption in both spaces accumulates into one quota.
 	ws2 := fmt.Sprintf("ws_quota2%04d", quotaTestSeq)
 	var ws2ID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (public_id, owner_user_id, name) VALUES ($1, $2, 'quota-ws-2') RETURNING internal_id`, ws2, userA).Scan(&ws2ID); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (public_id, organization_id, owner_user_id, name) VALUES ($1, $2, NULL, 'quota-ws-2') RETURNING internal_id`, ws2, orgID).Scan(&ws2ID); err != nil {
 		t.Fatalf("seed quota workspace 2: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member'), ($4, $2, 'owner'), ($4, $3, 'member')`, wsID, userA, userB, ws2ID); err != nil {
 		t.Fatalf("seed quota memberships: %v", err)
 	}
-	// Per-workspace billing account; the insert trigger provisions the
+	// Organization pool account; the insert trigger provisions the
 	// wallet, so funds arrive only through Grants below.
 	var account int64
-	if err := pool.QueryRow(ctx, `INSERT INTO billing_accounts (public_id, workspace_id) VALUES ($1, $2) RETURNING internal_id`, fmt.Sprintf("ba_quota%04d", quotaTestSeq), wsID).Scan(&account); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO billing_accounts (public_id, workspace_id, organization_id) VALUES ($1, NULL, $2) RETURNING internal_id`, fmt.Sprintf("ba_quota%04d", quotaTestSeq), orgID).Scan(&account); err != nil {
 		t.Fatalf("seed quota billing account: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO workspace_billing_links (workspace_id, billing_account_id) VALUES ($1, $2)`, ws2ID, account); err != nil {
-		t.Fatalf("link second workspace to account: %v", err)
+	// Independent second Organization pool for the isolation test.
+	var org2ID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO organizations (public_id, name) VALUES ($1, 'quota-org-2') RETURNING internal_id`, fmt.Sprintf("org_quotaB%04d", quotaTestSeq)).Scan(&org2ID); err != nil {
+		t.Fatalf("seed quota organization 2: %v", err)
 	}
-	// Independent second account for the isolation test.
 	var account2 int64
-	if err := pool.QueryRow(ctx, `INSERT INTO billing_accounts (public_id, workspace_id) VALUES ($1, $2) RETURNING internal_id`, fmt.Sprintf("ba_quotaB%04d", quotaTestSeq), ws2ID).Scan(&account2); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO billing_accounts (public_id, workspace_id, organization_id) VALUES ($1, NULL, $2) RETURNING internal_id`, fmt.Sprintf("ba_quotaB%04d", quotaTestSeq), org2ID).Scan(&account2); err != nil {
 		t.Fatalf("seed quota billing account 2: %v", err)
 	}
 	creditService := credits.NewService(pool)

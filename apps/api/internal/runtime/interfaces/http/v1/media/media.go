@@ -671,6 +671,17 @@ func (h *Handler) putUploadBytes(c *gin.Context) {
 		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("checksum_sha256"))
 		return
 	}
+	// Fail fast on truncated pixel bodies before anything lands in the
+	// staged slot: the header sniff above still passes a tail-cut PNG.
+	// verifyStagedUploadBytes re-checks at complete time (fail-closed).
+	if _, err := imageformat.InspectCompleteDetectedBytes(data); err != nil {
+		if errors.Is(err, imageformat.ErrUnsupportedImageFormat) {
+			renderMediaUnsupportedType(c, "mime_type")
+			return
+		}
+		renderUploadValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "invalid"}})
+		return
+	}
 	ctx := c.Request.Context()
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	scope := contract.IdempotencyScope(externalUser, "upload:bytes")
@@ -902,7 +913,7 @@ func (h *Handler) verifyStagedUploadBytes(ctx context.Context, session *workspac
 		_, _ = h.deps.Media.Media.FailSession(ctx, session.WorkspaceID, session.ID, "staged checksum mismatch")
 		return &workspacemedia.ValidationError{Fields: map[string]string{"checksum_sha256": "invalid"}}
 	}
-	imageFacts, err := imageformat.InspectDetectedBytes(object.Data)
+	imageFacts, err := imageformat.InspectCompleteDetectedBytes(object.Data)
 	if err != nil {
 		_, _ = h.deps.Media.Media.FailSession(ctx, session.WorkspaceID, session.ID, "invalid staged image")
 		return &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "invalid"}}

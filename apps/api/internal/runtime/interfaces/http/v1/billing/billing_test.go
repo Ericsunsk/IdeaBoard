@@ -67,25 +67,25 @@ type fakeBillingAccounts struct {
 // pool, OwnerType organization), "personal:<holder user id>" for personal
 // ones (holder survivor, OwnerType workspace). Unknown workspaces and
 // ownerless personal scopes fail closed like production.
-func (f *fakeBillingAccounts) billingScopeOf(ctx context.Context, workspacePublicID string) (scope, ownerType string, shared bool, err error) {
+func (f *fakeBillingAccounts) billingScopeOf(ctx context.Context, workspacePublicID string) (scope, ownerType string, err error) {
 	if f.store == nil {
-		return "", "", false, tenancy.ErrBillingWorkspaceInvalid
+		return "", "", tenancy.ErrBillingWorkspaceInvalid
 	}
 	ws, err := f.store.GetWorkspace(ctx, workspacePublicID)
 	if err != nil {
-		return "", "", false, tenancy.ErrBillingWorkspaceInvalid
+		return "", "", tenancy.ErrBillingWorkspaceInvalid
 	}
 	if ws.OrganizationID != nil {
-		return "org:" + *ws.OrganizationID, tenancypg.BillingOwnerOrganization, true, nil
+		return "org:" + *ws.OrganizationID, tenancypg.BillingOwnerOrganization, nil
 	}
 	if ws.OwnerUserID == nil || *ws.OwnerUserID <= 0 {
-		return "", "", false, tenancy.ErrBillingConflict
+		return "", "", tenancy.ErrBillingConflict
 	}
-	return fmt.Sprintf("personal:%d", *ws.OwnerUserID), tenancypg.BillingOwnerWorkspace, false, nil
+	return fmt.Sprintf("personal:%d", *ws.OwnerUserID), tenancypg.BillingOwnerWorkspace, nil
 }
 
 func (f *fakeBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
-	scope, ownerType, shared, err := f.billingScopeOf(ctx, workspacePublicID)
+	scope, ownerType, err := f.billingScopeOf(ctx, workspacePublicID)
 	if err != nil {
 		return funds.Identity{}, err
 	}
@@ -112,7 +112,6 @@ func (f *fakeBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicI
 				WorkspacePublicID:      workspacePublicID,
 				BillingAccountID:       existing.InternalID,
 				BillingAccountPublicID: existing.PublicID,
-				Shared:                 existing.Shared,
 				OwnerType:              existing.OwnerType,
 				CreatedAt:              existing.CreatedAt,
 				UpdatedAt:              existing.UpdatedAt,
@@ -125,7 +124,6 @@ func (f *fakeBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicI
 		InternalID:          workspaceInternalID,
 		PublicID:            "ba_test_" + workspacePublicID,
 		OwnerType:           ownerType,
-		Shared:              shared,
 		WorkspaceInternalID: workspaceInternalID,
 		WorkspacePublicID:   workspacePublicID,
 		CreatedAt:           billingTestNow,
@@ -145,7 +143,108 @@ func (f *fakeBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicI
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       account.InternalID,
 		BillingAccountPublicID: account.PublicID,
-		Shared:                 account.Shared,
+		OwnerType:              account.OwnerType,
+		CreatedAt:              account.CreatedAt,
+		UpdatedAt:              account.UpdatedAt,
+	}, nil
+}
+
+// ResolveFundsForActor mirrors production payer order (#973/#978): Org
+// workspaces keep the shared pool (actor-independent, same as ResolveFunds),
+// Personal workspaces resolve the viewer's own account
+// (personal:<actorID>), provisioned on demand. Fresh viewers fork no
+// other member's account, so A/B consumption stays isolated.
+func (f *fakeBillingAccounts) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
+	if actorUserID <= 0 {
+		return funds.Identity{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	if f.store == nil {
+		return funds.Identity{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	ws, err := f.store.GetWorkspace(ctx, workspacePublicID)
+	if err != nil {
+		return funds.Identity{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	var scope, ownerType string
+	if ws.OrganizationID != nil {
+		scope, ownerType = "org:"+*ws.OrganizationID, tenancypg.BillingOwnerOrganization
+	} else {
+		scope, ownerType = fmt.Sprintf("personal:%d", actorUserID), tenancypg.BillingOwnerWorkspace
+	}
+	workspaceInternalID := ws.InternalID
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	if f.byScope == nil {
+		f.byScope = make(map[string]int64)
+	}
+	if accountID, ok := f.byScope[scope]; ok {
+		if existing, ok := f.accounts[accountID]; ok {
+			existing.WorkspaceInternalID = workspaceInternalID
+			existing.WorkspacePublicID = workspacePublicID
+			return funds.Identity{
+				WorkspaceInternalID:    workspaceInternalID,
+				WorkspacePublicID:      workspacePublicID,
+				BillingAccountID:       existing.InternalID,
+				BillingAccountPublicID: existing.PublicID,
+				OwnerType:              existing.OwnerType,
+				CreatedAt:              existing.CreatedAt,
+				UpdatedAt:              existing.UpdatedAt,
+			}, nil
+		}
+	}
+	// Deterministic per-scope anchor: Org reuses the workspace id, Personal
+	// per-actor offsets by actor so different viewers never collide while
+	// the owner viewing their own workspace keeps the legacy id.
+	anchorID := workspaceInternalID
+	if ownerType != tenancypg.BillingOwnerOrganization {
+		anchorID = 900000 + actorUserID
+	}
+	account := tenancy.BillingAccount{
+		InternalID:          anchorID,
+		PublicID:            fmt.Sprintf("ba_test_%s_a%d", workspacePublicID, actorUserID),
+		OwnerType:           ownerType,
+		WorkspaceInternalID: workspaceInternalID,
+		WorkspacePublicID:   workspacePublicID,
+		CreatedAt:           billingTestNow,
+		UpdatedAt:           billingTestNow,
+	}
+	// Org scopes keep the legacy ba_test_<ws> identity when the caller
+	// already provisioned it via ResolveFunds (same pool, stable wire id).
+	if ownerType == tenancypg.BillingOwnerOrganization {
+		legacyScope, _, _ := f.billingScopeOf(ctx, workspacePublicID)
+		if legacyID, ok := f.byScope[legacyScope]; ok {
+			if existing, ok := f.accounts[legacyID]; ok {
+				existing.WorkspaceInternalID = workspaceInternalID
+				existing.WorkspacePublicID = workspacePublicID
+				return funds.Identity{
+					WorkspaceInternalID:    workspaceInternalID,
+					WorkspacePublicID:      workspacePublicID,
+					BillingAccountID:       existing.InternalID,
+					BillingAccountPublicID: existing.PublicID,
+					OwnerType:              existing.OwnerType,
+					CreatedAt:              existing.CreatedAt,
+					UpdatedAt:              existing.UpdatedAt,
+				}, nil
+			}
+		}
+		account.InternalID = workspaceInternalID
+		account.PublicID = "ba_test_" + workspacePublicID
+	}
+	if f.accounts == nil {
+		f.accounts = make(map[int64]tenancy.BillingAccount)
+	}
+	if f.byPublic == nil {
+		f.byPublic = make(map[string]int64)
+	}
+	f.accounts[account.InternalID] = account
+	f.byScope[scope] = account.InternalID
+	f.byPublic[account.PublicID] = account.InternalID
+	return funds.Identity{
+		WorkspaceInternalID:    workspaceInternalID,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       account.InternalID,
+		BillingAccountPublicID: account.PublicID,
 		OwnerType:              account.OwnerType,
 		CreatedAt:              account.CreatedAt,
 		UpdatedAt:              account.UpdatedAt,
@@ -555,10 +654,11 @@ func (fakeBillingQuoter) QuoteAtResolution(ctx context.Context, rawSKU string, r
 }
 
 type fakeWorkspaceCheckout struct {
-	mu       sync.Mutex
-	sessions map[string]workspaceCheckoutStatus
-	lastBill int64
-	create   func(ctx context.Context, billingAccountID, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
+	mu           sync.Mutex
+	sessions     map[string]workspaceCheckoutStatus
+	lastBill     int64
+	lastOperator int64
+	create       func(ctx context.Context, billingAccountID, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
 }
 
 func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, billingAccountID, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error) {
@@ -568,11 +668,16 @@ func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, bil
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lastBill = billingAccountID
+	f.lastOperator = userID
 	if f.sessions == nil {
 		f.sessions = make(map[string]workspaceCheckoutStatus)
 	}
-	sessionID := "sess_" + workspacePublicID + "_" + strings.TrimSpace(clientKey)
-	if existing, ok := f.sessions[sessionID]; ok {
+	// Production isolates intents by (BillingAccountID, ClientKey) (#919
+	// lockKey): same header key from different payers must not collide.
+	trimmed := strings.TrimSpace(clientKey)
+	sessionID := fmt.Sprintf("sess_%d_%s_%s", billingAccountID, workspacePublicID, trimmed)
+	key := fmt.Sprintf("%d:%s", billingAccountID, sessionID)
+	if existing, ok := f.sessions[key]; ok {
 		return workspaceCheckoutResult{SessionID: existing.SessionID, CheckoutURL: existing.CheckoutURL, ExpiresAt: existing.ExpiresAt, Reused: true}, nil
 	}
 	status := workspaceCheckoutStatus{
@@ -582,7 +687,7 @@ func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, bil
 		CheckoutURL:  "https://checkout.example/s/" + sessionID,
 		ExpiresAt:    billingTestNow.Add(time.Hour),
 	}
-	f.sessions[sessionID] = status
+	f.sessions[key] = status
 	return workspaceCheckoutResult{SessionID: status.SessionID, CheckoutURL: status.CheckoutURL, ExpiresAt: status.ExpiresAt}, nil
 }
 
@@ -590,7 +695,10 @@ func (f *fakeWorkspaceCheckout) GetWorkspaceCheckout(ctx context.Context, billin
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lastBill = billingAccountID
-	if status, ok := f.sessions[sessionID]; ok {
+	// Production reads return only the payer account's own orders; another
+	// payer's session stays invisible (404), never cross-account visible.
+	key := fmt.Sprintf("%d:%s", billingAccountID, strings.TrimSpace(sessionID))
+	if status, ok := f.sessions[key]; ok {
 		return status, nil
 	}
 	return workspaceCheckoutStatus{}, errBillingSessionNotFound
@@ -685,8 +793,14 @@ func TestV1BillingAccountProvisionsOnFirstRead(t *testing.T) {
 		t.Fatalf("GET billing-account status = %d (%v)", status, first)
 	}
 	data := v1Data(t, first).(map[string]any)
-	if data["workspace_id"] != ws.PublicID || data["owner_type"] != "workspace" || data["can_manage_member_quotas"] != true {
-		t.Fatalf("billing account = %v, want workspace binding", data)
+	// Personal reads resolve the viewer's own account (payer = actor,
+	// #973/#978): scope stays member and quota management stays disabled
+	// (read-only, no代付/transfer entry).
+	if data["workspace_id"] != ws.PublicID || data["owner_type"] != "workspace" || data["can_manage_member_quotas"] != false {
+		t.Fatalf("billing account = %v, want personal per-actor binding", data)
+	}
+	if data["consumption_scope"] != "member" {
+		t.Fatalf("billing account scope = %v, want member", data)
 	}
 	if _, ok := data["created_at"].(string); !ok {
 		t.Fatalf("billing account must carry created_at: %v", data)
@@ -736,7 +850,7 @@ func TestV1BillingQuotaCapabilityUsesWorkspaceScope(t *testing.T) {
 		{"organization owner", orgWorkspace, 11, true},
 		{"organization admin", orgWorkspace, 12, true},
 		{"organization member", orgWorkspace, 13, false},
-		{"personal holder", personalWorkspace, 14, true},
+		{"personal holder", personalWorkspace, 14, false},
 		{"unrelated organization admin and billing admin", personalWorkspace, 12, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -897,11 +1011,17 @@ func TestV1BillingSharedBalanceSameAccount(t *testing.T) {
 	}
 
 	// An independent holder scope keeps its own isolated account and balance.
+	// Per-actor reads (#978) resolve the viewer, so the check reads as the
+	// owner (12), not as a collaborator: 12's account never merges into 11's.
 	wsC := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-c", 12)
 	fx.store.SeedWorkspaceMember(wsC.PublicID, 11, tenancy.RoleAdmin)
 	accountC := fx.mustAccount(t, ctx, wsC)
 	fx.seedWallet(accountC, 10, 0)
-	third := readBalance(wsC.PublicID)
+	statusC, _, thirdPayload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsC.PublicID + "/credits/balance", userID: 12})
+	if statusC != http.StatusOK {
+		t.Fatalf("independent balance status = %d (%v)", statusC, thirdPayload)
+	}
+	third := v1Data(t, thirdPayload).(map[string]any)
 	if third["billing_account_id"] == first["billing_account_id"] {
 		t.Fatalf("independent balance account = %v, want isolation from %v", third["billing_account_id"], first["billing_account_id"])
 	}
@@ -993,20 +1113,37 @@ func TestV1BillingCheckoutSessionGet(t *testing.T) {
 	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("missing session = %d %v, want 404 billing_session_not_found", status, missing)
 	}
-	if v1Data(t, got).(map[string]any)["billing_account_id"] != "ba_test_"+ws.PublicID {
+	// Personal scopes bind the actor's own payer account (payer = actor).
+	wantIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1Data(t, got).(map[string]any)["billing_account_id"] != wantIdentity.BillingAccountPublicID {
 		t.Fatalf("session must name its payer account: %v", got)
 	}
 }
 
 // TestV1BillingFinanceRequiresBillingGrant pins the #919 financial
-// boundary on the checkout surface: a workspace admin without a Billing
-// Owner/Admin grant observes no session facts and cannot top up. The
+// boundary on the Org checkout surface: a workspace admin without a Billing
+// Owner/Admin grant observes no session facts and cannot top up. Personal
+// scopes are exempt (payer = actor, ADR-0042): any member tops up their own
+// account, see TestV1BillingPersonalCheckoutPerActor. The
 // purchase-options/pending/recharges matrix lives in gaps_test.go,
 // where those seams are wired.
 func TestV1BillingFinanceRequiresBillingGrant(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+	org, err := fx.store.CreateOrganization(ctx, 11, "finance-grant-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "billing")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}
@@ -1027,6 +1164,139 @@ func TestV1BillingFinanceRequiresBillingGrant(t *testing.T) {
 	status, _, forbiddenCreate := doV1(t, engine, v1Call{method: http.MethodPost, path: base + "/checkout-sessions", body: billingCheckoutBody(1000), userID: 12, headers: map[string]string{contract.IdempotencyKeyHeader: "grant-key-4"}})
 	if status != http.StatusForbidden || v1ErrorCode(t, forbiddenCreate) != string(contract.CodeBillingAccountForbidden) {
 		t.Fatalf("space-only admin checkout = %d %v, want 403 billing_account_forbidden", status, forbiddenCreate)
+	}
+}
+
+// TestV1BillingPersonalLedgerIsolation pins payer = actor (ADR-0042) on the
+// ledger read: a Personal collaborator reads only their own
+// (BillingAccount, User) column, never the holder's entries, with no
+// Billing grant required.
+func TestV1BillingPersonalLedgerIsolation(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing-personal-ledger", 11)
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ownerIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ownerIdentity.BillingAccountID == memberIdentity.BillingAccountID {
+		t.Fatalf("personal accounts = %d, want per-actor isolation", ownerIdentity.BillingAccountID)
+	}
+	// No Billing grant for the collaborator, yet the Personal read stays open.
+	fx.accounts.deny = map[int64]bool{12: true}
+	fx.seedWallet(ownerIdentity.BillingAccountID, 1000, 0)
+	fx.seedWallet(memberIdentity.BillingAccountID, 500, 0)
+	ledgerTx := func(seq int64, id string) domain.LedgerTransaction {
+		return domain.LedgerTransaction{
+			SequenceID: seq, TransactionID: id,
+			CommandType: domain.CommandCapture, Amount: 20,
+			AvailableBalanceAfter: 1000, ReservedBalanceAfter: 0,
+			CreatedAt: billingTestNow.Add(time.Duration(seq) * time.Minute),
+		}
+	}
+	fx.wallets.ledgers[ownerIdentity.BillingAccountID] = []domain.LedgerTransaction{
+		ledgerTx(2, "tx-owner-2"), ledgerTx(1, "tx-owner-1"),
+	}
+	fx.wallets.ledgers[memberIdentity.BillingAccountID] = []domain.LedgerTransaction{
+		ledgerTx(1, "tx-member-1"),
+	}
+	engine := fx.engine()
+
+	status, _, memberPayload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/credits/ledger", userID: 12})
+	if status != http.StatusOK {
+		t.Fatalf("member ledger = %d (%v), want 200 without Billing grant", status, memberPayload)
+	}
+	memberEntries := v1Data(t, memberPayload).([]any)
+	if len(memberEntries) != 1 || memberEntries[0].(map[string]any)["transaction_id"] != "tx-member-1" {
+		t.Fatalf("member ledger = %v, want only tx-member-1", memberEntries)
+	}
+	status, _, ownerPayload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/credits/ledger", userID: 11})
+	if status != http.StatusOK {
+		t.Fatalf("owner ledger = %d (%v)", status, ownerPayload)
+	}
+	ownerEntries := v1Data(t, ownerPayload).([]any)
+	if len(ownerEntries) != 2 {
+		t.Fatalf("owner ledger = %v, want 2 own entries", ownerEntries)
+	}
+	for _, entry := range ownerEntries {
+		if entry.(map[string]any)["transaction_id"] == "tx-member-1" {
+			t.Fatalf("owner ledger leaked member entry: %v", ownerEntries)
+		}
+	}
+}
+
+// TestV1BillingPersonalCheckoutPerActor pins payer = actor (ADR-0042) on the
+// checkout surface: Personal collaborators top up their own account with
+// operator = actor, the same header key never collides across payers, and a
+// member cannot observe another payer's session (404, never 403 leak).
+func TestV1BillingPersonalCheckoutPerActor(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing-personal-checkout", 11)
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	// No Billing grant for the collaborator: Personal checkout skips the
+	// manager gate entirely.
+	fx.accounts.deny = map[int64]bool{12: true}
+	engine := fx.engine()
+	base := "/api/v1/workspaces/" + ws.PublicID + "/checkout-sessions"
+
+	status, _, memberCreated := doV1(t, engine, v1Call{method: http.MethodPost, path: base, body: billingCheckoutBody(1000), userID: 12, headers: map[string]string{contract.IdempotencyKeyHeader: "personal-recharge-1"}})
+	if status != http.StatusCreated {
+		t.Fatalf("member checkout = %d (%v), want 201 without Billing grant", status, memberCreated)
+	}
+	memberData := v1Data(t, memberCreated).(map[string]any)
+	memberSession, _ := memberData["session_id"].(string)
+	memberAccount, _ := memberData["billing_account_id"].(string)
+	if memberSession == "" || memberAccount == "" {
+		t.Fatalf("member checkout must name session + payer account: %v", memberData)
+	}
+	memberIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if memberAccount != memberIdentity.BillingAccountPublicID {
+		t.Fatalf("member payer = %s, want own account %s", memberAccount, memberIdentity.BillingAccountPublicID)
+	}
+	if fx.checkout.lastBill != memberIdentity.BillingAccountID || fx.checkout.lastOperator != 12 {
+		t.Fatalf("member checkout bound = (%d, op %d), want (%d, op 12)", fx.checkout.lastBill, fx.checkout.lastOperator, memberIdentity.BillingAccountID)
+	}
+
+	// Same header key from the holder is an independent payer slot: no 409,
+	// distinct session and account.
+	status, _, ownerCreated := doV1(t, engine, v1Call{method: http.MethodPost, path: base, body: billingCheckoutBody(1000), userID: 11, headers: map[string]string{contract.IdempotencyKeyHeader: "personal-recharge-1"}})
+	if status != http.StatusCreated {
+		t.Fatalf("owner checkout same key = %d (%v), want 201 without cross-account conflict", status, ownerCreated)
+	}
+	ownerData := v1Data(t, ownerCreated).(map[string]any)
+	ownerSession, _ := ownerData["session_id"].(string)
+	ownerAccount, _ := ownerData["billing_account_id"].(string)
+	if ownerSession == "" || ownerSession == memberSession || ownerAccount == memberAccount {
+		t.Fatalf("payer sessions/accounts must differ: owner %v vs member %v", ownerData, memberData)
+	}
+
+	// Same-actor replay stays idempotent.
+	status, _, replayed := doV1(t, engine, v1Call{method: http.MethodPost, path: base, body: billingCheckoutBody(1000), userID: 12, headers: map[string]string{contract.IdempotencyKeyHeader: "personal-recharge-1"}})
+	if status != http.StatusCreated || v1Data(t, replayed).(map[string]any)["session_id"] != memberSession {
+		t.Fatalf("member replay = %d (%v), want same %s", status, replayed, memberSession)
+	}
+
+	// Cross-payer session reads stay invisible (404 billing_session_not_found).
+	status, _, cross := doV1(t, engine, v1Call{method: http.MethodGet, path: base + "/" + ownerSession, userID: 12})
+	if status != http.StatusNotFound || v1ErrorCode(t, cross) != string(contract.CodeBillingSessionNotFound) {
+		t.Fatalf("member reads owner session = %d %v, want 404 billing_session_not_found", status, cross)
+	}
+	status, _, own := doV1(t, engine, v1Call{method: http.MethodGet, path: base + "/" + memberSession, userID: 12})
+	if status != http.StatusOK || v1Data(t, own).(map[string]any)["billing_account_id"] != memberAccount {
+		t.Fatalf("member reads own session = %d (%v), want 200 on %s", status, own, memberAccount)
 	}
 }
 
@@ -1182,22 +1452,43 @@ func TestV1BillingQuoteToSettlementStub(t *testing.T) {
 
 // Full-account financial reads require a separate Billing grant. Workspace
 // membership, including Workspace Owner/Admin, never grants that scope.
+// Org workspaces keep the manager/workspace/member order; Personal scopes
+// always force the member filter (see TestV1BillingPersonalSplitsByActor).
 func TestV1BillingAccountReadsRequireFinancialGrant(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "financial-reads", 11)
+	org, err := fx.store.CreateOrganization(ctx, 11, "financial-reads-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 13, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "financial-reads")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 13, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
 	accountID := fx.mustAccount(t, ctx, ws)
 	fx.seedWallet(accountID, 980, 0)
 	fx.accounts.deny = map[int64]bool{11: true, 12: true, 13: true}
+	// Org workspace roles: owner 11, members 12/13 default to member; promote
+	// 12 to workspace admin so the workspace-scope branch is covered.
+	if _, err := fx.store.UpdateWorkspaceMemberRole(ctx, ws.PublicID, 11, 12, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
 	for _, member := range []struct {
 		userID int64
 		role   string
 	}{{11, tenancy.RoleOwner}, {12, tenancy.RoleAdmin}, {13, tenancy.RoleMember}} {
-		if member.userID != 11 {
-			if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, member.userID, member.role); err != nil {
-				t.Fatal(err)
-			}
-		}
 		for _, suffix := range []string{"/credits/ledger"} {
 			status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + suffix, userID: member.userID})
 			if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
@@ -1255,15 +1546,22 @@ func TestV1BillingAccountReadsRequireFinancialGrant(t *testing.T) {
 func TestV1BillingCheckoutKeysDoNotConflictAcrossAccounts(t *testing.T) {
 	fx := newBillingTestFixture()
 	first := v1WorkspaceFixture(t, t.Context(), fx.store, "first-account", 11)
-	// Distinct holder scopes own distinct payer accounts (ADR-0038); the
-	// same manager key stays independent across them. User 11 reads the
-	// second scope as an explicit workspace member.
+	// Distinct payers own distinct accounts (payer = actor, ADR-0042); the
+	// same header key stays independent across payers. User 11 acts on the
+	// first scope, user 12 (holder of the second) on the second.
 	second := v1WorkspaceFixture(t, t.Context(), fx.store, "second-account", 12)
 	fx.store.SeedWorkspaceMember(second.PublicID, 11, tenancy.RoleAdmin)
 	engine := fx.engine()
+	calls := []struct {
+		workspace *tenancy.Workspace
+		userID    int64
+	}{
+		{first, 11},
+		{second, 12},
+	}
 	var previousSession string
-	for _, workspace := range []*tenancy.Workspace{first, second} {
-		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + workspace.PublicID + "/checkout-sessions", body: billingCheckoutBody(1000), userID: 11, headers: map[string]string{contract.IdempotencyKeyHeader: "same-account-manager-key"}})
+	for _, call := range calls {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + call.workspace.PublicID + "/checkout-sessions", body: billingCheckoutBody(1000), userID: call.userID, headers: map[string]string{contract.IdempotencyKeyHeader: "same-account-manager-key"}})
 		if status != http.StatusCreated {
 			t.Fatalf("independent checkout = %d %v", status, payload)
 		}

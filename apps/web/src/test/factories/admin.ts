@@ -129,6 +129,54 @@ export function makePaymentOrderSummary(overrides: PaymentOrderSummaryOverrides 
   }
 }
 
+type AdminMonitorTaskExecutionSnapshotOverrides = {
+  provider: string
+  gateway_step: string
+  resolved_model: string
+}
+
+export type AdminMonitorTaskOverrides = {
+  task_id?: string
+  user_public_id?: string
+  user_display_name?: string
+  prompt?: string
+  service?: string
+  credits?: number
+  priority?: number
+  status?: string
+  error_msg?: string
+  result?: string
+  created_at?: string
+  completed_at?: string | null
+  latest_execution?: AdminMonitorTaskExecutionSnapshotOverrides
+  requested_resolution?: string
+  pool_version?: number
+  selected_model?: string
+  final_resolved_model?: string
+}
+
+// Converged from 4 admin/monitor specs (`useAdminTaskCancel.unit.spec.ts`,
+// `useAdminMonitor.contract.spec.ts`, `taskResultPresentation.unit.spec.ts`,
+// `columns.unit.spec.ts`): identical `AdminMonitorListItem` base shape;
+// every local `makeTask` was a fixed subset of these fields.
+export function makeAdminMonitorTask(overrides: AdminMonitorTaskOverrides = {}) {
+  return {
+    task_id: 'task-1',
+    user_public_id: '00000000-0000-0000-0000-000000000001',
+    user_display_name: 'User 1',
+    prompt: 'prompt',
+    service: '',
+    credits: 0,
+    priority: 2,
+    status: 'pending',
+    error_msg: '',
+    result: '',
+    created_at: '2026-07-27T00:00:00Z',
+    completed_at: null,
+    ...overrides,
+  }
+}
+
 export function makePaymentOrderDetail(overrides: PaymentOrderSummaryOverrides = {}) {
   return {
     ...makePaymentOrderSummary(overrides),

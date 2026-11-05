@@ -2274,6 +2274,7 @@
     "SITE_BRANDING_PROJECT_NAME_MAX_CHARS",
     "SITE_BRANDING_QUERY_KEY",
     "SiteBrandingOptions",
+    "SiteBrandingValidationError",
     "fetchSiteBranding",
     "getSiteBrandFallbackText",
     "isValidSiteBrandingLogoURL",
@@ -2490,12 +2491,7 @@
     "resolveChartTimeTickDensity",
     "shouldShowChartTimeTick"
   ],
-  "src/core/lib/pageChrome.ts": [
-    "createPageChromeAccountRoundControlClass",
-    "createPageChromeRoundControlClass",
-    "pageChromeAccountMenuClasses",
-    "pageChromeClasses"
-  ],
+  "src/core/lib/pageChrome.ts": ["pageChromeAccountMenuClasses", "pageChromeClasses"],
   "src/core/media/imageAssetPipeline.ts": [
     "IMAGE_ASSET_PIPELINE_CONFIG",
     "ImageAssetCompressionPolicy",
@@ -3377,6 +3373,7 @@
     "BoardAccessPosture",
     "BoardCommandDependencies",
     "BoardCommands",
+    "BoardCreateAndOpenResult",
     "BoardCreateResult",
     "BoardDeleteResult",
     "BoardDuplicateResult",
@@ -3494,7 +3491,6 @@
     "createBoardCommands",
     "createBoardFeedback",
     "createBoardRepository",
-    "createCatalog",
     "createCommandHandlers",
     "createEmptyBoardSnapshot",
     "createEmptyBoardState",
@@ -3698,8 +3694,10 @@
     "makeBoardMeta",
     "makeBoardSnapshot",
     "makeBoardState",
+    "makeCommandDeps",
     "makePendingImageNodeSnapshot",
     "makePromptBoardState",
+    "makeServerMeta",
     "primeAuthenticatedWorkspace",
     "selectWorkspace"
   ],
@@ -4419,16 +4417,22 @@
   "src/test/factories/index.ts": [
     "AdminCommandTargetOverrides",
     "AdminListItemOverrides",
+    "AdminMonitorTaskOverrides",
     "ControlUserPayloadOverrides",
+    "MemberQuotaSummaryOverrides",
+    "MemberQuotaSummaryValue",
     "PaymentOrderSummaryOverrides",
     "TestUserOverrides",
     "adminPaymentOrderNumber",
+    "makeAdminMonitorTask",
     "makeAdminUserCommandTarget",
     "makeAdminUserListItem",
     "makeControlUserPayload",
+    "makeMemberQuotaSummary",
     "makePaymentOrderDetail",
     "makePaymentOrderSummary",
-    "makeSessionUser"
+    "makeSessionUser",
+    "makeUnlimitedMemberQuota"
   ],
   "src/theme/appOverlayMenu.ts": [
     "appOverlayMenuDangerItemClass",

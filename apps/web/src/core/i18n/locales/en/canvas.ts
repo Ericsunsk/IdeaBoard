@@ -37,7 +37,6 @@ export default {
     cancelled: 'Task cancelled',
     cancelledWithPartialResults: 'Task cancelled — partial results kept on the canvas.',
     progressTimeout: 'This is taking longer than expected. Check back in a moment.',
-    progressDataInvalid: 'Task progress data looks invalid. Please retry.',
     failedGeneric: 'Image generation failed. Please try again.',
   },
   minimap: {
@@ -45,7 +44,6 @@ export default {
   },
   controls: {
     prompt: 'Prompt',
-    promptPlaceholder: 'type your idea...',
     send: 'Apply',
     free: 'Free',
     selectImageCountTooltip: 'Select image count',
@@ -135,10 +133,8 @@ export default {
   },
   contextMenu: {
     label: 'Canvas node actions',
-    addNode: '+ {title} node',
   },
   execution: {
-    missingBoardIdMask: 'Missing board ID. Unable to upload the mask.',
     markInpaintAreaFirst: 'Mark the area to inpaint first.',
     recoveryFailed: 'Failed to restore image results. Please try again.',
     canvasSaveFailedProgressLost:
@@ -157,7 +153,6 @@ export default {
     fusionNodeMissing: 'Fusion node not found.',
     fusionNeedsTwoImages: 'Fusion needs at least 2 images.',
     fusionInputsInvalid: 'Fusion input images are invalid.',
-    imageMissingUrl: 'The image is missing a URL.',
     outpaintMissingOriginalSize: 'Outpaint is missing the original image size.',
   },
   tools: {
@@ -166,7 +161,6 @@ export default {
     noEditableLayers: 'No editable layers to apply.',
     autoConnectFailed:
       'Image created, but automatic connection failed. Please connect it manually.',
-    applyEditFailed: 'Failed to apply edits.',
     maskPromptPlaceholder: 'Describe how to repaint the selection',
     optionalPromptPlaceholder: 'Optional instructions',
     outpaintPromptPlaceholder: 'Enter an outpaint prompt',
@@ -180,10 +174,6 @@ export default {
       'Failed to write the connection to the canvas. Refresh and try again.',
     deleteWriteFailedWarning: 'Failed to write the deletion to the canvas. Refresh and try again.',
     deleteApplyFailedWarning: 'Failed to apply the deletion. Refresh the canvas and try again.',
-    connectRequiredInputLabel: 'Connect {label}',
-    connectRequiredInputsLabel: 'Connect {count} inputs',
-    waitForInputLabel: 'Waiting for {label}',
-    waitForInputsLabel: 'Waiting for {count} inputs',
   },
   handles: {
     inputDirectionLabel: 'Input',

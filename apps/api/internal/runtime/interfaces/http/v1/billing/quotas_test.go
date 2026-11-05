@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -124,6 +125,79 @@ func quotaUserPublicID(userID int64) string {
 	return tenancy.FormatUserPublicID(testUUIDForUser(userID))
 }
 
+func TestV1QuotaPersonalListAndSetRejected(t *testing.T) {
+	ctx := context.Background()
+	fx, quotas := newQuotaTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota-personal", 11)
+	engine := fx.engine()
+
+	// Personal scopes carry no quota concept (#975): lists and writes fail
+	// closed with 403 billing_account_forbidden (never a silent success),
+	// and the denial persists nothing.
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas", userID: 11})
+	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("personal list = %d %v, want 403 billing_account_forbidden", status, payload)
+	}
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodPut, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(11), userID: 11, body: `{"data":{"period":"daily","limit_credits":100}}`})
+	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("personal set = %d %v, want 403 billing_account_forbidden", status, payload)
+	}
+	if len(quotas.period) != 0 {
+		t.Fatal("denied Personal write must not persist a row")
+	}
+}
+
+func TestV1QuotaPersonalSelfUnlimited(t *testing.T) {
+	ctx := context.Background()
+	fx, quotas := newQuotaTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota-personal-self", 11)
+	account := fx.mustAccount(t, ctx, ws)
+	// A stale capped Personal row must not surface: Personal self reads
+	// return unlimited without touching quota rows.
+	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodDaily
+	limit := int64(100)
+	quotas.limit[quotaKey{account, 11}] = &limit
+	quotas.setUsed(account, 11, 25)
+	engine := fx.engine()
+
+	for _, path := range []string{
+		"/api/v1/workspaces/" + ws.PublicID + "/member-quotas/self",
+		"/api/v1/workspaces/" + ws.PublicID + "/member-quotas?scope=self",
+	} {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: path, userID: 11})
+		if status != http.StatusOK {
+			t.Fatalf("GET %s status = %d (%v)", path, status, payload)
+		}
+		var data map[string]any
+		if strings.HasSuffix(path, "scope=self") {
+			items, ok := v1Data(t, payload).([]any)
+			if !ok || len(items) != 1 {
+				t.Fatalf("scope=self = %v, want single-item page", payload)
+			}
+			var okObj bool
+			data, okObj = items[0].(map[string]any)
+			if !okObj {
+				t.Fatalf("scope=self row = %v, want object", items[0])
+			}
+		} else {
+			var okObj bool
+			data, okObj = v1Data(t, payload).(map[string]any)
+			if !okObj {
+				t.Fatalf("self = %v, want object", payload)
+			}
+		}
+		if data["period"] != "unlimited" || data["used_credits"] != float64(0) {
+			t.Fatalf("personal self %s = %v, want unlimited with no usage", path, data)
+		}
+		if _, ok := data["limit_credits"]; ok {
+			t.Fatalf("personal self %s must omit limit_credits: %v", path, data)
+		}
+		if _, ok := data["remaining_credits"]; ok {
+			t.Fatalf("personal self %s must omit remaining_credits: %v", path, data)
+		}
+	}
+}
+
 func TestV1QuotaSelfDefaultsUnlimited(t *testing.T) {
 	ctx := context.Background()
 	fx, _ := newQuotaTestFixture()
@@ -153,16 +227,31 @@ func TestV1QuotaSelfDefaultsUnlimited(t *testing.T) {
 func TestV1QuotaSelfReadsCapAndUsage(t *testing.T) {
 	ctx := context.Background()
 	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only quotas (#975): Admin caps are enforceable; Owner reads
+	// unlimited. Use an Org Admin so the daily cap path stays covered.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-self-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
 	account := fx.mustAccount(t, ctx, ws)
-	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodDaily
+	quotas.period[quotaKey{account, 12}] = memberquotas.PeriodDaily
 	limit := int64(100)
-	quotas.limit[quotaKey{account, 11}] = &limit
-	quotas.setUsed(account, 11, 25)
+	quotas.limit[quotaKey{account, 12}] = &limit
+	quotas.setUsed(account, 12, 25)
 	engine := fx.engine()
 	path := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/self"
 
-	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: path, userID: 11})
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: path, userID: 12})
 	if status != http.StatusOK {
 		t.Fatalf("GET self quota status = %d (%v)", status, payload)
 	}
@@ -208,9 +297,25 @@ func TestV1QuotaHiddenWorkspace(t *testing.T) {
 func TestV1QuotaOwnerSetsAndReadsBack(t *testing.T) {
 	ctx := context.Background()
 	fx, _ := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only (#975): Owner sets a Member cap (capped Owner writes render
+	// 403); the member reads it back, then the owner clears it.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-set-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.dir.ensure(12)
 	engine := fx.engine()
-	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(11)
+	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(12)
 	self := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/self"
 
 	status, _, payload := doV1(t, engine, v1Call{method: http.MethodPut, path: set, userID: 11, body: `{"data":{"period":"weekly","limit_credits":500}}`})
@@ -223,7 +328,7 @@ func TestV1QuotaOwnerSetsAndReadsBack(t *testing.T) {
 	}
 
 	// The member reads the same cap back on the self endpoint.
-	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: self, userID: 11})
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: self, userID: 12})
 	if status != http.StatusOK {
 		t.Fatalf("GET self after set status = %d (%v)", status, payload)
 	}
@@ -244,29 +349,42 @@ func TestV1QuotaOwnerSetsAndReadsBack(t *testing.T) {
 func TestV1QuotaSpaceAdminCannotRaise(t *testing.T) {
 	ctx := context.Background()
 	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only (#975): space-only standing never manages quotas. The caller
+	// is a workspace admin but only an org member, so PUT/list render 403
+	// while self stays readable.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-space-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
 	account := fx.mustAccount(t, ctx, ws)
-	// The caller is the workspace owner but holds no Billing grant:
-	// space-only standing never manages the pool-granted quota.
-	fx.accounts.roles = map[int64]map[int64]string{account: {}}
-	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodDaily
+	quotas.period[quotaKey{account, 12}] = memberquotas.PeriodDaily
 	limit := int64(100)
-	quotas.limit[quotaKey{account, 11}] = &limit
+	quotas.limit[quotaKey{account, 12}] = &limit
 	engine := fx.engine()
-	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(11)
+	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(12)
 
-	status, _, payload := doV1(t, engine, v1Call{method: http.MethodPut, path: set, userID: 11, body: `{"data":{"period":"daily","limit_credits":500}}`})
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodPut, path: set, userID: 12, body: `{"data":{"period":"daily","limit_credits":500}}`})
 	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
 		t.Fatalf("space-only PUT = %d %v, want 403 billing_account_forbidden", status, payload)
 	}
 	// The account-wide list is manager-only too...
-	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas", userID: 11})
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas", userID: 12})
 	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
 		t.Fatalf("space-only list = %d %v, want 403 billing_account_forbidden", status, payload)
 	}
 	// ...while the self read stays member-visible: the denial is
 	// management-only.
-	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/self", userID: 11})
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/self", userID: 12})
 	if status != http.StatusOK {
 		t.Fatalf("space-only self status = %d (%v)", status, payload)
 	}
@@ -275,17 +393,39 @@ func TestV1QuotaSpaceAdminCannotRaise(t *testing.T) {
 func TestV1QuotaListShowsManagerView(t *testing.T) {
 	ctx := context.Background()
 	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only (#975): manager list shows Admin/Member caps; Owner reads
+	// unlimited via the short-circuit.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-list-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 13, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 13, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
 	account := fx.mustAccount(t, ctx, ws)
 	fx.dir.ensure(12)
-	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodMonthly
+	fx.dir.ensure(13)
+	quotas.period[quotaKey{account, 12}] = memberquotas.PeriodMonthly
 	monthly := int64(1000)
-	quotas.limit[quotaKey{account, 11}] = &monthly
-	quotas.period[quotaKey{account, 12}] = memberquotas.PeriodFixed
+	quotas.limit[quotaKey{account, 12}] = &monthly
+	quotas.period[quotaKey{account, 13}] = memberquotas.PeriodFixed
 	fixed := int64(200)
-	quotas.limit[quotaKey{account, 12}] = &fixed
-	quotas.setUsed(account, 11, 250)
-	quotas.setUsed(account, 12, 200)
+	quotas.limit[quotaKey{account, 13}] = &fixed
+	quotas.setUsed(account, 12, 250)
+	quotas.setUsed(account, 13, 200)
 	engine := fx.engine()
 	path := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas"
 
@@ -306,11 +446,11 @@ func TestV1QuotaListShowsManagerView(t *testing.T) {
 		user, _ := row["user_id"].(string)
 		byUser[user] = row
 	}
-	self := byUser[quotaUserPublicID(11)]
+	self := byUser[quotaUserPublicID(12)]
 	if self["period"] != "monthly" || self["limit_credits"] != float64(1000) || self["used_credits"] != float64(250) || self["remaining_credits"] != float64(750) {
 		t.Fatalf("manager row = %v, want monthly 1000/250/750", self)
 	}
-	other := byUser[quotaUserPublicID(12)]
+	other := byUser[quotaUserPublicID(13)]
 	// Fixed cap reached exactly: remaining clamps at zero.
 	if other["period"] != "fixed" || other["limit_credits"] != float64(200) || other["used_credits"] != float64(200) || other["remaining_credits"] != float64(0) {
 		t.Fatalf("fixed row = %v, want fixed 200/200/0", other)
@@ -323,9 +463,26 @@ func TestV1QuotaListShowsManagerView(t *testing.T) {
 func TestV1QuotaSetValidation(t *testing.T) {
 	ctx := context.Background()
 	fx, _ := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only (#975): validation runs after the manager gate, so use an
+	// Org Admin target to reach field validation.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-validate-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.dir.ensure(11)
+	fx.dir.ensure(12)
 	engine := fx.engine()
-	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(11)
+	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(12)
 
 	for _, tc := range []struct {
 		name string
@@ -349,7 +506,15 @@ func TestV1QuotaSetValidation(t *testing.T) {
 func TestV1QuotaSetUnknownUser(t *testing.T) {
 	ctx := context.Background()
 	fx, _ := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	// Org-only (#975): unknown user mapping runs after the manager gate.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-unknown-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota")
+	if err != nil {
+		t.Fatal(err)
+	}
 	engine := fx.engine()
 	// Never-ensured usr_ identity: unknown target, never a quota status.
 	set := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(77)

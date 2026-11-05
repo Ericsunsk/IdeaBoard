@@ -182,6 +182,16 @@
   --primitive-shadow-ring-4-green: 0 0 0 4px rgba(40, 134, 97, 0.14);
   --primitive-shadow-ring-4-rose: 0 0 0 4px rgba(201, 74, 86, 0.14);
 
+  /*
+   * Marketing hero shadow inks (mode-blind color ingredients; the hero floats
+   * over imagery in both modes, so Tier 2 hero shadows reference these without
+   * light overrides — same precedent as --shadow-home-hero-ring).
+   */
+  --primitive-home-shadow-note: rgb(78 70 58);
+  --primitive-home-shadow-gold: rgb(224 195 42);
+  --primitive-home-shadow-slate: rgb(35 38 46);
+  --primitive-home-shadow-ink: rgb(26 28 34);
+
   /* Physical dimensions, type scales, motion timing and stacking steps. */
   --primitive-size-10: 10px;
   --primitive-size-12: 12px;
@@ -229,6 +239,7 @@
   --primitive-z-40: 40;
   --primitive-z-50: 50;
   --primitive-z-80: 80;
+  --primitive-z-90: 90;
   --primitive-z-1200: 1200;
   --primitive-z-2000: 2000;
   --primitive-duration-160: 160ms;

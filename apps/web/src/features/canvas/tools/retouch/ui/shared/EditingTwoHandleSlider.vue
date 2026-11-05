@@ -235,7 +235,7 @@ function snapValue(value: number) {
 .editing-two-handle-slider__handle {
   position: absolute;
   top: 50%;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
   width: var(--editing-two-handle-slider-handle-size);
   height: var(--editing-two-handle-slider-handle-size);
   border: 0;
@@ -250,7 +250,7 @@ function snapValue(value: number) {
 }
 
 .editing-two-handle-slider__handle.is-active {
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
 }
 
 .editing-two-handle-slider__handle:active {

@@ -43,9 +43,9 @@ function listSearchProviders() {
   return (async () => {
     try {
       const body = await listControlSearchProviders()
-      return requireContractData<SearchProviderList>(body, '加载图片搜索供应商配置失败')
+      return requireContractData<SearchProviderList>(body, '加载图片搜索供应商设置失败')
     } catch (error) {
-      throw withControlCopy(error, '加载图片搜索供应商配置失败')
+      throw withControlCopy(error, '加载图片搜索供应商设置失败')
     }
   })()
 }
@@ -62,9 +62,9 @@ async function updateSearchProvider(
       { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
-    requireContractData<Record<string, unknown>>(body, '保存图片搜索供应商配置失败')
+    requireContractData<Record<string, unknown>>(body, '保存图片搜索供应商设置失败')
   } catch (error) {
-    throw withControlCopy(error, '保存图片搜索供应商配置失败')
+    throw withControlCopy(error, '保存图片搜索供应商设置失败')
   }
 }
 

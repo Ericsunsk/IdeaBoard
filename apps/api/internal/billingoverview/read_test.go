@@ -23,14 +23,18 @@ type accountFixture struct {
 	roleCalls int
 }
 
-func (a *accountFixture) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
+// ResolveFundsForActor mirrors the production payer order for tests:
+// Org workspaces keep the shared pool (actor-independent). Personal
+// workspaces are covered by TestReaderPersonalSplitsByActor with a
+// dedicated per-actor fixture; this shared fixture stays Org-only.
+func (a *accountFixture) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
 	a.check(ctx, false)
 	return funds.Identity{
 		WorkspaceInternalID:    1,
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       77,
 		BillingAccountPublicID: "ba_test",
-		OwnerType:              funds.OwnerTypeWorkspace,
+		OwnerType:              funds.OwnerTypeOrganization,
 	}, nil
 }
 func (a *accountFixture) GetBillingAccountRole(ctx context.Context, _, _ int64) (string, bool, error) {
@@ -47,18 +51,31 @@ func (a *accountFixture) ListBillingTransferInvitesForAccount(ctx context.Contex
 	return []*tenancy.BillingTransferInvite{nil, {FromUserID: 11, ToUserID: 12, Status: tenancy.BillingTransferPending}, {FromUserID: 11, ToUserID: 13, Status: tenancy.BillingTransferAccepted}}, nil
 }
 
-type tenancyFixture struct{ check func(context.Context, bool) }
+type tenancyFixture struct {
+	check   func(context.Context, bool)
+	orgRole string
+}
 
 func (s tenancyFixture) ListWorkspaceMembers(ctx context.Context, _ string) ([]*tenancy.WorkspaceMember, error) {
 	s.check(ctx, true)
 	return []*tenancy.WorkspaceMember{{UserID: 11}, {UserID: 12}}, nil
 }
-func (s tenancyFixture) GetOrganizationRole(context.Context, string, int64) (string, bool, error) {
-	return "", false, nil
+func (s tenancyFixture) GetOrganizationRole(ctx context.Context, _ string, _ int64) (string, bool, error) {
+	if s.orgRole == "" {
+		return "", false, nil
+	}
+	return s.orgRole, true, nil
 }
 
-func (s tenancyFixture) GetOrganizationRoles(context.Context, string, []int64) (map[int64]string, error) {
-	return nil, nil
+func (s tenancyFixture) GetOrganizationRoles(ctx context.Context, _ string, userIDs []int64) (map[int64]string, error) {
+	if s.orgRole == "" {
+		return nil, nil
+	}
+	out := make(map[int64]string, len(userIDs))
+	for _, id := range userIDs {
+		out[id] = s.orgRole
+	}
+	return out, nil
 }
 
 type quotaFixture struct {
@@ -113,7 +130,7 @@ func overviewFixture(t *testing.T) (Reader, Input, *accountFixture, *quotaFixtur
 	accounts := &accountFixture{check: check, role: tenancy.BillingRoleOwner}
 	quotas := &quotaFixture{check: check}
 	reader := Reader{
-		Accounts: accounts, Tenancy: tenancyFixture{check: check}, Quotas: quotas,
+		Accounts: accounts, Tenancy: tenancyFixture{check: check, orgRole: tenancy.RoleOwner}, Quotas: quotas,
 		Snapshot: func(ctx context.Context, read func(context.Context) error) error {
 			return read(context.WithValue(ctx, snapshotMarker{}, true))
 		},
@@ -134,7 +151,8 @@ func overviewFixture(t *testing.T) (Reader, Input, *accountFixture, *quotaFixtur
 			return usageapplication.Usage{}, nil
 		}),
 	}
-	input := Input{Workspace: &tenancy.Workspace{InternalID: 1, PublicID: "ws_test"}, WorkspaceRole: tenancy.RoleOwner, ActorUserID: 11}
+	orgID := "org_test"
+	input := Input{Workspace: &tenancy.Workspace{InternalID: 1, PublicID: "ws_test", OrganizationID: &orgID}, WorkspaceRole: tenancy.RoleOwner, ActorUserID: 11}
 	return reader, input, accounts, quotas
 }
 
@@ -145,6 +163,7 @@ func TestReaderOwnsSnapshotAndVisibility(t *testing.T) {
 			if !manager {
 				accounts.role = ""
 				input.WorkspaceRole = tenancy.RoleAdmin
+				reader.Tenancy = tenancyFixture{check: reader.Tenancy.(tenancyFixture).check, orgRole: ""}
 			}
 			result, err := reader.Read(t.Context(), input)
 			if err != nil {
@@ -254,5 +273,116 @@ func TestReaderRequiresExplicitSnapshot(t *testing.T) {
 	}
 	if accounts.roleCalls != 0 {
 		t.Fatal("account reads started without a snapshot adapter")
+	}
+}
+
+type personalAccountFixture struct {
+	check func(context.Context, bool)
+}
+
+func (a *personalAccountFixture) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
+	a.check(ctx, false)
+	if actorUserID <= 0 {
+		return funds.Identity{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	return funds.Identity{
+		WorkspaceInternalID:    1,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       1000 + actorUserID,
+		BillingAccountPublicID: fmt.Sprintf("ba_personal_%d", actorUserID),
+		OwnerType:              funds.OwnerTypeWorkspace,
+	}, nil
+}
+
+func (a *personalAccountFixture) GetBillingAccountRole(context.Context, int64, int64) (string, bool, error) {
+	return "", false, tenancy.ErrBillingNotFound
+}
+
+func (a *personalAccountFixture) ListBillingAccountMembers(context.Context, int64, int64) ([]tenancy.BillingAccountMember, error) {
+	return nil, tenancy.ErrBillingForbidden
+}
+
+func (a *personalAccountFixture) ListBillingTransferInvitesForAccount(context.Context, int64, int64, int64, int) ([]*tenancy.BillingTransferInvite, error) {
+	return nil, nil
+}
+
+// TestReaderPersonalSplitsByActor pins #978: Personal workspaces resolve
+// the viewer's own (BillingAccount, User) column, never merge into the
+// owner, and expose no manager/transfer sections. A/B each see their own
+// account with member scope and unlimited self quota; role lookups never
+// run so no other member's amounts can leak.
+func TestReaderPersonalSplitsByActor(t *testing.T) {
+	check := func(ctx context.Context, snapshot bool) {
+		t.Helper()
+		if got := ctx.Value(snapshotMarker{}) == true; got != snapshot {
+			t.Errorf("snapshot carrier = %v, want %v", got, snapshot)
+		}
+	}
+	for _, actor := range []int64{11, 12} {
+		t.Run(fmt.Sprint(actor), func(t *testing.T) {
+			quotas := &quotaFixture{check: check}
+			var walletAccount int64
+			var usageAccount int64
+			var usageFilter creditsdomain.UsageFilter
+			reader := Reader{
+				Accounts: &personalAccountFixture{check: check},
+				Tenancy:  tenancyFixture{check: check},
+				Quotas:   quotas,
+				Snapshot: func(ctx context.Context, read func(context.Context) error) error {
+					return read(context.WithValue(ctx, snapshotMarker{}, true))
+				},
+				People: func(ctx context.Context, ids []int64) (map[int64]Person, error) {
+					check(ctx, true)
+					if len(ids) != 0 {
+						t.Fatalf("personal people ids = %v, want no manager/transfer leakage", ids)
+					}
+					return map[int64]Person{}, nil
+				},
+				Wallets: walletFunc(func(ctx context.Context, id int64) (creditsdomain.WalletDetails, error) {
+					check(ctx, false)
+					walletAccount = id
+					return creditsdomain.WalletDetails{}, nil
+				}),
+				Usage: usageFunc(func(ctx context.Context, id int64, filter creditsdomain.UsageFilter, _ usagedomain.Range) (usageapplication.Usage, error) {
+					check(ctx, false)
+					usageAccount = id
+					usageFilter = filter
+					return usageapplication.Usage{}, nil
+				}),
+			}
+			input := Input{Workspace: &tenancy.Workspace{InternalID: 1, PublicID: "ws_test"}, WorkspaceRole: tenancy.RoleOwner, ActorUserID: actor}
+			if !input.Workspace.IsPersonal() {
+				t.Fatal("personal fixture must use a Personal workspace")
+			}
+			result, err := reader.Read(t.Context(), input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantAccount := 1000 + actor
+			if result.Account.InternalID != wantAccount {
+				t.Fatalf("account = %d, want %d (actor-owned, not holder-merged)", result.Account.InternalID, wantAccount)
+			}
+			if result.Scope != "member" {
+				t.Fatalf("scope = %q, want member", result.Scope)
+			}
+			if result.CanManageQuotas {
+				t.Fatal("personal CanManageQuotas must stay false (no quota concept, read-only)")
+			}
+			if len(result.BillingMembers) != 0 || len(result.LiveInvites) != 0 || len(result.Quotas) != 0 {
+				t.Fatalf("personal must omit manager/transfer sections: %+v", result)
+			}
+			if walletAccount != wantAccount || usageAccount != wantAccount {
+				t.Fatalf("wallet/usage accounts = %d/%d, want %d", walletAccount, usageAccount, wantAccount)
+			}
+			if usageFilter != (creditsdomain.UsageFilter{ActorUserID: actor}) {
+				t.Fatalf("usage filter = %+v, want actor-only", usageFilter)
+			}
+			if result.Quota.UserID != actor || result.Quota.Period != memberquotas.PeriodUnlimited {
+				t.Fatalf("self quota = %+v, want actor unlimited", result.Quota)
+			}
+			if result.MembersCount != 2 {
+				t.Fatalf("members_count = %d, want 2", result.MembersCount)
+			}
+		})
 	}
 }

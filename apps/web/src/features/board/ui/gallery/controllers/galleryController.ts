@@ -129,51 +129,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const isDeleteDialogVisible = ref(false)
   const pendingDeleteBoard = ref<CatalogEntry | null>(null)
   const isDeletePending = ref(false)
-
-  const { visibleBoards, rangeCounts } = createBoardViews({
-    boards: () => dependencies.catalog.viewModel.boards.value,
-    searchKeyword,
-    sortMode,
-    galleryRange: galleryRangeState.range,
-  })
-
-  const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
-    activeMenuBoardId.value = null
-    clearRename()
-    catalogRecoveryBoardId.value = null
-    resetDeleteState()
-    // The persisted range is isolated per User + Workspace: a scope switch
-    // loads that scope's saved range (default personal), never the
-    // previous scope's selection.
-    galleryRangeState.reloadPersistedRange()
-  })
-
-  const commandHandlers = createCommandHandlers({
-    ...dependencies,
-    state: {
-      activeMenuBoardId,
-      renamingBoardId,
-      renameDraft,
-      catalogRecoveryBoardId,
-      isCatalogReloadPending,
-      pendingDeleteBoard,
-      isDeletePending,
-    },
-    clearRename,
-    resetDeleteState,
-  })
-
-  const { hydration, reloadCatalog } = commandHandlers
-
-  async function createAndOpenBoard(): Promise<void> {
-    const didOpen = await commandHandlers.createAndOpenBoard()
-    // New boards are server-fixed to workspace_access none under the
-    // caller, so they always land in the personal range: a successful
-    // creation returns the gallery there whatever range it started from.
-    // Creation sends a name-only body in every range; the current range
-    // never changes the default permission.
-    if (didOpen) galleryRangeState.setRange('personal')
-  }
+  const isCreatePending = ref(false)
 
   function setSearchKeyword(value: string | undefined) {
     searchKeyword.value = (value ?? '').trim()
@@ -208,10 +164,6 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     renameDraft.value = ''
   }
 
-  function cancelRename() {
-    clearRename()
-  }
-
   function openBoardFromCard(boardId: string) {
     if (activeMenuBoardId.value) {
       activeMenuBoardId.value = null
@@ -219,6 +171,10 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     }
     if (renamingBoardId.value) return
     dependencies.navigation.openBoard(boardId)
+  }
+
+  function openShare(boardId: string) {
+    dependencies.navigation.shareBoard?.(boardId)
   }
 
   function requestDelete(board: CatalogEntry) {
@@ -242,6 +198,53 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     pendingDeleteBoard.value = null
   }
 
+  const { visibleBoards, rangeCounts } = createBoardViews({
+    boards: () => dependencies.catalog.viewModel.boards.value,
+    searchKeyword,
+    sortMode,
+    galleryRange: galleryRangeState.range,
+  })
+
+  const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
+    activeMenuBoardId.value = null
+    clearRename()
+    catalogRecoveryBoardId.value = null
+    resetDeleteState()
+    // The persisted range is isolated per User + Workspace: a scope switch
+    // loads that scope's saved range (default personal), never the
+    // previous scope's selection.
+    galleryRangeState.reloadPersistedRange()
+  })
+
+  const commandHandlers = createCommandHandlers({
+    ...dependencies,
+    state: {
+      activeMenuBoardId,
+      renamingBoardId,
+      renameDraft,
+      catalogRecoveryBoardId,
+      isCatalogReloadPending,
+      pendingDeleteBoard,
+      isDeletePending,
+      isCreatePending,
+    },
+    clearRename,
+    resetDeleteState,
+  })
+
+  const { hydration, reloadCatalog } = commandHandlers
+
+  async function createAndOpenBoard(): Promise<void> {
+    // Session owns initialization and catalog publication around navigation.
+    const didOpen = await commandHandlers.createAndOpenBoard()
+    // New boards are server-fixed to workspace_access none under the
+    // caller, so they always land in the personal range: a successful
+    // creation returns the gallery there whatever range it started from.
+    // Creation sends a name-only body in every range; the current range
+    // never changes the default permission.
+    if (didOpen) galleryRangeState.setRange('personal')
+  }
+
   const disposeRefresh = setupCatalogRefresh({
     scope: dependencies.catalog.viewModel.scope,
     ...hydration.viewModel,
@@ -251,11 +254,10 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
 
   return {
     viewModel: {
+      ...hydration.viewModel,
       visibleBoards,
       sceneMap: computed(() => dependencies.scenes.sceneMap.value),
       workspaceId: computed(() => dependencies.scenes.workspaceId.value),
-      isBoardsLoading: hydration.viewModel.isBoardsLoading,
-      hasCatalogHydrationFailed: hydration.viewModel.hasCatalogHydrationFailed,
       searchKeyword: readonly(searchKeyword),
       sortMode: readonly(sortMode),
       range: readonly(galleryRangeState.range),
@@ -263,11 +265,10 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       activeMenuBoardId: readonly(activeMenuBoardId),
       renamingBoardId: readonly(renamingBoardId),
       renameDraft: readonly(renameDraft),
-      catalogRecoveryBoardId: hydration.viewModel.catalogRecoveryBoardId,
-      isCatalogReloadPending: hydration.viewModel.isCatalogReloadPending,
       isDeleteDialogVisible: readonly(isDeleteDialogVisible),
       pendingDeleteBoard: readonly(pendingDeleteBoard),
       isDeletePending: readonly(isDeletePending),
+      isCreatePending: readonly(isCreatePending),
     },
     commands: {
       initialize: hydration.initialize,
@@ -281,9 +282,10 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       startRename,
       updateRenameDraft,
       commitRename: commandHandlers.commitRename,
-      cancelRename,
+      cancelRename: clearRename,
       reloadCatalog,
       openBoardFromCard,
+      openShare,
       requestDelete,
       closeDeleteDialog,
       handleDeleteDialogHidden,

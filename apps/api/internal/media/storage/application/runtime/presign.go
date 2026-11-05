@@ -24,10 +24,7 @@ func (s *Service) Presign(ctx context.Context, req ports.PresignRequest) (ports.
 	if strings.TrimSpace(req.ObjectKey) == "" {
 		return ports.PresignedURL{}, domain.ErrPresignInvalidObjectKey
 	}
-	ttl, err := ports.ClampTTL(req.TTL)
-	if err != nil {
-		ttl = ports.MaxPresignTTL
-	}
+	ttl := ports.ClampTTL(req.TTL)
 	profile, err := s.profiles.ResolveProfileByID(ctx, req.StorageProfileID)
 	if err != nil {
 		return ports.PresignedURL{}, fmt.Errorf("presign: resolve storage profile %q: %w", req.StorageProfileID, err)

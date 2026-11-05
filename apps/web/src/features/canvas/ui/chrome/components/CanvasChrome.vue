@@ -166,9 +166,10 @@ import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
 import UserAccountMenu from '../../../../account/ui/chrome/UserAccountMenu.vue'
 import { useSupportChannels } from '../../../../../core/composables/useSupportChannels'
 import {
-  createPageChromeAccountRoundControlClass,
-  createPageChromeRoundControlClass,
+  pageChromeAccountMenuClasses,
+  pageChromeClasses,
 } from '../../../../../core/lib/pageChrome'
+import { cn } from '../../../../../lib/utils'
 import type {
   CanvasChromeAccountState,
   CanvasChromeBoardState,
@@ -212,11 +213,15 @@ const NotificationBell = defineAsyncComponent(() =>
 const { t } = useI18n()
 const { channels: supportChannels } = useSupportChannels()
 
-const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
-const canvasChromeActionControlClass = createPageChromeRoundControlClass(
+const canvasChromeRoundControlClass = cn(
+  pageChromeClasses.roundControl,
   'canvas-chrome-icon-button',
 )
-const canvasChromeAvatarButtonClass = createPageChromeAccountRoundControlClass()
+const canvasChromeActionControlClass = cn(
+  pageChromeClasses.roundControl,
+  'canvas-chrome-icon-button',
+)
+const canvasChromeAvatarButtonClass = cn(pageChromeAccountMenuClasses.avatarButton)
 
 function handleLibraryFocusOut(event: FocusEvent) {
   const nextTarget = event.relatedTarget

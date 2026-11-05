@@ -9,7 +9,10 @@ import {
 import type { ControlBrandingLogoUpload } from '@/api/generated-query/control/model/controlBrandingLogoUpload'
 import { requireContractData } from '@/api/http/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
-import type { AdminBrandingSettingsFeedback } from '../useSettingsFeedback'
+import {
+  formatAdminBrandingValidation,
+  type AdminBrandingSettingsFeedback,
+} from '../useSettingsFeedback'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
   SITE_BRANDING_QUERY_KEY,
@@ -45,7 +48,7 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
     isSaving,
     normalize: normalizeSiteBrandingSetting,
     isSame: isSameBrandingSetting,
-    validate: validateSiteBrandingSetting,
+    validate: (draft) => formatAdminBrandingValidation(validateSiteBrandingSetting(draft)),
     save: async (draft) => {
       const saved = await saveMutation.mutateAsync(draft)
       writeBrandingQueryCache(queryClient, saved)

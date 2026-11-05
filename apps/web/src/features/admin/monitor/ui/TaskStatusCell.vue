@@ -12,7 +12,7 @@ const props = defineProps<{
   row: AdminTaskRow
 }>()
 
-// 任务五态中文文案与 tone 均取 core/status 单源。
+// 任务五态英文文案与 tone 均取 core/status 单源。
 const pill = computed(() => {
   const definition = getTaskStatusDefinition(props.row.status)
   return { label: definition.text, tone: definition.tone }

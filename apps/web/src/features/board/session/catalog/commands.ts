@@ -1,9 +1,11 @@
+import { createEmptyBoardState } from '../../core/document/nodes'
 import {
   createBoard,
   deleteBoard,
   duplicateBoard,
   getBoardById,
   isBoardNameTaken,
+  normalizeBoardName,
   registerBoardMeta,
   renameBoard,
   type BoardMeta,
@@ -24,6 +26,7 @@ import {
   createWorkspaceBoard,
   fetchWorkspaceBoardDocument,
   requireBoardWorkspaceId,
+  saveWorkspaceBoard,
   type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
 } from '../adapters/boardsResource'
@@ -119,6 +122,7 @@ export interface BoardCommandDependencies {
   // register the minted identity locally, then sync the document.
   resolveWorkspace?(): string
   createServerBoard?(workspaceId: string, name: string): Promise<WorkspaceBoardMeta>
+  initializeServerBoard(workspaceId: string, board: WorkspaceBoardMeta): Promise<WorkspaceBoardMeta>
   /** Reads the source document to prove copy readability before minting. */
   fetchSourceDocument?(workspaceId: string, boardId: string): Promise<WorkspaceBoardDocument>
   /** Archives a server-created board using the workspace captured before the request. */
@@ -132,11 +136,18 @@ export interface BoardCommandDependencies {
     workspaceAccess?: WorkspaceBoardMeta['workspaceAccess']
     isCreator?: boolean
     hasDirectGrant?: boolean
+    creatorUserId?: WorkspaceBoardMeta['creatorUserId']
+    ownerAvatarUrl?: WorkspaceBoardMeta['ownerAvatarUrl']
   }): BoardMeta | null
 }
 
 export interface BoardCommands {
   create(input?: { name?: string }): Promise<BoardCreateResult>
+  /** Initializes a readable document, opens it, then publishes it to the catalog. */
+  createAndOpen(input: {
+    name?: string
+    openBoard(boardId: string): void | Promise<unknown>
+  }): Promise<BoardCreateAndOpenResult>
   rename(input: { boardId: string; nextName: string }): Promise<BoardRenameResult>
   renameOptimistic(input: { boardId: string; nextName: string }): BoardOptimisticRenameResult
   rollbackOptimisticRename(input: {
@@ -146,6 +157,15 @@ export interface BoardCommands {
   duplicate(input: { sourceBoardId: string }): Promise<BoardDuplicateResult>
   delete(input: { boardId: string }): Promise<BoardDeleteResult>
 }
+
+export type BoardCreateAndOpenResult =
+  | BoardCreateResult
+  | {
+      isOk: false
+      reason: 'navigation-failed'
+      board: BoardMeta
+      error: unknown
+    }
 
 const defaultDependencies: BoardCommandDependencies = {
   createBoard,
@@ -166,20 +186,23 @@ const defaultDependencies: BoardCommandDependencies = {
   isMutationCurrent: () => true,
   resolveWorkspace: () => requireBoardWorkspaceId(),
   createServerBoard: (workspaceId, name) => createWorkspaceBoard(workspaceId, name),
+  initializeServerBoard: async (workspaceId, board) => {
+    const saved = await saveWorkspaceBoard(workspaceId, board.id, {
+      state: createEmptyBoardState(),
+      baseRevision: board.revision,
+    })
+    return saved.board
+  },
   fetchSourceDocument: (workspaceId, boardId) => fetchWorkspaceBoardDocument(workspaceId, boardId),
   archiveServerBoard: (workspaceId, boardId) => archiveWorkspaceBoard(workspaceId, boardId),
   registerServerBoard: (input) => registerBoardMeta(input),
 }
 
-/**
- * A create/duplicate response belongs to the workspace captured before the
- * POST. If the user changes scope before the response is applied, archive the
- * minted board through that captured workspace so it cannot become an unseen
- * server orphan. Archiving is the v1 reversible delete semantic. Cleanup is
- * best effort: the mutation must still terminate as scope-changed even when
- * the cleanup request is unavailable.
+/** Archives only a board minted by this creation attempt before it was published.
+ * Initialization failure or a scope change must not leave an unseen server
+ * orphan. Archiving is reversible; cleanup never replaces the original failure.
  */
-async function archiveServerBoardAfterScopeChange(
+async function archiveCreatedServerBoard(
   deps: BoardCommandDependencies,
   workspaceId: string,
   boardId: string,
@@ -189,10 +212,56 @@ async function archiveServerBoardAfterScopeChange(
   try {
     await archive(workspaceId, boardId)
   } catch {
-    // The caller cannot safely retry in the new scope. Keep the original
-    // scope-changed result; a later reconciliation can restore the board if
-    // the best-effort archive failed.
+    // Preserve the creation/scope failure if best-effort cleanup is unavailable.
   }
+}
+
+async function ensureScopeOrArchive(
+  deps: BoardCommandDependencies,
+  workspaceId: string,
+  serverId: string,
+): Promise<BoardScopeChangedResult | null> {
+  if (deps.isMutationCurrent()) return null
+  await archiveCreatedServerBoard(deps, workspaceId, serverId)
+  return { isOk: false, reason: 'scope-changed' }
+}
+
+function registerMintedBoard(
+  deps: BoardCommandDependencies,
+  workspaceId: string,
+  server: WorkspaceBoardMeta,
+  fallbackName?: string,
+): BoardMeta | null {
+  const registerServerBoard = deps.registerServerBoard ?? ((entry) => registerBoardMeta(entry))
+  const registered = registerServerBoard({
+    id: server.id,
+    name: server.name || fallbackName || server.id,
+    revision: server.revision,
+    // A minted board carries the server's access fact (workspace_access
+    // none, creator-only): capabilities register verbatim so the copy
+    // never inherits the source ACL.
+    capabilities: server.capabilities,
+    accessState: server.accessState,
+    workspaceAccess: server.workspaceAccess,
+    isCreator: server.isCreator,
+    hasDirectGrant: server.hasDirectGrant,
+    creatorUserId: server.creatorUserId,
+    ownerAvatarUrl: server.ownerAvatarUrl,
+  })
+  if (!registered) return null
+  writeBoardListMeta(workspaceId, server)
+  return registered
+}
+
+async function handleSyncConflict(
+  deps: BoardCommandDependencies,
+  error: unknown,
+): Promise<BoardSyncConflictKind | null> {
+  const conflictKind = deps.getSyncConflictKind(error)
+  if (conflictKind) {
+    await deps.hydrateBoards()
+  }
+  return conflictKind
 }
 
 type SyncRegisteredBoardResult =
@@ -204,6 +273,84 @@ type SyncRegisteredBoardResult =
       error: unknown
     }
   | BoardScopeChangedResult
+
+const MAX_BOARD_NAME_LEN = 60
+
+function resolveUniqueCreateName(
+  inputName: string | undefined,
+  isTaken: (name: string) => boolean,
+): string {
+  const normalized = normalizeBoardName((inputName ?? '').trim() || 'Untitled') || 'Untitled'
+  if (!isTaken(normalized)) return normalized
+  for (let index = 2; index < 10000; index += 1) {
+    const suffix = ` ${index}`
+    const maxBase = Math.max(1, MAX_BOARD_NAME_LEN - suffix.length)
+    const candidate = normalizeBoardName(`${normalized.slice(0, maxBase).trimEnd()}${suffix}`)
+    if (candidate && !isTaken(candidate)) return candidate
+  }
+  const timestampSuffix = `${Date.now()}`.slice(-6)
+  const maxBase = Math.max(1, MAX_BOARD_NAME_LEN - timestampSuffix.length - 1)
+  const base = normalized.slice(0, maxBase).trimEnd()
+  return normalizeBoardName(`${base} ${timestampSuffix}`)
+}
+
+function failedAutoOpenBoard(uniqueName: string): BoardMeta {
+  const now = Date.now()
+  return { id: '', name: uniqueName, createdAt: now, updatedAt: now }
+}
+
+function toAutoOpenBoard(server: WorkspaceBoardMeta, uniqueName: string): BoardMeta {
+  return {
+    id: server.id,
+    name: server.name || uniqueName,
+    createdAt: server.createdAt,
+    updatedAt: server.updatedAt,
+    ...(server.revision === undefined ? {} : { revision: server.revision }),
+    ...(server.archivedAt === undefined || !server.archivedAt
+      ? {}
+      : { archivedAt: server.archivedAt }),
+    ...(server.capabilities === undefined ? {} : { capabilities: server.capabilities }),
+    ...(server.accessState === undefined ? {} : { accessState: server.accessState }),
+    ...(server.workspaceAccess === undefined ? {} : { workspaceAccess: server.workspaceAccess }),
+    ...(server.isCreator === undefined ? {} : { isCreator: server.isCreator }),
+    ...(server.hasDirectGrant === undefined ? {} : { hasDirectGrant: server.hasDirectGrant }),
+    ...(server.creatorUserId === undefined ? {} : { creatorUserId: server.creatorUserId }),
+    ...(server.ownerAvatarUrl === undefined ? {} : { ownerAvatarUrl: server.ownerAvatarUrl }),
+  }
+}
+
+async function mintAutoOpenServer(
+  deps: BoardCommandDependencies,
+  workspaceId: string,
+  uniqueName: string,
+): Promise<
+  | { isOk: true; server: WorkspaceBoardMeta }
+  | {
+      isOk: false
+      reason: BoardSyncConflictKind | 'sync-failed'
+      board: BoardMeta
+      error: unknown
+    }
+  | BoardScopeChangedResult
+> {
+  const createServerBoard =
+    deps.createServerBoard ?? ((workspaceId, name) => createWorkspaceBoard(workspaceId, name))
+  let server: WorkspaceBoardMeta
+  try {
+    server = await createServerBoard(workspaceId, uniqueName)
+  } catch (error) {
+    if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' as const }
+    const board = failedAutoOpenBoard(uniqueName)
+    const conflictKind = await handleSyncConflict(deps, error)
+    if (conflictKind) {
+      return { isOk: false as const, reason: conflictKind, board, error }
+    }
+    return { isOk: false as const, reason: 'sync-failed' as const, board, error }
+  }
+  const scopeChanged = await ensureScopeOrArchive(deps, workspaceId, server.id)
+  if (scopeChanged) return scopeChanged
+  return { isOk: true as const, server }
+}
 
 // Shared document-sync confirmation for server-minted boards (create and
 // duplicate share this phase verbatim): a scope switch at any await drops
@@ -220,9 +367,8 @@ async function syncRegisteredBoard(
     if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
     deps.deleteBoard(board.id)
     deps.deleteBoardState(board.id)
-    const conflictKind = deps.getSyncConflictKind(error)
+    const conflictKind = await handleSyncConflict(deps, error)
     if (conflictKind) {
-      await deps.hydrateBoards()
       return { isOk: false as const, reason: conflictKind, board, error }
     }
     return { isOk: false as const, reason: 'sync-failed' as const, board, error }
@@ -310,7 +456,6 @@ export function createBoardCommands(
     const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
     const createServerBoard =
       deps.createServerBoard ?? ((workspaceId, name) => createWorkspaceBoard(workspaceId, name))
-    const registerServerBoard = deps.registerServerBoard ?? ((entry) => registerBoardMeta(entry))
 
     let workspaceId: string
     try {
@@ -328,9 +473,8 @@ export function createBoardCommands(
       // board stays in its own scope and the new scope is never touched.
       if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
       cleanupLocal()
-      const conflictKind = deps.getSyncConflictKind(error)
+      const conflictKind = await handleSyncConflict(deps, error)
       if (conflictKind) {
-        await deps.hydrateBoards()
         return { isOk: false, reason: conflictKind, board: localBoard, error }
       }
       return { isOk: false, reason: 'sync-failed', board: localBoard, error }
@@ -339,24 +483,10 @@ export function createBoardCommands(
     // The server-minted identity belongs to the captured workspace. If the
     // selection changed while the POST was in flight, archive it through
     // the captured workspace and never register it into the new scope.
-    if (!deps.isMutationCurrent()) {
-      await archiveServerBoardAfterScopeChange(deps, workspaceId, server.id)
-      return { isOk: false, reason: 'scope-changed' }
-    }
+    const scopeChanged = await ensureScopeOrArchive(deps, workspaceId, server.id)
+    if (scopeChanged) return scopeChanged
 
-    const registered = registerServerBoard({
-      id: server.id,
-      name: server.name || localBoard.name,
-      revision: server.revision,
-      // A minted board carries the server's access fact (workspace_access
-      // none, creator-only): capabilities register verbatim so the copy
-      // never inherits the source ACL.
-      capabilities: server.capabilities,
-      accessState: server.accessState,
-      workspaceAccess: server.workspaceAccess,
-      isCreator: server.isCreator,
-      hasDirectGrant: server.hasDirectGrant,
-    })
+    const registered = registerMintedBoard(deps, workspaceId, server, localBoard.name)
     cleanupLocal()
     if (!registered) {
       return {
@@ -368,7 +498,6 @@ export function createBoardCommands(
     }
     // Create write-back: the server-minted meta enters the Query catalog
     // list immediately; the document snapshot follows on the sync below.
-    writeBoardListMeta(workspaceId, server)
     afterRegister?.(registered.id)
     return syncRegisteredBoard(deps, registered)
   }
@@ -380,6 +509,56 @@ export function createBoardCommands(
         deps.deleteBoard(board.id)
         deps.deleteBoardState(board.id)
       })
+    },
+
+    async createAndOpen(input) {
+      const uniqueName = resolveUniqueCreateName(input.name, deps.isNameTaken)
+      let workspaceId: string
+      try {
+        workspaceId = (deps.resolveWorkspace ?? requireBoardWorkspaceId)()
+      } catch (error) {
+        return { isOk: false, reason: 'sync-failed', board: failedAutoOpenBoard(uniqueName), error }
+      }
+      const minted = await mintAutoOpenServer(deps, workspaceId, uniqueName)
+      if (!minted.isOk) return minted
+      let server: WorkspaceBoardMeta
+      try {
+        // Initialize directly through the adapter: neither local metadata nor
+        // Query catalog entries may appear while the gallery is still open.
+        server = await deps.initializeServerBoard(workspaceId, minted.server)
+      } catch (error) {
+        await archiveCreatedServerBoard(deps, workspaceId, minted.server.id)
+        if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
+        return {
+          isOk: false,
+          reason: 'sync-failed',
+          board: toAutoOpenBoard(minted.server, uniqueName),
+          error,
+        }
+      }
+      const beforeOpen = await ensureScopeOrArchive(deps, workspaceId, server.id)
+      if (beforeOpen) return beforeOpen
+      let navigationFailure: { error: unknown } | undefined
+      try {
+        await input.openBoard(server.id)
+      } catch (error) {
+        navigationFailure = { error }
+      }
+      const afterOpen = await ensureScopeOrArchive(deps, workspaceId, server.id)
+      if (afterOpen) return afterOpen
+      // A failed navigation still leaves a readable board in the gallery so
+      // the user can open it again. Publication never conceals that failure.
+      const board = registerMintedBoard(deps, workspaceId, server, uniqueName)
+      if (!board)
+        return {
+          isOk: false,
+          reason: 'sync-failed',
+          board: toAutoOpenBoard(server, uniqueName),
+          error: new Error('Board registration failed'),
+        }
+      if (navigationFailure)
+        return { isOk: false, reason: 'navigation-failed', board, error: navigationFailure.error }
+      return { isOk: true, board }
     },
 
     async rename({ boardId, nextName }) {
@@ -444,16 +623,13 @@ export function createBoardCommands(
       // current workspace (scope switches return scope-changed above and
       // archive through the captured workspace there instead).
       if (!result.isOk && result.reason !== 'scope-changed' && mintedServerBoardId) {
-        const archive = deps.archiveServerBoard
-        if (archive) {
-          try {
-            const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
-            await archive(resolveWorkspace(), mintedServerBoardId)
-          } catch {
-            // Best effort: the orphan stays creator-only (workspace_access
-            // none) so it never exposes tenant content; a later
-            // reconciliation can restore or re-archive it.
-          }
+        try {
+          const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
+          await archiveCreatedServerBoard(deps, resolveWorkspace(), mintedServerBoardId)
+        } catch {
+          // Best effort: the orphan stays creator-only (workspace_access
+          // none) so it never exposes tenant content; a later
+          // reconciliation can restore or re-archive it.
         }
       }
       return result

@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 .inpaint-overlay {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: var(--canvas-z-overlay);
   pointer-events: auto;
   overflow: visible;
 }
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 4;
+  z-index: var(--canvas-z-overlay-top);
   color: var(--canvas-accent-hover);
   opacity: 0;
   pointer-events: none;

@@ -46,7 +46,7 @@ export type CatalogEntry = {
 export type CatalogSortMode = 'recent' | 'name'
 
 export type CatalogNavigation = {
-  openBoard(boardId: string): void
+  openBoard(boardId: string): void | Promise<unknown>
   shareBoard?(boardId: string): void
 }
 
@@ -74,6 +74,7 @@ export type Catalog = {
     isDeleteDialogVisible: Readonly<Ref<boolean>>
     pendingDeleteBoard: Readonly<Ref<CatalogEntry | null>>
     isDeletePending: Readonly<Ref<boolean>>
+    isCreatePending: Readonly<Ref<boolean>>
   }
   commands: {
     initialize(): Promise<void>
@@ -90,6 +91,7 @@ export type Catalog = {
     cancelRename(): void
     reloadCatalog(): Promise<void>
     openBoardFromCard(boardId: string): void
+    openShare(boardId: string): void
     requestDelete(board: CatalogEntry): void
     closeDeleteDialog(): void
     handleDeleteDialogHidden(): void

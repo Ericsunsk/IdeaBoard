@@ -113,7 +113,7 @@ describe('AdminMailConfigCard', () => {
     )
     expect(confirmMock).not.toHaveBeenCalled()
     expect((screen.getByLabelText('邮件服务商 API Key') as HTMLInputElement).value).toBe('')
-    expect(toast.success).toHaveBeenCalledWith('邮件配置已保存，请发送 Test Email')
+    expect(toast.success).toHaveBeenCalledWith('邮件设置已保存，请发送 Test Email')
   })
 
   it('sends a Test Email without a confirm dialog and reloads the readiness metadata', async () => {
@@ -209,7 +209,7 @@ describe('AdminMailConfigCard', () => {
     resolveUpdate({ ...summary, enabled: false, readiness: 'not_tested' })
     await waitFor(() => expect(toggle).not.toBeChecked())
     await waitFor(() => expect(toggle).toBeEnabled())
-    expect(toast.success).toHaveBeenCalledWith('邮件配置已保存，请发送 Test Email')
+    expect(toast.success).toHaveBeenCalledWith('邮件设置已保存，请发送 Test Email')
   })
 
   it.each([true, false])(
@@ -331,14 +331,14 @@ describe('AdminMailConfigCard', () => {
     await screen.findByText('Ready')
 
     const dangerZone = screen.getByRole('group', { name: 'Danger Zone' })
-    expect(dangerZone).toHaveTextContent('删除邮件发送配置后事务邮件将不可用，且不可撤销。')
-    const deleteButton = within(dangerZone).getByRole('button', { name: '删除配置' })
+    expect(dangerZone).toHaveTextContent('删除邮件发送设置后事务邮件将不可用，且不可撤销。')
+    const deleteButton = within(dangerZone).getByRole('button', { name: '删除设置' })
     await user.click(deleteButton)
 
     await waitFor(() => expect(resource.clear).toHaveBeenCalledWith())
     expect(confirmMock).toHaveBeenCalledOnce()
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
-    expect(toast.success).toHaveBeenCalledWith('邮件配置已删除')
+    expect(toast.success).toHaveBeenCalledWith('邮件设置已删除')
   })
 
   it('maps not_tested to unverified neutral without warning yellow', async () => {

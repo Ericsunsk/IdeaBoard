@@ -45,6 +45,7 @@ import (
 type staticVisionAccounts struct {
 	workspaceInternalID int64
 	billingAccountID    int64
+	ownerType           string
 	err                 error
 }
 
@@ -52,7 +53,7 @@ func (s staticVisionAccounts) ResolveVisionSettlementInTx(_ context.Context, _ p
 	if s.err != nil {
 		return VisionSettlementIdentity{}, s.err
 	}
-	return VisionSettlementIdentity{WorkspaceInternalID: s.workspaceInternalID, BillingAccountID: s.billingAccountID}, nil
+	return VisionSettlementIdentity{WorkspaceInternalID: s.workspaceInternalID, BillingAccountID: s.billingAccountID, OwnerType: s.ownerType}, nil
 }
 
 func (s staticVisionAccounts) ResolveWorkspaceInternalID(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
@@ -224,6 +225,22 @@ func (e *visionWorkspaceEnv) billingAccountFor(t *testing.T, wsPublic string) in
 	return account.InternalID
 }
 
+func (e *visionWorkspaceEnv) personalAccountFor(t *testing.T, userID int64) int64 {
+	t.Helper()
+	var account int64
+	if err := e.pool.QueryRow(context.Background(), `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&account); err != nil {
+		t.Fatalf("resolve personal account: %v", err)
+	}
+	return account
+}
+
+func (e *visionWorkspaceEnv) fundPersonal(t *testing.T, userID int64, amount int64) int64 {
+	t.Helper()
+	account := e.personalAccountFor(t, userID)
+	e.fundAccount(t, account, amount)
+	return account
+}
+
 func (e *visionWorkspaceEnv) fundAccount(t *testing.T, accountID int64, amount int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -258,7 +275,11 @@ func (e *visionWorkspaceEnv) serviceWith(client *visionClientStub) *VisionBillin
 }
 
 func visionTestInput() searchdomain.VisionInput {
-	return searchdomain.VisionInput{Images: []searchdomain.VisionImage{validVisionImage()}, UserText: "dunes at dusk"}
+	fixture, err := visionTestFixture()
+	if err != nil {
+		panic("visionTestFixture: " + err.Error())
+	}
+	return searchdomain.VisionInput{Images: []searchdomain.VisionImage{fixture}, UserText: "dunes at dusk"}
 }
 
 type visionOperationRow struct {
@@ -381,9 +402,11 @@ func TestVisionWorkspaceSettlementTriple(t *testing.T) {
 	}
 }
 
-// TestVisionWorkspaceExplicitLinkSharesOneChain proves the no-org chain:
-// two personal workspaces with an explicit link bill the same account,
-// exactly like the organization pool above.
+// TestVisionWorkspaceExplicitLinkSharesOneChain proves payer = actor
+// (#973/#977) ignores the legacy explicit link on personal scopes: even
+// with a studio link pinning wsB to the owner's account, a member submit
+// bills the member's own Personal account and leaves the linked account
+// untouched.
 func TestVisionWorkspaceExplicitLinkSharesOneChain(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 5)
 	ctx := context.Background()
@@ -399,10 +422,11 @@ func TestVisionWorkspaceExplicitLinkSharesOneChain(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Explicit studio link (permission checks belong to #915 tests; the
-	// settlement must treat the linked account as the stable payer).
+	// settlement must ignore it for personal scopes and bill the actor).
 	if _, err := env.pool.Exec(ctx, `INSERT INTO workspace_billing_links (workspace_id, billing_account_id) VALUES ($1, $2) ON CONFLICT (workspace_id) DO UPDATE SET billing_account_id = EXCLUDED.billing_account_id`, wsBInternal, accountA); err != nil {
 		t.Fatalf("link workspaces: %v", err)
 	}
+	actorAccount := env.fundPersonal(t, member, 500)
 	env.fundAccount(t, accountA, 500)
 
 	service := env.serviceWith(&visionClientStub{extraction: searchdomain.VisionExtraction{Query: "linked dunes"}})
@@ -410,16 +434,20 @@ func TestVisionWorkspaceExplicitLinkSharesOneChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if row := env.operationRow(t, got.OperationID); row.account != accountA || row.status != "succeeded" {
-		t.Fatalf("linked operation = %+v, want payer %d succeeded", row, accountA)
+	if row := env.operationRow(t, got.OperationID); row.account != actorAccount || row.status != "succeeded" {
+		t.Fatalf("linked operation = %+v, want payer %d succeeded (link ignored)", row, actorAccount)
 	}
-	if env.ledgerCount(t, "capture", accountA) != 1 {
-		t.Fatal("linked workspace did not capture on the shared account")
+	if env.ledgerCount(t, "capture", actorAccount) != 1 {
+		t.Fatal("member submit did not capture on the actor account")
+	}
+	if env.ledgerCount(t, "hold", accountA) != 0 || env.ledgerCount(t, "capture", accountA) != 0 {
+		t.Fatal("explicit link was charged for a personal member submit")
 	}
 }
 
 // TestVisionWorkspaceFailureReleasesOriginalAccount proves deterministic
-// provider failures Release the same payer's Hold and persist the failure.
+// provider failures Release the actor's own Hold and persist the failure:
+// the owner's account sees zero ledger movement.
 func TestVisionWorkspaceFailureReleasesOriginalAccount(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 7)
 	ctx := context.Background()
@@ -427,8 +455,9 @@ func TestVisionWorkspaceFailureReleasesOriginalAccount(t *testing.T) {
 	member := env.createUser(t, "vision-fail-member")
 	ws := "ws_visionfail01"
 	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
-	account := env.billingAccountFor(t, ws)
-	env.fundAccount(t, account, 1000)
+	actorAccount := env.fundPersonal(t, member, 1000)
+	ownerAccount := env.personalAccountFor(t, owner)
+	env.fundAccount(t, ownerAccount, 1000)
 
 	service := env.serviceWith(&visionClientStub{err: &searchdomain.VisionProviderError{Kind: searchdomain.VisionProviderFailureCredentials, Err: errors.New("bad key")}})
 	_, err := service.Extract(ctx, ws, member, "vision-fail-1", visionTestInput())
@@ -445,13 +474,16 @@ func TestVisionWorkspaceFailureReleasesOriginalAccount(t *testing.T) {
 		member, "vision-fail-1").Scan(&status, &errorCode, &storedAccount); err != nil {
 		t.Fatalf("read failed operation: %v", err)
 	}
-	if status != "failed" || storedAccount != account {
-		t.Fatalf("failed operation status=%s account=%d, want failed/%d", status, storedAccount, account)
+	if status != "failed" || storedAccount != actorAccount {
+		t.Fatalf("failed operation status=%s account=%d, want failed/%d", status, storedAccount, actorAccount)
 	}
-	if env.ledgerCount(t, "hold", account) != 1 || env.ledgerCount(t, "release", account) != 1 || env.ledgerCount(t, "capture", account) != 0 {
-		t.Fatal("failure did not hold+release exactly once on the original payer")
+	if env.ledgerCount(t, "hold", actorAccount) != 1 || env.ledgerCount(t, "release", actorAccount) != 1 || env.ledgerCount(t, "capture", actorAccount) != 0 {
+		t.Fatal("failure did not hold+release exactly once on the actor payer")
 	}
-	wallet, err := env.credits.GetWallet(ctx, account)
+	if env.ledgerCount(t, "hold", ownerAccount) != 0 || env.ledgerCount(t, "release", ownerAccount) != 0 || env.ledgerCount(t, "capture", ownerAccount) != 0 {
+		t.Fatal("failure moved the owner's account")
+	}
+	wallet, err := env.credits.GetWallet(ctx, actorAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,8 +505,8 @@ func TestVisionWorkspaceIdempotencyBinding(t *testing.T) {
 	wsA, wsB := "ws_visionidemA01", "ws_visionidemB01"
 	env.createPersonalWorkspace(t, wsA, owner, map[int64]string{member: "member", other: "member"})
 	env.createPersonalWorkspace(t, wsB, owner, map[int64]string{member: "member"})
-	env.fundAccount(t, env.billingAccountFor(t, wsA), 1000)
-	env.fundAccount(t, env.billingAccountFor(t, wsB), 1000)
+	memberAccount := env.fundPersonal(t, member, 1000)
+	env.fundPersonal(t, other, 1000)
 
 	service := env.serviceWith(&visionClientStub{extraction: searchdomain.VisionExtraction{Query: "dunes"}})
 	input := visionTestInput()
@@ -482,7 +514,10 @@ func TestVisionWorkspaceIdempotencyBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Extract() error = %v", err)
 	}
-	holdsBefore := env.ledgerCount(t, "hold", env.billingAccountFor(t, wsA))
+	if row := env.operationRow(t, first.OperationID); row.account != memberAccount {
+		t.Fatalf("first operation payer = %d, want actor %d", row.account, memberAccount)
+	}
+	holdsBefore := env.ledgerCount(t, "hold", memberAccount)
 
 	// Same key + same scope: replay, no new ledger row.
 	replay, err := service.Extract(ctx, wsA, member, "vision-idem-1", input)
@@ -492,8 +527,7 @@ func TestVisionWorkspaceIdempotencyBinding(t *testing.T) {
 	if !replay.Replayed || replay.OperationID != first.OperationID {
 		t.Fatalf("replay = %+v, want same operation replayed", replay)
 	}
-	accountA := env.billingAccountFor(t, wsA)
-	if env.ledgerCount(t, "hold", accountA) != holdsBefore {
+	if env.ledgerCount(t, "hold", memberAccount) != holdsBefore {
 		t.Fatal("replay wrote a second hold")
 	}
 
@@ -517,7 +551,8 @@ func TestVisionWorkspaceIdempotencyBinding(t *testing.T) {
 }
 
 // TestVisionWorkspaceConcurrency proves concurrent retries of one user
-// action converge to a single operation and a single Hold.
+// action converge to a single operation and a single Hold on the actor's
+// own Personal account.
 func TestVisionWorkspaceConcurrency(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 7)
 	ctx := context.Background()
@@ -525,8 +560,8 @@ func TestVisionWorkspaceConcurrency(t *testing.T) {
 	member := env.createUser(t, "vision-conc-member")
 	ws := "ws_visionconc01"
 	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
-	account := env.billingAccountFor(t, ws)
-	env.fundAccount(t, account, 1000)
+	actorAccount := env.fundPersonal(t, member, 1000)
+	ownerAccount := env.personalAccountFor(t, owner)
 
 	service := env.serviceWith(&visionClientStub{extraction: searchdomain.VisionExtraction{Query: "dunes"}})
 	const callers = 8
@@ -552,15 +587,18 @@ func TestVisionWorkspaceConcurrency(t *testing.T) {
 	if env.operationCount(t, ws, "vision-conc-1") != 1 {
 		t.Fatal("concurrent reserves created more than one operation")
 	}
-	if env.ledgerCount(t, "hold", account) != 1 {
-		t.Fatalf("concurrent holds = %d, want exactly 1", env.ledgerCount(t, "hold", account))
+	if env.ledgerCount(t, "hold", actorAccount) != 1 {
+		t.Fatalf("concurrent holds = %d, want exactly 1", env.ledgerCount(t, "hold", actorAccount))
+	}
+	if env.ledgerCount(t, "hold", ownerAccount) != 0 {
+		t.Fatal("concurrent member submits charged the owner account")
 	}
 }
 
 // TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount proves uncertain
-// outcomes park for reconciliation and converge on the ORIGINAL payer even
-// after the operator loses workspace standing and the billing management
-// hands over: reconciliation never re-resolves the payer.
+// outcomes park for reconciliation and converge on the actor's stored payer
+// even after the operator loses workspace standing and the billing
+// management hands over: reconciliation never re-resolves the payer.
 func TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 7)
 	ctx := context.Background()
@@ -569,8 +607,9 @@ func TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount(t *testing.T) {
 	successor := env.createUser(t, "vision-rec-successor")
 	ws := "ws_visionrec01"
 	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
-	account := env.billingAccountFor(t, ws)
-	env.fundAccount(t, account, 1000)
+	actorAccount := env.fundPersonal(t, member, 1000)
+	ownerAccount := env.personalAccountFor(t, owner)
+	env.fundAccount(t, ownerAccount, 1000)
 
 	uncertain := env.serviceWith(&visionClientStub{err: &searchdomain.VisionProviderError{Kind: searchdomain.VisionProviderFailureTimeout, Err: errors.New("gateway timeout")}})
 	pending, err := uncertain.Extract(ctx, ws, member, "vision-rec-1", visionTestInput())
@@ -589,7 +628,7 @@ func TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount(t *testing.T) {
 	if _, err := env.pool.Exec(ctx, `DELETE FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2`, wsInternal, member); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.pool.Exec(ctx, `INSERT INTO billing_account_members (billing_account_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`, account, successor); err != nil {
+	if _, err := env.pool.Exec(ctx, `INSERT INTO billing_account_members (billing_account_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`, actorAccount, successor); err != nil {
 		t.Fatal(err)
 	}
 	// Age the operation past the reconciliation horizon.
@@ -602,13 +641,16 @@ func TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount(t *testing.T) {
 		t.Fatalf("ReconcilePending() error = %v", err)
 	}
 	row := env.operationRow(t, pending.OperationID)
-	if row.status != "failed" || row.errorCode != "vision_search_reconciliation_timeout" || row.account != account {
-		t.Fatalf("reconciled = %+v, want failed/timeout on payer %d", row, account)
+	if row.status != "failed" || row.errorCode != "vision_search_reconciliation_timeout" || row.account != actorAccount {
+		t.Fatalf("reconciled = %+v, want failed/timeout on payer %d", row, actorAccount)
 	}
-	if env.ledgerCount(t, "hold", account) != 1 || env.ledgerCount(t, "release", account) != 1 || env.ledgerCount(t, "capture", account) != 0 {
-		t.Fatal("reconciliation did not release the original hold exactly once")
+	if env.ledgerCount(t, "hold", actorAccount) != 1 || env.ledgerCount(t, "release", actorAccount) != 1 || env.ledgerCount(t, "capture", actorAccount) != 0 {
+		t.Fatal("reconciliation did not release the actor hold exactly once")
 	}
-	wallet, err := env.credits.GetWallet(ctx, account)
+	if env.ledgerCount(t, "hold", ownerAccount) != 0 || env.ledgerCount(t, "release", ownerAccount) != 0 {
+		t.Fatal("reconciliation moved the owner's account")
+	}
+	wallet, err := env.credits.GetWallet(ctx, actorAccount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,8 +661,8 @@ func TestVisionWorkspaceTimeoutRecoveryUsesOriginalAccount(t *testing.T) {
 
 // TestVisionWorkspacePermissionAndFundsGate proves search permission,
 // insufficient-funds feedback, and payer isolation: outsiders see only
-// workspace_not_found (never a billing fact), underfunded calls fail on
-// the payer with no operation row and no personal-wallet fallback.
+// workspace_not_found (never a billing fact), underfunded actor calls fail
+// on the actor's own payer with no operation row and no other wallet moves.
 func TestVisionWorkspacePermissionAndFundsGate(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 7)
 	ctx := context.Background()
@@ -629,7 +671,8 @@ func TestVisionWorkspacePermissionAndFundsGate(t *testing.T) {
 	outsider := env.createUser(t, "vision-gate-outsider")
 	ws := "ws_visiongate01"
 	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
-	account := env.billingAccountFor(t, ws)
+	actorAccount := env.personalAccountFor(t, member)
+	ownerAccount := env.personalAccountFor(t, owner)
 
 	// Outsider: invisible workspace, no billing signal.
 	service := env.serviceWith(&visionClientStub{extraction: searchdomain.VisionExtraction{Query: "dunes"}})
@@ -640,21 +683,21 @@ func TestVisionWorkspacePermissionAndFundsGate(t *testing.T) {
 		t.Fatal("outsider call persisted an operation")
 	}
 
-	// Underfunded payer: Hold fails with insufficient credits on the
-	// payer; nothing persists and no other wallet moves.
-	env.fundAccount(t, account, 3)
+	// Underfunded actor: Hold fails with insufficient credits on the
+	// actor's own payer; nothing persists and no other wallet moves.
+	env.fundAccount(t, actorAccount, 3)
+	env.fundAccount(t, ownerAccount, 1000)
 	if _, err := service.Extract(ctx, ws, member, "vision-gate-2", visionTestInput()); !errors.Is(err, creditsdomain.ErrInsufficientCredits) {
 		t.Fatalf("underfunded error = %v, want insufficient credits", err)
 	}
 	if env.operationCount(t, ws, "vision-gate-2") != 0 {
 		t.Fatal("underfunded call persisted an operation")
 	}
-	var personal int64
-	if err := env.pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, member).Scan(&personal); err != nil {
-		t.Fatal(err)
+	if env.ledgerCount(t, "hold", actorAccount) != 0 {
+		t.Fatal("underfunded call wrote a hold on the actor payer")
 	}
-	if env.ledgerCount(t, "hold", personal) != 0 {
-		t.Fatal("underfunded call fell back to the personal wallet")
+	if env.ledgerCount(t, "hold", ownerAccount) != 0 || env.ledgerCount(t, "capture", ownerAccount) != 0 {
+		t.Fatal("underfunded member call moved the owner's account")
 	}
 }
 

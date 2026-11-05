@@ -21,12 +21,12 @@ export type AdminStorageFeedback = {
 }
 
 const ADMIN_STORAGE_COPY = {
-  loadProfilesFailed: { error: '加载存储配置失败' },
-  refreshFailed: { error: '刷新存储配置失败' },
-  staleProfile: { warning: '存储配置已变化，请刷新后重试' },
+  loadProfilesFailed: { error: '加载存储设置失败' },
+  refreshFailed: { error: '刷新存储设置失败' },
+  staleProfile: { warning: '存储设置已变化，请刷新后重试' },
   unsupportedVendorPreset: { info: (label: string) => `${label} 暂未接入后端，当前先作为预设展示` },
   noCreatableProviders: { warning: '当前没有可新增的存储类型' },
-  missingEditableTarget: { errorText: '未找到可编辑的存储配置' },
+  missingEditableTarget: { errorText: '未找到可编辑的存储设置' },
   saveDraftSucceeded: { successMessage: '保存成功' },
   saveDraftFailed: { error: '保存失败' },
   applyCurrentSucceeded: { successMessage: '已设为当前存储' },

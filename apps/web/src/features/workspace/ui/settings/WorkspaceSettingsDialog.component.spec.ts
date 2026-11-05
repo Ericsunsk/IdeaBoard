@@ -21,7 +21,13 @@ vi.mock('@/features/account/session/accountWorkspace', async (load) => ({
   }),
 }))
 vi.mock('../members/WorkspaceMemberSection.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('./WorkspaceLimitsSection.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('./WorkspaceLimitsSection.vue', () => ({
+  default: {
+    props: ['organizationId'],
+    template:
+      '<div data-testid="limits-section" :data-organization-id="organizationId" />',
+  },
+}))
 vi.mock('../dialogs/WorkspaceCreateDialog.vue', () => ({ default: { template: '<div />' } }))
 
 const DialogRootStub = defineComponent({
@@ -112,5 +118,24 @@ describe('WorkspaceSettingsDialog opaque organization host', () => {
     const { view, panel } = renderDialog()
     await view.rerender({ isOpen: false })
     await waitFor(() => expect(panel.setEnabled).toHaveBeenLastCalledWith(false))
+  })
+})
+
+describe('WorkspaceSettingsDialog member quota card scope (Org-only contract)', () => {
+  it('leaves Personal workspaces without the limits card (caller guard; Personal has no quota concept)', () => {
+    renderDialog([WORKSPACE])
+    expect(screen.queryByTestId('limits-section')).toBeNull()
+  })
+
+  it('mounts the Org-only limits card with the required organization id', async () => {
+    const { view } = renderDialog([
+      WORKSPACE,
+      { ...WORKSPACE, publicId: 'ws_org', name: 'Team', organizationId: 'org_1' },
+    ])
+    await view.user.click(screen.getByRole('button', { name: 'Team' }))
+    expect(screen.getByTestId('limits-section')).toBeVisible()
+    expect(screen.getByTestId('limits-section').getAttribute('data-organization-id')).toBe(
+      'org_1',
+    )
   })
 })

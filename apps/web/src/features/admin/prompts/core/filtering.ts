@@ -14,8 +14,8 @@ const PROMPT_CONFIG_STATUS_FILTER_OPTIONS: ReadonlyArray<{
   value: PromptConfigStatusFilter
 }> = [
   { label: '全部状态', value: 'all' },
-  { label: '已配置', value: 'configured' },
-  { label: '未配置', value: 'unconfigured' },
+  { label: '已设置', value: 'configured' },
+  { label: '未设置', value: 'unconfigured' },
 ]
 
 export type UsePromptConfigFiltersOptions = {

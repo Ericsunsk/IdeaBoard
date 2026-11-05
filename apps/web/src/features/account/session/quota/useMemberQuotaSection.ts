@@ -26,9 +26,13 @@ type MemberQuotaSectionOptions = {
   workspaceId: MaybeRefOrGetter<string>
   canManage: MaybeRefOrGetter<boolean>
   isExpanded: MaybeRefOrGetter<boolean>
-  // Management forms stay behind the local toggle: the list (and its roster
-  // assistance) only load once a manager expands them.
-  isListEnabled?: MaybeRefOrGetter<boolean> | undefined
+  // Actor identity for the Org role matrix (Owner sets Admin, Owner/Admin set
+  // Member, Admin never touches Owner/Admin, Owner rows stay unlimited).
+  // Organization facts are supplied by the Workspace owner of this surface.
+  currentUserId?: MaybeRefOrGetter<string | null | undefined> | undefined
+  organizationMembers: MaybeRefOrGetter<
+    readonly { userId: string; role: 'owner' | 'admin' | 'member' }[]
+  >
 }
 
 export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
@@ -42,17 +46,17 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
   const selfQuery = useQuery({
     queryKey: computed(() => memberQuotaQueryKeys.self(workspaceIdOf())),
     queryFn: ({ signal }) => fetchSelfMemberQuota(workspaceIdOf(), signal),
-    enabled: computed(() => toValue(options.isExpanded) && workspaceIdOf() !== ''),
+    // Managers render the list, never the self block. Keep the settings read
+    // budget at four GETs including Organization membership and shared reads.
+    enabled: computed(
+      () => toValue(options.isExpanded) && !canManage.value && workspaceIdOf() !== '',
+    ),
     ...accountScoped(),
     ...noRetry(),
   })
 
   const isListEnabled = computed(
-    () =>
-      toValue(options.isExpanded) &&
-      canManage.value &&
-      (options.isListEnabled == null || toValue(options.isListEnabled)) &&
-      workspaceIdOf() !== '',
+    () => toValue(options.isExpanded) && canManage.value && workspaceIdOf() !== '',
   )
 
   const listQuery = useQuery({
@@ -111,9 +115,64 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
   const isSaving = ref(false)
   const saveError = ref<string | null>(null)
 
+  function memberRole(userId: string) {
+    return (
+      toValue(options.organizationMembers).find((entry) => entry.userId === userId)?.role ?? null
+    )
+  }
+
+  const actorRole = computed(() => {
+    const current = toValue(options.currentUserId)?.trim()
+    if (!current) return null
+    return memberRole(current)
+  })
+
+  // Org adjust matrix (mirrors the backend CanSet policy, fail-closed):
+  // Owner rows stay unlimited (never adjustable); an Admin actor adjusts
+  // Member rows only (Owner sets Admin, Owner/Admin set Member); unknown or
+  // non-manager actors adjust nothing. canAdjustTarget is the single adjust
+  // truth: visibility gates the manager surface, target roles gate the row.
+  function canAdjustTarget(targetUserId: string): boolean {
+    if (!canManage.value) return false
+    const actor = actorRole.value
+    const targetRole = memberRole(targetUserId)
+    if (actor !== 'owner' && actor !== 'admin') return false
+    if (targetRole == null) return false
+    if (targetRole === 'owner') return false
+    if (actor === 'admin' && targetRole === 'admin') return false
+    return true
+  }
+
+  // Single fail-closed guard for picking and saving a target:
+  // forbidden actor/target pairs toast the same way and never send;
+  // backend still enforces 403.
+  function guardAdjustTarget(targetUserId: string): boolean {
+    if (!canAdjustTarget(targetUserId)) {
+      toast.error(t('workspace.quota.saveFailed'))
+      return false
+    }
+    return true
+  }
+
   function pickTargetUser(value: unknown): void {
     saveError.value = null
-    targetUserId.value = typeof value === 'string' ? value.trim() : ''
+    const next = typeof value === 'string' ? value.trim() : ''
+    if (!next) {
+      targetUserId.value = ''
+      return
+    }
+    // Whitelist to the dialog options (roster + listed quotas): arbitrary
+    // strings never become a target, even when called programmatically.
+    if (!memberOptions.value.includes(next)) {
+      toast.error(t('workspace.quota.saveFailed'))
+      return
+    }
+    // Disabled options (Owner rows, Admin-actor Owner/Admin rows) reject the
+    // programmatic pick the same way instead of arming a forbidden save.
+    if (!guardAdjustTarget(next)) {
+      return
+    }
+    targetUserId.value = next
   }
 
   function pickTargetPeriod(value: unknown): void {
@@ -131,12 +190,17 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
       : t('workspace.quota.saveFailed')
   }
 
-  async function saveQuota(): Promise<void> {
-    if (isSaving.value) return
+  async function saveQuota(): Promise<boolean> {
+    if (isSaving.value) return false
     const userId = targetUserId.value.trim()
     if (!userId) {
       saveError.value = t('workspace.quota.pickMember')
-      return
+      return false
+    }
+    // Front-stop the Org role matrix before any transport: forbidden
+    // actor/target pairs never send (backend still enforces 403).
+    if (!guardAdjustTarget(userId)) {
+      return false
     }
     let input: UpdateMemberQuotaInput
     const period = targetPeriod.value
@@ -146,30 +210,23 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
       const limit = validateQuotaLimit(limitDraft.value)
       if (limit == null) {
         saveError.value = t('workspace.quota.invalidLimit', { max: MAX_MEMBER_QUOTA_LIMIT })
-        return
+        return false
       }
       input = { period, limitCredits: limit }
     }
-    await persistQuota(userId, input)
-  }
-
-  async function persistQuota(userId: string, input: UpdateMemberQuotaInput): Promise<void> {
-    if (isSaving.value || !canManage.value) return
     isSaving.value = true
     saveError.value = null
     try {
       await updateMemberQuota(workspaceIdOf(), userId, input)
       await invalidateQuotaQueries()
       toast.success(t('workspace.quota.saved'))
+      return true
     } catch (error) {
       toast.error(describeSaveError(error))
+      return false
     } finally {
       isSaving.value = false
     }
-  }
-
-  function clearQuota(userId: string): Promise<void> {
-    return persistQuota(userId, { period: 'unlimited' })
   }
 
   return {
@@ -193,6 +250,7 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
     pickTargetUser,
     pickTargetPeriod,
     saveQuota,
-    clearQuota,
+    memberRole,
+    canAdjustTarget,
   }
 }

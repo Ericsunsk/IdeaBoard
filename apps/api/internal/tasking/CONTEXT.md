@@ -23,7 +23,7 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
 ## Package map
 
 - `domain`: task identity, payload, status, manifest, and lifecycle facts.
-- `application`: submission, billing, runtime state transitions, task command/
+- `application`: advisory Task readiness, submission, billing, runtime state transitions, task command/
   query use cases, statistics use cases, and retention use cases.
 - `infrastructure`: PostgreSQL persistence, terminal settlement, and River
   queue adapters.
@@ -35,9 +35,15 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
 ## Invariants
 
 - Task insert, billing hold, media reference claim, and River enqueue commit in
-  one PostgreSQL transaction against the Workspace's stable Billing Account
-  (#915 resolution joins the transaction, #916 spends it); the submitter
-  rides as the operator Actor, never as the funds identity. Inside the
+  one PostgreSQL transaction against the settlement payer
+  (#915 resolution joins the transaction, #916 spends it, payer = actor per
+  #973/#974: Personal scopes bill the actor's own Personal account,
+  Organization scopes bill the shared pool); the submitter
+  rides as the operator Actor, never as the funds identity.
+  Supersedes the pre-#973 Personal rule (the Workspace's stable Billing
+  Account, i.e. the owner's survivor, paid for every Personal scope);
+  see [ADR-0042](../../../../docs/adr/0042-personal-payer-is-actor.md).
+  The Organization shared-pool rule is unchanged. Inside the
   transaction the submission gate (workspace row lock) precedes the durable
   idempotency claim: the claim's workspace FK takes `FOR KEY SHARE`, so
   locking first is the only deadlock-free entry order for concurrent
@@ -77,7 +83,13 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
   the stalled-settlement sweep and the assets without task linkage
   (accepted residual risk).
 - Member-quota checks join the settlement transaction after Quote and before
-  Hold, using the resolved Billing Account and actual submitting User. Holds,
+  Hold on Organization scopes only, using the resolved shared account and
+  actual submitting User. Personal scopes bill the actor with no quota
+  concept and skip the check (#973/#974). Supersedes the pre-#973 Personal
+  quota rule (aggregation by (Personal Billing Account, User) with the
+  holder as manager); `member_quota_exhausted` never fires on Personal
+  scopes (see [ADR-0042](../../../../docs/adr/0042-personal-payer-is-actor.md)).
+  The Organization quota rule is unchanged. Holds,
   Capture, and Release settle against the submission-time quota window.
 - Submission validates current Workspace membership, Board generation capability,
   and canonical Media read permission for every input and mask within the same
@@ -135,3 +147,12 @@ non-transactional write path. Claims and payer resolvers are wired explicitly,
 while cancel-only callers need only lifecycle, holder, and billing projection.
 Durable settlement facts and errors
 live under `ports/billing`; `application/billing` only reads durable usage facts.
+
+`workspacetasks.Readiness.Check` owns advisory eligibility composition through
+Tasking's read seams: current membership and Organization scope, Board capability,
+actor payer, routing/price, Wallet funds and Organization member quota. Its
+price-only result reserves neither Credits nor a Task; `Service.Create` remains
+the authoritative acceptance fence. HTTP retains its membership prelude, strict
+wire binding and response/error rendering. Tenancy scope projection belongs to
+the infrastructure adapter; funds, Board capabilities and quota policies remain
+with their existing owners.

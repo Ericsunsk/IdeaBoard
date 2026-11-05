@@ -120,8 +120,10 @@ type OrganizationClosure struct {
 // Billing scope (ADR-0038) is the creation scope and nothing else:
 //   - Organization workspaces always use the organization pool.
 //   - Personal workspaces always use the owner's deterministic Personal
-//     account (the Default-workspace-anchored survivor); no per-workspace
-//     account is minted and no link row is written.
+//     account (the Default-workspace-anchored account); no per-workspace
+//     account is minted and no link row is written. Settlement bills the
+//     actor's own Personal account (payer = actor, #973/#974), never the
+//     workspace owner as payer for another member.
 //
 // The scope is fixed at creation: there is no payer switch, no
 // billing_account_id / new_billing_account option, and no link indirection.

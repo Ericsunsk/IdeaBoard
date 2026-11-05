@@ -19,6 +19,7 @@
     "lint": "npm run lint:eslint:fast && npm run lint:import && npm run lint:governance",
     "lint:user-copy": "tsx scripts/checkUserCopyLocale.ts",
     "lint:locale-parity": "tsx scripts/checkLocaleParity.ts",
+    "lint:locale-usage": "tsx scripts/checkLocaleUsage.ts",
     "lint:import-boundaries": "tsx scripts/checkEslintImportBoundaries.ts",
     "lint:dependencies": "tsx scripts/checkDependencyBoundaries.ts --strict",
     "lint:admin-form-validation": "tsx scripts/checkAdminFormValidation.ts",

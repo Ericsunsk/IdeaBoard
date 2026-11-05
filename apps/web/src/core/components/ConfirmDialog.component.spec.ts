@@ -1,8 +1,9 @@
 import { defineComponent } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { activeConfirm, useConfirm } from '../composables/useConfirmDialog'
 import { renderWithUser, screen } from '../../test/render'
+import { setUserLocale } from '../i18n'
 
 const toast = vi.hoisted(() => ({ error: vi.fn() }))
 
@@ -73,9 +74,60 @@ function renderUserDialog(isLoading = false, extraProps: Record<string, unknown>
 }
 
 describe('ConfirmDialog', () => {
+  afterEach(async () => {
+    await setUserLocale('en')
+  })
+
   beforeEach(() => {
     activeConfirm.value = null
     vi.clearAllMocks()
+  })
+
+  it.each(['en', 'es', 'ko'] as const)(
+    'keeps admin cancel and busy copy Chinese under %s',
+    async (locale) => {
+      await setUserLocale(locale)
+      renderWithUser(ConfirmDialog, {
+        props: { surface: 'admin', isVisible: true, title: '确认删除', isLoading: true },
+      })
+
+      expect(await screen.findByRole('button', { name: '取消' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: '处理中...' })).toBeDisabled()
+    },
+  )
+
+  it.each([
+    ['en', 'Cancel', 'Confirm'],
+    ['es', 'Cancelar', 'Confirmar'],
+    ['ko', '취소', '확인'],
+  ] as const)('keeps user controls translated under %s', async (locale, cancel, confirm) => {
+    await setUserLocale(locale)
+    renderUserDialog(false, { confirmLabel: '' })
+
+    expect(screen.getByRole('button', { name: cancel })).toBeVisible()
+    expect(screen.getByRole('button', { name: confirm })).toBeVisible()
+  })
+
+  it('keeps the admin failure fallback Chinese under a non-Chinese locale', async () => {
+    await setUserLocale('en')
+    const error = new Error('dial tcp 127.0.0.1:5432: connection refused')
+    const rejectedConfirm = useConfirm()
+      .confirm({
+        title: '确认删除',
+        message: '删除后不可恢复。',
+        confirmLabel: '删除',
+        intent: 'danger',
+        onConfirm: async () => {
+          throw error
+        },
+      })
+      .catch((reason: unknown) => reason)
+    const { user } = renderWithUser(ConfirmDialog, { props: { surface: 'admin' } })
+
+    await user.click(await screen.findByRole('button', { name: '删除' }))
+
+    await expect(rejectedConfirm).resolves.toBe(error)
+    expect(toast.error).toHaveBeenCalledWith('操作失败，请重试')
   })
 
   it('dismisses from the mask through the shared lifecycle while idle', async () => {

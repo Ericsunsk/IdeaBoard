@@ -46,8 +46,23 @@ func TestV1BillingAccountReturnsStableIdentity(t *testing.T) {
 func TestV1SpaceAdminCannotCheckout(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing-space-admin", 7)
-	fx.store.SeedWorkspaceMember(ws.PublicID, 8, tenancy.RoleAdmin)
+	// Org scope keeps the manager gate: a Workspace Admin without a Billing
+	// grant cannot top up the shared pool. Personal scopes are exempt
+	// (payer = actor, ADR-0042): any member tops up their own account.
+	org, err := fx.store.CreateOrganization(ctx, 7, "space-admin-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 8, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 7, "billing-space-admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 8, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
 	// Caller 8 is a Workspace Admin but holds no billing grant.
 	fx.accounts.deny = map[int64]bool{8: true}
 	fx.seedWallet(7, 100000, 0)

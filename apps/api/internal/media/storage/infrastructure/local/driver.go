@@ -144,7 +144,7 @@ func (d *LocalStorageDriver) StoreBytesRef(ctx context.Context, profile *domain.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	facts, err := imageformat.InspectDetectedBytes(data)
+	facts, err := imageformat.InspectCompleteDetectedBytes(data)
 	if err != nil {
 		return nil, fmt.Errorf(errorrender.MsgStoreBytesRef, err)
 	}

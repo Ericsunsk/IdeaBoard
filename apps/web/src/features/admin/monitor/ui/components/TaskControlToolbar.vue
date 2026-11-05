@@ -1,31 +1,7 @@
 <template>
   <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
-    <!-- 左侧：侧边栏抽屉按钮 + Events 选择器 + 搜索输入框 -->
+    <!-- 左侧：搜索输入框 -->
     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-      <!-- 侧边栏按钮 (样式占位，后续接功能) -->
-      <button
-        type="button"
-        disabled
-        class="relative flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-control border border-border bg-card text-muted-foreground opacity-60"
-        :title="MONITOR_MESSAGES.sidebarToggleTitle"
-      >
-        <SidebarCollapse class="size-4" />
-        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-pill bg-info"></span>
-      </button>
-
-      <!-- 数据集选择器 (样式占位，后续接功能) -->
-      <div class="relative inline-flex items-center">
-        <button
-          type="button"
-          disabled
-          class="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-semibold text-foreground opacity-60"
-        >
-          <Table class="size-3.5 text-muted-foreground" />
-          <span>Events</span>
-          <NavArrowDown class="size-3.5 text-muted-foreground" />
-        </button>
-      </div>
-
       <!-- 搜索输入框: AdminToolbarSearch（带清空按钮，清空即重新查询） -->
       <AdminToolbarSearch
         :model-value="searchKeyword"
@@ -84,7 +60,7 @@ import { AdminButton } from '../../../shared'
 import { adminToolbarButtonClass } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import { MoreHoriz, NavArrowDown, Play, SidebarCollapse, Table } from '@iconoir/vue'
+import { MoreHoriz, Play } from '@iconoir/vue'
 import type { TimeRangePreset, TimeRangePresetKey } from '../../core/timeRange'
 import { MONITOR_MESSAGES } from '../pages/messages'
 

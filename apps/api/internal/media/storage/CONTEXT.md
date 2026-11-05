@@ -62,8 +62,8 @@ orchestration, task scheduling, or billing ledger facts.
   explicitly retired/revoked.
 - Path traversal and object key attacks must be blocked at domain boundaries
   (`NormalizeUploadObjectKey`, `NormalizeStorageUserSegment`).
-- Presigned URLs must clamp TTL to safe bounds
-  (`DefaultPresignTTL` / `MaxPresignTTL`).
+- Presigned URLs use the single `PresignTTL` bound (non-positive TTLs fall
+  back to it).
 - The root package is a composition surface only; production code depends
   on the owning subpackage (`domain`, `ports`, `application`,
   or `infrastructure`), never on root-level contracts.

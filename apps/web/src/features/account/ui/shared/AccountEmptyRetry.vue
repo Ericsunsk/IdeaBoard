@@ -8,7 +8,13 @@
     <span v-if="props.description" :class="accountEmptyDescriptionClass">{{
       props.description
     }}</span>
-    <Button variant="ghost" size="sm" :class="retryButtonClass" @click="emit('retry')">
+    <Button
+      v-if="props.retryLabel"
+      variant="ghost"
+      size="sm"
+      :class="retryButtonClass"
+      @click="emit('retry')"
+    >
       {{ props.retryLabel }}
     </Button>
   </div>
@@ -30,13 +36,14 @@ const props = withDefaults(
   defineProps<{
     title?: string | undefined
     description?: string | undefined
-    retryLabel: string
+    retryLabel?: string | undefined
     variant?: 'default' | 'tall' | 'compact' | undefined
     announce?: 'polite' | 'status' | undefined
   }>(),
   {
     title: undefined,
     description: undefined,
+    retryLabel: undefined,
     variant: 'default',
     announce: 'polite',
   },

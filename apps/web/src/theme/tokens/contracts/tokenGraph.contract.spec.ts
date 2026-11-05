@@ -273,6 +273,25 @@ describe('mode parity fixtures', () => {
     const decls = [decl('theme/theme.css', '--color-board-page', '#0f0f0f', 'dark')]
     expect(rules(checkParity(decls))).toContain('mode-parity')
   })
+
+  it('accepts single-source chrome roles that resolve through mode-aware chains', () => {
+    const decls = [
+      decl(
+        'theme/tokens/semantic.css',
+        '--color-page-chrome-bg',
+        'var(--color-board-control-bg)',
+        'dark',
+      ),
+    ]
+    expect(checkParity(decls)).toEqual([])
+  })
+
+  it('rejects a single-source chrome role carrying its own raw color', () => {
+    const decls = [
+      decl('theme/tokens/semantic.css', '--color-page-chrome-bg', '#0f0f0f', 'dark'),
+    ]
+    expect(rules(checkParity(decls))).toContain('mode-parity')
+  })
 })
 
 describe('contrast inventory fixtures', () => {

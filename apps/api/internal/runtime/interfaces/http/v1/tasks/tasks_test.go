@@ -15,8 +15,11 @@ import (
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
 	taskservice "ideaboard/api/internal/tasking/application/task"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
 	taskdomain "ideaboard/api/internal/tasking/domain"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
+	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
@@ -90,24 +93,30 @@ func (f *fakeTaskQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resoluti
 	return f.Quote(ctx, kind, resolution, quantity)
 }
 
-// v1FakeBillingAccounts serves the stable funds-identity seam from a fixed
-// fixture account for in-memory settlement tests.
+// v1FakeBillingAccounts serves the payer seam from a fixed
+// fixture account for in-memory settlement tests. shared=true models the
+// Organization scope so quota-gated tests exercise the enforced path;
+// the Personal skip lives in the service suite.
 type v1FakeBillingAccounts struct{}
 
-func (v1FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
-	return 7001, nil
+func (v1FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, _ int64) (int64, string, error) {
+	return 7001, tenancypg.BillingOwnerOrganization, nil
 }
 
-// ResolveFunds serves the quote-preflight resolution from the same fixed
-// fixture account submit holds (#917: one payer for quote, readiness,
-// and submit in these fixtures).
-func (v1FakeBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID string) (funds.Identity, error) {
+// ResolveFundsForActor serves the quote-preflight resolution from the same
+// fixed fixture account submit holds (payer = actor, #973/#980: one payer
+// for quote, readiness, and submit in these fixtures; Organization scopes
+// are actor-independent so the fixed account is correct). Shared=true
+// models the Organization scope so quota-gated tests exercise the enforced
+// path; the Personal skip lives in the service suite and the Personal
+// preflight tests.
+func (v1FakeBillingAccounts) ResolveFundsForActor(_ context.Context, workspacePublicID string, _ int64) (funds.Identity, error) {
 	return funds.Identity{
 		WorkspaceInternalID:    7001,
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       7001,
 		BillingAccountPublicID: "ba_quote0000001",
-		OwnerType:              tenancypg.BillingOwnerWorkspace,
+		OwnerType:              tenancypg.BillingOwnerOrganization,
 	}, nil
 }
 
@@ -318,9 +327,12 @@ func newV1TaskFixture(t *testing.T, pools ...map[string]routing.Pool) *v1TaskFix
 			TaskBillingAccounts: v1FakeBillingAccounts{},
 			// #917: the preflight resolves the same fixture account submit
 			// holds and gates the same fixture funds.
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         wallets,
-			TaskAcceptance:           &v1testsupport.TxSubmissionAcceptance{Assets: assets},
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: store},
+				Boards:     nil, Quoter: quoter, Resolver: resolver,
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: wallets, Quotas: nil,
+			}),
+			TaskAcceptance: &v1testsupport.TxSubmissionAcceptance{Assets: assets},
 		},
 	})
 	handler.Mount(v1)
@@ -877,13 +889,16 @@ func newV1PromptMaskFixtureWithPrompts(t *testing.T, reader taskservice.FeatureP
 		Tasks: ContractV1TaskDeps{
 			Tasks: txTasks, TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
 			TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
-			TaskPreparer:             taskservice.NewWorkspacePreparer(reader),
-			TaskRouter:               allowTestPoolResolver(),
-			TaskSnapshotSaver:        v1testsupport.TxSnapshotSaver(saved),
-			TaskBillingAccounts:      v1FakeBillingAccounts{},
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         wallets,
-			TaskAcceptance:           &v1testsupport.TxSubmissionAcceptance{Assets: assets},
+			TaskPreparer:        taskservice.NewWorkspacePreparer(reader),
+			TaskRouter:          allowTestPoolResolver(),
+			TaskSnapshotSaver:   v1testsupport.TxSnapshotSaver(saved),
+			TaskBillingAccounts: v1FakeBillingAccounts{},
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: store},
+				Boards:     nil, Quoter: quoter, Resolver: allowTestPoolResolver(),
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: wallets, Quotas: nil,
+			}),
+			TaskAcceptance: &v1testsupport.TxSubmissionAcceptance{Assets: assets},
 		},
 	})
 	handler.Mount(v1)
@@ -1075,8 +1090,11 @@ func newV1TaskRoutingFixture(t *testing.T, pools map[string]routing.Pool) *v1Rou
 			TaskBillingAccounts: v1FakeBillingAccounts{},
 			// #917: the preflight resolves the same fixture account submit
 			// holds and gates the same fixture funds.
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         base.wallets,
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: base.store},
+				Boards:     nil, Quoter: base.quoter, Resolver: resolver,
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: base.wallets, Quotas: nil,
+			}),
 		},
 	})
 	handler.Mount(v1)
@@ -1428,5 +1446,104 @@ func TestV1TaskPromptPreparationFailurePrecedesAcceptanceAndReplay(t *testing.T)
 	status, payload = fx.postTask(t, "prepared", body)
 	if status < 400 || len(fx.queue.enqueued) != 1 {
 		t.Fatalf("read failure replay=%d %v queue=%d", status, payload, len(fx.queue.enqueued))
+	}
+}
+
+type readinessCheckFunc func(context.Context, taskports.ReadinessParams) (taskdomain.BillingSnapshot, error)
+
+func (f readinessCheckFunc) Check(ctx context.Context, input taskports.ReadinessParams) (taskdomain.BillingSnapshot, error) {
+	return f(ctx, input)
+}
+
+func readinessWireEngine(t *testing.T, fx *v1TaskFixture, actor int64, checker taskports.ReadinessChecker) *gin.Engine {
+	t.Helper()
+	p, err := principal.New(actor, fx.dir.ensure(actor), "auth-test", "readiness-test", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := gin.New()
+	engine.Use(runtimehttp.ContractRequestIDMiddleware())
+	engine.Use(func(c *gin.Context) {
+		if err := principal.Set(c, p); err != nil {
+			t.Fatal(err)
+		}
+		c.Next()
+	})
+	handler := NewHandler(Deps{Store: fx.store, Tasks: ContractV1TaskDeps{Tasks: fx.txTasks, TaskReadiness: checker}})
+	handler.Mount(engine.Group(runtimehttp.ContractV1GroupPath))
+	return engine
+}
+
+func TestV1TaskReadinessWire(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	calls := 0
+	checker := readinessCheckFunc(func(_ context.Context, input taskports.ReadinessParams) (taskdomain.BillingSnapshot, error) {
+		calls++
+		if input.WorkspaceID != fx.ws.PublicID || input.ActorUserID != 3 || input.Quantity != 1 || input.Resolution != "" || input.Service != "render" {
+			t.Fatalf("wire defaults=%+v", input)
+		}
+		return taskdomain.BillingSnapshot{SKU: "ai-image:render", UnitCredits: 10, TotalCredits: 10, Quantity: 1, QuotedAt: time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC), SettlementState: "quoted"}, nil
+	})
+	engine := readinessWireEngine(t, fx, 3, checker)
+	status, payload := quoteTask(t, engine, fx.ws.PublicID, 3, `{"data":{"service":" render "}}`)
+	if status != http.StatusOK || calls != 1 {
+		t.Fatalf("quote=%d %v calls=%d", status, payload, calls)
+	}
+	data := v1Data(t, payload).(map[string]any)
+	if data["settlement_state"] != "quoted" || data["quantity"] != float64(1) || data["total_credits"] != float64(10) || data["quoted_at"] != "2026-11-06T00:00:00Z" {
+		t.Fatalf("snapshot DTO=%v", data)
+	}
+	if _, ok := data["available_credits"]; ok {
+		t.Fatal("price snapshot leaked wallet balance")
+	}
+	status, _ = quoteTask(t, engine, fx.ws.PublicID, 3, `{"data":{"service":"render","unknown":true}}`)
+	if status != http.StatusBadRequest || calls != 1 {
+		t.Fatalf("strict JSON=%d calls=%d", status, calls)
+	}
+	hidden := readinessWireEngine(t, fx, 9, checker)
+	status, payload = quoteTask(t, hidden, fx.ws.PublicID, 9, `{"data":{"unknown":true}}`)
+	if status != http.StatusNotFound || v1ErrorCode(t, payload) != string(contract.CodeTaskNotFound) || calls != 1 {
+		t.Fatalf("membership before strict JSON=%d %v calls=%d", status, payload, calls)
+	}
+}
+
+func TestV1TaskReadinessErrorRendering(t *testing.T) {
+	fx := newV1TaskFixture(t)
+	outage := errors.New("same reader error")
+	for _, tc := range []struct {
+		name    string
+		err     error
+		status  int
+		code    contract.Code
+		message string
+	}{
+		{name: "funds unknown", err: &taskports.FundsResolutionError{Cause: outage}, status: 503, code: contract.CodeServiceUnavailable, message: runtimehttp.MsgServiceUnavailable39},
+		{name: "wallet unknown", err: outage, status: 503, code: contract.CodeServiceUnavailable, message: runtimehttp.MsgServiceUnavailable25},
+		{name: "funds conflict", err: &taskports.FundsResolutionError{Cause: tenancy.ErrBillingConflict}, status: 409, code: contract.CodeBillingAccountConflict},
+		{name: "same conflict from wallet", err: tenancy.ErrBillingConflict, status: 503, code: contract.CodeServiceUnavailable},
+		{name: "funds not found", err: &taskports.FundsResolutionError{Cause: tenancy.ErrBillingNotFound}, status: 404, code: contract.CodeBillingAccountNotFound},
+		{name: "funds forbidden", err: &taskports.FundsResolutionError{Cause: tenancy.ErrForbidden}, status: 403, code: contract.CodeWorkspaceForbidden},
+		{name: "restricted", err: taskdomain.ErrWalletRestricted, status: 403, code: contract.CodeBillingWalletRestricted},
+		{name: "insufficient", err: taskdomain.ErrInsufficientCredits, status: 402, code: contract.CodeTaskInsufficientCredits},
+		{name: "quota", err: taskdomain.ErrMemberQuotaExhausted, status: 403, code: contract.CodeMemberQuotaExhausted},
+		{name: "Board hidden", err: taskdomain.ErrBoardNotFound, status: 404, code: contract.CodeBoardNotFound},
+		{name: "Board archived", err: taskdomain.ErrBoardArchived, status: 409, code: contract.CodeBoardArchived},
+		{name: "Board viewer", err: taskdomain.ErrForbidden, status: 403, code: contract.CodeTaskForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			engine := readinessWireEngine(t, fx, 3, readinessCheckFunc(func(context.Context, taskports.ReadinessParams) (taskdomain.BillingSnapshot, error) {
+				return taskdomain.BillingSnapshot{}, tc.err
+			}))
+			status, payload := quoteTask(t, engine, fx.ws.PublicID, 3, quoteRenderBody(""))
+			if status != tc.status || v1ErrorCode(t, payload) != string(tc.code) {
+				t.Fatalf("status=%d payload=%v", status, payload)
+			}
+			if tc.message != "" {
+				raw := payload["error"].(map[string]any)
+				if raw["message"] != tc.message {
+					t.Fatalf("message=%v want %q", raw, tc.message)
+				}
+			}
+		})
 	}
 }

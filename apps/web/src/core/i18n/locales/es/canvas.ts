@@ -36,8 +36,6 @@ export default {
     cancelled: 'Tarea cancelada',
     cancelledWithPartialResults: 'Tarea cancelada — resultados parciales conservados en el lienzo.',
     progressTimeout: 'Esto está tardando más de lo esperado. Vuelva a comprobarlo en un momento.',
-    progressDataInvalid:
-      'Los datos de progreso de la tarea no parecen válidos. Inténtelo de nuevo.',
     failedGeneric: 'Error al generar la imagen. Inténtelo de nuevo.',
   },
   minimap: {
@@ -45,7 +43,6 @@ export default {
   },
   controls: {
     prompt: 'Indicación',
-    promptPlaceholder: 'escriba su idea...',
     send: 'Aplicar',
     free: 'Gratis',
     selectImageCountTooltip: 'Seleccionar cantidad de imágenes',
@@ -142,10 +139,8 @@ export default {
   },
   contextMenu: {
     label: 'Acciones de nodos del lienzo',
-    addNode: '+ Nodo {title}',
   },
   execution: {
-    missingBoardIdMask: 'Falta el ID del lienzo. No se puede subir la máscara.',
     markInpaintAreaFirst: 'Marque primero el área a pintar.',
     recoveryFailed: 'No se pudieron restaurar los resultados de imagen. Inténtelo de nuevo.',
     canvasSaveFailedProgressLost:
@@ -166,7 +161,6 @@ export default {
     fusionNodeMissing: 'Nodo de fusión no encontrado.',
     fusionNeedsTwoImages: 'La fusión necesita al menos 2 imágenes.',
     fusionInputsInvalid: 'Las imágenes de entrada de fusión no son válidas.',
-    imageMissingUrl: 'Falta la URL de la imagen.',
     outpaintMissingOriginalSize: 'Falta el tamaño original de la imagen para la extensión.',
   },
   tools: {
@@ -174,7 +168,6 @@ export default {
     imageNotEditable: 'Esta imagen no se puede editar.',
     noEditableLayers: 'No hay capas editables para aplicar.',
     autoConnectFailed: 'Imagen creada, pero falló la conexión automática. Conéctela manualmente.',
-    applyEditFailed: 'Error al aplicar las ediciones.',
     maskPromptPlaceholder: 'Describa cómo repintar la selección',
     optionalPromptPlaceholder: 'Instrucciones opcionales',
     outpaintPromptPlaceholder: 'Introduzca una indicación para extender',
@@ -190,10 +183,6 @@ export default {
       'Error al escribir la eliminación en el lienzo. Actualice e inténtelo de nuevo.',
     deleteApplyFailedWarning:
       'Error al aplicar la eliminación. Actualice el lienzo e inténtelo de nuevo.',
-    connectRequiredInputLabel: 'Conectar {label}',
-    connectRequiredInputsLabel: 'Conectar {count} entradas',
-    waitForInputLabel: 'Esperando a {label}',
-    waitForInputsLabel: 'Esperando a {count} entradas',
   },
   handles: {
     inputDirectionLabel: 'Entrada',

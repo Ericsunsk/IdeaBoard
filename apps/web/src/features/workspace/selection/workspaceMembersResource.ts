@@ -39,10 +39,10 @@ import { isOpaqueIdWithPrefix } from '../../../core/utils/opaqueIds'
 //   re-adding keeps the current role; admin inviting owner renders 403.
 //   Personal Default is private: invites there render 403
 //   `workspace_default_protected`. Other Personal workspaces invite freely
-//   with no per-invite holder approval: consumption charges the holder's
-//   shared Personal account with the real operator on each record, and an
-//   unconfigured collaborator quota reads as unlimited (the holder sets it
-//   later without clearing usage).
+//   with no per-invite owner approval: consumption bills each submitter's
+//   own Personal account (payer = actor, #973) with the real operator on
+//   each record, and an unconfigured collaborator quota reads as unlimited
+//   (a manager sets it later without clearing usage).
 // - role change (PATCH): no `Idempotency-Key`; promoting to owner requires
 //   owner; the last owner cannot be demoted (`membership_transition_forbidden`).
 // - removal (DELETE): requires `Idempotency-Key` per attempt; self-leave is

@@ -24,7 +24,12 @@ import {
 
 type BoardRepositoryMutations = Pick<
   BoardCommands,
-  'create' | 'renameOptimistic' | 'rollbackOptimisticRename' | 'duplicate' | 'delete'
+  | 'create'
+  | 'createAndOpen'
+  | 'renameOptimistic'
+  | 'rollbackOptimisticRename'
+  | 'duplicate'
+  | 'delete'
 >
 
 export type BoardRepositoryRenameResult =
@@ -51,6 +56,7 @@ export type BoardRepositoryViewModel = {
 export type BoardRepositoryCommands = {
   hydrate(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
   create: BoardCommands['create']
+  createAndOpen: BoardCommands['createAndOpen']
   rename(input: { boardId: string; nextName: string }): Promise<BoardRepositoryRenameResult>
   duplicate: BoardCommands['duplicate']
   delete: BoardCommands['delete']
@@ -190,6 +196,20 @@ export function createBoardRepository(
     return { isOk: false, reason: 'scope-changed' }
   }
 
+  function scopedMutations(token: ReturnType<typeof captureScope>): BoardRepositoryMutations {
+    return deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
+  }
+
+  function enqueueScopedMutation<T>(
+    operation: (mutations: BoardRepositoryMutations) => Promise<T>,
+  ): Promise<T | BoardScopeChangedResult> {
+    const token = captureScope()
+    return enqueue(async () => {
+      if (!isScopeCurrent(token)) return scopeChangedResult()
+      return operation(scopedMutations(token))
+    })
+  }
+
   const unsubscribe = deps.subscribe(refresh)
   const unsubscribeScope = deps.subscribeScope((nextScope) => {
     if (scope.value === nextScope) return
@@ -239,19 +259,18 @@ export function createBoardRepository(
     },
 
     create(input) {
-      const token = captureScope()
-      return enqueue(async () => {
-        if (!isScopeCurrent(token)) return scopeChangedResult()
-        const mutations = deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
-        return mutations.create(input)
-      })
+      return enqueueScopedMutation((mutations) => mutations.create(input))
+    },
+
+    createAndOpen(input) {
+      return enqueueScopedMutation((mutations) => mutations.createAndOpen(input))
     },
 
     rename(input) {
       const token = captureScope()
       return enqueue(async () => {
         if (!isScopeCurrent(token)) return scopeChangedResult()
-        const mutations = deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
+        const mutations = scopedMutations(token)
         const optimistic = mutations.renameOptimistic(input)
         if (!optimistic.isOk) return optimistic
 
@@ -275,21 +294,11 @@ export function createBoardRepository(
     },
 
     duplicate(input) {
-      const token = captureScope()
-      return enqueue(async () => {
-        if (!isScopeCurrent(token)) return scopeChangedResult()
-        const mutations = deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
-        return mutations.duplicate(input)
-      })
+      return enqueueScopedMutation((mutations) => mutations.duplicate(input))
     },
 
     delete(input) {
-      const token = captureScope()
-      return enqueue(async () => {
-        if (!isScopeCurrent(token)) return scopeChangedResult()
-        const mutations = deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
-        return mutations.delete(input)
-      })
+      return enqueueScopedMutation((mutations) => mutations.delete(input))
     },
   }
 

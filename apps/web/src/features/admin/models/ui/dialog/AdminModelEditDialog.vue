@@ -8,7 +8,7 @@
     @close="emit('update:visible', false)"
   >
     <div class="grid grid-cols-1 gap-6 p-5 lg:grid-cols-12">
-      <!-- 左侧：主要配置工作区 (7 列) -->
+      <!-- 左侧：主要设置工作区 (7 列) -->
       <div class="flex flex-col gap-4.5 lg:col-span-7">
         <CatalogIdentityPanel
           v-model:model-id="form.values.id"

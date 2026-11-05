@@ -410,7 +410,7 @@ function submitOutpaint(prompt: string) {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  z-index: 3;
+  z-index: var(--canvas-z-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -453,7 +453,7 @@ function submitOutpaint(prompt: string) {
 
 .image-node-stage-empty {
   position: relative;
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
   width: 100%;
   height: 100%;
   border: 0;

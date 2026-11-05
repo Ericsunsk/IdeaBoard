@@ -4,9 +4,9 @@
   >
     <!-- 表头：带外层边框，底色同页面背景 (bg-background) -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-      <!-- 标题 Events + ℹ 提示图标 -->
+      <!-- 标题 事件 + ℹ 提示图标 -->
       <div class="flex items-center gap-1.5">
-        <span class="text-sm font-bold text-foreground">Events</span>
+        <span class="text-sm font-bold text-foreground">{{ MONITOR_MESSAGES.eventsTitle }}</span>
         <span
           :title="MONITOR_MESSAGES.eventsInfoTitle"
           class="flex size-4 cursor-pointer items-center justify-center rounded-pill text-muted-foreground hover:text-foreground"

@@ -456,6 +456,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',
     },
   ],
+  'src/features/board/ui/gallery/cards/SceneThumbnail.component.spec.ts': [
+    {
+      reason:
+        'Verifies the scene-frame--clear visual contract (transparent mounted/empty frames vs solid pending placeholder); the class is the paint contract the thumbnail exposes.',
+    },
+  ],
   'src/core/components/ConfirmDialog.component.spec.ts': [
     {
       reason:

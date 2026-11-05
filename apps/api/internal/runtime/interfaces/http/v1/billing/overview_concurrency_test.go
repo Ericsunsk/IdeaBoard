@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/billingoverview"
+	"ideaboard/api/internal/db/dbutil"
 	identitypg "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/memberquotas"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -38,7 +38,20 @@ func TestV1BillingOverviewIdentityProjectionsJoinSnapshotPG(t *testing.T) {
 		}
 	}
 	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, t.Context(), fx.store, "overview-snapshot", 11)
+	// Org scope preserves the manager/transfer/quota fan-out whose identity
+	// projections must join the snapshot transaction. Personal scopes omit
+	// those sections (read-only per-actor, no transfer entry).
+	org, err := fx.store.CreateOrganization(t.Context(), 11, "overview-snapshot-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(t.Context(), org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(t.Context(), org.PublicID, 11, "overview-snapshot")
+	if err != nil {
+		t.Fatal(err)
+	}
 	fx.dir.ensure(11)
 	fx.dir.ensure(12)
 	if _, err := fx.store.AddWorkspaceMember(t.Context(), ws.PublicID, 12, tenancy.RoleMember); err != nil {
@@ -54,7 +67,9 @@ func TestV1BillingOverviewIdentityProjectionsJoinSnapshotPG(t *testing.T) {
 	users := identitypg.NewRepository(pool)
 	fx.deps.Users = runtimehttp.NewUsersRepositoryDirectory(users)
 	fx.deps.MemberDisplay = v1testsupport.NewMemberDisplayService(users, nil)
-	fx.deps.Snapshot = billingoverview.PostgresSnapshot(pool)
+	fx.deps.Snapshot = func(ctx context.Context, read func(context.Context) error) error {
+		return dbutil.WithReadSnapshot(ctx, pool, read)
+	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()

@@ -73,6 +73,7 @@ async function renderRange(initialBoards: BoardMeta[] = [ownBoard(), teamBoard()
       commands: {
         hydrate,
         create: vi.fn(),
+        createAndOpen: vi.fn(),
         rename: vi.fn(),
         duplicate: vi.fn(),
         delete: vi.fn(),

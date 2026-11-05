@@ -16,7 +16,7 @@ import (
 )
 
 type AccountReader interface {
-	ResolveFunds(context.Context, string) (funds.Identity, error)
+	ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error)
 	GetBillingAccountRole(context.Context, int64, int64) (string, bool, error)
 	ListBillingAccountMembers(context.Context, int64, int64) ([]tenancy.BillingAccountMember, error)
 	ListBillingTransferInvitesForAccount(context.Context, int64, int64, int64, int) ([]*tenancy.BillingTransferInvite, error)
@@ -110,7 +110,11 @@ func (r Reader) Read(ctx context.Context, input Input) (Result, error) {
 		return result, failed(SnapshotRead, errors.New("snapshot reader is not configured"))
 	}
 	// First-touch provisioning must precede the read-only transaction.
-	identity, err := r.Accounts.ResolveFunds(ctx, input.Workspace.PublicID)
+	// Personal scopes resolve the viewer's own account (payer = actor,
+	// #973/#978) so members each see their own (BillingAccount, User)
+	// column with zero cross pollution; Org scopes keep the shared pool
+	// (actor-independent, same as the owner order).
+	identity, err := r.Accounts.ResolveFundsForActor(ctx, input.Workspace.PublicID, input.ActorUserID)
 	if err != nil {
 		return result, failed(Account, err)
 	}
@@ -119,35 +123,69 @@ func (r Reader) Read(ctx context.Context, input Input) (Result, error) {
 	}
 	account := identity.ToBillingAccount()
 	result.Account = account
-	role, member, err := r.Accounts.GetBillingAccountRole(ctx, account.InternalID, input.ActorUserID)
-	if err != nil {
-		return result, failed(Account, err)
-	}
-	filter, scope := ConsumptionScope(input.Workspace.InternalID, input.ActorUserID, input.WorkspaceRole, role, member)
-	result.Scope = scope
-	policy := memberquotas.Policy{OrganizationRoles: r.Tenancy}
-	quotaScope := memberquotas.ScopeForWorkspace(input.Workspace)
-	personalOwner := input.Workspace.OrganizationID == nil && member && role == tenancy.BillingRoleOwner
-	result.CanManageQuotas, err = policy.CanManage(ctx, quotaScope, input.ActorUserID, personalOwner)
-	if err != nil {
-		return result, failed(Account, err)
+	var filter creditsdomain.UsageFilter
+	var role string
+	var member bool
+	if input.Workspace.IsPersonal() {
+		filter.ActorUserID = input.ActorUserID
+		result.Scope = "member"
+	} else {
+		role, member, err = r.Accounts.GetBillingAccountRole(ctx, account.InternalID, input.ActorUserID)
+		if err != nil {
+			return result, failed(Account, err)
+		}
+		filter, result.Scope = ConsumptionScope(input.Workspace.InternalID, input.ActorUserID, input.WorkspaceRole, role, member)
+		policy := memberquotas.Policy{OrganizationRoles: r.Tenancy}
+		result.CanManageQuotas, err = policy.CanManage(ctx, memberquotas.ScopeForWorkspace(input.Workspace), input.ActorUserID)
+		if err != nil {
+			return result, failed(Account, err)
+		}
 	}
 
 	workCtx, cancel := context.WithCancel(ctx)
 	var group sync.WaitGroup
-	// An error must cancel AND join both reads before the caller can reuse
-	// request state. Workers capture only context and immutable input facts.
+	// Cancel and join on every exit; snapshot failures take precedence over
+	// concurrent wallet/usage failures and never return partial data.
 	defer func() { cancel(); group.Wait() }()
+	var wallet creditsdomain.WalletDetails
+	var usage usageapplication.Usage
 	var walletErr, usageErr error
-	group.Go(func() { result.Wallet, walletErr = r.Wallets.GetWallet(workCtx, account.InternalID) })
-	group.Go(func() { result.Usage, usageErr = r.Usage.GetCurrent(workCtx, account.InternalID, filter, input.Range) })
+	group.Go(func() { wallet, walletErr = r.Wallets.GetWallet(workCtx, account.InternalID) })
+	group.Go(func() { usage, usageErr = r.Usage.GetCurrent(workCtx, account.InternalID, filter, input.Range) })
 	err = r.Snapshot(ctx, func(snapCtx context.Context) error {
-		members, err := r.Tenancy.ListWorkspaceMembers(snapCtx, input.Workspace.PublicID)
-		if err != nil {
-			return failed(WorkspaceMembers, err)
+		return r.snapshotBody(snapCtx, input, member, role, &result)
+	})
+	if err != nil {
+		var readErr *Error
+		if errors.As(err, &readErr) {
+			return Result{}, err
 		}
-		result.MembersCount = len(members)
-		userIDs := []int64{}
+		return Result{}, failed(SnapshotRead, err)
+	}
+	group.Wait()
+	if walletErr != nil {
+		return Result{}, failed(Wallet, walletErr)
+	}
+	if usageErr != nil {
+		return Result{}, failed(Usage, usageErr)
+	}
+	result.Wallet, result.Usage = wallet, usage
+	return result, nil
+}
+
+// snapshotBody is the single snapshot callback behind both scopes. Org
+// scopes fan out manager/transfer/quota-list facts; Personal scopes read
+// only their own unlimited quota with no financial-manager sections.
+func (r Reader) snapshotBody(snapCtx context.Context, input Input, member bool, role string, result *Result) error {
+	account := result.Account
+	personal := input.Workspace.IsPersonal()
+	members, err := r.Tenancy.ListWorkspaceMembers(snapCtx, input.Workspace.PublicID)
+	if err != nil {
+		return failed(WorkspaceMembers, err)
+	}
+	result.MembersCount = len(members)
+	userIDs := []int64{}
+	if !personal {
 		if member && tenancy.IsBillingManager(role) {
 			result.BillingMembers, err = r.Accounts.ListBillingAccountMembers(snapCtx, account.InternalID, input.ActorUserID)
 			if err != nil {
@@ -171,63 +209,64 @@ func (r Reader) Read(ctx context.Context, input Input) (Result, error) {
 				userIDs = append(userIDs, *invite.DecidedBy)
 			}
 		}
-		quotas := memberquotas.Reader{Store: r.Quotas, Policy: policy}
-		if result.CanManageQuotas {
-			rows, err := r.Quotas.ListQuotas(snapCtx, account.InternalID)
-			if err != nil {
-				return failed(Quota, err)
-			}
-			result.Quotas, err = quotas.Page(snapCtx, quotaScope, account.InternalID, rows)
-			if err != nil {
-				return failed(Quota, err)
-			}
-			found := false
-			for _, reading := range result.Quotas {
-				userIDs = append(userIDs, reading.UserID)
-				if reading.UserID == input.ActorUserID {
-					result.Quota, found = reading, true
-				}
-			}
-			if !found {
-				result.Quota, err = quotas.Read(snapCtx, account.InternalID, input.ActorUserID, memberquotas.PeriodUnlimited, nil)
-				if err != nil {
-					return failed(Quota, err)
-				}
-			}
-		} else {
-			result.Quota, err = quotas.Self(snapCtx, quotaScope, account.InternalID, input.ActorUserID)
-			if err != nil {
-				return failed(Quota, err)
-			}
-		}
-		if r.People == nil {
-			return failed(People, errors.New("people reader is not configured"))
-		}
-		result.People, err = r.People(snapCtx, userIDs)
+	}
+	var quotaScope memberquotas.Scope
+	if !personal {
+		quotaScope = memberquotas.ScopeForWorkspace(input.Workspace)
+	}
+	policy := memberquotas.Policy{OrganizationRoles: r.Tenancy}
+	quotas := memberquotas.Reader{Store: r.Quotas, Policy: policy}
+	if personal {
+		// Personal has no quota concept (#975): return the unlimited
+		// constant directly without a Reader/Policy/Scope call.
+		result.Quota = memberquotas.Reading{UserID: input.ActorUserID, Period: memberquotas.PeriodUnlimited}
+	} else if result.CanManageQuotas {
+		rows, err := r.Quotas.ListQuotas(snapCtx, account.InternalID)
 		if err != nil {
-			return failed(People, err)
+			return failed(Quota, err)
 		}
-		return nil
-	})
+		result.Quotas, err = quotas.Page(snapCtx, quotaScope, account.InternalID, rows)
+		if err != nil {
+			return failed(Quota, err)
+		}
+		found := false
+		for _, reading := range result.Quotas {
+			userIDs = append(userIDs, reading.UserID)
+			if reading.UserID == input.ActorUserID {
+				result.Quota, found = reading, true
+			}
+		}
+		if !found {
+			result.Quota, err = quotas.Read(snapCtx, account.InternalID, input.ActorUserID, memberquotas.PeriodUnlimited, nil)
+			if err != nil {
+				return failed(Quota, err)
+			}
+		}
+	} else {
+		result.Quota, err = quotas.Self(snapCtx, quotaScope, account.InternalID, input.ActorUserID)
+		if err != nil {
+			return failed(Quota, err)
+		}
+	}
+	if r.People == nil {
+		return failed(People, errors.New("people reader is not configured"))
+	}
+	// Personal has no quota concept (#975): the unlimited constant above
+	// already applies, and the manager list path stays disabled so no
+	// write entry appears.
+	result.People, err = r.People(snapCtx, userIDs)
 	if err != nil {
-		var readErr *Error
-		if errors.As(err, &readErr) {
-			return Result{}, err
-		}
-		return Result{}, failed(SnapshotRead, err)
+		return failed(People, err)
 	}
-	group.Wait()
-	if walletErr != nil {
-		return Result{}, failed(Wallet, walletErr)
-	}
-	if usageErr != nil {
-		return Result{}, failed(Usage, usageErr)
-	}
-	return result, nil
+	return nil
 }
 
 // ConsumptionScope is shared with the itemized single reads. Workspace
 // membership alone never grants account-wide financial visibility.
+//
+// Personal workspaces never use this helper: they force the member filter
+// in Reader.Read and the billing handlers so each viewer reads
+// only their own (BillingAccount, User) column. Org scopes keep this order.
 func ConsumptionScope(workspaceID, actorUserID int64, workspaceRole, billingRole string, billingMember bool) (creditsdomain.UsageFilter, string) {
 	if billingMember && tenancy.IsBillingManager(billingRole) {
 		return creditsdomain.UsageFilter{}, "account"

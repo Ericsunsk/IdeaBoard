@@ -242,7 +242,7 @@ describe('AdminSettingsUnifiedPage', () => {
     )
     expect(toast.success).not.toHaveBeenCalled()
     // 失败一律 toast，不设内嵌 Alert/重试；图片搜索板块保留为真相源。
-    expect(await screen.findByText('外部图片搜索与素材供应商配置')).toBeVisible()
+    expect(await screen.findByText('外部图片搜索与素材供应商设置')).toBeVisible()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
     expect(screen.queryByText(/boom/)).not.toBeInTheDocument()

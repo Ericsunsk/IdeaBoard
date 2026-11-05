@@ -121,7 +121,9 @@
         </div>
 
         <div aria-labelledby="payment-disputes">
-          <h3 id="payment-disputes" class="text-admin-body font-bold text-foreground">Dispute</h3>
+          <h3 id="payment-disputes" class="text-admin-body font-bold text-foreground">
+            {{ PAYMENT_ORDERS_MESSAGES.disputesTitle }}
+          </h3>
           <p v-if="detail.disputes.length === 0" class="mt-2 text-admin-meta text-muted-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.disputesEmpty }}
           </p>

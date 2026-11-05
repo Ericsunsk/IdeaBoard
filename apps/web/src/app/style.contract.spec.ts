@@ -21,7 +21,7 @@ async function build(candidates: string[]): Promise<string> {
 
 describe('admin token closure', () => {
   it('compiles admin stacking utilities with their native z-index tokens', async () => {
-    const layers = ['sticky', 'header', 'overlay', 'dialog']
+    const layers = ['sticky', 'header', 'overlay', 'dialog', 'confirm']
     const css = await build(layers.map((layer) => `z-admin-${layer}`))
 
     for (const layer of layers) {
@@ -29,6 +29,61 @@ describe('admin token closure', () => {
         `\\.z-admin-${layer}\\s*\\{\\s*z-index: var\\(--z-index-admin-${layer}\\);\\s*\\}`,
       )
       expect(rule.test(css), `compiled z-admin-${layer} utility`).toBe(true)
+    }
+  })
+
+  it('pins admin confirm above the config dialog and popover tiers', async () => {
+    // Regression: the global admin confirm shared the dialog tier, so same-tier
+    // portal/DOM order decided the winner and the confirm often lost.
+    const roles = readFileSync(resolve(process.cwd(), 'src/theme/tokens/z.css'), 'utf8')
+    const roleTarget = (role: string): string => {
+      const match = roles.match(new RegExp(`${role}:\\s*var\\((--[\\w-]+)\\)`))
+      expect(match, `declared ${role}`).not.toBeNull()
+      return match![1]!
+    }
+
+    // Compile existence only: numeric order lives in token-graph
+    // (checkTokenGraph) and the motion/z stacking in overlayMenuContract.
+    for (const role of [
+      '--z-index-admin-dialog',
+      '--z-index-popover',
+      '--z-index-admin-confirm',
+      '--z-index-content',
+    ]) {
+      expect(roleTarget(role), 'Tier 2 stacking role targets a Tier 1 step').toMatch(
+        /^--primitive-z-\d+$/,
+      )
+    }
+
+    // Confirm must ride the new tier; the config dialog stays on the dialog
+    // tier so numeric order (not DOM order) decides the winner.
+    const confirmDialog = readFileSync(
+      resolve(process.cwd(), 'src/core/components/ConfirmDialog.vue'),
+      'utf8',
+    )
+    expect(confirmDialog).toContain('z-admin-confirm')
+    expect(confirmDialog).not.toContain('z-admin-dialog')
+    const adminShell = readFileSync(
+      resolve(process.cwd(), 'src/features/admin/shared/ui/shell/AdminDialogShell.vue'),
+      'utf8',
+    )
+    expect(adminShell).toContain('z-admin-dialog')
+    expect(adminShell).not.toContain('z-admin-confirm')
+    const adminMasks = readFileSync(
+      resolve(process.cwd(), 'src/features/admin/shared/ui/styling/uiClasses.ts'),
+      'utf8',
+    )
+    expect(adminMasks).toContain('z-admin-dialog')
+    expect(adminMasks).not.toContain('z-admin-confirm')
+
+    // Computed cascade: compiled utilities resolve through the token graph.
+    // Numeric order is owned by token-graph/overlayMenuContract; here only
+    // assert each utility compiles to its stacking token.
+    const css = await build(['z-admin-confirm', 'z-admin-dialog', 'z-popover', 'z-content'])
+    for (const utility of ['z-admin-confirm', 'z-admin-dialog', 'z-popover', 'z-content']) {
+      expect(css, `compiled ${utility}`).toMatch(
+        new RegExp(`\\.${utility}\\s*\\{\\s*z-index: var\\(--z-index-[\\w-]+\\)`),
+      )
     }
   })
 })

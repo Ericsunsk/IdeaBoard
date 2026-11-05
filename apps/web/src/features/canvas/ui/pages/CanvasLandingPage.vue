@@ -48,26 +48,26 @@
         <div class="home-hero-decorations pointer-events-none absolute inset-0 z-[5] h-full w-full">
           <div
             data-home-hero-safe
-            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-overlay border border-[var(--color-home-note-border)] bg-[var(--color-home-note-bg)] px-8 py-7 text-admin-meta leading-[1.5] text-[var(--color-home-note-text)] shadow-[0_18px_48px_color-mix(in_srgb,rgb(78_70_58)_8%,transparent)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
+            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-overlay border border-[var(--color-home-note-border)] bg-[var(--color-home-note-bg)] px-8 py-7 text-admin-meta leading-[1.5] text-[var(--color-home-note-text)] shadow-[var(--shadow-home-hero-note)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
             {{ projectName }} is an AI Canvas for Visual Designers to explore, compare, and refine
             image directions in one connected workspace.
           </div>
           <img
             :src="homeHeroAssets.starburst"
-            class="home-hero-starburst absolute left-[43%] top-[28%] w-[6.1%] rotate-[-4deg] object-contain drop-shadow-[0_12px_20px_color-mix(in_srgb,rgb(224_195_42)_18%,transparent)]"
+            class="home-hero-starburst absolute left-[43%] top-[28%] w-[6.1%] rotate-[-4deg] object-contain drop-shadow-[var(--shadow-home-hero-starburst)]"
             alt=""
             aria-hidden="true"
           />
           <img
             :src="homeHeroAssets.socks"
-            class="home-hero-socks absolute left-[8%] top-[38%] w-[29%] rotate-[-1.5deg] object-contain drop-shadow-[0_26px_28px_color-mix(in_srgb,rgb(35_38_46)_8%,transparent)]"
+            class="home-hero-socks absolute left-[8%] top-[38%] w-[29%] rotate-[-1.5deg] object-contain drop-shadow-[var(--shadow-home-hero-apparel)]"
             alt=""
             aria-hidden="true"
           />
           <img
             :src="homeHeroAssets.boots"
-            class="home-hero-boots absolute left-[66.8%] top-[10.6%] w-[20.2%] rotate-[3deg] object-contain drop-shadow-[0_26px_28px_color-mix(in_srgb,rgb(35_38_46)_8%,transparent)]"
+            class="home-hero-boots absolute left-[66.8%] top-[10.6%] w-[20.2%] rotate-[3deg] object-contain drop-shadow-[var(--shadow-home-hero-apparel)]"
             alt=""
             aria-hidden="true"
           />
@@ -77,7 +77,7 @@
           ></div>
           <img
             :src="homeHeroAssets.portrait"
-            class="home-hero-portrait absolute left-[65%] top-[48%] w-[22.4%] rotate-[0.5deg] object-contain drop-shadow-[0_28px_26px_color-mix(in_srgb,rgb(26_28_34)_10%,transparent)]"
+            class="home-hero-portrait absolute left-[65%] top-[48%] w-[22.4%] rotate-[0.5deg] object-contain drop-shadow-[var(--shadow-home-hero-portrait)]"
             alt=""
             aria-hidden="true"
           />

@@ -12,6 +12,7 @@ type CatalogCommandState = {
   isCatalogReloadPending: Ref<boolean>
   pendingDeleteBoard: Ref<CatalogEntry | null>
   isDeletePending: Ref<boolean>
+  isCreatePending: Ref<boolean>
 }
 
 type CatalogCommandDependencies = {
@@ -170,23 +171,30 @@ export function createCommandHandlers({
 }: CatalogCommandDependencies) {
   const hydration = createCatalogHydration({ catalog, feedback, warn, state })
   async function createAndOpenBoard(): Promise<boolean> {
+    if (state.isCreatePending.value) return false
     state.activeMenuBoardId.value = null
-    const result = await runCatalogCommand(
-      () => catalog.commands.create(),
-      (error) => {
-        warn('[boards] failed to create board', error)
-        feedback.catalogSyncFailed()
-      },
-    )
-    if (!result) return false
-    if (!result.isOk) {
-      if (result.reason === 'scope-changed') return false
-      feedback.createFailed(result)
-      warn('[boards] failed to sync new board', result.error)
-      return false
+    state.isCreatePending.value = true
+    try {
+      const created = await runCatalogCommand(
+        () =>
+          catalog.commands.createAndOpen({ openBoard: (boardId) => navigation.openBoard(boardId) }),
+        (error) => {
+          warn('[boards] failed to create board', error)
+          feedback.catalogSyncFailed()
+        },
+      )
+      if (!created) return false
+      if (!created.isOk) {
+        if (created.reason === 'scope-changed') return false
+        if (created.reason === 'navigation-failed') feedback.catalogSyncFailed()
+        else feedback.createFailed(created)
+        warn('[boards] failed to create or open board', created.error)
+        return false
+      }
+      return true
+    } finally {
+      state.isCreatePending.value = false
     }
-    navigation.openBoard(result.board.id)
-    return true
   }
 
   async function duplicateBoard(boardId: string) {

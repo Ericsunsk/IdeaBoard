@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-3">
-    <!-- 头部：板块名 + 副标题，配置按钮右上 -->
+    <!-- 头部：板块名 + 副标题，设置按钮右上 -->
     <div class="flex flex-wrap items-center justify-between gap-3 pb-1">
       <div class="flex min-w-0 flex-col gap-0.5">
         <div class="flex items-center gap-2">

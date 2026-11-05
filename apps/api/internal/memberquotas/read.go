@@ -32,6 +32,12 @@ type Reader struct {
 }
 
 func (r Reader) Self(ctx context.Context, scope Scope, accountID, userID int64) (Reading, error) {
+	// Org-only (#975): Personal scopes never reach here (callers return
+	// the unlimited constant directly without a Reader/Policy/Scope).
+	// A Personal scope reaching this point fails closed.
+	if err := requireOrganizationScope(scope); err != nil {
+		return Reading{}, err
+	}
 	period, limit, _, err := r.Store.GetQuotaRow(ctx, accountID, userID)
 	if err != nil {
 		return Reading{}, err
@@ -55,6 +61,12 @@ func (r Reader) Read(ctx context.Context, accountID, userID int64, period string
 }
 
 func (r Reader) Page(ctx context.Context, scope Scope, accountID int64, rows []QuotaRow) ([]Reading, error) {
+	// Listing is a management read: Personal scopes fail closed because
+	// Personal quotas do not exist (the HTTP layer rejects Personal lists
+	// before this point).
+	if err := requireOrganizationScope(scope); err != nil {
+		return nil, err
+	}
 	normalized, err := r.Policy.NormalizeReadBatch(ctx, scope, rows)
 	if err != nil {
 		return nil, err

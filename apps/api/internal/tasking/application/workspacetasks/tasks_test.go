@@ -436,7 +436,7 @@ func TestResolverUnavailableReservesNothing(t *testing.T) {
 	ctx := context.Background()
 	env := newRoutingTestEnv(map[string]routing.Pool{})
 
-	_, quoteErr := env.service.Quote(ctx, QuoteParams{Service: "render", Resolution: "2k"})
+	_, quoteErr := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "render", Resolution: "2k"})
 	if !errors.Is(quoteErr, routing.ErrServiceResolutionUnavailable) {
 		t.Fatalf("Quote err = %v, want ErrServiceResolutionUnavailable", quoteErr)
 	}
@@ -581,7 +581,7 @@ func TestResolverInvalidInputIsValidationNotAvailability(t *testing.T) {
 		routingEntry("a/first", true, routing.Resolution1K),
 	)})
 
-	_, quoteErr := env.service.Quote(ctx, QuoteParams{Service: "render", Resolution: "8k"})
+	_, quoteErr := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "render", Resolution: "8k"})
 	if !IsValidationError(quoteErr) {
 		t.Fatalf("Quote err = %T %v, want *ValidationError", quoteErr, quoteErr)
 	}
@@ -715,7 +715,7 @@ func TestCreateRejectsBeforeHoldWhenRoutingIsUnavailable(t *testing.T) {
 		SnapshotSaver: noopSnapshotSaver, Acceptance: &fakeSubmissionAcceptance{},
 	})
 
-	_, quoteErr := service.Quote(ctx, QuoteParams{Service: "render"})
+	_, quoteErr := priceQuoteForTest(ctx, service, QuoteParams{Service: "render"})
 	if !errors.Is(quoteErr, routing.ErrServiceResolutionUnavailable) {
 		t.Fatalf("Quote err = %v, want ErrServiceResolutionUnavailable", quoteErr)
 	}
@@ -1044,11 +1044,11 @@ func TestAvailabilityPriceInvariantAcrossModelChanges(t *testing.T) {
 	envA := newAvailabilityTestEnv(&echoQuoter{unit: 12}, poolsA)
 	envB := newAvailabilityTestEnv(&echoQuoter{unit: 12}, poolsB)
 
-	quoteA, err := envA.service.Quote(ctx, QuoteParams{Service: "render", Resolution: "2k", Quantity: 3})
+	quoteA, err := priceQuoteForTest(ctx, envA.service, QuoteParams{Service: "render", Resolution: "2k", Quantity: 3})
 	if err != nil {
 		t.Fatalf("Quote A: %v", err)
 	}
-	quoteB, err := envB.service.Quote(ctx, QuoteParams{Service: "render", Resolution: "2k", Quantity: 3})
+	quoteB, err := priceQuoteForTest(ctx, envB.service, QuoteParams{Service: "render", Resolution: "2k", Quantity: 3})
 	if err != nil {
 		t.Fatalf("Quote B: %v", err)
 	}
@@ -1104,7 +1104,7 @@ func TestAvailabilityPricesIndependentPerServiceResolutionQuantity(t *testing.T)
 	env := newAvailabilityTestEnv(&perResolutionQuoter{prices: prices}, pools)
 
 	for resolution, unit := range prices {
-		quote, err := env.service.Quote(ctx, QuoteParams{Service: "render", Resolution: resolution, Quantity: 2})
+		quote, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "render", Resolution: resolution, Quantity: 2})
 		if err != nil {
 			t.Fatalf("Quote render/%s: %v", resolution, err)
 		}
@@ -1124,7 +1124,7 @@ func TestAvailabilityPricesIndependentPerServiceResolutionQuantity(t *testing.T)
 	}
 
 	// Fixed-resolution Services canonicalize omitted input to 1k end to end.
-	quote, err := env.service.Quote(ctx, QuoteParams{Service: "cutout"})
+	quote, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "cutout"})
 	if err != nil {
 		t.Fatalf("Quote cutout (omitted resolution): %v", err)
 	}
@@ -1158,7 +1158,7 @@ func TestAvailabilityEmptyResolutionUsesServicePolicyDefault(t *testing.T) {
 	twoKOnly := newAvailabilityTestEnv(&echoQuoter{}, map[string]routing.Pool{
 		"render": routingPool(1, routingEntry("b/second", true, routing.Resolution2K)),
 	})
-	if _, err := twoKOnly.service.Quote(ctx, QuoteParams{Service: "render"}); !errors.Is(err, routing.ErrServiceResolutionUnavailable) {
+	if _, err := priceQuoteForTest(ctx, twoKOnly.service, QuoteParams{Service: "render"}); !errors.Is(err, routing.ErrServiceResolutionUnavailable) {
 		t.Fatalf("Quote render (omitted) err = %v, want ErrServiceResolutionUnavailable", err)
 	}
 	if _, err := twoKOnly.service.Create(ctx, CreateInput{
@@ -1179,7 +1179,7 @@ func TestAvailabilityEmptyResolutionUsesServicePolicyDefault(t *testing.T) {
 	oneK := newAvailabilityTestEnv(&echoQuoter{}, map[string]routing.Pool{
 		"render": routingPool(2, routingEntry("a/first", true, routing.Resolution1K)),
 	})
-	quote, err := oneK.service.Quote(ctx, QuoteParams{Service: "render"})
+	quote, err := priceQuoteForTest(ctx, oneK.service, QuoteParams{Service: "render"})
 	if err != nil {
 		t.Fatalf("Quote render (omitted): %v", err)
 	}
@@ -1209,7 +1209,7 @@ func TestAvailabilitySnapshotsRetainServiceAndResolution(t *testing.T) {
 		"variations": routingPool(1, routingEntry("a/first", true,
 			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K)),
 	})
-	quote, err := env.service.Quote(ctx, QuoteParams{Service: "variations", Resolution: "4K", Quantity: 2})
+	quote, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "variations", Resolution: "4K", Quantity: 2})
 	if err != nil {
 		t.Fatalf("Quote: %v", err)
 	}
@@ -1260,7 +1260,7 @@ func TestAvailabilityExplicitDefaultForScalableIsValidation(t *testing.T) {
 			t.Fatalf("%s fields = %v, want a resolution entry", name, validationErr.Fields)
 		}
 	}
-	if _, err := env.service.Quote(ctx, QuoteParams{Service: "render", Resolution: "default"}); err == nil {
+	if _, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "render", Resolution: "default"}); err == nil {
 		t.Fatal("Quote render @default must fail")
 	} else {
 		assertResolutionInvalid("Quote render @default", err)
@@ -1283,15 +1283,15 @@ func TestAvailabilityExplicitDefaultForScalableIsValidation(t *testing.T) {
 	}
 
 	// Fixed services also accept only the canonical 1k/2k/4k values.
-	if _, err := env.service.Quote(ctx, QuoteParams{Service: "upscale"}); err != nil {
+	if _, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "upscale"}); err != nil {
 		t.Fatalf("Quote upscale (omitted): %v", err)
 	}
-	if _, err := env.service.Quote(ctx, QuoteParams{Service: "upscale", Resolution: "default"}); err == nil {
+	if _, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "upscale", Resolution: "default"}); err == nil {
 		t.Fatal("Quote upscale @default must fail")
 	}
 	// Omitted resolutions for scalable services keep the 1k policy
 	// default and are unaffected by the explicit-default rejection.
-	if _, err := env.service.Quote(ctx, QuoteParams{Service: "render"}); err != nil {
+	if _, err := priceQuoteForTest(ctx, env.service, QuoteParams{Service: "render"}); err != nil {
 		t.Fatalf("Quote render (omitted): %v", err)
 	}
 }

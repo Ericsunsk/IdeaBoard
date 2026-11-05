@@ -15,7 +15,7 @@
 // never switches. Resolution joins the caller transaction and fails
 // closed on missing or ownerless scopes; joining a Workspace never merges
 // personal funds. Financial Owner/Admin manages recharge and bills.
-// Personal member quotas require the account holder; Organization quotas
+// Personal member quotas require the account owner; Organization quotas
 // follow the Organization Owner/Admin role policy. Workspace Owner/Admin
 // standing alone grants no financial management, and financial management
 // grants no Board content access.

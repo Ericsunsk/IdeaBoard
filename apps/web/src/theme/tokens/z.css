@@ -15,6 +15,10 @@
   --z-index-admin-overlay: var(--primitive-z-40);
   --z-index-admin-dialog: var(--primitive-z-50);
   --z-index-popover: var(--primitive-z-80);
+  /* Admin confirm sits above dialog and popover: it must cover the config
+     dialog plus its overlay, and any select/popover float must stay under
+     the confirm mask while the confirm is open. */
+  --z-index-admin-confirm: var(--primitive-z-90);
   --z-index-banner: var(--primitive-z-1200);
   --z-index-lightbox: var(--primitive-z-2000);
 }

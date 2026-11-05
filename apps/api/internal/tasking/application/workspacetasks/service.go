@@ -121,51 +121,6 @@ func (s *Service) stageWithTokenAt(taskID, workspaceID string, status tasks.Stat
 	})
 }
 
-func (s *Service) resolveSnapshot(ctx context.Context, service, resolution string) (routing.RoutingSnapshot, error) {
-	if s.resolver == nil {
-		requested := routing.Resolution(strings.ToLower(strings.TrimSpace(resolution)))
-		return routing.RoutingSnapshot{}, &routing.ResolutionUnavailableError{Service: service, Resolution: requested}
-	}
-	snap, err := s.resolver.Resolve(ctx, service, resolution)
-	if err != nil {
-		var inputErr *routing.InvalidRoutingInputError
-		if errors.As(err, &inputErr) {
-			return routing.RoutingSnapshot{}, tasks.NewValidationError(tasks.FieldError{Field: inputErr.Field, Message: "invalid"})
-		}
-		return routing.RoutingSnapshot{}, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
-	}
-	return snap, nil
-}
-
-// Quote mints an immutable price snapshot with no persistence (preflight,
-// separate from authoritative create).
-func (s *Service) Quote(ctx context.Context, params tasks.QuoteParams) (tasks.BillingSnapshot, error) {
-	if s.quoter == nil {
-		return tasks.BillingSnapshot{}, fmt.Errorf("workspacetasks: quoter unavailable: %w", tasks.ErrQuoteUnavailable)
-	}
-	kind, err := tasks.ValidateCreate(params.Service, nil, map[string]any{})
-	if err != nil {
-		return tasks.BillingSnapshot{}, err
-	}
-	quantity := params.Quantity
-	if quantity <= 0 {
-		quantity = 1
-	}
-	resolution := strings.TrimSpace(params.Resolution)
-	if resolution == "" {
-		resolution = workflow.OutputResolution1K
-	}
-	if _, err := s.resolveSnapshot(ctx, kind, resolution); err != nil {
-		return tasks.BillingSnapshot{}, err
-	}
-	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
-	if err != nil {
-		return tasks.BillingSnapshot{}, err
-	}
-	snapshot.SettlementState = "quoted"
-	return snapshot, nil
-}
-
 // Create settles one task atomically: Quote -> Hold -> Insert -> Enqueue,
 // fenced by a durable submit idempotency claim written in the same
 // transaction.

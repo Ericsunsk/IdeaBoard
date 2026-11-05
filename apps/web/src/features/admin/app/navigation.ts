@@ -50,7 +50,7 @@ export type AdminNavigationGroup = {
 export const adminNavigationGroups: AdminNavigationGroup[] = [
   { title: '业务监控', keys: ['statistics', 'monitor'] },
   { title: '运营管理', keys: ['users', 'credits'] },
-  { title: '系统配置', keys: ['models', 'feature-prompts', 'settings'] },
+  { title: '系统设置', keys: ['models', 'feature-prompts', 'settings'] },
 ]
 
 export function findAdminNavigationItemByPath(path: string) {

@@ -27,25 +27,31 @@ func (r policyRoleReader) GetOrganizationRoles(_ context.Context, _ string, user
 
 func TestPolicyCanManageScopes(t *testing.T) {
 	org := Scope{Kind: ScopeOrganization, OrganizationID: "org_1"}
-	personal := Scope{Kind: ScopePersonal}
 	p := Policy{OrganizationRoles: policyRoleReader{roles: map[int64]string{
 		1: tenancy.RoleOwner, 2: tenancy.RoleAdmin, 3: tenancy.RoleMember,
 	}}}
 	for _, tc := range []struct {
-		name          string
-		scope         Scope
-		actor         int64
-		personalOwner bool
-		want          bool
+		name    string
+		scope   Scope
+		actor   int64
+		want    bool
+		wantErr bool
 	}{
-		{"organization owner", org, 1, false, true},
-		{"organization admin", org, 2, false, true},
-		{"organization member", org, 3, true, false},
-		{"personal account holder", personal, 3, true, true},
-		{"personal workspace admin", personal, 3, false, false},
+		{"organization owner", org, 1, true, false},
+		{"organization admin", org, 2, true, false},
+		{"organization member", org, 3, false, false},
+		{"outsider", org, 9, false, false},
+		{"personal scope fails closed", Scope{Kind: ScopePersonal}, 3, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got, err := p.CanManage(context.Background(), tc.scope, tc.actor, tc.personalOwner); err != nil || got != tc.want {
+			got, err := p.CanManage(context.Background(), tc.scope, tc.actor)
+			if tc.wantErr {
+				if !errors.Is(err, ErrPersonalQuotaUnsupported) && err == nil {
+					t.Fatalf("CanManage() = %v, %v, want organization-only error", got, err)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
 				t.Fatalf("CanManage() = %v, %v, want %v", got, err, tc.want)
 			}
 		})
@@ -76,7 +82,7 @@ func TestPolicyCanSetOrganizationTargets(t *testing.T) {
 		{"outsider cannot set member", 4, 3, PeriodDaily, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := p.CanSet(context.Background(), scope, tc.actor, tc.target, tc.period, false)
+			got, err := p.CanSet(context.Background(), scope, tc.actor, tc.target, tc.period)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -87,12 +93,10 @@ func TestPolicyCanSetOrganizationTargets(t *testing.T) {
 	}
 }
 
-func TestPolicyCanSetPersonalRequiresHolder(t *testing.T) {
-	for _, holder := range []bool{true, false} {
-		got, err := (Policy{}).CanSet(context.Background(), Scope{Kind: ScopePersonal}, 1, 2, PeriodDaily, holder)
-		if err != nil || got != holder {
-			t.Fatalf("CanSet(holder=%v) = %v, %v", holder, got, err)
-		}
+func TestPolicyCanSetPersonalFailsClosed(t *testing.T) {
+	p := Policy{OrganizationRoles: policyRoleReader{roles: map[int64]string{1: tenancy.RoleOwner}}}
+	if _, err := p.CanSet(context.Background(), Scope{Kind: ScopePersonal}, 1, 2, PeriodDaily); !errors.Is(err, ErrPersonalQuotaUnsupported) {
+		t.Fatalf("personal CanSet() error = %v, want ErrPersonalQuotaUnsupported", err)
 	}
 }
 
@@ -112,7 +116,6 @@ func TestPolicyNormalizeRead(t *testing.T) {
 		{"Organization Owner", org, 1, PeriodDaily, &limit, PeriodUnlimited, nil},
 		{"Organization Member", org, 2, PeriodDaily, &limit, PeriodDaily, &limit},
 		{"missing member", org, 3, PeriodDaily, &limit, PeriodDaily, &limit},
-		{"Personal holder", Scope{Kind: ScopePersonal}, 1, PeriodDaily, &limit, PeriodDaily, &limit},
 		{"absent quota", org, 2, "", nil, PeriodUnlimited, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,12 +148,12 @@ func TestPolicyCanSetPropagatesRoleLookupFailures(t *testing.T) {
 			policyRoleReader: policyRoleReader{roles: map[int64]string{1: tenancy.RoleOwner, 2: tenancy.RoleAdmin}},
 			failedUserID:     failedUserID, err: lookupErr,
 		}}
-		decision, err := p.CanSet(context.Background(), scope, 1, 2, PeriodDaily, false)
+		decision, err := p.CanSet(context.Background(), scope, 1, 2, PeriodDaily)
 		if decision || !errors.Is(err, lookupErr) {
 			t.Fatalf("failed lookup for %d: CanSet() = %+v, %v, want denied and lookup error", failedUserID, decision, err)
 		}
 	}
-	decision, err := (Policy{}).CanSet(context.Background(), scope, 1, 2, PeriodDaily, false)
+	decision, err := (Policy{}).CanSet(context.Background(), scope, 1, 2, PeriodDaily)
 	if decision || err == nil {
 		t.Fatalf("missing reader: CanSet() = %+v, %v, want denied and error", decision, err)
 	}
@@ -160,7 +163,7 @@ func TestPolicyReadAndManagementPropagateRoleLookupFailures(t *testing.T) {
 	lookupErr := errors.New("role lookup failed")
 	p := Policy{OrganizationRoles: failingPolicyRoleReader{failedUserID: 1, err: lookupErr}}
 	scope := Scope{Kind: ScopeOrganization, OrganizationID: "org_1"}
-	allowed, err := p.CanManage(context.Background(), scope, 1, false)
+	allowed, err := p.CanManage(context.Background(), scope, 1)
 	if allowed || !errors.Is(err, lookupErr) {
 		t.Fatalf("CanManage() = %v, %v, want denied and lookup error", allowed, err)
 	}

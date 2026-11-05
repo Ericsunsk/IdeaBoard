@@ -90,7 +90,7 @@ function onSubmit(prompt: string) {
 .image-node-outpaint-overlay {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: var(--canvas-z-overlay);
   pointer-events: none;
 }
 
@@ -98,7 +98,9 @@ function onSubmit(prompt: string) {
   --outpaint-frame-stroke: 2px;
   --outpaint-frame-accent: var(--canvas-accent);
   --outpaint-frame-grid: var(--canvas-accent);
-  --outpaint-frame-contrast: color-mix(in srgb, white 74%, transparent);
+  /* Contrast ring over imagery: fixed light-ink inverse for media overlays
+     (mode-independent — the frame floats over image content, not app chrome). */
+  --outpaint-frame-contrast: color-mix(in srgb, var(--color-media-foreground) 74%, transparent);
   --outpaint-handle-center-inset: calc(var(--outpaint-frame-stroke) / 2);
   position: absolute;
   border: 0;

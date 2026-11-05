@@ -24,27 +24,33 @@ const PENDING_BANNER_CLASS =
   'bg-[linear-gradient(135deg,var(--color-admin-status-pending-glow),var(--color-admin-status-wash))] before:bg-info'
 const PENDING_DOT_CLASS = 'bg-info shadow-admin-status-dot-pending'
 
+// Running chrome is shared by the live `running` state and the requeued
+// attempt definition (same warning wash): single source, two definitions.
+const RUNNING_CHROME = {
+  color: 'var(--warning)',
+  bannerClass:
+    'bg-[linear-gradient(135deg,var(--color-admin-status-running-glow),var(--color-admin-status-wash))] before:bg-warning',
+  dotClass: 'bg-warning shadow-admin-status-dot-running',
+} as const
+
 export const adminTaskStatuses = TaskStatus
 
 const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   [TaskStatus.pending]: {
     tone: 'info',
-    text: '等待中',
+    text: 'Pending',
     color: PENDING_STATUS_COLOR,
     bannerClass: PENDING_BANNER_CLASS,
     dotClass: PENDING_DOT_CLASS,
   },
   [TaskStatus.running]: {
     tone: 'warning',
-    text: '执行中',
-    color: 'var(--warning)',
-    bannerClass:
-      'bg-[linear-gradient(135deg,var(--color-admin-status-running-glow),var(--color-admin-status-wash))] before:bg-warning',
-    dotClass: 'bg-warning shadow-admin-status-dot-running',
+    text: 'Running',
+    ...RUNNING_CHROME,
   },
   [TaskStatus.completed]: {
     tone: 'success',
-    text: '已完成',
+    text: 'Completed',
     color: 'var(--success)',
     bannerClass:
       'bg-[linear-gradient(135deg,var(--color-admin-status-success-glow),var(--color-admin-status-wash))] before:bg-success',
@@ -52,7 +58,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   },
   [TaskStatus.failed]: {
     tone: 'danger',
-    text: '失败',
+    text: 'Failed',
     color: 'var(--destructive)',
     bannerClass:
       'bg-[linear-gradient(135deg,var(--color-admin-status-danger-glow),var(--color-admin-status-wash))] before:bg-destructive',
@@ -60,16 +66,28 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   },
   [TaskStatus.cancelled]: {
     tone: 'neutral',
-    text: '已停止',
+    text: 'Cancelled',
     color: DEFAULT_STATUS_COLOR,
     bannerClass: DEFAULT_BANNER_CLASS,
     dotClass: DEFAULT_DOT_CLASS,
   },
 }
 
+// Attempt-only sixth definition (requeued): five task states stay single-sourced
+// from TaskStatus above; attempt labels delegate here without a local Set.
+const attemptExtraDefinitions: Record<string, TaskStatusDefinition> = {
+  requeued: {
+    tone: 'warning',
+    text: '已重试',
+    ...RUNNING_CHROME,
+  },
+}
+
 export function getTaskStatusDefinition(status: string): TaskStatusDefinition {
+  const core = taskStatusDefinitions[status as TaskStatusValue]
+  if (core) return core
   return (
-    taskStatusDefinitions[status as TaskStatusValue] || {
+    attemptExtraDefinitions[status] || {
       tone: 'neutral',
       text: status,
       color: DEFAULT_STATUS_COLOR,

@@ -15,7 +15,6 @@ func TestIdentityWireProjection(t *testing.T) {
 		WorkspacePublicID:      "ws_test123456",
 		BillingAccountID:       9001,
 		BillingAccountPublicID: "ba_test123456",
-		Shared:                 false,
 		OwnerType:              OwnerTypeWorkspace,
 		CreatedAt:              time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC),
 		UpdatedAt:              time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC),
@@ -39,8 +38,13 @@ func TestResolveFundsRejectsMalformedWorkspace(t *testing.T) {
 	if _, err := store.ResolveFunds(context.Background(), "not-a-workspace"); err == nil {
 		t.Fatal("ResolveFunds(malformed) = nil, want fail-closed error")
 	}
-	if _, err := store.ResolveFundsInTx(context.Background(), nil, "ws_test123456"); err == nil {
-		t.Fatal("ResolveFundsInTx(nil tx) = nil, want fail-closed error")
+	// Actor reads fail closed on malformed workspaces and non-positive actors
+	// without provisioning another wallet (#973/#978).
+	if _, err := store.ResolveFundsForActor(context.Background(), "not-a-workspace", 11); err == nil {
+		t.Fatal("ResolveFundsForActor(malformed) = nil, want fail-closed error")
+	}
+	if _, err := store.ResolveFundsForActor(context.Background(), "ws_0123456789ab", 0); err == nil {
+		t.Fatal("ResolveFundsForActor(zero actor) = nil, want fail-closed error")
 	}
 }
 
@@ -64,9 +68,9 @@ func TestResolveFundsRequiresStoreConfigured(t *testing.T) {
 // drift: the deep identity projects onto the agreed tenancy shape without
 // reinterpreting the mapping.
 func TestBillingAccountProjectionPreservesTenancyShape(t *testing.T) {
-	identity := Identity{BillingAccountID: 7, BillingAccountPublicID: "ba_abc", OwnerType: OwnerTypeOrganization, Shared: true}
+	identity := Identity{BillingAccountID: 7, BillingAccountPublicID: "ba_abc", OwnerType: OwnerTypeOrganization}
 	projected := identity.ToBillingAccount()
-	if projected.OwnerType != OwnerTypeOrganization || !projected.Shared {
+	if projected.OwnerType != OwnerTypeOrganization {
 		t.Fatalf("projection lost funds facts: %+v", projected)
 	}
 }

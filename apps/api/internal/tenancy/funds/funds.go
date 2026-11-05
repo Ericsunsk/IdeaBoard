@@ -20,8 +20,8 @@ import (
 const mintAttempts = 5
 
 // Owner types for the funds identity projection. Values stay byte-identical
-// to the tenancy postgres ownerTypeOf mapping ("workspace" for the Personal
-// survivor anchor, "organization" for the shared org pool).
+// to the tenancy postgres mapping ("workspace" for the Personal
+// account anchor, "organization" for the shared org pool).
 const (
 	OwnerTypeWorkspace    = "workspace"
 	OwnerTypeOrganization = "organization"
@@ -30,14 +30,13 @@ const (
 // Identity is the stable funds identity for one workspace consumption scope.
 // BillingAccountID is the internal join handle (database only, never on the
 // wire); BillingAccountPublicID is the stable ba_ funds identity the API
-// addresses. Workspace records the consumption location. Shared reports the
-// org-pool fact (true) versus the Personal survivor (false).
+// addresses. Workspace records the consumption location. OwnerType reports
+// the org-pool fact (organization) versus the Personal account (workspace).
 type Identity struct {
 	WorkspaceInternalID    int64
 	WorkspacePublicID      string
 	BillingAccountID       int64
 	BillingAccountPublicID string
-	Shared                 bool
 	OwnerType              string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
@@ -58,7 +57,6 @@ func (i Identity) ToBillingAccount() tenancy.BillingAccount {
 		OwnerType:           i.OwnerType,
 		WorkspaceInternalID: i.WorkspaceInternalID,
 		WorkspacePublicID:   i.WorkspacePublicID,
-		Shared:              i.Shared,
 		CreatedAt:           i.CreatedAt,
 		UpdatedAt:           i.UpdatedAt,
 	}
@@ -69,7 +67,7 @@ func (i Identity) ToBillingAccount() tenancy.BillingAccount {
 // closed; it never falls back to another wallet.
 type Resolver interface {
 	ResolveFunds(ctx context.Context, workspacePublicID string) (Identity, error)
-	ResolveFundsInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (Identity, error)
+	ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (Identity, error)
 }
 
 // Store provisions and resolves the stable funds identity over pool.
@@ -89,20 +87,19 @@ func NewStore(db *pgxpool.Pool) *Store {
 // Compile-time convergence with the agreed seam.
 var _ Resolver = (*Store)(nil)
 
-// ResolveFunds resolves workspace (ws_) to ba_ in one borrow-or-begin unit.
-// When ctx carries an ambient carrier it joins it (no new transaction, no
-// commit here); otherwise it begins, provisions, and commits its own unit so
-// first-touch provisioning is durable. Missing or ownerless scopes fail
-// closed; a zero account never returns success.
-func (s *Store) ResolveFunds(ctx context.Context, workspacePublicID string) (Identity, error) {
-	scope, err := dbutil.Begin(ctx, poolOf(s), pgx.TxOptions{})
+// withBorrow runs fn in one borrow-or-begin unit: it joins the ambient
+// carrier when one is staged, else opens its own commit-or-rollback unit
+// so first-touch provisioning is durable. Callers never manage the
+// lifecycle; fn receives only the query set.
+func withBorrow(ctx context.Context, db *pgxpool.Pool, fn func(queries *dbsqlc.Queries) (Identity, error)) (Identity, error) {
+	scope, err := dbutil.Begin(ctx, db, pgx.TxOptions{})
 	if err != nil {
 		return Identity{}, err
 	}
 	defer func() {
 		_ = scope.Rollback(ctx)
 	}()
-	identity, err := ResolveByPublicIDWithQueries(ctx, scope.Queries(), workspacePublicID)
+	identity, err := fn(scope.Queries())
 	if err != nil {
 		return Identity{}, err
 	}
@@ -112,15 +109,30 @@ func (s *Store) ResolveFunds(ctx context.Context, workspacePublicID string) (Ide
 	return identity, nil
 }
 
-// ResolveFundsInTx resolves workspace (ws_) to ba_ inside the caller's
-// transaction. It runs statements only and never commits or rolls back tx;
-// the caller owns the lifecycle. Task/Vision settlement uses this form so
-// Quote/Hold/Task/River stay atomic with the funds-identity provisioning.
-func (s *Store) ResolveFundsInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (Identity, error) {
-	if tx == nil {
-		return Identity{}, tenancy.ErrBillingWorkspaceInvalid
-	}
-	return ResolveByPublicIDWithQueries(ctx, dbsqlc.New(tx), workspacePublicID)
+// ResolveFunds resolves workspace (ws_) to ba_ in one borrow-or-begin unit.
+// When ctx carries an ambient carrier it joins it (no new transaction, no
+// commit here); otherwise it begins, provisions, and commits its own unit so
+// first-touch provisioning is durable. Missing or ownerless scopes fail
+// closed; a zero account never returns success.
+func (s *Store) ResolveFunds(ctx context.Context, workspacePublicID string) (Identity, error) {
+	return withBorrow(ctx, poolOf(s), func(queries *dbsqlc.Queries) (Identity, error) {
+		return ResolveByPublicIDWithQueries(ctx, queries, workspacePublicID)
+	})
+}
+
+// ResolveFundsForActor resolves workspace (ws_) to ba_ for one viewer in
+// one borrow-or-begin unit (payer = actor, #973/#978): the Organization
+// pool for org workspaces (actor-independent), else the viewer's own
+// deterministic Personal account (provisioned on demand, no fallback to
+// the workspace owner). Ownerless personal scopes, unknown workspaces,
+// and a non-positive actor all fail closed. Billing overview, balance,
+// usage, and billing-records reads use this seam so Personal members
+// each see their own (BillingAccount, User) column with zero cross
+// pollution; Org reads keep the shared pool.
+func (s *Store) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (Identity, error) {
+	return withBorrow(ctx, poolOf(s), func(queries *dbsqlc.Queries) (Identity, error) {
+		return ResolveByPublicIDForActorWithQueries(ctx, queries, workspacePublicID, actorUserID)
+	})
 }
 
 func poolOf(s *Store) *pgxpool.Pool {
@@ -130,6 +142,24 @@ func poolOf(s *Store) *pgxpool.Pool {
 	return s.db
 }
 
+// loadWorkspaceRowByPublicID maps a ws_ public id to its workspace row:
+// the single trim/validate/lookup seam behind both ByPublicID orders.
+// Unknown or malformed ids fail closed as ErrBillingWorkspaceInvalid.
+func loadWorkspaceRowByPublicID(ctx context.Context, queries *dbsqlc.Queries, workspacePublicID string) (dbsqlc.Workspace, error) {
+	trimmed := strings.TrimSpace(workspacePublicID)
+	if queries == nil || !contract.IsWorkspaceID(trimmed) {
+		return dbsqlc.Workspace{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	row, err := queries.GetWorkspaceByPublicID(ctx, trimmed)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return dbsqlc.Workspace{}, tenancy.ErrBillingWorkspaceInvalid
+		}
+		return dbsqlc.Workspace{}, err
+	}
+	return row, nil
+}
+
 // ResolveByPublicIDWithQueries is the single workspace (ws_) to ba_ seam
 // over an existing query set (caller transaction or pool). It maps the public
 // id to its internal id, then applies the fixed creation-scope order.
@@ -137,34 +167,31 @@ func poolOf(s *Store) *pgxpool.Pool {
 // settlement, HTTP visibility); this seam never grants visibility, only the
 // payer.
 func ResolveByPublicIDWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspacePublicID string) (Identity, error) {
-	trimmed := strings.TrimSpace(workspacePublicID)
-	if queries == nil || !contract.IsWorkspaceID(trimmed) {
-		return Identity{}, tenancy.ErrBillingWorkspaceInvalid
-	}
-	row, err := queries.GetWorkspaceByPublicID(ctx, trimmed)
+	row, err := loadWorkspaceRowByPublicID(ctx, queries, workspacePublicID)
 	if err != nil {
-		if database.IsNotFound(err) {
-			return Identity{}, tenancy.ErrBillingWorkspaceInvalid
-		}
 		return Identity{}, err
 	}
 	return ResolveByInternalIDWithQueries(ctx, queries, row.InternalID, row.PublicID)
 }
 
 // ResolveAccountRowByInternalIDWithQueries is the row-level fixed-order seam
-// for tenancy postgres adapters. It returns the stable dbsqlc row plus the
-// shared fact; Identity projection stays in ResolveByInternalIDWithQueries.
-// There is exactly one order implementation (this one).
-func ResolveAccountRowByInternalIDWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, bool, error) {
-	return resolveBillingAccountRow(ctx, queries, workspaceInternalID)
+// for tenancy postgres adapters. Identity projection stays in
+// ResolveByInternalIDWithQueries. There is exactly one order implementation
+// (resolveBillingAccountRowForScope with useActor=false).
+func ResolveAccountRowByInternalIDWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, error) {
+	return resolveBillingAccountRowForScope(ctx, queries, workspaceInternalID, 0, false)
 }
 
 // ResolveByInternalIDWithQueries applies the same fixed order to an already
 // resolved workspace internal id. Tenancy postgres delegates here so there
 // is exactly one order implementation. workspacePublicID rides the projection
 // only (pass "" to leave it empty); the order never reads it.
+//
+// This is the owner-based order for non-settlement readers. Settlement
+// uses ResolveByInternalIDForActorWithQueries so Personal scopes bill the
+// actor (payer = actor, #973/#974) instead of the workspace owner.
 func ResolveByInternalIDWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64, workspacePublicID string) (Identity, error) {
-	row, shared, err := resolveBillingAccountRow(ctx, queries, workspaceInternalID)
+	row, err := resolveBillingAccountRowForScope(ctx, queries, workspaceInternalID, 0, false)
 	if err != nil {
 		return Identity{}, err
 	}
@@ -173,31 +200,72 @@ func ResolveByInternalIDWithQueries(ctx context.Context, queries *dbsqlc.Queries
 		// of leaving a row that later reads as unfunded.
 		return Identity{}, tenancy.ErrBillingNotFound
 	}
-	return mapIdentity(row, workspaceInternalID, workspacePublicID, shared), nil
+	return mapIdentity(row, workspaceInternalID, workspacePublicID), nil
 }
 
-// resolveBillingAccountRow implements the fixed creation-scope order
-// (ADR-0038): the Organization pool for org workspaces, else the owner's
-// deterministic Personal survivor for personal workspaces (provisioned on
-// demand, so first reads never fork per-workspace accounts). Ownerless
-// personal scopes and missing rows fail closed; there is no link indirection
-// and no per-workspace mint. Byte-identical to the retired postgres helper.
-func resolveBillingAccountRow(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, bool, error) {
+// ResolveByPublicIDForActorWithQueries is the settlement payer seam
+// (payer = actor, #973/#974): the Organization pool for org workspaces
+// (actor-independent, same as the owner-based order), else the actor's
+// own deterministic Personal account (provisioned on demand, no fallback
+// to the workspace owner or any other wallet). Ownerless personal scopes,
+// unknown workspaces, and a non-positive actor all fail closed.
+func ResolveByPublicIDForActorWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspacePublicID string, actorUserID int64) (Identity, error) {
+	row, err := loadWorkspaceRowByPublicID(ctx, queries, workspacePublicID)
+	if err != nil {
+		return Identity{}, err
+	}
+	return ResolveByInternalIDForActorWithQueries(ctx, queries, row.InternalID, row.PublicID, actorUserID)
+}
+
+// ResolveByInternalIDForActorWithQueries applies the settlement payer
+// order to an already resolved workspace internal id. workspacePublicID
+// rides the projection only (pass "" to leave it empty); the order never
+// reads it.
+func ResolveByInternalIDForActorWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64, workspacePublicID string, actorUserID int64) (Identity, error) {
+	row, err := resolveBillingAccountRowForScope(ctx, queries, workspaceInternalID, actorUserID, true)
+	if err != nil {
+		return Identity{}, err
+	}
+	if row.InternalID <= 0 || strings.TrimSpace(row.PublicID) == "" {
+		// Creation path without a funds identity fails closed here instead
+		// of leaving a row that later reads as unfunded.
+		return Identity{}, tenancy.ErrBillingNotFound
+	}
+	return mapIdentity(row, workspaceInternalID, workspacePublicID), nil
+}
+
+// resolveBillingAccountRowForScope implements the fixed creation-scope
+// order behind both reader orders (ADR-0038 owner order, #973/#974
+// settlement payer order): the Organization pool for org workspaces
+// (actor-independent), else a deterministic Personal account provisioned on
+// demand. useActor=false reads the workspace owner's account (ownerless
+// personal scopes fail closed with ErrBillingConflict); useActor=true reads
+// the actor's own account (a non-positive actor fails closed with
+// ErrBillingWorkspaceInvalid, never falling back to the owner). There is no
+// link indirection and no per-workspace mint. Byte-identical to the retired
+// postgres helper.
+func resolveBillingAccountRowForScope(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID, actorUserID int64, useActor bool) (dbsqlc.BillingAccount, error) {
 	if queries == nil || workspaceInternalID <= 0 {
-		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
+		return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
 	}
 	ws, err := queries.GetWorkspaceByInternalID(ctx, workspaceInternalID)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
+			return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
 		}
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
 	if ws.OrganizationID.Valid {
 		return resolveOrganizationAccount(ctx, queries, ws.OrganizationID.Int64)
 	}
+	if useActor {
+		if actorUserID <= 0 {
+			return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
+		}
+		return resolvePersonalAccount(ctx, queries, actorUserID)
+	}
 	if !ws.OwnerUserID.Valid || ws.OwnerUserID.Int64 <= 0 {
-		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingConflict
+		return dbsqlc.BillingAccount{}, tenancy.ErrBillingConflict
 	}
 	return resolvePersonalAccount(ctx, queries, ws.OwnerUserID.Int64)
 }
@@ -259,40 +327,42 @@ func grantOrganizationBillingOwner(ctx context.Context, queries *dbsqlc.Queries,
 }
 
 // resolveOrganizationAccount returns the shared org pool, provisioning once.
-func resolveOrganizationAccount(ctx context.Context, queries *dbsqlc.Queries, organizationInternalID int64) (dbsqlc.BillingAccount, bool, error) {
+func resolveOrganizationAccount(ctx context.Context, queries *dbsqlc.Queries, organizationInternalID int64) (dbsqlc.BillingAccount, error) {
 	row, err := EnsureOrganizationBillingAccountInTx(ctx, queries, organizationInternalID, 0)
 	if err != nil {
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
-	return row, true, nil
+	return row, nil
 }
 
-// resolvePersonalAccount returns the owner's deterministic Personal
-// survivor (the Default-workspace-anchored account), provisioning the
+// resolvePersonalAccount returns the deterministic Personal account for
+// one user (their Default-workspace-anchored account), provisioning the
 // Default workspace, its membership, the account, and the owner grant on
 // demand through the caller's queries (no SQL-function dependency, so it
 // joins settlement transactions and works wherever the tenancy tables
-// exist). Personal workspaces never mint their own account and never read
+// exist). Callers pass the workspace owner for the owner-based order and
+// the submitter for the settlement payer order (payer = actor, #973/#974).
+// Personal workspaces never mint their own account and never read
 // link rows: every Personal scope of one user shares this pool.
-func resolvePersonalAccount(ctx context.Context, queries *dbsqlc.Queries, ownerUserID int64) (dbsqlc.BillingAccount, bool, error) {
-	if ownerUserID <= 0 {
-		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
+func resolvePersonalAccount(ctx context.Context, queries *dbsqlc.Queries, userID int64) (dbsqlc.BillingAccount, error) {
+	if userID <= 0 {
+		return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
 	}
-	def, err := EnsureDefaultWorkspaceWithQueries(ctx, queries, ownerUserID)
+	def, err := EnsureDefaultWorkspaceWithQueries(ctx, queries, userID)
 	if err != nil {
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
-	if err := EnsureWorkspaceAccountWithQueries(ctx, queries, def.InternalID, ownerUserID); err != nil {
-		return dbsqlc.BillingAccount{}, false, err
+	if err := EnsureWorkspaceAccountWithQueries(ctx, queries, def.InternalID, userID); err != nil {
+		return dbsqlc.BillingAccount{}, err
 	}
 	row, err := queries.GetBillingAccountByWorkspaceID(ctx, pgtype.Int8{Int64: def.InternalID, Valid: true})
 	if err != nil {
 		if database.IsNotFound(err) {
-			return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingNotFound
+			return dbsqlc.BillingAccount{}, tenancy.ErrBillingNotFound
 		}
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
-	return row, false, nil
+	return row, nil
 }
 
 // ensureBillingOwnerForOrg seeds the org owner as billing owner when
@@ -326,7 +396,7 @@ func ensureBillingOwner(ctx context.Context, queries *dbsqlc.Queries, billingAcc
 // Default workspace plus its owner membership through the caller's
 // queries (INSERT ... ON CONFLICT DO NOTHING plus read-back, so
 // concurrent callers converge to a single Default row). The Personal
-// survivor account follows via EnsureWorkspaceAccountWithQueries at the
+// account follows via EnsureWorkspaceAccountWithQueries at the
 // call sites that need funds identity.
 func EnsureDefaultWorkspaceWithQueries(ctx context.Context, q *dbsqlc.Queries, userID int64) (dbsqlc.Workspace, error) {
 	if userID <= 0 {
@@ -366,7 +436,7 @@ func EnsureDefaultWorkspaceWithQueries(ctx context.Context, q *dbsqlc.Queries, u
 // EnsureWorkspaceAccountWithQueries Get-or-Creates the per-workspace
 // account for a freshly minted workspace plus the creator billing-owner
 // grant. The wallet row follows via the account-insert trigger. Only the
-// Default workspace row owns such an anchor (the Personal survivor);
+// Default workspace row owns such an anchor (the Personal account anchor);
 // business workspaces never call this. Internal-only: this is the Personal
 // counterpart to EnsureOrganizationBillingAccountInTx; both resolve through
 // CreateBillingAccountStub, the sole billing_accounts insert primitive.
@@ -414,21 +484,17 @@ func isPublicIDConflict(err error) bool {
 		database.IsConstraintViolation(err, "uq_organizations_public_id")
 }
 
-func ownerTypeOf(row dbsqlc.BillingAccount) string {
+func mapIdentity(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string) Identity {
+	ownerType := OwnerTypeWorkspace
 	if row.OrganizationID.Valid {
-		return OwnerTypeOrganization
+		ownerType = OwnerTypeOrganization
 	}
-	return OwnerTypeWorkspace
-}
-
-func mapIdentity(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string, shared bool) Identity {
 	return Identity{
 		WorkspaceInternalID:    workspaceInternalID,
 		WorkspacePublicID:      workspacePublicID,
 		BillingAccountID:       row.InternalID,
 		BillingAccountPublicID: row.PublicID,
-		Shared:                 shared,
-		OwnerType:              ownerTypeOf(row),
+		OwnerType:              ownerType,
 		CreatedAt:              dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:              dbutil.TimeValue(row.UpdatedAt),
 	}

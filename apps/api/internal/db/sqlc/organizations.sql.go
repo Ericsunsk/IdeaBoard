@@ -175,16 +175,10 @@ SELECT m.organization_id, m.user_id, m.role, m.created_at
 FROM organization_memberships AS m
 WHERE m.organization_id = $1
 ORDER BY m.user_id ASC
-LIMIT $2
 `
 
-type ListOrganizationMembersParams struct {
-	OrganizationID int64 `json:"organization_id"`
-	RowLimit       int32 `json:"row_limit"`
-}
-
-func (q *Queries) ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error) {
-	rows, err := q.db.Query(ctx, listOrganizationMembers, arg.OrganizationID, arg.RowLimit)
+func (q *Queries) ListOrganizationMembers(ctx context.Context, organizationID int64) ([]OrganizationMembership, error) {
+	rows, err := q.db.Query(ctx, listOrganizationMembers, organizationID)
 	if err != nil {
 		return nil, err
 	}

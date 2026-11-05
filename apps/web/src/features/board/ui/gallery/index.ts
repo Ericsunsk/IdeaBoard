@@ -9,7 +9,7 @@ export { default as BoardsPage } from './views/BoardsPage.vue'
 // Controllers
 export { createGalleryController } from './controllers/galleryController'
 export { createCommandHandlers } from './controllers/commandHandlers'
-export { createCatalog, useCatalog } from './controllers/useCatalog'
+export { useCatalog } from './controllers/useCatalog'
 export {
   createBoardFeedback,
   useBoardFeedback,

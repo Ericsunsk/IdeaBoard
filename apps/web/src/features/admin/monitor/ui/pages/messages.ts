@@ -78,15 +78,23 @@ export const MONITOR_MESSAGES = {
   // Activity table.
   tableEmpty: '暂无事件日志',
   timestampColumn: '时间戳',
+  serviceColumn: '服务',
+  modelColumn: '模型',
+  statusColumn: 'Status',
+  resultColumn: '结果',
+  messageColumn: '消息',
+  creditsColumn: '消耗',
+  durationColumn: '耗时',
+  moreColumn: '详情',
   cancelAction: '取消',
   cancelTaskAria: '取消任务',
   moreDetailAria: '更多任务详情',
   totalRecords: (total: number) => `共 ${total} 条记录`,
   // Control toolbar.
-  sidebarToggleTitle: '切换侧边导航',
   timeRangeAria: '选择时间范围',
   moreActionsAria: '更多操作',
   // Events card.
+  eventsTitle: '事件',
   eventsInfoTitle: '查看事件时序概览',
   chartsToggle: (collapsed: boolean) => (collapsed ? '展开图表' : '折叠图表'),
   // Result cell.

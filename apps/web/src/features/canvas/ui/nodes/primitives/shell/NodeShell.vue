@@ -61,7 +61,7 @@ const nodeStyle = computed(() => ({
 <style scoped>
 .workflow-node {
   position: relative;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
   pointer-events: auto;
 }
 

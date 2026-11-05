@@ -54,6 +54,12 @@ var (
 	// render it distinctly from balance insufficiency (402) and other
 	// funds restrictions (403 billing_wallet_restricted).
 	ErrQuotaExhausted = errors.New("memberquotas: member quota exhausted")
+	// ErrPersonalQuotaUnsupported reports that a quota check targeted a
+	// Personal (non-Organization) Billing Account. MemberQuotas is
+	// Org-only (#975): Personal workspaces carry no quota concept, so the
+	// checks fail closed here instead of enforcing a Personal cap (never
+	// ErrQuotaExhausted on Personal scopes) or passing silently.
+	ErrPersonalQuotaUnsupported = errors.New("memberquotas: member quota is organization-only")
 	// ErrQuotaInvalid reports a malformed quota set request (unknown
 	// period, non-positive capped limit, over-ceiling limit, or a limit
 	// carried on unlimited).

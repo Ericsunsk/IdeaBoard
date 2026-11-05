@@ -12,9 +12,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"ideaboard/api/internal/billingoverview"
 	"ideaboard/api/internal/boards"
 	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	eventoutbox "ideaboard/api/internal/events/outbox"
 	"ideaboard/api/internal/generation/catalog"
@@ -66,6 +66,7 @@ import (
 	searchports "ideaboard/api/internal/searchcatalog/ports"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
 	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -290,16 +291,13 @@ func NewAppRouter(
 				TaskHolder:           taskServices.workspaceTaskHolder,
 				TaskQueue:            taskServices.workspaceTaskQueue,
 				TaskAssets:           taskServices.workspaceTaskAssets,
-				// #917: the quote/readiness preflight resolves the same stable
-				// Billing Account submit holds (no owner-wallet fallback) and
-				// gates the same Wallet funds (402 insufficient vs 403
-				// restricted). The store below is the same tenancy seam the
-				// workspace billing reads use, so every surface names one payer.
-				TaskQuoteBillingAccounts: billingAccounts,
-				TaskQuoteWallets:         services.creditService,
-				// #946: the quote/readiness preflight reports the same
-				// member quota submit enforces (not-ready early).
-				TaskQuoteQuotas: memberquotas.NewStore(repos.db),
+				TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+					Workspaces:      &taskadapters.ReadinessWorkspaceReader{Store: tenancyStore},
+					Boards:          &boardtaskaccess.Authorizer{Store: boardStore},
+					BillingAccounts: billingAccounts, Wallets: services.creditService,
+					Quotas: memberquotas.NewStore(repos.db),
+					Quoter: taskServices.workspaceTaskQuoter, Resolver: taskServices.workspaceTaskRouter,
+				}),
 				// #848: quote, submit, and readiness share one RoutingResolver
 				// over the catalog pool (ADR-0012 rule 10, single seam).
 				// Submit pins its snapshot atomically via
@@ -373,7 +371,9 @@ func NewAppRouter(
 			MemberDisplay: memberDisplay,
 			// Required read-only snapshot for the billing overview fan-out
 			// (REPEATABLE READ with ambient-carrier join).
-			Snapshot: billingoverview.PostgresSnapshot(repos.db),
+			Snapshot: func(ctx context.Context, read func(context.Context) error) error {
+				return dbutil.WithReadSnapshot(ctx, repos.db, read)
+			},
 			Branding: services.runtimeSettings,
 		},
 		// Control administration shares domain handlers and stores. The guard

@@ -4,8 +4,9 @@
   --canvas-chrome-control-gap: 12px;
   --canvas-chrome-minimap-height: 134px;
   --canvas-chrome-library-clearance: 20px;
-  --canvas-chrome-icon-size: var(--page-chrome-icon-size, 19px);
   --canvas-chrome-z-index: 100;
+  /* Board menu floats above the chrome region (see Canvas Layer Order). */
+  --canvas-chrome-menu-z-index: 140;
   z-index: var(--canvas-chrome-z-index);
 }
 
@@ -176,7 +177,7 @@
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
-  z-index: 140;
+  z-index: var(--canvas-chrome-menu-z-index);
   max-height: 280px;
   min-width: 220px;
   max-width: 280px;
@@ -265,8 +266,8 @@
 }
 
 .canvas-chrome-icon {
-  width: var(--canvas-chrome-icon-size, var(--page-chrome-icon-size, 19px));
-  height: var(--canvas-chrome-icon-size, var(--page-chrome-icon-size, 19px));
+  width: var(--page-chrome-icon-size, 19px);
+  height: var(--page-chrome-icon-size, 19px);
 }
 
 .canvas-chrome-status-control {

@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/searchcatalog"
 	visionapplication "ideaboard/api/internal/searchcatalog/application/vision"
 	"ideaboard/api/internal/searchcatalog/domain"
 
@@ -144,8 +145,11 @@ func readLibraryVisionImage(ctx context.Context, asset librarydomain.Asset) (dom
 	if strings.TrimSpace(rawURL) == "" {
 		rawURL = asset.PreviewURL
 	}
-	parsed, ok := parseHTTPSVisionImageURL(rawURL)
-	if !ok {
+	if !searchcatalog.IsV1VisionExternalImageURL(rawURL) {
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
+	}
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
 		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)
@@ -221,25 +225,7 @@ func parseLibraryAssetIDs(rawIDs []string) ([]int64, error) {
 	return ids, nil
 }
 
-// parseHTTPSVisionImageURL validates one server-fetchable reference image
-// URL: exact https (no exotic ports, no userinfo) with a host. The curated
-// CDN host checks are gone: the single gate is the safehttp transport
-// (private/loopback DNS + dial re-check, redirect re-validation, 3-hop
-// cap), so any public https URL is fetchable and anything else fails at
-// fetch time as unavailable.
-func parseHTTPSVisionImageURL(raw string) (*url.URL, bool) {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
-		return nil, false
-	}
-	if port := parsed.Port(); port != "" && port != "443" {
-		return nil, false
-	}
-	return parsed, true
-}
-
 // VisionExternalReference is the metadata the browser sends for a Search
-// reference whose image is owned by a third-party provider (Unsplash, Pexels).
 // The browser must never fetch the third-party image; the API retrieves,
 // validates, and forwards the bytes to the Vision provider. Allowing direct
 // fetches would re-introduce the cross-origin / CORS coupling that the
@@ -306,8 +292,11 @@ func isAllowedExternalProvider(provider string) bool {
 // the same one the library-asset path uses so the timeout and size cap stay
 // consistent (no per-host allowlist on either path).
 func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (domain.VisionImage, error) {
-	parsed, ok := parseHTTPSVisionImageURL(ref.PreviewURL)
-	if !ok {
+	if !searchcatalog.IsV1VisionExternalImageURL(ref.PreviewURL) {
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
+	}
+	parsed, err := url.Parse(strings.TrimSpace(ref.PreviewURL))
+	if err != nil {
 		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)

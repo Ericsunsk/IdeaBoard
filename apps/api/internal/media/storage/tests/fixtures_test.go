@@ -1,9 +1,11 @@
 package tests
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,8 +57,7 @@ const (
 	StorageSecretVersionStatusActive  = domain.StorageSecretVersionStatusActive
 	StorageSecretVersionStatusRetired = domain.StorageSecretVersionStatusRetired
 	StorageSecretVersionStatusRevoked = domain.StorageSecretVersionStatusRevoked
-	DefaultPresignTTL                 = ports.DefaultPresignTTL
-	MaxPresignTTL                     = ports.MaxPresignTTL
+	PresignTTL                        = ports.PresignTTL
 	UploadObjectRoot                  = domain.UploadObjectRoot
 	storageSecretAccessKeyName        = "secret_access_key"
 )
@@ -124,11 +125,11 @@ func withTempWorkingDir(t *testing.T) {
 
 func tinyPNGBytes(t *testing.T) []byte {
 	t.Helper()
-	data, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCwkAAAAASUVORK5CYII=")
-	if err != nil {
-		t.Fatalf("decode tiny png: %v", err)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewNRGBA(image.Rect(0, 0, 1, 1))); err != nil {
+		t.Fatalf("encode tiny png: %v", err)
 	}
-	return data
+	return buf.Bytes()
 }
 
 func assertDirEmpty(t *testing.T, dir string) {

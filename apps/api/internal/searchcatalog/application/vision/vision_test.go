@@ -69,7 +69,11 @@ func (s *visionClientStub) Extract(_ context.Context, _ ports.VisionProviderConf
 func TestVisionSearchServiceOrchestratesTypedPorts(t *testing.T) {
 	client := &visionClientStub{extraction: domain.VisionExtraction{Query: " warm cafe "}}
 	service := newVisionSearchService(visionConfigStub{config: ports.VisionProviderConfig{Model: "model"}}, client)
-	got, err := service.Extract(context.Background(), domain.VisionInput{Images: []domain.VisionImage{validVisionImage()}, UserText: "  warm   cafe "})
+	firstImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	got, err := service.Extract(context.Background(), domain.VisionInput{Images: []domain.VisionImage{firstImage}, UserText: "  warm   cafe "})
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
@@ -106,7 +110,11 @@ func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
 		body: `{"choices":[{"message":{"content":"` + "```json\\n{\\\"query\\\":\\\"warm cafe\\\"}\\n```" + `"}}]}`}
 
 	client := gatewayVisionProviderClient{gateway: fake}
-	gotExtraction, err := client.Extract(context.Background(), ports.VisionProviderConfig{Model: "model"}, domain.VisionInput{Images: []domain.VisionImage{validVisionImage(), secondImage}, UserText: "warm cafe"})
+	firstImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	gotExtraction, err := client.Extract(context.Background(), ports.VisionProviderConfig{Model: "model"}, domain.VisionInput{Images: []domain.VisionImage{firstImage, secondImage}, UserText: "warm cafe"})
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
@@ -127,17 +135,13 @@ func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
 		t.Fatalf("image content = %#v", payload.Messages)
 	}
 }
-func validVisionImage() domain.VisionImage {
-	return domain.VisionImage{
-		Filename:    "fixture.png",
-		ContentType: "image/png",
-		Data:        []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82},
-	}
-}
-
 func TestVisionGatewayClientMissingFailsClosed(t *testing.T) {
 	client := gatewayVisionProviderClient{}
-	if _, err := client.Extract(context.Background(), ports.VisionProviderConfig{Model: "model"}, domain.VisionInput{Images: []domain.VisionImage{validVisionImage()}}); err == nil {
+	missingImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	if _, err := client.Extract(context.Background(), ports.VisionProviderConfig{Model: "model"}, domain.VisionInput{Images: []domain.VisionImage{missingImage}}); err == nil {
 		t.Fatal("Extract() with nil gateway succeeded, want error")
 	}
 }

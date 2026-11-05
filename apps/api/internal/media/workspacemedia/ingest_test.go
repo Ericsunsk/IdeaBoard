@@ -136,6 +136,23 @@ func TestIngestImageRejectsBytesBeforeReservation(t *testing.T) {
 	}
 }
 
+func TestIngestImageRejectsTruncatedPNG(t *testing.T) {
+	full := ingestPNG(t)
+	truncated := full[:len(full)-10]
+	sessions := &ingestSessions{SessionStore: NewInMemoryWorkspaceMediaStoreForTests()}
+	objects := &ingestObjects{}
+	asset, err := IngestImage(context.Background(), sessions, objects, IngestImageParams{
+		WorkspaceID: "ws_image", OwnerUserID: 42, FilenameStem: "result", Data: truncated,
+	})
+	if err == nil || asset != nil || sessions.session != nil || objects.key != "" {
+		t.Fatalf("truncated png reserved resources: asset=%v, err=%v", asset, err)
+	}
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) || validationErr.Fields["file"] == "" {
+		t.Fatalf("truncated png error = %v, want typed file validation", err)
+	}
+}
+
 func TestIngestImageFailureLeavesNoAssetAndFailsSession(t *testing.T) {
 	for _, stage := range []string{"put", "complete"} {
 		t.Run(stage, func(t *testing.T) {

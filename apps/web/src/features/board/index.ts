@@ -92,7 +92,6 @@ export {
   type CatalogSortMode,
   type Catalog,
   type CatalogNavigation,
-  createCatalog,
   formatCatalogDate,
   useCatalog,
   createGalleryController,

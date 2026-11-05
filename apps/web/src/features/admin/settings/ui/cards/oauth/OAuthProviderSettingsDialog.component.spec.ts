@@ -66,7 +66,7 @@ describe('OAuthProviderSettingsDialog', () => {
     const secret = within(dialog).getByLabelText('Client Secret') as HTMLInputElement
     expect(secret).toHaveValue('')
     expect(secret).toHaveAttribute('type', 'password')
-    expect(secret).toHaveAttribute('placeholder', '已配置，留空则保持不变')
+    expect(secret).toHaveAttribute('placeholder', '已设置，留空则保持不变')
   })
 
   it('loads the other provider on demand when it is selected', async () => {
@@ -200,7 +200,7 @@ describe('OAuthProviderSettingsDialog', () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('请先配置 Discord 的 Client ID 和 Client Secret'),
+        expect.stringContaining('请先设置 Discord 的 Client ID 和 Client Secret'),
       ),
     )
     expect(resource.save).not.toHaveBeenCalled()

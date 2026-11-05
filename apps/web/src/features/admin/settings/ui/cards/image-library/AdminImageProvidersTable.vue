@@ -45,7 +45,7 @@
             <div class="flex items-center gap-2">
               <span
                 v-if="searchProviderLogo(data.provider as SearchProviderId)"
-                class="flex size-6 shrink-0 items-center justify-center rounded-control bg-white p-1 ring-1 ring-border"
+                class="flex size-6 shrink-0 items-center justify-center rounded-control bg-card p-1 ring-1 ring-border"
               >
                 <img
                   :src="searchProviderLogo(data.provider as SearchProviderId)"

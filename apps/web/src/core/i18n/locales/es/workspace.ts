@@ -185,9 +185,9 @@ export default {
     remaining: 'Quedan {remaining} Ideas',
     periodRange: '{start} – {end}',
     exhausted:
-      'Cuota personal agotada. Las nuevas generaciones de pago y Visual Search están en pausa hasta la próxima ventana o un límite mayor.',
+      'Cuota agotada. Las nuevas generaciones de pago y Visual Search están en pausa hasta la próxima ventana o un límite mayor.',
     managerOnly:
-      'Solo el titular de la cuenta Personal y los propietarios o administradores de la organización pueden cambiar las cuotas de miembros. Los administradores del espacio no pueden aumentar una cuota otorgada por el fondo.',
+      'Solo los propietarios o administradores de la organización pueden cambiar las cuotas de miembros. Los administradores del espacio no pueden aumentar una cuota otorgada por el fondo.',
     memberLabel: 'Miembro',
     periodLabel: 'Período',
     limitLabel: 'Límite (Ideas)',
@@ -202,6 +202,35 @@ export default {
     noQuotas: 'Sin cuotas de miembros. Todos son ilimitados.',
     sharedAccountNote:
       'El consumo de los colaboradores se descuenta del saldo compartido de la cuenta y se suma en todos sus espacios, atribuido al operador real.',
+    tableLabel: 'Tabla de uso de miembros',
+    overviewExhausted: '{count} agotada(s)',
+    headerMember: 'Miembro',
+    headerPeriod: 'Período',
+    headerUsed: 'Uso',
+    headerRemaining: 'Restante',
+    headerStatus: 'Estado',
+    headerActions: 'Acciones',
+    emptyTitle: 'Sin cuotas de miembros',
+    emptyDescription:
+      'Todos son ilimitados actualmente. Establezca la primera cuota para un miembro.',
+    createFirst: 'Establecer primera cuota',
+    createAction: 'Establecer cuota',
+    adjustAction: 'Ajustar',
+    unlimitedDash: '—',
+    statusNearExhausted: 'Por agotarse',
+    statusUnlimited: 'Ilimitado',
+    statusExhausted: 'Agotada',
+    nearExhaustedHint: 'Queda menos del 20%',
+    editTitle: 'Ajustar cuota de miembro',
+    editCreateTitle: 'Establecer cuota de miembro',
+    editDescription:
+      'Establezca la cuota del miembro con cargo a la cuenta compartida. Los cambios se aplican de inmediato sin borrar el historial de uso.',
+    memberPlaceholder: 'Seleccione un miembro',
+    unlimitedHint:
+      'Los miembros ilimitados usan el saldo compartido sin restricción. El historial no se ve afectado.',
+    clearConfirmTitle: 'Cambiar a ilimitado',
+    clearConfirmMessage: '¿Cambiar {name} a ilimitado? El historial no se ve afectado.',
+    clearConfirmAction: 'Confirmar cambio',
   },
   limits: {
     title: 'Límites de uso',

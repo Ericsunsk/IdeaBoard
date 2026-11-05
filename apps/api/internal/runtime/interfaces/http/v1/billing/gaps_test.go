@@ -319,7 +319,6 @@ func (f *fakeGapBillingAccounts) ResolveFunds(ctx context.Context, workspacePubl
 				WorkspacePublicID:      account.WorkspacePublicID,
 				BillingAccountID:       account.InternalID,
 				BillingAccountPublicID: account.PublicID,
-				Shared:                 account.Shared,
 				OwnerType:              account.OwnerType,
 			}, nil
 		}
@@ -344,9 +343,12 @@ func (f *fakeGapBillingAccounts) ResolveFunds(ctx context.Context, workspacePubl
 		WorkspacePublicID:      account.WorkspacePublicID,
 		BillingAccountID:       account.InternalID,
 		BillingAccountPublicID: account.PublicID,
-		Shared:                 account.Shared,
 		OwnerType:              account.OwnerType,
 	}, nil
+}
+
+func (f *fakeGapBillingAccounts) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
+	return f.ResolveFunds(ctx, workspacePublicID)
 }
 
 func (f *fakeGapBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {

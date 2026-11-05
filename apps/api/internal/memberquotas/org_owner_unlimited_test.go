@@ -45,7 +45,7 @@ func openOrgQuotaFixture(t *testing.T) *orgQuotaFixture {
 		t.Fatalf("seed quota org admin user: %v", err)
 	}
 	var orgID int64
-	if err := e.pool.QueryRow(ctx, `INSERT INTO organizations (public_id, name) VALUES ($1, 'quota-org') RETURNING internal_id`, fmt.Sprintf("org_quota%04d", quotaTestSeq)).Scan(&orgID); err != nil {
+	if err := e.pool.QueryRow(ctx, `INSERT INTO organizations (public_id, name) VALUES ($1, 'quota-org') RETURNING internal_id`, fmt.Sprintf("org_ownerquota%04d", quotaTestSeq)).Scan(&orgID); err != nil {
 		t.Fatalf("seed quota organization: %v", err)
 	}
 	if _, err := e.pool.Exec(ctx, `INSERT INTO organization_memberships (organization_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'admin'), ($1, $4, 'member')`, orgID, e.userA, userC, e.userB); err != nil {

@@ -322,16 +322,14 @@ function onMenuOpenChange(open: boolean) {
     transform var(--motion-control-duration) var(--motion-control-easing);
 }
 
-.board-card:hover,
-.board-card:focus-visible {
+.board-card:not(.board-card-enter-active):not(.board-card-appear-active):hover,
+.board-card:not(.board-card-enter-active):not(.board-card-appear-active):focus-visible {
   transform: translateY(-2px) scale(1.006);
 }
 
 .board-card-enter-active,
 .board-card-appear-active {
-  transition:
-    opacity var(--motion-enter-duration) var(--motion-enter-easing),
-    transform var(--motion-enter-duration) var(--motion-enter-easing);
+  transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
 }
 
 .board-card-leave-active {
@@ -341,14 +339,20 @@ function onMenuOpenChange(open: boolean) {
 }
 
 .board-card-enter-from,
-.board-card-appear-from,
+.board-card-appear-from {
+  opacity: 0;
+}
+
 .board-card-leave-to {
   opacity: 0;
   transform: translateY(12px) scale(0.985);
 }
 
 .board-card-enter-to,
-.board-card-appear-to,
+.board-card-appear-to {
+  opacity: 1;
+}
+
 .board-card-leave-from {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -359,8 +363,8 @@ function onMenuOpenChange(open: boolean) {
     transition: border-color var(--motion-control-duration) var(--motion-control-easing);
   }
 
-  .board-card:hover,
-  .board-card:focus-visible {
+  .board-card:not(.board-card-enter-active):not(.board-card-appear-active):hover,
+  .board-card:not(.board-card-enter-active):not(.board-card-appear-active):focus-visible {
     transform: none;
   }
 

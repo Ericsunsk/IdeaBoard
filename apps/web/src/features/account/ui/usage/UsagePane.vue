@@ -41,9 +41,6 @@
     </section>
 
     <template v-else-if="usage">
-      <p v-if="billingAccountId" class="mb-3 text-admin-meta text-muted-foreground" role="status">
-        {{ t('account.usage.sharedAccount', { account: billingAccountId }) }}
-      </p>
       <section :class="summaryPanelClass" :aria-label="t('account.usage.summaryAria')">
         <div :class="summaryGridClass">
           <article
@@ -163,12 +160,12 @@ import {
   resolveUsageChartTheme,
 } from '../../session/chart'
 import AccountPane from '../shared/AccountPane.vue'
-import { accountEmptyDescriptionClass, accountEmptyTitleClass } from '../shared/ui'
+import { accountDataTableFrameClass, accountEmptyDescriptionClass, accountEmptyTitleClass } from '../shared/ui'
 
 const props = defineProps<{ active: boolean }>()
 const { t, locale } = useI18n()
 const selectedRange = ref<UsageRange>(DEFAULT_USAGE_RANGE)
-const { billingAccountId, usage, displayRange, isInitialPending, isSwitching, error, retry } =
+const { usage, displayRange, isInitialPending, isSwitching, error, retry } =
   useUsage(selectedRange, () => props.active)
 const isForbidden = computed(() => userErrorCode(error.value) === 'billing_account_forbidden')
 
@@ -176,7 +173,7 @@ const isForbidden = computed(() => userErrorCode(error.value) === 'billing_accou
 useFailureToast(error, (value) => errorMessage(value), {
   skip: (value) => userErrorCode(value) === 'billing_account_forbidden' || usage.value != null,
 })
-const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-raised'
+const summaryPanelClass = `${accountDataTableFrameClass} overflow-hidden`
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
 const trendChartTheme = computed(() => resolveUsageChartTheme())

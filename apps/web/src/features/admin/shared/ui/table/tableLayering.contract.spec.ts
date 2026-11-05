@@ -12,9 +12,11 @@ import { describe, expect, it } from 'vitest'
  * - `components/ui/table/*`：原子实现。
  * - `core/components/DataTableFrame.vue`：用户面数据表实现（Admin 不用）。
  * - `features/admin/shared/ui/table/*`：AdminTable 数据封装实现。
- * - `features/admin/models/ui/dialog/AdminModelAddDialog.vue`：对话框本地多选
- *   列表（全选 indeterminate + 禁用行），暂未迁入 AdminTable，新增业务表不许仿效。
  * - `features/account/ui/usage/UsagePane.vue`：sr-only 无障碍数据表，无视觉表格。
+ *
+ * 说明：`AdminModelAddDialog.vue` 曾作为本地多选列表示例列入例外，现已无
+ * 原生 <table>（仅 provider select + model input），故不再列入 allowlist；
+ * 若将来对话框需要本地多选列表，必须改用 AdminTable，不得仿效手写表。
  */
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..')
 const ALLOWLIST = new Set([
@@ -28,7 +30,6 @@ const ALLOWLIST = new Set([
   'components/ui/table/TableHeader.vue',
   'components/ui/table/TableRow.vue',
   'core/components/DataTableFrame.vue',
-  'features/admin/models/ui/dialog/AdminModelAddDialog.vue',
   'features/account/ui/usage/UsagePane.vue',
 ])
 

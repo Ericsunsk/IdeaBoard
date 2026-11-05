@@ -141,7 +141,7 @@ describe('AdminStoragePage', () => {
       expect(mocks.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-load')),
     )
     expect(mocks.success).not.toHaveBeenCalled()
-    expect(screen.queryByText('加载存储配置失败')).not.toBeInTheDocument()
+    expect(screen.queryByText('加载存储设置失败')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByText('Ready')).not.toBeInTheDocument()
@@ -172,8 +172,8 @@ describe('AdminStoragePage', () => {
     expect(unverified.length).toBeGreaterThan(0)
     expect(unverified[0]?.parentElement?.className ?? '').toContain('bg-muted')
     expect(screen.queryByText('使用中')).not.toBeInTheDocument()
-    expect(screen.queryByText('已配置')).not.toBeInTheDocument()
-    expect(screen.queryByText('未配置')).not.toBeInTheDocument()
+    expect(screen.queryByText('已设置')).not.toBeInTheDocument()
+    expect(screen.queryByText('未设置')).not.toBeInTheDocument()
     expect(screen.queryByText('当前生效存储')).not.toBeInTheDocument()
     expect(screen.queryByText('状态')).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -261,8 +261,8 @@ describe('AdminStoragePage', () => {
     expect(screen.getByText('Ready')).toBeVisible()
     expect(screen.getByText('Unverified')).toBeVisible()
     expect(screen.queryByText('使用中')).not.toBeInTheDocument()
-    expect(screen.queryByText('已配置')).not.toBeInTheDocument()
-    expect(screen.queryByText('未配置')).not.toBeInTheDocument()
+    expect(screen.queryByText('已设置')).not.toBeInTheDocument()
+    expect(screen.queryByText('未设置')).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -299,7 +299,7 @@ describe('AdminStoragePage', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '阿里云 OSS' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cloudflare R2' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/存储配置名称/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/存储设置名称/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '基础与凭据' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '端点与网络' })).toBeInTheDocument()
 
@@ -360,7 +360,7 @@ describe('AdminStoragePage', () => {
     const storageDialog = await screen.findByRole('dialog')
     expect(within(storageDialog).queryByText('当前生效存储')).not.toBeInTheDocument()
     expect(within(storageDialog).queryByText('使用中')).not.toBeInTheDocument()
-    expect(within(storageDialog).queryByText('已配置')).not.toBeInTheDocument()
+    expect(within(storageDialog).queryByText('已设置')).not.toBeInTheDocument()
   })
 
   it('flips the storage switch optimistically and keeps the same DOM node on success', async () => {

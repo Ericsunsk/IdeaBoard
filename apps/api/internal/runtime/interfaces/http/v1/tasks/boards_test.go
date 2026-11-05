@@ -22,6 +22,8 @@ import (
 	"context"
 	"fmt"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,9 +82,12 @@ func newV1BoardTaskFixture(t *testing.T) *v1BoardTaskFixture {
 			TaskBillingAccounts: v1FakeBillingAccounts{},
 			// #917: the preflight resolves the same fixture account submit
 			// holds and gates the same fixture funds.
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         fx.wallets,
-			TaskAcceptance:           &v1testsupport.TxSubmissionAcceptance{Boards: &boardtaskaccess.Authorizer{Store: boardStore}, Assets: fx.assets},
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: fx.store},
+				Boards:     &boardtaskaccess.Authorizer{Store: boardStore}, Quoter: fx.quoter, Resolver: allowTestPoolResolver(),
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: fx.wallets, Quotas: nil,
+			}),
+			TaskAcceptance: &v1testsupport.TxSubmissionAcceptance{Boards: &boardtaskaccess.Authorizer{Store: boardStore}, Assets: fx.assets},
 		},
 	})
 	handler.Mount(v1)

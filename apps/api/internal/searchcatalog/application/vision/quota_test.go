@@ -1,9 +1,10 @@
-// Vision Search member quota tests (#946).
+// Vision Search member quota tests (#946, Org-only per #973/#977).
 //
 // The quota check joins the Vision reservation transaction after Quote
-// and before Hold: an over-quota request fails
-// closed with ErrVisionQuotaExhausted (403 member_quota_exhausted) and
-// leaves no operation row and no Hold.
+// and before Hold for Organization scopes only: an over-quota request
+// fails closed with ErrVisionQuotaExhausted (403 member_quota_exhausted)
+// and leaves no operation row and no Hold. Personal scopes bill the actor
+// with no quota concept and skip the check.
 // In-flight operations converge on their
 // submit-time payer and period facts, so terminal Capture/Release needs
 // no re-check.
@@ -23,16 +24,18 @@ import (
 )
 
 // TestVisionQuotaExhaustedBlocksReserve proves Task and Vision share one
-// member quota: a succeeded Vision Search consumes quota, and the next
-// request over the cap fails before any ledger or operation write while
-// the funded wallet stays untouched by the block.
+// member quota on Organization scopes: a succeeded Vision Search consumes
+// quota, and the next request over the cap fails before any ledger or
+// operation write while the funded pool stays untouched by the block.
 func TestVisionQuotaExhaustedBlocksReserve(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 25)
 	ctx := context.Background()
 	owner := env.createUser(t, "vision-quota-owner")
 	member := env.createUser(t, "vision-quota-member")
+	orgPublic := "org_visionquota01"
 	ws := "ws_visionquota01"
-	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
+	env.createOrg(t, orgPublic, map[int64]string{owner: "owner", member: "member"})
+	env.createOrgWorkspace(t, orgPublic, ws, map[int64]string{owner: "owner", member: "member"})
 	account := env.billingAccountFor(t, ws)
 	env.fundAccount(t, account, 1000)
 
@@ -78,15 +81,17 @@ func TestVisionQuotaExhaustedBlocksReserve(t *testing.T) {
 }
 
 // TestVisionQuotaGateReportsOwnReason proves the quota gate constrains
-// Vision Search on its own: a tight quota blocks with the quota reason,
-// and a roomy quota settles.
+// Vision Search on Organization scopes: a tight quota blocks with the
+// quota reason, and a roomy quota settles.
 func TestVisionQuotaGateReportsOwnReason(t *testing.T) {
 	env := openVisionWorkspaceEnv(t, 25)
 	ctx := context.Background()
 	owner := env.createUser(t, "vision-quota-owner")
 	member := env.createUser(t, "vision-quota-member")
+	orgPublic := "org_visionquota02"
 	ws := "ws_visionquota02"
-	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
+	env.createOrg(t, orgPublic, map[int64]string{owner: "owner", member: "member"})
+	env.createOrgWorkspace(t, orgPublic, ws, map[int64]string{owner: "owner", member: "member"})
 	account := env.billingAccountFor(t, ws)
 	env.fundAccount(t, account, 1000)
 
@@ -111,5 +116,38 @@ func TestVisionQuotaGateReportsOwnReason(t *testing.T) {
 	}
 	if _, err := service.Extract(ctx, ws, member, "vision-quota-4", visionTestInput()); err != nil {
 		t.Fatalf("roomy Extract() error = %v", err)
+	}
+}
+
+// TestVisionPersonalSkipsQuota proves Personal scopes never hit
+// member_quota_exhausted (#973/#977): even with a tight Personal quota row
+// present, the reservation skips the check and bills the actor's own
+// account.
+func TestVisionPersonalSkipsQuota(t *testing.T) {
+	env := openVisionWorkspaceEnv(t, 25)
+	ctx := context.Background()
+	owner := env.createUser(t, "vision-noquota-owner")
+	member := env.createUser(t, "vision-noquota-member")
+	ws := "ws_visionnoquota01"
+	env.createPersonalWorkspace(t, ws, owner, map[int64]string{member: "member"})
+	actorAccount := env.fundPersonal(t, member, 1000)
+
+	quotas := memberquotas.NewStore(env.pool)
+	tightQuota := int64(1)
+	if _, err := quotas.SetQuota(ctx, actorAccount, member, memberquotas.PeriodDaily, &tightQuota, owner); err != nil {
+		t.Fatalf("set tight personal quota: %v", err)
+	}
+	service := env.serviceWith(&visionClientStub{extraction: searchdomain.VisionExtraction{Query: "quota dunes"}})
+	service.SetQuotaChecker(quotas)
+
+	got, err := service.Extract(ctx, ws, member, "vision-noquota-1", visionTestInput())
+	if err != nil {
+		t.Fatalf("personal Extract() error = %v, want success (quota skipped)", err)
+	}
+	if got.Status != string(VisionOperationSucceeded) {
+		t.Fatalf("personal status = %q, want succeeded", got.Status)
+	}
+	if row := env.operationRow(t, got.OperationID); row.account != actorAccount {
+		t.Fatalf("personal operation payer = %d, want actor %d", row.account, actorAccount)
 	}
 }

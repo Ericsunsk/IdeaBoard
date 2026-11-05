@@ -303,7 +303,7 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
 .canvas-minimap-viewport-overlay {
   position: absolute;
   inset: 5px;
-  z-index: 6;
+  z-index: var(--canvas-z-minimap);
   pointer-events: none;
 }
 

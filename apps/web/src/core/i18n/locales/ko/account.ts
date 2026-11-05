@@ -105,8 +105,6 @@ export default {
     retryLoad: '다시 불러오기',
     loadMore: '더 불러오기',
     unknownTime: '알 수 없는 시간',
-    sharedAccount:
-      '공유 잔액 계정 {account}: 이 계정의 모든 워크스페이스에 동일한 잔액이 표시됩니다.',
     forbiddenTitle: '접근 제한됨',
     forbiddenDescription:
       '현재 역할로는 이 기록을 볼 수 없습니다. 워크스페이스 또는 결제 관리자에게 문의하세요.',
@@ -139,7 +137,6 @@ export default {
     rangeWeek: '주',
     rangeMonth: '월',
     rangeYear: '년',
-    sharedAccount: '공유 계정 {account}의 사용량입니다.',
     forbiddenTitle: '접근 제한됨',
     forbiddenDescription:
       '현재 역할로는 이 사용량을 볼 수 없습니다. 워크스페이스 또는 결제 관리자에게 문의하세요.',

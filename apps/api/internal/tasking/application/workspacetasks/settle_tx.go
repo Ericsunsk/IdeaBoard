@@ -13,6 +13,7 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
 	"ideaboard/api/internal/tasking/settlement"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -124,7 +125,7 @@ func (s *Service) createInTx(ctx context.Context, input tasks.CreateInput, kind,
 		committed = true
 		return replayed, nil
 	}
-	billingAccountID, err := s.billingAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)
+	billingAccountID, ownerType, err := s.billingAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID, input.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,13 @@ func (s *Service) createInTx(ctx context.Context, input tasks.CreateInput, kind,
 	}
 	snapshot.SettlementState = "quoted"
 	snapshot.BillingAccountID = billingAccountID
-	if s.quotas != nil && snapshot.TotalCredits > 0 {
+	if s.quotas != nil && snapshot.TotalCredits > 0 && ownerType == funds.OwnerTypeOrganization {
+		// Member quota gates Organization scopes only (#973/#974):
+		// Personal scopes bill the actor with no quota concept, so the
+		// settlement skips the check instead of enforcing a default.
+		// OwnerType organization is the funds-resolution org-pool fact:
+		// the single scope source, so an Org pool mislabeled workspace
+		// would silently skip enforcement.
 		if err := s.quotas.CheckQuotaInTx(ctx, tx, billingAccountID, input.OwnerUserID, snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
 			return nil, err
 		}

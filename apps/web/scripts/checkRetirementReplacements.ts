@@ -7,6 +7,7 @@ import postcss, { type Root } from 'postcss'
 import { parse as parseSfc } from '@vue/compiler-sfc'
 import { baseParse, NodeTypes, type ElementNode } from '@vue/compiler-dom'
 import ts from 'typescript'
+import { isRetiredProductTokenDecl } from './checkTokenGraph'
 
 export type RetirementSources = Record<string, string>
 export type RetirementViolation = { rule: string; file: string; message: string }
@@ -40,7 +41,6 @@ const requiredTokens = [
     `--color-admin-status-${status}-glow`,
     `--shadow-admin-status-dot-${status}`,
   ]),
-  ...['purple', 'orange', 'blue', 'rose'].map((provider) => `--color-provider-${provider}`),
   '--color-scrim',
   '--color-scrim-soft',
   ...[
@@ -369,11 +369,8 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
   })
   for (const file of tokenOwners) {
     css(file).walkDecls((decl) => {
-      if (
-        /^--(?:color-ib-|text-ib-|shadow-ib-(?:control|overlay|focus)|color-dialog-overlay)/.test(
-          decl.prop,
-        )
-      )
+      // Retired-namespace predicate lives in token-graph (single owner).
+      if (isRetiredProductTokenDecl(decl.prop))
         fail('token-namespace', file, `Retired namespace ${decl.prop}`)
     })
   }

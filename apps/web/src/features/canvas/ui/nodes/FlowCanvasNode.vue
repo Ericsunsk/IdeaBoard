@@ -278,7 +278,7 @@ function noopMouse() {}
 
 .flow-canvas-node__drag-zone {
   position: absolute;
-  z-index: 20;
+  z-index: var(--canvas-z-node);
   pointer-events: auto;
   cursor: grab;
   touch-action: none;

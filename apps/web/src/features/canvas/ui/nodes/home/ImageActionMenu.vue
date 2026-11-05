@@ -271,7 +271,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   border: none;
   backdrop-filter: none;
   box-shadow: none;
-  z-index: 30;
+  z-index: var(--canvas-z-node-menu);
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -352,7 +352,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   --canvas-range-track-background: var(--canvas-accent-outline);
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
   opacity: 0;
   pointer-events: none;
 }

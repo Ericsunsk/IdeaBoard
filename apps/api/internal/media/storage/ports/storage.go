@@ -2,11 +2,9 @@ package ports
 
 import (
 	"context"
-	"fmt"
 	"mime/multipart"
 	"time"
 
-	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage/domain"
 )
 
@@ -28,20 +26,6 @@ type StoredUploadRef struct {
 	SizeBytes      int64
 	ChecksumSHA256 string
 	Animated       bool
-}
-
-func (r StoredUploadRef) IngestionCompletion(sourceURL string) ingestion.Completion {
-	return ingestion.Completion{
-		StorageKey:     r.StorageKey,
-		URL:            r.URL,
-		SourceURL:      sourceURL,
-		MIMEType:       r.MIMEType,
-		Width:          r.Width,
-		Height:         r.Height,
-		SizeBytes:      r.SizeBytes,
-		ChecksumSHA256: r.ChecksumSHA256,
-		Animated:       r.Animated,
-	}
 }
 
 type StoredUploadObject struct {
@@ -93,19 +77,13 @@ type PresignedURL struct {
 	PresignID        string
 }
 
-const (
-	DefaultPresignTTL = 5 * time.Minute
-	MaxPresignTTL     = 5 * time.Minute
-)
+const PresignTTL = 5 * time.Minute
 
-func ClampTTL(requested time.Duration) (time.Duration, error) {
+func ClampTTL(requested time.Duration) time.Duration {
 	if requested <= 0 {
-		return DefaultPresignTTL, nil
+		return PresignTTL
 	}
-	if requested > MaxPresignTTL {
-		return MaxPresignTTL, fmt.Errorf("%w (requested %s, capped to %s)", domain.ErrPresignTTLTooLong, requested, MaxPresignTTL)
-	}
-	return requested, nil
+	return requested
 }
 
 type ObjectStore interface {

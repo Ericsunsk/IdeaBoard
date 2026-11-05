@@ -17,8 +17,8 @@ import AdminOptionFilter from './AdminOptionFilter.vue'
 describe('AdminOptionFilter browser contract', () => {
   const options = [
     { label: '全部状态', value: 'all' },
-    { label: '已配置', value: 'configured' },
-    { label: '未配置', value: 'unconfigured' },
+    { label: '已设置', value: 'configured' },
+    { label: '未设置', value: 'unconfigured' },
   ]
 
   /**
@@ -52,10 +52,10 @@ describe('AdminOptionFilter browser contract', () => {
     await user.click(trigger)
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: '已配置' })).toBeTruthy()
+      expect(screen.getByRole('option', { name: '已设置' })).toBeTruthy()
     })
     expect(screen.getByRole('option', { name: '全部状态' })).toBeTruthy()
-    expect(screen.getByRole('option', { name: '未配置' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: '未设置' })).toBeTruthy()
     void view
   })
 
@@ -66,11 +66,11 @@ describe('AdminOptionFilter browser contract', () => {
     const trigger = screen.getByRole('combobox', { name: '筛选提示词状态' })
     await user.click(trigger)
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: '已配置' })).toBeTruthy()
+      expect(screen.getByRole('option', { name: '已设置' })).toBeTruthy()
     })
 
     // reka highlights the current value on open, so the first ArrowDown moves off
-    // "全部状态" and the second lands on "未配置". The point of the test is that
+    // "全部状态" and the second lands on "未设置". The point of the test is that
     // arrow keys and Enter commit a selection at all: the old Popover
     // implementation supported none of this.
     await user.keyboard('{ArrowDown}')
@@ -81,7 +81,7 @@ describe('AdminOptionFilter browser contract', () => {
       expect(value.value).toBe('unconfigured')
     })
     await waitFor(() => {
-      expect(trigger.textContent).toContain('未配置')
+      expect(trigger.textContent).toContain('未设置')
     })
   })
 
@@ -92,10 +92,10 @@ describe('AdminOptionFilter browser contract', () => {
     const trigger = screen.getByRole('combobox', { name: '筛选提示词状态' })
     await user.click(trigger)
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: '已配置' })).toBeTruthy()
+      expect(screen.getByRole('option', { name: '已设置' })).toBeTruthy()
     })
 
-    await user.click(screen.getByRole('option', { name: '已配置' }))
+    await user.click(screen.getByRole('option', { name: '已设置' }))
 
     await waitFor(() => {
       expect(value.value).toBe('configured')

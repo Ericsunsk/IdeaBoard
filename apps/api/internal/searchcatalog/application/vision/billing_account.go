@@ -1,15 +1,16 @@
-// Vision workspace settlement identity (ADR-0038).
+// Vision workspace settlement identity (ADR-0038, payer = actor per
+// #973/#977).
 //
-// A Vision Search call bills the consuming Workspace's stable Billing
-// Account (fixed creation scope: the Organization pool for org workspaces,
-// the owner's deterministic Personal account for personal workspaces; fail
-// closed), never the operator's personal wallet. The operation row persists
-// the settlement triple: submitter (user_id, the real initiator, also the
-// Actor on every Command), consumption location (workspace_id), and payer
-// (billing_account_id). Hold/Capture/Release and background reconciliation
-// converge on the stored payer; they never re-resolve from the live Owner
-// or membership, so an owner handover or member departure mid-flight
-// cannot move the money.
+// A Vision Search call bills the submitter's own deterministic Personal
+// account for personal workspaces (the actor's Default-workspace-anchored
+// survivor, provisioned on demand, fail closed), and the Organization pool
+// for org workspaces (actor-independent, unchanged). The operation row
+// persists the settlement triple: submitter (user_id, the real initiator,
+// also the Actor on every Command), consumption location (workspace_id),
+// and payer (billing_account_id). Hold/Capture/Release and background
+// reconciliation converge on the stored payer; they never re-resolve from
+// the live Owner or membership, so an owner handover or member departure
+// mid-flight cannot move the money.
 //
 // The member quota (#946) joins this same settlement transaction: the
 // resolver runs inside the caller's tx before Quote/Hold, so the quota
@@ -35,16 +36,24 @@ import (
 type VisionSettlementIdentity struct {
 	// WorkspaceInternalID is the consumption location (workspaces.internal_id).
 	WorkspaceInternalID int64
-	// BillingAccountID is the stable payer (billing_accounts.internal_id).
+	// BillingAccountID is the settlement payer (billing_accounts.internal_id):
+	// the actor's own Personal account for personal workspaces, the shared
+	// Organization pool for org workspaces.
 	BillingAccountID int64
+	// OwnerType is the funds-resolution org-pool fact (organization means the
+	// shared Organization pool, so the reservation runs the member quota
+	// check; workspace means the Personal actor account, which carries no
+	// quota concept).
+	OwnerType string
 }
 
 // VisionBillingAccountResolver resolves the settlement triple inside the
 // caller's transaction and fails closed on ambiguity or conflict. The
 // production implementation below owns the fixed-scope chain; tests inject a
-// fake. Resolution never falls back to a personal wallet: scopeless
-// callers do not exist on this path (every vision call names its
-// consuming workspace).
+// fake. Resolution never falls back to another wallet: personal scopes
+// resolve the actor's own deterministic Personal account, organization
+// scopes the shared pool. Scopeless callers do not exist on this path
+// (every vision call names its consuming workspace).
 type VisionBillingAccountResolver interface {
 	ResolveVisionSettlementInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (VisionSettlementIdentity, error)
 	// ResolveWorkspaceInternalID maps a ws_ public id to its internal id
@@ -56,9 +65,10 @@ type VisionBillingAccountResolver interface {
 
 // visionBillingAccountResolver is the production fixed-scope chain over the
 // caller's transaction: workspace visibility + membership gate, then the
-// stable account resolution. Hidden workspaces and non-members converge
-// to ErrVisionWorkspaceNotFound (never a distinct billing status), per
-// anti-enumeration; billing ambiguity/conflict propagates fail-closed.
+// payer-aware account resolution (payer = actor, #973/#977). Hidden
+// workspaces and non-members converge to ErrVisionWorkspaceNotFound (never
+// a distinct billing status), per anti-enumeration;
+// billing ambiguity/conflict propagates fail-closed.
 type visionBillingAccountResolver struct{}
 
 func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (VisionSettlementIdentity, error) {
@@ -93,7 +103,7 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 		}
 	}
-	account, err := funds.ResolveByPublicIDWithQueries(ctx, queries, workspacePublicID)
+	account, err := funds.ResolveByPublicIDForActorWithQueries(ctx, queries, workspacePublicID, actorUserID)
 	if err != nil {
 		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 	}
@@ -103,6 +113,7 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 	return VisionSettlementIdentity{
 		WorkspaceInternalID: account.WorkspaceInternalID,
 		BillingAccountID:    account.BillingAccountID,
+		OwnerType:           account.OwnerType,
 	}, nil
 }
 

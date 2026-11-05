@@ -202,7 +202,7 @@ describe('mail/resource', () => {
         ),
       ),
     )
-    await expect(resource.get()).rejects.toThrow('权限不足，无法操作邮件配置')
+    await expect(resource.get()).rejects.toThrow('权限不足，无法操作邮件设置')
 
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/mail', () =>
@@ -212,7 +212,7 @@ describe('mail/resource', () => {
         ),
       ),
     )
-    await expect(resource.get()).rejects.toThrow('邮件配置不存在')
+    await expect(resource.get()).rejects.toThrow('邮件设置不存在')
 
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/mail', () =>
@@ -244,7 +244,7 @@ describe('mail/resource', () => {
     const resource = createAdminMailConfigResource()
     await expect(
       resource.update({ from_name: 'IdeaBoard', from_email: 'noreply@example.com' }),
-    ).rejects.toThrow('邮件配置不存在')
+    ).rejects.toThrow('邮件设置不存在')
     await expect(resource.clear()).rejects.toThrow('操作已提交，请勿重复操作')
   })
 })

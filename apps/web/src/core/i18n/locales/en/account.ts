@@ -105,8 +105,6 @@ export default {
     retryLoad: 'Retry load',
     loadMore: 'Load more',
     unknownTime: 'Unknown time',
-    sharedAccount:
-      'Shared balance account {account}: every workspace on this account shows the same balance.',
     forbiddenTitle: 'Access restricted',
     forbiddenDescription:
       'Your current role cannot view these records. Contact a workspace or billing admin.',
@@ -139,7 +137,6 @@ export default {
     rangeWeek: 'Week',
     rangeMonth: 'Month',
     rangeYear: 'Year',
-    sharedAccount: 'Usage of shared account {account}.',
     forbiddenTitle: 'Access restricted',
     forbiddenDescription:
       'Your current role cannot view this usage. Contact a workspace or billing admin.',

@@ -88,6 +88,7 @@ export const CANVAS_SCREEN_FILE = 'features/canvas/ui/screens/CanvasScreen.vue'
 export const SURFACE_SKIN_FILE = 'features/canvas/ui/styles/canvas-surface-skin.css'
 export const APP_STYLE_FILE = 'app/style.css'
 export const THEME_ENTRY_FILE = 'theme/theme.css'
+export const SEMANTIC_TOKENS_FILE = 'theme/tokens/semantic.css'
 export const CHROME_SKIN_FILE = 'features/canvas/ui/styles/canvas-chrome.css'
 export const STYLE_CONTRACTS_FILE = 'features/canvas/ui/styles/canvas-style-contracts.css'
 export const TOOLTIP_SKIN_FILE = 'features/canvas/ui/styles/canvas-tool-tooltip.css'
@@ -360,7 +361,7 @@ export function validateSurfaceTokenMapping(
   return issues
 }
 
-/** The tonal-range wash resolves through the app wash token with its fallback. */
+/** The tonal-range wash resolves through the app wash token directly (no local fallback). */
 export function validateSurfaceWash(skinCss: string, appCss: string): string[] {
   const issues: string[] = []
   requireDeclarations(
@@ -368,7 +369,7 @@ export function validateSurfaceWash(skinCss: string, appCss: string): string[] {
     skinCss,
     '.canvas-surface-skin',
     {
-      '--canvas-accent-wash': 'var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08))',
+      '--canvas-accent-wash': 'var(--color-canvas-accent-wash)',
     },
     'The surface skin',
   )
@@ -561,7 +562,7 @@ export function checkCanvasUiStyleSources(
     SURFACE_SKIN_FILE,
     validateSurfaceTokenMapping(
       sources[SURFACE_SKIN_FILE] ?? '',
-      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}`,
+      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}\n${sources[SEMANTIC_TOKENS_FILE] ?? ''}`,
       sources[HANDLE_RAIL_FILE] ?? '',
     ),
   )
@@ -570,7 +571,7 @@ export function checkCanvasUiStyleSources(
     SURFACE_SKIN_FILE,
     validateSurfaceWash(
       sources[SURFACE_SKIN_FILE] ?? '',
-      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}`,
+      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}\n${sources[SEMANTIC_TOKENS_FILE] ?? ''}`,
     ),
   )
   for (const file of CONSUMER_FILES) {
@@ -631,7 +632,7 @@ body.canvas-overscroll-guard {
   --canvas-accent: var(--color-canvas-accent);
   --canvas-accent-hover: var(--color-canvas-accent-hover);
   --canvas-text-muted: var(--color-canvas-text-secondary);
-  --canvas-accent-wash: var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08));
+  --canvas-accent-wash: var(--color-canvas-accent-wash);
   --flow-edge-color: var(--color-canvas-edge);
   --flow-edge-running-duration: 0.5s;
 }`
@@ -816,10 +817,7 @@ const FIXTURES: Fixture[] = [
     'surface wash hardcoded fallback fails',
     () =>
       validateSurfaceWash(
-        SKIN_POSITIVE.replace(
-          'var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08))',
-          'rgba(122, 107, 213, 0.08)',
-        ),
+        SKIN_POSITIVE.replace('var(--color-canvas-accent-wash)', 'rgba(122, 107, 213, 0.08)'),
         APP_POSITIVE,
       ),
     false,
@@ -1041,6 +1039,7 @@ const SOURCE_FILES = [
   SURFACE_SKIN_FILE,
   APP_STYLE_FILE,
   THEME_ENTRY_FILE,
+  SEMANTIC_TOKENS_FILE,
   CHROME_SKIN_FILE,
   STYLE_CONTRACTS_FILE,
   TOOLTIP_SKIN_FILE,

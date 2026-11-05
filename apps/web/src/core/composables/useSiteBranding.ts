@@ -88,20 +88,25 @@ export function resolveSiteBrandingLogoURL(logoURL: string): string {
   return resolveAssetUrl(trimmed)
 }
 
-export function validateSiteBrandingSetting(setting: BrandingSetting): string {
+export type SiteBrandingValidationError =
+  'nameRequired' | 'nameTooLong' | 'logoTooLong' | 'logoInvalid'
+
+export function validateSiteBrandingSetting(
+  setting: BrandingSetting,
+): SiteBrandingValidationError | '' {
   const projectName = setting.project_name.trim()
   const logoURL = setting.logo_url.trim()
   if (!projectName) {
-    return '项目名称不能为空'
+    return 'nameRequired'
   }
   if (Array.from(projectName).length > SITE_BRANDING_PROJECT_NAME_MAX_CHARS) {
-    return `项目名称不能超过 ${SITE_BRANDING_PROJECT_NAME_MAX_CHARS} 个字符`
+    return 'nameTooLong'
   }
   if (logoURL.length > SITE_BRANDING_LOGO_URL_MAX_LENGTH) {
-    return `Logo 地址不能超过 ${SITE_BRANDING_LOGO_URL_MAX_LENGTH} 个字符`
+    return 'logoTooLong'
   }
   if (!isValidSiteBrandingLogoURL(logoURL)) {
-    return 'Logo 地址必须为空、站内 Logo 链接或 http(s) URL'
+    return 'logoInvalid'
   }
   return ''
 }

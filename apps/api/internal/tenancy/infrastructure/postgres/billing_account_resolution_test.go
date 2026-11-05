@@ -8,6 +8,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -53,8 +54,8 @@ func TestBillingResolutionSharesOrgPool(t *testing.T) {
 	if wsA.InternalID == wsB.InternalID {
 		t.Fatal("workspaces must stay distinct resource scopes")
 	}
-	if accA.OwnerType != BillingOwnerOrganization || !accA.Shared {
-		t.Fatalf("org account view = %+v, want owner_type=organization shared=true", accA)
+	if accA.OwnerType != BillingOwnerOrganization {
+		t.Fatalf("org account view = %+v, want owner_type=organization", accA)
 	}
 	// Second org stays isolated.
 	owner2 := createTenancyTestUser(t, db)
@@ -197,7 +198,7 @@ func TestBillingResolutionJoinsCallerTx(t *testing.T) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := dbsqlc.New(tx)
-	resolved, err := EnsureBillingAccountForWorkspaceWithQueries(ctx, q, ws.InternalID)
+	resolved, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, q, ws.InternalID)
 	if err != nil {
 		t.Fatalf("tx resolution failed: %v", err)
 	}
@@ -226,7 +227,7 @@ func TestBillingResolutionFailClosed(t *testing.T) {
 	if _, err := baStore.EnsureBillingAccountForWorkspace(ctx, 0, "ws_missing"); !errors.Is(err, tenancy.ErrBillingWorkspaceInvalid) {
 		t.Fatalf("zero workspace err = %v, want ErrBillingWorkspaceInvalid", err)
 	}
-	if _, err := EnsureBillingAccountForWorkspaceWithQueries(ctx, dbsqlc.New(db), -1); !errors.Is(err, tenancy.ErrBillingWorkspaceInvalid) {
+	if _, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, dbsqlc.New(db), -1); !errors.Is(err, tenancy.ErrBillingWorkspaceInvalid) {
 		t.Fatalf("negative workspace err = %v, want ErrBillingWorkspaceInvalid", err)
 	}
 

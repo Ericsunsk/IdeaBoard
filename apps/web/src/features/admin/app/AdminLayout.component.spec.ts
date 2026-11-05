@@ -55,9 +55,13 @@ describe('AdminLayout', () => {
   it('renders grouped navigation with all sections', async () => {
     await renderLayout()
 
-    for (const group of ['业务监控', '运营管理', '系统配置']) {
+    for (const group of ['业务监控', '运营管理']) {
       expect(await screen.findByText(group)).toBeVisible()
     }
+    // 系统设置既是分组标题也是导航项：两者都应渲染。
+    const settingsNodes = await screen.findAllByText('系统设置')
+    expect(settingsNodes).toHaveLength(2)
+    settingsNodes.forEach((node) => expect(node).toBeVisible())
     for (const label of [
       '数据仪表盘',
       '任务监控',

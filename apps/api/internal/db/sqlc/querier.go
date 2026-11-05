@@ -558,7 +558,7 @@ type Querier interface {
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListNotificationsByUserID(ctx context.Context, arg ListNotificationsByUserIDParams) ([]UserNotification, error)
 	ListOrganizationMemberInvitesByOrganizationID(ctx context.Context, arg ListOrganizationMemberInvitesByOrganizationIDParams) ([]OrganizationMemberInvite, error)
-	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
+	ListOrganizationMembers(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
 	ListOrganizationMembersForSnapshot(ctx context.Context, organizationID int64) ([]ListOrganizationMembersForSnapshotRow, error)
 	ListOrganizationOwners(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
 	// Batch organization roles for many users inside one organization: a single

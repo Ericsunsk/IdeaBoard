@@ -25,19 +25,34 @@ func overviewData(t *testing.T, payload map[string]any) map[string]any {
 func TestV1BillingOverviewAggregatesPanelReads(t *testing.T) {
 	ctx := context.Background()
 	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "overview", 11)
-	fx.dir.ensure(11)
-	fx.dir.ensure(12)
+	// Org scope keeps the shared-pool manager projection (account scope,
+	// quota list, billing members). Personal scopes stay per-actor member
+	// reads (see TestV1BillingPersonalSplitsByActor).
+	org, err := fx.store.CreateOrganization(ctx, 11, "overview-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "overview")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}
+	fx.dir.ensure(11)
+	fx.dir.ensure(12)
 	account := fx.mustAccount(t, ctx, ws)
 	fx.seedWallet(account, 1000, 100)
 	fx.accounts.roles = map[int64]map[int64]string{account: {11: tenancy.BillingRoleOwner}}
+	// Org Owner reads unlimited (Owner short-circuit); the managed member
+	// carries the daily cap so the manager list stays covered.
 	dailyLimit := int64(100)
-	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodDaily
-	quotas.limit[quotaKey{account, 11}] = &dailyLimit
-	quotas.setUsed(account, 11, 25)
+	quotas.period[quotaKey{account, 12}] = memberquotas.PeriodDaily
+	quotas.limit[quotaKey{account, 12}] = &dailyLimit
+	quotas.setUsed(account, 12, 25)
 	engine := fx.engine()
 	path := "/api/v1/workspaces/" + ws.PublicID + "/billing-overview"
 
@@ -59,12 +74,16 @@ func TestV1BillingOverviewAggregatesPanelReads(t *testing.T) {
 		t.Fatalf("usage section = %v, want composed usage snapshot", data["usage"])
 	}
 	quota, ok := data["quota"].(map[string]any)
-	if !ok || quota["user_id"] != quotaUserPublicID(11) || quota["period"] != "daily" || quota["used_credits"] != float64(25) {
-		t.Fatalf("quota section = %v, want caller daily 25", data["quota"])
+	if !ok || quota["user_id"] != quotaUserPublicID(11) || quota["period"] != "unlimited" {
+		t.Fatalf("quota section = %v, want owner unlimited self", data["quota"])
 	}
 	quotasList, ok := data["quotas"].([]any)
 	if !ok || len(quotasList) != 1 {
 		t.Fatalf("quotas section = %v, want manager list with one row", data["quotas"])
+	}
+	row, ok := quotasList[0].(map[string]any)
+	if !ok || row["user_id"] != quotaUserPublicID(12) || row["period"] != "daily" || row["used_credits"] != float64(25) {
+		t.Fatalf("quotas row = %v, want member daily 25", quotasList[0])
 	}
 	managers, ok := data["billing_members"].([]any)
 	if !ok || len(managers) != 1 {
@@ -89,6 +108,13 @@ func TestV1BillingOverviewMemberViewOmitsManagerSections(t *testing.T) {
 	}
 	account := fx.mustAccount(t, ctx, ws)
 	fx.seedWallet(account, 500, 0)
+	// Personal per-actor reads (#978): the collaborator resolves their own
+	// account, so seed it too; otherwise the balance read fails closed.
+	memberIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.seedWallet(memberIdentity.BillingAccountID, 500, 0)
 	fx.accounts.roles = map[int64]map[int64]string{account: {11: tenancy.BillingRoleOwner}}
 	monthlyLimit := int64(200)
 	quotas.period[quotaKey{account, 11}] = memberquotas.PeriodMonthly
@@ -124,12 +150,21 @@ func TestV1BillingOverviewMemberViewOmitsManagerSections(t *testing.T) {
 func TestV1BillingOverviewLiveInvitesPendingOnly(t *testing.T) {
 	ctx := context.Background()
 	fx, _ := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "overview-invites", 11)
-	fx.dir.ensure(11)
-	fx.dir.ensure(12)
-	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+	// Org scope keeps transfer invites visible; Personal scopes omit them
+	// (read-only, no代付/transfer entry, see TestV1BillingPersonalSplitsByActor).
+	org, err := fx.store.CreateOrganization(ctx, 11, "overview-invites-org")
+	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "overview-invites")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.dir.ensure(11)
+	fx.dir.ensure(12)
 	account := fx.mustAccount(t, ctx, ws)
 	fx.seedWallet(account, 500, 0)
 	fx.accounts.roles = map[int64]map[int64]string{account: {11: tenancy.BillingRoleOwner}}
@@ -186,15 +221,117 @@ func TestV1BillingOverviewHiddenWorkspace(t *testing.T) {
 	}
 }
 
-func TestV1MemberQuotaScopeSelfShortcut(t *testing.T) {
+// TestV1BillingPersonalSplitsByActor pins #978: Personal workspaces resolve
+// the viewer's own (BillingAccount, User) column. A/B viewing the same
+// Personal workspace get different payer accounts, member scope, no quota
+// management, and no manager/transfer sections; usage and billing-records
+// filters stay actor-only so SQL applies authorization before pagination
+// and no viewer sees another member's amounts.
+func TestV1BillingPersonalSplitsByActor(t *testing.T) {
 	ctx := context.Background()
-	fx, quotas := newQuotaTestFixture()
-	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota-scope", 11)
+	fx, _ := newQuotaTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "personal-split", 11)
 	fx.dir.ensure(11)
 	fx.dir.ensure(12)
 	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}
+	ownerIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberIdentity, err := fx.accounts.ResolveFundsForActor(ctx, ws.PublicID, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ownerIdentity.BillingAccountID == memberIdentity.BillingAccountID {
+		t.Fatalf("personal accounts = %d, want per-actor isolation", ownerIdentity.BillingAccountID)
+	}
+	fx.seedWallet(ownerIdentity.BillingAccountID, 1000, 0)
+	fx.seedWallet(memberIdentity.BillingAccountID, 500, 0)
+	engine := fx.engine()
+
+	accounts := map[int64]string{}
+	for _, actor := range []int64{11, 12} {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-overview", userID: actor})
+		if status != http.StatusOK {
+			t.Fatalf("actor %d overview = %d (%v)", actor, status, payload)
+		}
+		data := overviewData(t, payload)
+		billingAccount, ok := data["billing_account"].(map[string]any)
+		if !ok {
+			t.Fatalf("actor %d billing_account missing: %v", actor, data)
+		}
+		if billingAccount["consumption_scope"] != "member" || billingAccount["can_manage_member_quotas"] != false {
+			t.Fatalf("actor %d billing_account = %v, want member scope without quota management", actor, billingAccount)
+		}
+		if _, present := data["quotas"]; present {
+			t.Fatalf("actor %d quotas = %v, want omitted for Personal", actor, data["quotas"])
+		}
+		if _, present := data["billing_members"]; present {
+			t.Fatalf("actor %d billing_members = %v, want omitted for Personal", actor, data["billing_members"])
+		}
+		if _, present := data["live_invites"]; present {
+			t.Fatalf("actor %d live_invites = %v, want omitted for Personal (no transfer entry)", actor, data["live_invites"])
+		}
+		quota, ok := data["quota"].(map[string]any)
+		if !ok || quota["period"] != "unlimited" {
+			t.Fatalf("actor %d quota = %v, want unlimited self", actor, data["quota"])
+		}
+		ba, _ := billingAccount["billing_account_id"].(string)
+		accounts[actor] = ba
+		if data["members_count"] != float64(2) {
+			t.Fatalf("actor %d members_count = %v, want 2", actor, data["members_count"])
+		}
+	}
+	if accounts[11] == "" || accounts[11] == accounts[12] {
+		t.Fatalf("payer accounts = %v, want distinct per-actor columns", accounts)
+	}
+
+	// Itemized reads stay actor-scoped on the viewer's own account.
+	for _, actor := range []int64{11, 12} {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: actor})
+		if status != http.StatusOK {
+			t.Fatalf("actor %d usage = %d (%v)", actor, status, payload)
+		}
+		wantAccount := ownerIdentity.BillingAccountID
+		if actor == 12 {
+			wantAccount = memberIdentity.BillingAccountID
+		}
+		if fx.usage.lastAccountID != wantAccount || fx.usage.lastFilter.ActorUserID != actor || fx.usage.lastFilter.WorkspaceID != 0 {
+			t.Fatalf("actor %d usage filter/account = %+v/%d, want actor-only on %d", actor, fx.usage.lastFilter, fx.usage.lastAccountID, wantAccount)
+		}
+		status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-records", userID: actor})
+		if status != http.StatusOK {
+			t.Fatalf("actor %d records = %d (%v)", actor, status, payload)
+		}
+		if fx.records.lastInput.BillingAccountID != wantAccount || fx.records.lastInput.ActorUserID != actor || fx.records.lastInput.WorkspaceID != 0 {
+			t.Fatalf("actor %d records input = %+v, want actor-only on %d", actor, fx.records.lastInput, wantAccount)
+		}
+	}
+}
+
+func TestV1MemberQuotaScopeSelfShortcut(t *testing.T) {
+	ctx := context.Background()
+	fx, quotas := newQuotaTestFixture()
+	// Org-only (#975): scope=self reads the caller's Org cap without the
+	// manager gate; Personal scopes carry no quota concept.
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-scope-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota-scope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.dir.ensure(11)
+	fx.dir.ensure(12)
 	account := fx.mustAccount(t, ctx, ws)
 	fx.accounts.roles = map[int64]map[int64]string{account: {11: tenancy.BillingRoleOwner}}
 	dailyLimit := int64(100)

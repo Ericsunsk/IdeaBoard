@@ -112,7 +112,8 @@ func IsValidationError(err error) bool {
 // INSERT-only in the durable implementation.
 //
 // BillingAccountID is the funds identity (#916): the stable Billing Account
-// whose Wallet was held. It never derives from the current Workspace Owner;
+// whose Wallet was held (Personal: the actor's own account; Organization:
+// the shared pool). It never derives from the current Workspace Owner;
 // the submitter rides OwnerUserID as the real operator (Actor).
 type BillingSnapshot struct {
 	BillingAccountID  int64     `json:"billing_account_id"`
@@ -167,9 +168,11 @@ type WorkspaceTask struct {
 	ID          string `json:"id"`
 	WorkspaceID string `json:"workspace_id"`
 	OwnerUserID int64  `json:"owner_user_id"`
-	// BillingAccountID is the stable funds identity resolved at submit
-	// (#916): terminal Capture/Release converge on this account with
-	// OwnerUserID as the operator Actor. Internal only, never on the wire.
+	// BillingAccountID is the settlement payer resolved at submit
+	// (#916, payer = actor per #973/#974: the actor's own Personal account
+	// or the shared Organization pool): terminal Capture/Release converge
+	// on this account with OwnerUserID as the operator Actor. Internal
+	// only, never on the wire.
 	BillingAccountID int64          `json:"-"`
 	Service          string         `json:"service"`
 	MediaAssetIDs    []string       `json:"media_asset_ids,omitempty"`

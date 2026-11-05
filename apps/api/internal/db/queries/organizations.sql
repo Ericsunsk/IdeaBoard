@@ -53,8 +53,7 @@ WHERE organization_id = sqlc.arg(organization_id) AND user_id = sqlc.arg(user_id
 SELECT m.organization_id, m.user_id, m.role, m.created_at
 FROM organization_memberships AS m
 WHERE m.organization_id = sqlc.arg(organization_id)
-ORDER BY m.user_id ASC
-LIMIT sqlc.arg(row_limit);
+ORDER BY m.user_id ASC;
 
 
 -- name: CountOrganizationOwners :one

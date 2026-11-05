@@ -31,19 +31,19 @@ describe('AdminTaskResultDialog', () => {
     {
       label: 'completed',
       task: { status: adminTaskStatuses.completed },
-      statusText: '已完成',
+      statusText: 'Completed',
       detailText: undefined,
     },
     {
       label: 'failed',
       task: { status: adminTaskStatuses.failed, error_msg: '上游请求失败' },
-      statusText: '失败',
+      statusText: 'Failed',
       detailText: '上游请求失败',
     },
     {
       label: 'cancelled',
       task: { status: adminTaskStatuses.cancelled },
-      statusText: '已停止',
+      statusText: 'Cancelled',
       detailText: '任务已停止，未继续执行。',
     },
   ] satisfies ReadonlyArray<{

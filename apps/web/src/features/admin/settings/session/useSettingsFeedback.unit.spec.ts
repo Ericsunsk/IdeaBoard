@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  formatAdminBrandingValidation,
   useAdminAccessSettingsFeedback,
   useAdminBrandingSettingsFeedback,
   useAdminMailSettingsFeedback,
@@ -35,9 +36,9 @@ describe('Admin mail settings feedback', () => {
     feedback.testSent()
     feedback.cleared()
     expect(toast.success.mock.calls.map(([message]) => message)).toEqual([
-      '邮件配置已保存，请发送 Test Email',
+      '邮件设置已保存，请发送 Test Email',
       'Test Email 已发送',
-      '邮件配置已删除',
+      '邮件设置已删除',
     ])
 
     // 内部错误（dial tcp）收敛到 fallback，不透出底层细节。
@@ -47,15 +48,15 @@ describe('Admin mail settings feedback', () => {
     feedback.testFailed(internalError)
     feedback.clearFailed(internalError)
     expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
-      '加载邮件配置失败',
-      '保存邮件配置失败',
+      '加载邮件设置失败',
+      '保存邮件设置失败',
       '发送 Test Email 失败',
-      '删除邮件配置失败',
+      '删除邮件设置失败',
     ])
 
     // 含 secret 的报错同样收敛到 fallback。
     feedback.saveFailed(new Error('api-key: sk_live_abc123'))
-    expect(toast.error).toHaveBeenLastCalledWith('保存邮件配置失败')
+    expect(toast.error).toHaveBeenLastCalledWith('保存邮件设置失败')
   })
 })
 
@@ -83,7 +84,7 @@ describe('Admin search provider feedback', () => {
     feedback.toggleFailed(internalError, true)
     feedback.toggleFailed(internalError, false)
     expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
-      '加载图片搜索供应商配置失败',
+      '加载图片搜索供应商设置失败',
       '保存 API Key 失败',
       '连接测试失败',
       '启用失败',
@@ -93,6 +94,16 @@ describe('Admin search provider feedback', () => {
 })
 
 describe('Admin branding settings feedback', () => {
+  it.each([
+    ['', ''],
+    ['nameRequired', '项目名称不能为空'],
+    ['nameTooLong', '项目名称不能超过 40 个字符'],
+    ['logoTooLong', 'Logo 地址不能超过 2048 个字符'],
+    ['logoInvalid', 'Logo 地址必须为空、站内 Logo 链接或 http(s) URL'],
+  ] as const)('presents semantic validation %s with colocated Chinese copy', (error, copy) => {
+    expect(formatAdminBrandingValidation(error)).toBe(copy)
+  })
+
   it('covers save/logo pairs with safe fallbacks and validation passthrough', () => {
     const feedback = useAdminBrandingSettingsFeedback()
 

@@ -111,7 +111,47 @@ const CUSTOMIZATION_POINT_REFS = new Set([
 
 const COLOR_ROLE_PATTERN =
   /^--(?:color|background|foreground|card|popover|primary|secondary|muted|accent|destructive|success|warning|info|border|input|ring|surface|sidebar|chart|workspace|tool|tooltip|progress)(?:-|$)/
+
+/**
+ * Single owner of the retired product-prefix token vocabulary.
+ * `checkStyleGovernance` (usage scans) and `checkRetirementReplacements`
+ * (declaration scans) both derive their matchers from this fragment so a new
+ * `ib-` alias cannot slip through one lane while the other stays green.
+ * The compatibility aliases in `checkRetirementReplacements` (`aliases`,
+ * e.g. `--color-canvas-text-control`) stay live: the admin theme-token bridge
+ * and canvas surface skin still resolve through them, so they are NOT deleted
+ * here — removing them would break closure and bridge-fallback contracts.
+ * Expiry: delete an alias only when the bridge fallback, the canvas surface
+ * skin, and `textRampContrast` no longer resolve through it (all three).
+ */
+export const RETIRED_PRODUCT_TOKEN_FRAGMENT =
+  'color-ib-[a-z0-9-]+|text-ib-[a-z0-9-]+|shadow-ib-(?:control|overlay|focus)(?=[\\s:),])'
+
+/** Declaration-side retired-namespace test (token-owner files). */
+export function isRetiredProductTokenDecl(prop: string): boolean {
+  return /^--(?:color-ib-|text-ib-|shadow-ib-(?:control|overlay|focus)|color-dialog-overlay)/.test(
+    prop,
+  )
+}
 const MECHANICAL_KEYWORD_PATTERN = /^(?:transparent|inherit|currentColor|none)$/i
+
+/**
+ * Single-source chrome roles: these resolve through mode-aware board-card /
+ * accent roles, so one dark declaration serves both modes and an explicit
+ * light twin would be byte-identical redundancy (see the single-source note
+ * over the page-chrome block in `tokens/semantic.css`). The exemption only
+ * applies while the dark value carries no raw design color of its own.
+ */
+const SINGLE_SOURCE_NO_LIGHT_TWIN = new Set([
+  '--color-page-chrome-bg',
+  '--color-page-chrome-bg-hover',
+  '--color-page-chrome-border',
+  '--color-page-chrome-border-hover',
+  '--color-page-chrome-color',
+  '--color-page-chrome-color-hover',
+  '--color-page-chrome-color-disabled',
+  '--color-page-chrome-focus-ring',
+])
 const RAW_COLOR_PATTERN =
   /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(|\b(?:white|black)\b/i
 
@@ -450,6 +490,11 @@ export function checkParity(decls: readonly TokenDecl[]): TokenViolation[] {
   }
   for (const [name, decl] of dark) {
     if (MECHANICAL_KEYWORD_PATTERN.test(decl.value)) continue
+    if (
+      SINGLE_SOURCE_NO_LIGHT_TWIN.has(name) &&
+      !RAW_COLOR_PATTERN.test(decl.value)
+    )
+      continue
     if (!light.has(name)) {
       issues.push({
         rule: 'mode-parity',

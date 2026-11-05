@@ -1,8 +1,5 @@
 <template>
   <AccountPane :title="t('account.tabs.billingTransactions')">
-    <p v-if="billingAccountId" class="mb-3 text-admin-meta text-muted-foreground" role="status">
-      {{ t('account.billingRecords.sharedAccount', { account: billingAccountId }) }}
-    </p>
     <DataTableFrame
       :value="tableRows"
       data-key="record_id"
@@ -93,16 +90,13 @@
           :retry-label="t('account.reload')"
           @retry="retryInitial()"
         />
-        <div
+        <AccountEmptyRetry
           v-else
-          class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
-          role="status"
-        >
-          <span :class="accountEmptyTitleClass">{{ t('account.billingRecords.emptyTitle') }}</span>
-          <span :class="accountEmptyDescriptionClass">{{
-            t('account.billingRecords.emptyDescription')
-          }}</span>
-        </div>
+          variant="tall"
+          announce="status"
+          :title="t('account.billingRecords.emptyTitle')"
+          :description="t('account.billingRecords.emptyDescription')"
+        />
       </template>
 
       <template #after>
@@ -158,8 +152,6 @@ import AccountPane from '../shared/AccountPane.vue'
 import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
 import {
   accountDataTableFrameClass,
-  accountEmptyDescriptionClass,
-  accountEmptyTitleClass,
 } from '../shared/ui'
 
 type BillingSkeletonRow = {
@@ -171,7 +163,6 @@ type BillingTableRow = BillingRecord | BillingSkeletonRow
 const props = defineProps<{ active: boolean }>()
 const { t } = useI18n()
 const {
-  billingAccountId,
   consumptionScope,
   records,
   isInitialPending,

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { setUserLocale } from '../../../../../core/i18n'
 import { renderWithUser, screen } from '../../../../../test/render'
 import { clearStoredAuth } from '../../../../../core/utils/auth'
-import { primeAuthenticatedWorkspace } from '../../../testing'
+import { makeBoardMeta, primeAuthenticatedWorkspace } from '../../../testing'
 import type { BoardAccessCapabilities } from '../../../session/catalog/boards'
 import type { CatalogEntry } from '../styling/contract'
 import BoardCard from '../cards/BoardCard.vue'
@@ -49,16 +49,12 @@ const viewerCapabilities: BoardAccessCapabilities = {
 }
 
 function shareBoard(): CatalogEntry {
-  return {
-    id: 'board-1',
-    name: 'Campaign',
-    createdAt: 1,
-    updatedAt: 2,
+  return makeBoardMeta('board-1', 'Campaign', 2, {
     capabilities: { ...manageCapabilities },
     accessState: 'workspace',
     workspaceAccess: 'none',
     isCreator: false,
-  }
+  })
 }
 
 function renderPage(board: CatalogEntry) {
@@ -90,6 +86,7 @@ function renderPage(board: CatalogEntry) {
       cancelRename: vi.fn(),
       reloadCatalog: vi.fn(),
       openBoardFromCard: vi.fn(),
+      openShare: vi.fn(),
       requestDelete: vi.fn(),
       closeDeleteDialog: vi.fn(),
       handleDeleteDialogHidden: vi.fn(),
@@ -127,12 +124,23 @@ afterEach(async () => {
 })
 
 describe('BoardsPage share intent', () => {
-  test('opens the single Share panel from the card Share item', async () => {
+  test('forwards the card Share item through the controller openShare seam', async () => {
     const view = renderPage(shareBoard())
 
     expect(screen.queryByTestId('share-stub')).toBeNull()
     await view.user.click(screen.getByRole('button', { name: 'More actions' }))
     await view.user.click(await screen.findByRole('menuitem', { name: 'Share' }))
+
+    expect(view.catalog.commands.openShare).toHaveBeenCalledWith('board-1')
+  })
+
+  test('opens the single Share panel through navigation.shareBoard', async () => {
+    renderPage(shareBoard())
+    const navigation = vi.mocked(useCatalog).mock.calls.at(-1)?.[0]?.navigation
+    expect(navigation?.shareBoard).toBeTypeOf('function')
+
+    expect(screen.queryByTestId('share-stub')).toBeNull()
+    navigation?.shareBoard?.('board-1')
 
     expect(await screen.findByTestId('share-stub')).toBeVisible()
   })

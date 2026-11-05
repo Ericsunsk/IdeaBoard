@@ -52,9 +52,9 @@ describe('AdminOAuthLoginCard', () => {
     expect(resource.get).toHaveBeenCalledWith('google')
     expect(resource.get).toHaveBeenCalledWith('discord')
 
-    await user.click(screen.getByRole('button', { name: '配置' }))
+    await user.click(screen.getByRole('button', { name: '设置' }))
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
-    expect(within(dialog).getByText('Google 凭据配置')).toBeVisible()
+    expect(within(dialog).getByText('Google 凭据设置')).toBeVisible()
   })
 
   it('routes load failure to toast error without an inline alert and keeps pills as truth', async () => {

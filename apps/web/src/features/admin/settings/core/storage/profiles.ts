@@ -177,7 +177,7 @@ export function canTest(storage: StorageCard, providerMap: ProviderMetaMap) {
 
 export function storageSubtitle(storage: StorageCard) {
   if (storage.provider === 'local') return ''
-  return configText(storage, 'bucket_name') || '未配置 Bucket'
+  return configText(storage, 'bucket_name') || '未设置 Bucket'
 }
 
 export function storageMetaItems(storage: StorageCard) {

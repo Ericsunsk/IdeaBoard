@@ -31,6 +31,7 @@ function createHarness() {
     commands: {
       hydrate: vi.fn(async () => ({ isOk: true as const })),
       create: vi.fn(async () => ({ isOk: true as const, board: makeBoard('created') })),
+      createAndOpen: vi.fn(async () => ({ isOk: true as const, board: makeBoard('created') })),
       rename: vi.fn(async () => ({ isOk: true as const, board: makeBoard('board-1') })),
       duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('copy') })),
       delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),

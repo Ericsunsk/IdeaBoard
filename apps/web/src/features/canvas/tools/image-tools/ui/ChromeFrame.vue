@@ -59,7 +59,7 @@ const chromeStyle = computed(() => ({
   --node-tool-button-gap: var(--image-tool-button-gap);
   --node-tool-icon-size: var(--image-tool-icon-size);
   position: absolute;
-  z-index: 21;
+  z-index: var(--canvas-z-node-chrome);
   overflow: visible;
   pointer-events: none;
 }

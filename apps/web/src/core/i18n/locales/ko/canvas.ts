@@ -37,7 +37,6 @@ export default {
     cancelled: '작업이 취소되었습니다',
     cancelledWithPartialResults: '작업이 취소되었습니다 — 부분 결과가 캔버스에 유지됩니다.',
     progressTimeout: '예상보다 오래 걸리고 있습니다. 잠시 후 다시 확인해 주세요.',
-    progressDataInvalid: '작업 진행 데이터가 올바르지 않습니다. 다시 시도해 주세요.',
     failedGeneric: '이미지 생성에 실패했습니다. 다시 시도해 주세요.',
   },
   minimap: {
@@ -45,7 +44,6 @@ export default {
   },
   controls: {
     prompt: '프롬프트',
-    promptPlaceholder: '아이디어를 입력하세요...',
     send: '적용',
     free: '무료',
     selectImageCountTooltip: '이미지 개수 선택',
@@ -139,10 +137,8 @@ export default {
   },
   contextMenu: {
     label: '캔버스 노드 작업',
-    addNode: '+ {title} 노드',
   },
   execution: {
-    missingBoardIdMask: '보드 ID가 없습니다. 마스크를 업로드할 수 없습니다.',
     markInpaintAreaFirst: '먼저 인페인팅할 영역을 표시하세요.',
     recoveryFailed: '이미지 결과를 복원하지 못했습니다. 다시 시도해 주세요.',
     canvasSaveFailedProgressLost:
@@ -161,7 +157,6 @@ export default {
     fusionNodeMissing: '퓨전 노드를 찾을 수 없습니다.',
     fusionNeedsTwoImages: '퓨전은 최소 2개의 이미지가 필요합니다.',
     fusionInputsInvalid: '퓨전 입력 이미지가 올바르지 않습니다.',
-    imageMissingUrl: '이미지에 URL이 없습니다.',
     outpaintMissingOriginalSize: '아웃페인트에 원본 이미지 크기가 없습니다.',
   },
   tools: {
@@ -169,7 +164,6 @@ export default {
     imageNotEditable: '이 이미지는 편집할 수 없습니다.',
     noEditableLayers: '적용할 편집 레이어가 없습니다.',
     autoConnectFailed: '이미지는 생성되었지만 자동 연결에 실패했습니다. 수동으로 연결해 주세요.',
-    applyEditFailed: '편집 내용을 적용하지 못했습니다.',
     maskPromptPlaceholder: '선택 영역을 어떻게 다시 칠할지 설명하세요',
     optionalPromptPlaceholder: '선택 사항',
     outpaintPromptPlaceholder: '아웃페인트 프롬프트를 입력하세요',
@@ -185,10 +179,6 @@ export default {
       '삭제를 캔버스에 기록하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.',
     deleteApplyFailedWarning:
       '삭제를 적용하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
-    connectRequiredInputLabel: '{label} 연결',
-    connectRequiredInputsLabel: '{count}개 입력 연결',
-    waitForInputLabel: '{label} 대기 중',
-    waitForInputsLabel: '{count}개 입력 대기 중',
   },
   handles: {
     inputDirectionLabel: '입력',

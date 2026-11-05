@@ -2,10 +2,11 @@
 :root {
   --search-overlay-btn-size: 28px;
   --search-dock-height: 44px;
-  /* Image overlay action fills source the app overlay-btn tokens; the local
-     names stay so card markup keeps referencing the Search contract. */
-  --search-overlay-btn-bg: var(--color-overlay-btn-bg, rgba(0, 0, 0, 0.42));
-  --search-overlay-btn-bg-hover: var(--color-overlay-btn-bg-hover, rgba(0, 0, 0, 0.68));
+  /* Image overlay action fills source the app overlay-btn tokens directly
+     (no local fallback values): the app tokens are always declared, and the
+     local names stay so card markup keeps referencing the Search contract. */
+  --search-overlay-btn-bg: var(--color-overlay-btn-bg);
+  --search-overlay-btn-bg-hover: var(--color-overlay-btn-bg-hover);
 }
 
 .search-reference-control {

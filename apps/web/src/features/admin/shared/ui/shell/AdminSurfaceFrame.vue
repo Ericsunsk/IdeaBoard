@@ -1,4 +1,7 @@
 <template>
+  <!-- Internal shell: intentionally NOT exported from `shared/index.ts`.
+    Verticals use `AdminTablePanel` (or `AdminCollectionPageShell`); this frame
+    stays private so the table/panel seam remains the single public entry. -->
   <div :class="rootClass">
     <div :class="panelClass">
       <slot v-if="hasToolbar" name="toolbar" />

@@ -2,10 +2,11 @@
 //
 // A Billing Account holds the unified balance; many Workspaces share one
 // account. Exactly one Personal account exists per user (the
-// Default-workspace-anchored survivor) and exactly one shared account per
+// Default-workspace-anchored account) and exactly one shared account per
 // Organization. Resolution is fixed at Workspace creation scope: org
 // workspaces resolve to the Organization pool, personal workspaces to
-// their owner's Personal survivor. Missing or ownerless scopes fail
+// their owner's deterministic Personal account (settlement bills the
+// actor's own account, payer = actor). Missing or ownerless scopes fail
 // closed instead of silently picking another wallet. Joining a Workspace
 // never merges personal funds; creating an Organization never moves
 // existing Personal workspaces.
@@ -80,10 +81,11 @@ func checkBillingMemberMutationInTx(ctx context.Context, q *dbsqlc.Queries, acco
 	return nil
 }
 
-// Billing owner types for the API projection.
+// Billing owner types for the API projection (aliases of the funds kernel
+// OwnerType values; single source is tenancy/funds).
 const (
-	BillingOwnerWorkspace    = "workspace"
-	BillingOwnerOrganization = "organization"
+	BillingOwnerWorkspace    = funds.OwnerTypeWorkspace
+	BillingOwnerOrganization = funds.OwnerTypeOrganization
 )
 
 // BillingAccountStore provisions and resolves stable billing accounts.
@@ -123,17 +125,18 @@ func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Conte
 	if s == nil || s.q == nil {
 		return tenancy.BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
 	}
-	row, shared, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, s.dbWithContext(ctx).q, workspaceInternalID)
+	row, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, s.dbWithContext(ctx).q, workspaceInternalID)
 	if err != nil {
 		return tenancy.BillingAccount{}, err
 	}
-	return mapBillingAccount(row, workspaceInternalID, workspacePublicID, shared), nil
+	return mapBillingAccount(row, workspaceInternalID, workspacePublicID), nil
 }
 
 // ResolveFunds resolves workspace (ws_) to the stable ba_ funds identity in
-// one borrow-or-begin unit (deep funds kernel). v1 handlers use this seam so
-// they pass only the ws_ public id and receive the ba_ identity; they never
-// branch on the workspace/org mapping that produced it.
+// one borrow-or-begin unit (deep funds kernel, owner-based order). v1 write
+// and manager paths use this seam so they address the owner/shared pool;
+// read-only billing views (overview, balance, usage, records) use
+// ResolveFundsForActor so Personal scopes bill the viewer.
 func (s *BillingAccountStore) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
 	if s == nil || s.db == nil {
 		// Still allow ambient-carrier borrow when the pool is nil (settlement
@@ -143,13 +146,16 @@ func (s *BillingAccountStore) ResolveFunds(ctx context.Context, workspacePublicI
 	return funds.NewStore(s.db).ResolveFunds(ctx, workspacePublicID)
 }
 
-// EnsureBillingAccountForWorkspaceWithQueries applies the same resolution to
-// an existing query set, including a caller-owned transaction. Task
-// settlement uses this form so resolution stays in the task insert
-// transaction without duplicating logic. Delegates to the funds kernel.
-func EnsureBillingAccountForWorkspaceWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, error) {
-	row, _, err := funds.ResolveAccountRowByInternalIDWithQueries(ctx, queries, workspaceInternalID)
-	return row, err
+// ResolveFundsForActor resolves workspace (ws_) to ba_ for one viewer
+// (payer = actor, #973/#978): the Organization pool for org workspaces,
+// else the viewer's own Personal account. Read-only billing views use
+// this seam so Personal members each see their own (BillingAccount, User)
+// column with zero cross pollution; Org reads keep the shared pool.
+func (s *BillingAccountStore) ResolveFundsForActor(ctx context.Context, workspacePublicID string, actorUserID int64) (funds.Identity, error) {
+	if s == nil || s.db == nil {
+		return funds.NewStore(nil).ResolveFundsForActor(ctx, workspacePublicID, actorUserID)
+	}
+	return funds.NewStore(s.db).ResolveFundsForActor(ctx, workspacePublicID, actorUserID)
 }
 
 // ensureOrganizationBillingAccountInTx delegates to the funds kernel so
@@ -207,10 +213,14 @@ func (s *BillingAccountStore) ListBillingAccountsForAdmin(ctx context.Context, b
 	}
 	out := make([]AdminBillingAccount, 0, len(rows))
 	for _, row := range rows {
+		ownerType := funds.OwnerTypeWorkspace
+		if row.OrganizationID.Valid {
+			ownerType = funds.OwnerTypeOrganization
+		}
 		out = append(out, AdminBillingAccount{
 			InternalID:           row.InternalID,
 			PublicID:             row.PublicID,
-			OwnerType:            ownerTypeOf(dbsqlc.BillingAccount{InternalID: row.InternalID, PublicID: row.PublicID, WorkspaceID: row.WorkspaceID, OrganizationID: row.OrganizationID}),
+			OwnerType:            ownerType,
 			WorkspacePublicID:    textOrEmpty(row.WorkspacePublicID),
 			OrganizationPublicID: textOrEmpty(row.OrganizationPublicID),
 			CreatedAt:            dbutil.TimeValue(row.CreatedAt),
@@ -297,8 +307,12 @@ func (s *BillingAccountStore) GetBillingAccountByInternalID(ctx context.Context,
 		}
 		return tenancy.BillingAccount{}, err
 	}
+	ownerType := funds.OwnerTypeWorkspace
+	if row.OrganizationID.Valid {
+		ownerType = funds.OwnerTypeOrganization
+	}
 	return tenancy.BillingAccount{
-		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerTypeOf(row),
+		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerType,
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
 }
@@ -322,7 +336,12 @@ func (s *BillingAccountStore) GetAdminBillingAccountByPublicID(ctx context.Conte
 		return AdminBillingAccount{}, err
 	}
 	detail := AdminBillingAccount{
-		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerTypeOf(row),
+		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: func() string {
+			if row.OrganizationID.Valid {
+				return funds.OwnerTypeOrganization
+			}
+			return funds.OwnerTypeWorkspace
+		}(),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}
 	if row.WorkspaceID.Valid {
@@ -361,7 +380,12 @@ func (s *BillingAccountStore) GetBillingAccountByPublicID(ctx context.Context, p
 		return tenancy.BillingAccount{}, err
 	}
 	return tenancy.BillingAccount{
-		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerTypeOf(row),
+		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: func() string {
+			if row.OrganizationID.Valid {
+				return funds.OwnerTypeOrganization
+			}
+			return funds.OwnerTypeWorkspace
+		}(),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
 }
@@ -501,13 +525,6 @@ func (s *BillingAccountStore) UpdateBillingAccountMemberRole(ctx context.Context
 	return updated, err
 }
 
-func ownerTypeOf(row dbsqlc.BillingAccount) string {
-	if row.OrganizationID.Valid {
-		return BillingOwnerOrganization
-	}
-	return BillingOwnerWorkspace
-}
-
 // textOrEmpty projects a nullable public id for Admin display. Invalid
 // values render empty; the ba_/ws_/org_ wire shape is set only from valid
 // database facts, never synthesized here.
@@ -518,14 +535,17 @@ func textOrEmpty(value pgtype.Text) string {
 	return value.String
 }
 
-func mapBillingAccount(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string, shared bool) tenancy.BillingAccount {
+func mapBillingAccount(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string) tenancy.BillingAccount {
+	ownerType := funds.OwnerTypeWorkspace
+	if row.OrganizationID.Valid {
+		ownerType = funds.OwnerTypeOrganization
+	}
 	return tenancy.BillingAccount{
 		InternalID:          row.InternalID,
 		PublicID:            row.PublicID,
-		OwnerType:           ownerTypeOf(row),
+		OwnerType:           ownerType,
 		WorkspaceInternalID: workspaceInternalID,
 		WorkspacePublicID:   workspacePublicID,
-		Shared:              shared,
 		CreatedAt:           dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:           dbutil.TimeValue(row.UpdatedAt),
 	}

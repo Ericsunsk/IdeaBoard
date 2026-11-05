@@ -93,7 +93,7 @@ watch(
 .flow-canvas-node__handle-rail {
   position: absolute;
   inset: 0;
-  z-index: 24;
+  z-index: var(--canvas-z-node-handle);
   pointer-events: none;
   overflow: visible;
 }
@@ -108,7 +108,7 @@ watch(
   opacity: 0;
   box-shadow: none;
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
 }
 
 .flow-canvas-node__handle-aggregate {
@@ -131,7 +131,7 @@ watch(
   visibility: hidden;
   box-shadow: none;
   pointer-events: none;
-  z-index: 24;
+  z-index: var(--canvas-z-node-handle);
   cursor: crosshair;
   touch-action: none;
   outline: none;

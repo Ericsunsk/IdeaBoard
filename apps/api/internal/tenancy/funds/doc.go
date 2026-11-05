@@ -3,17 +3,22 @@
 // It answers "whose money does this consumption spend" in one call inside
 // the caller's transaction: workspace (ws_) to stable Billing Account (ba_).
 // Resolution order is fixed at creation scope - the Organization pool for
-// org workspaces, the owner's deterministic Personal survivor (the
+// org workspaces, the owner's deterministic Personal account (the
 // Default-workspace-anchored account) for personal workspaces - and fails
 // closed on missing or ownerless scopes. There is no owner-wallet fallback,
 // no per-workspace mint, and no link indirection.
+//
+// Settlement (payer = actor, #973/#974) resolves through
+// ResolveByPublicIDForActorWithQueries: org scopes keep the shared pool
+// (actor-independent) while Personal scopes resolve the actor's own
+// deterministic Personal account, provisioned on demand with no fallback
+// to the workspace owner or any other wallet.
 //
 // Transaction discipline lives in the unified borrow-or-begin module
 // (dbutil.Begin/BorrowedQueries, the same seam
 // settlement.BorrowOrBeginScope delegates to); this package mints no
 // transaction and refuses no lifecycle itself. ResolveFunds borrows the ambient carrier when one is
-// staged, or begins an owned transaction otherwise; ResolveFundsInTx runs
-// statements only, never committing or rolling back the caller's unit.
+// staged, or begins an owned transaction otherwise.
 //
 // What it deliberately does NOT own (by design, not a gap):
 //   - Prices stay with Billing (Quote seam), ledger writes stay with Credits

@@ -49,7 +49,7 @@ export default {
     preconditionRequired: '访问状态已过期，已显示最新状态。',
     boardArchived: '该画板已归档，无法执行此操作。',
     memberUnknown: '该成员已不可用。',
-    invalidRequest: '访问配置无效。',
+    invalidRequest: '访问设置无效。',
     actionFailed: '操作未完成，请重试。',
     membersUnavailable: '成员加载失败。',
     retry: '重试',

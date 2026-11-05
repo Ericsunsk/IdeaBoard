@@ -27,12 +27,12 @@ describe('Admin storage feedback', () => {
     feedback.loadProfilesFailed(internalError)
     feedback.refreshFailed(internalError)
     expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
-      '加载存储配置失败',
-      '刷新存储配置失败',
+      '加载存储设置失败',
+      '刷新存储设置失败',
     ])
 
     feedback.loadProfilesFailed(new Error('api-key: sk_live_abc123'))
-    expect(toast.error).toHaveBeenLastCalledWith('加载存储配置失败')
+    expect(toast.error).toHaveBeenLastCalledWith('加载存储设置失败')
   })
 
   it('routes static warnings/info without formatting', () => {
@@ -42,7 +42,7 @@ describe('Admin storage feedback', () => {
     feedback.noCreatableProviders()
     feedback.bucketDomainsEmpty()
     expect(toast.warning.mock.calls.map(([message]) => message)).toEqual([
-      '存储配置已变化，请刷新后重试',
+      '存储设置已变化，请刷新后重试',
       '当前没有可新增的存储类型',
       '未检测到绑定域名',
     ])
@@ -51,7 +51,7 @@ describe('Admin storage feedback', () => {
     expect(toast.info).toHaveBeenCalledWith('S3 暂未接入后端，当前先作为预设展示')
 
     feedback.missingEditableTarget()
-    expect(toast.error).toHaveBeenCalledWith('未找到可编辑的存储配置')
+    expect(toast.error).toHaveBeenCalledWith('未找到可编辑的存储设置')
   })
 
   it('prefers server messages for save/apply/test/delete with safe fallbacks', () => {

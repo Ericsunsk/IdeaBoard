@@ -184,7 +184,7 @@ const emit = defineEmits<{
   delete: [item: AdminBillableItemCard]
 }>()
 
-// 未设置态与 Model 列未配置同样式（灰 mono 非粗体），有值才高亮。
+// 未设置态与 Model 列未设置同样式（灰 mono 非粗体），有值才高亮。
 // 数值列按 E6 追加 tabular-nums + whitespace-nowrap（ledger/orders 范本）。
 // 「未设置 / —」的档位语义区分保留，不收敛（见 billingPricingColumns.ts）。
 function priceValueClass(value: string): string {

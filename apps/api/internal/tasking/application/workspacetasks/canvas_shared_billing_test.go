@@ -5,11 +5,11 @@ package workspacetasks
 // What is proven here, over the real settlement seams (Billing catalog,
 // Credits Commands, postgres task Store, stable Billing Account
 // resolution):
-//   - Two Personal workspaces of one owner share the Personal survivor by
-//     creation scope (no link, no organization) and settle submits against
-//     that one payer with the real submitter as operator; no other wallet
+//   - Two Personal workspaces of one owner settle same-actor submits
+//     against that owner's Personal account with the real submitter as
+//     operator (payer = actor per #973/#974); no other wallet
 //     is touched.
-//   - Concurrent holds against the shared account cannot overdraft: every
+//   - Concurrent holds against one actor's account cannot overdraft: every
 //     failure is ErrInsufficientCredits and the balance never goes
 //     negative.
 //   - A repeated submit (same key + hash) replays the original task with
@@ -32,14 +32,20 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // openSharedBillingSecondWorkspace provisions a second personal workspace
 // for the same owner. Under ADR-0038 it shares the owner's Personal
-// survivor by creation scope alone (no link, no organization): the
+// account by creation scope alone (no link, no organization): the
 // no-organization cross-workspace sharing shape.
 func openSharedBillingSecondWorkspace(t *testing.T, env *atomicEnv) (string, int64) {
 	t.Helper()
@@ -199,7 +205,8 @@ func TestCanvasSubmitIdempotencyReplaySingleHold(t *testing.T) {
 // TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange proves member
 // departure, billing manager role changes, and payer-link changes never
 // rewrite an existing Task's attribution: terminal settlement converges on
-// the submit-time account facts.
+// the submit-time account facts (payer = actor per #973/#974, so the second
+// submitter spends their own funded Personal account).
 func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 	env := openAtomicEnv(t, 10)
 	ctx := context.Background()
@@ -220,6 +227,49 @@ func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 	).Scan(&otherUser); err != nil {
 		t.Fatalf("seed second user: %v", err)
 	}
+	// Payer = actor: the second submitter spends their own Personal
+	// account, so fund it before they submit.
+	otherAccount := func() int64 {
+		t.Helper()
+		queries := dbsqlc.New(env.pool)
+		def, err := funds.EnsureDefaultWorkspaceWithQueries(ctx, queries, otherUser)
+		if err != nil {
+			t.Fatalf("provision other default workspace: %v", err)
+		}
+		if err := funds.EnsureWorkspaceAccountWithQueries(ctx, queries, def.InternalID, otherUser); err != nil {
+			t.Fatalf("provision other personal account: %v", err)
+		}
+		row, err := queries.GetBillingAccountByWorkspaceID(ctx, pgtype.Int8{Int64: def.InternalID, Valid: true})
+		if err != nil {
+			t.Fatalf("resolve other personal account: %v", err)
+		}
+		tx, err := env.pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := env.credits.LifecycleInTx(tx).ProvisionAccountWallet(ctx, row.InternalID); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("provision other wallet: %v", err)
+		}
+		grantAmount, err := domain.NewCreditAmount(1000)
+		if err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatal(err)
+		}
+		if _, err := env.credits.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: row.InternalID, Amount: grantAmount, Metadata: domain.CommandMetadata{
+			IdempotencyKey: "shared-settle-other-seed-" + randomAtomicHex(t, 4),
+			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
+			Source:         "test", Reason: "shared settle other seed",
+			BusinessReference: domain.BusinessReference{Type: "test", ID: "shared-settle-other-seed"},
+		}}); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("grant other funds: %v", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return row.InternalID
+	}()
 	baStore := tenancypg.NewBillingAccountStore(env.pool)
 	if _, err := baStore.AddBillingAccountMember(ctx, env.accountID, env.userID, otherUser, tenancy.BillingRoleOwner); err != nil {
 		t.Fatalf("add billing admin: %v", err)
@@ -248,9 +298,10 @@ func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 		t.Fatalf("shared wallet = (%d, %d), want (990, 0) after capture on the original account", available, reserved)
 	}
 
-	// Failure still releases to the original account. The membership is
+	// Failure releases to the actor's own account. The membership is
 	// gone, so the submit below must come from the remaining billing
-	// owner through a fresh membership.
+	// owner through a fresh membership; payer = actor bills their own
+	// Personal account, not the departed submitter's.
 	if _, err := env.pool.Exec(ctx, `INSERT INTO workspace_memberships(workspace_id,user_id,role) SELECT internal_id,$2,'owner' FROM workspaces WHERE public_id=$1`, env.ws, otherUser); err != nil {
 		t.Fatalf("seed owner membership: %v", err)
 	}
@@ -262,15 +313,18 @@ func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 		t.Fatalf("second Create: %v", err)
 	}
 	_ = env.service.StagedEvents()
-	if failing.BillingAccountID != env.accountID {
-		t.Fatalf("second task billing account = %d, want the still-shared %d", failing.BillingAccountID, env.accountID)
+	if failing.BillingAccountID != otherAccount {
+		t.Fatalf("second task billing account = %d, want the actor account %d", failing.BillingAccountID, otherAccount)
 	}
 	if _, err := env.service.Fail(ctx, env.ws, failing.ID, "provider exploded"); err != nil {
 		t.Fatalf("Fail after tenancy change: %v", err)
 	}
 	_ = env.service.StagedEvents()
+	if available, reserved := collaboratorWallet(t, env, otherAccount); available != 1000 || reserved != 0 {
+		t.Fatalf("actor wallet = (%d, %d), want (1000, 0) after release to the actor account", available, reserved)
+	}
 	if available, reserved := env.wallet(t); available != 990 || reserved != 0 {
-		t.Fatalf("shared wallet = (%d, %d), want (990, 0) after release to the original account", available, reserved)
+		t.Fatalf("owner wallet = (%d, %d), want (990, 0) (first task captured, second billed the actor)", available, reserved)
 	}
 }
 

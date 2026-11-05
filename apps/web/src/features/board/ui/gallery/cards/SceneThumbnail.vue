@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootEl" class="scene-thumbnail">
+  <div ref="rootEl" class="scene-thumbnail" :style="aspectStyle">
     <div
       v-if="!presentation.viewBox"
       class="scene-empty"
@@ -52,6 +52,7 @@
       <g v-for="node in presentation.nodes" :key="node.id" :data-scene-node="node.id">
         <rect
           class="scene-frame"
+          :class="{ 'scene-frame--clear': !nodeFrameIsPending(node) }"
           :x="node.x"
           :y="node.y"
           :width="node.width"
@@ -77,6 +78,7 @@
             v-for="(slot, slotIndex) in node.slots"
             :key="slotIndex"
             class="scene-slot"
+            :class="{ 'scene-slot--clear': !nodeFrameIsPending(node) }"
             :x="slot.x"
             :y="slot.y"
             :width="slot.width"
@@ -110,6 +112,7 @@
           :height="raster.frame.height"
           :clip-id="clipIdFor(raster.key)"
           :is-enabled="isCardVisible"
+          @resolved="(isResolved) => onRasterResolved(raster.key, isResolved)"
         />
       </g>
     </svg>
@@ -117,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import type { PreviewScene } from '../../../core/preview/scene'
 import { composeSceneThumbnail } from '../../../core/preview/renderer'
@@ -138,6 +141,17 @@ useResizeObserver(rootEl, ([entry]) => {
 })
 
 const presentation = computed(() => composeSceneThumbnail(props.scene, viewport.value))
+// Fixed aspect-ratio placeholder from scene extent (H2): the first paint
+// reserves the extent ratio before any size measurement, so frames/glyphs
+// render from extent immediately without a size snap when rasters arrive.
+// Raster eligibility still follows MIN_RASTER_SIZE via measured viewport.
+const aspectStyle = computed(() => {
+  const { width, height } = props.scene.extent
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+    return { aspectRatio: `${width} / ${height}` }
+  }
+  return {}
+})
 const clips = computed(() =>
   presentation.value.nodes.flatMap((node) =>
     node.rasters.map((raster) => ({
@@ -150,6 +164,24 @@ const clips = computed(() =>
 
 function clipIdFor(rasterKey: string): string {
   return `thumb-${props.boardId}-${rasterKey}`
+}
+
+// Resolved raster identities (image mounted, any mime). Frames stay solid
+// only while an eligible raster is still pending/loading; once any raster
+// resolves the frame goes transparent — opaque pixels cover it fully via
+// `slice` so their paint is unchanged, while transparent sources show the
+// card surface instead of a gray matte. Unknown mimes therefore never show
+// gray. Empty nodes (no eligible rasters, only glyph/frame) are transparent
+// too and keep only the glyph plus the thin border.
+const rasterReadyByKey = reactive(new Set<string>())
+
+function onRasterResolved(rasterKey: string, isResolved: boolean): void {
+  if (isResolved) rasterReadyByKey.add(rasterKey)
+  else rasterReadyByKey.delete(rasterKey)
+}
+
+function nodeFrameIsPending(node: { rasters: Array<{ key: string }> }): boolean {
+  return node.rasters.length > 0 && !node.rasters.some((raster) => rasterReadyByKey.has(raster.key))
 }
 
 // Decide at setup: when intersection observation exists, cards start hidden
@@ -206,6 +238,15 @@ onUnmounted(() => {
   stroke: var(--border);
 }
 
+/* Resolved frames underdraw nothing: transparent sources show the card
+   preview surface instead of a solid matte, and opaque rasters cover the
+   frame fully via `slice`, so their paint is unchanged. Only
+   pending/loading rasters keep the solid placeholder. Empty nodes (glyph
+   only) stay transparent with the thin border. */
+.scene-frame--clear {
+  fill: transparent;
+}
+
 .scene-group {
   fill: none;
   stroke: var(--border);
@@ -227,6 +268,10 @@ onUnmounted(() => {
   fill: var(--muted);
   stroke: var(--border);
   opacity: 0.35;
+}
+
+.scene-slot--clear {
+  fill: transparent;
 }
 
 .scene-glyph {

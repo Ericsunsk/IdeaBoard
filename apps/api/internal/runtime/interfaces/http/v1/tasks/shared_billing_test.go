@@ -20,6 +20,8 @@ package tasks
 import (
 	"context"
 	"fmt"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,12 +29,14 @@ import (
 	"time"
 
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
+	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -53,41 +57,6 @@ func quoteRenderBody(boardID string) string {
 		return `{"data":{"service":"render","quantity":1}}`
 	}
 	return `{"data":{"service":"render","quantity":1,"board_id":"` + boardID + `"}}`
-}
-
-func TestV1TaskQuoteFundsGate(t *testing.T) {
-	t.Parallel()
-	fx := newV1TaskFixture(t)
-
-	// Funded account: 200 with a price snapshot.
-	status, payload := quoteTask(t, fx.engine, fx.ws.PublicID, 3, quoteRenderBody(""))
-	if status != http.StatusOK {
-		t.Fatalf("funded quote = %d %v, want 200", status, payload)
-	}
-
-	// Shortfall: 402 task_insufficient_credits (the fixture quotes 10).
-	fx.wallets.available = 5
-	status, payload = quoteTask(t, fx.engine, fx.ws.PublicID, 3, quoteRenderBody(""))
-	if status != http.StatusPaymentRequired || v1ErrorCode(t, payload) != string(contract.CodeTaskInsufficientCredits) {
-		t.Fatalf("shortfall quote = %d %v, want 402 task_insufficient_credits", status, payload)
-	}
-
-	// Active restriction: 403 billing_wallet_restricted, even when funded.
-	fx.wallets.available = 1000000
-	fx.wallets.restrictions = []string{"ledger_integrity"}
-	status, payload = quoteTask(t, fx.engine, fx.ws.PublicID, 3, quoteRenderBody(""))
-	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingWalletRestricted) {
-		t.Fatalf("restricted quote = %d %v, want 403 billing_wallet_restricted", status, payload)
-	}
-
-	// Restricted read model: 403 as well.
-	fx.wallets.restrictions = nil
-	fx.wallets.err = domain.ErrWalletRestricted
-	status, payload = quoteTask(t, fx.engine, fx.ws.PublicID, 3, quoteRenderBody(""))
-	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingWalletRestricted) {
-		t.Fatalf("restricted wallet quote = %d %v, want 403 billing_wallet_restricted", status, payload)
-	}
-	fx.wallets.err = nil
 }
 
 func TestV1TaskQuoteBoardGateMirrorsSubmit(t *testing.T) {
@@ -147,29 +116,6 @@ func TestV1TaskQuoteBoardGateMirrorsSubmit(t *testing.T) {
 	}
 }
 
-func TestV1TaskQuoteBoardArchived(t *testing.T) {
-	t.Parallel()
-	fx := newV1BoardTaskFixture(t)
-	if _, err := fx.boardStore.ArchiveBoard(context.Background(), fx.ws.PublicID, fx.boardID, 1); err != nil {
-		t.Fatal(err)
-	}
-	status, payload := quoteTask(t, fx.engine, fx.ws.PublicID, 1, quoteRenderBody(fx.boardID))
-	if status != http.StatusConflict || v1ErrorCode(t, payload) != string(contract.CodeBoardArchived) {
-		t.Fatalf("archived board quote = %d %v, want 409 board_archived", status, payload)
-	}
-}
-
-func TestV1TaskQuoteOutsiderHidden(t *testing.T) {
-	t.Parallel()
-	fx := newV1TaskFixture(t)
-	// Non-members converge to 404 task_not_found: the surface never leaks
-	// workspace existence, and financial standing alone grants no quote.
-	status, payload := quoteTask(t, fx.engine, fx.ws.PublicID, 9, quoteRenderBody(""))
-	if status != http.StatusNotFound || v1ErrorCode(t, payload) != string(contract.CodeTaskNotFound) {
-		t.Fatalf("outsider quote = %d %v, want 404 task_not_found", status, payload)
-	}
-}
-
 func TestV1TaskQuoteAndSubmitShareFixtureAccount(t *testing.T) {
 	t.Parallel()
 	fx := newV1TaskFixture(t)
@@ -226,9 +172,39 @@ func (s *stubTaskQuotas) CheckQuotaInTx(_ context.Context, _ pgx.Tx, _, _ int64,
 	return s.txErr
 }
 
+// v1PersonalBillingAccounts mirrors the Personal scope for the quota
+// preflight: the resolved account is actor-owned (Shared=false), so the
+// Org-only quota gate must skip without consulting the checker.
+type v1PersonalBillingAccounts struct{}
+
+func (v1PersonalBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, _ int64) (int64, string, error) {
+	return 7001, tenancypg.BillingOwnerWorkspace, nil
+}
+
+func (v1PersonalBillingAccounts) ResolveFundsForActor(_ context.Context, workspacePublicID string, _ int64) (funds.Identity, error) {
+	return funds.Identity{
+		WorkspaceInternalID:    7001,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       7001,
+		BillingAccountPublicID: "ba_quote0000001",
+		OwnerType:              tenancypg.BillingOwnerWorkspace,
+	}, nil
+}
+
 // newQuotaTaskEngine rebuilds the task surface of fx with the quota
 // seams installed: the shared fixture registers them nil (unlimited).
 func newQuotaTaskEngine(fx *v1TaskFixture, quotas *stubTaskQuotas) *gin.Engine {
+	return newQuotaTaskEngineWithAccounts(fx, quotas, v1FakeBillingAccounts{})
+}
+
+// newQuotaTaskEngineWithAccounts rebuilds the same surface with an
+// explicit billing-accounts seam so Personal-scope tests can prove the
+// Org-only quota gate skips without consulting the checker.
+func newQuotaTaskEngineWithAccounts(fx *v1TaskFixture, quotas *stubTaskQuotas, accounts interface {
+	ResolveBillingAccountInTx(context.Context, pgx.Tx, string, int64) (int64, string, error)
+	ResolveFundsForActor(context.Context, string, int64) (funds.Identity, error)
+},
+) *gin.Engine {
 	router := gin.New()
 	router.Use(runtimehttp.ContractRequestIDMiddleware())
 	router.Use(func(c *gin.Context) {
@@ -261,50 +237,64 @@ func newQuotaTaskEngine(fx *v1TaskFixture, quotas *stubTaskQuotas) *gin.Engine {
 		Tasks: ContractV1TaskDeps{
 			Tasks: fx.txTasks, TaskLifecycle: fx.txTasks, TaskSubmissionClaims: fx.txTasks,
 			TaskQuoter: fx.quoter, TaskHolder: fx.holder, TaskQueue: fx.queue, TaskAssets: fx.assets,
-			TaskRouter:               allowTestPoolResolver(),
-			TaskSnapshotSaver:        v1testsupport.TxSnapshotSaver(fx.saved),
-			TaskBillingAccounts:      v1FakeBillingAccounts{},
-			TaskQuotas:               quotas,
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         fx.wallets,
-			TaskQuoteQuotas:          quotas,
-			TaskAcceptance:           &v1testsupport.TxSubmissionAcceptance{Assets: fx.assets},
+			TaskRouter:          allowTestPoolResolver(),
+			TaskSnapshotSaver:   v1testsupport.TxSnapshotSaver(fx.saved),
+			TaskBillingAccounts: accounts,
+			TaskQuotas:          quotas,
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: fx.store},
+				Boards:     nil, Quoter: fx.quoter, Resolver: allowTestPoolResolver(),
+				BillingAccounts: accounts, Wallets: fx.wallets, Quotas: quotas,
+			}),
+			TaskAcceptance: &v1testsupport.TxSubmissionAcceptance{Assets: fx.assets},
 		},
 	})
 	handler.Mount(v1)
 	return router
 }
 
-func TestV1TaskQuoteQuotaExhausted(t *testing.T) {
+// TestV1TaskQuoteSharedFakePersonalSkipsQuota proves the shared
+// FakeBillingAccounts fake matches production on Personal scopes:
+// Shared=false skips the quota on both the quote preflight and the submit
+// settlement, exactly like the real funds resolution (Shared=false for the
+// Personal actor account).
+func TestV1TaskQuoteSharedFakePersonalSkipsQuota(t *testing.T) {
 	t.Parallel()
 	fx := newV1TaskFixture(t)
 	fx.wallets.available = 1000000
-	quotas := &stubTaskQuotas{quoteErr: memberquotas.ErrQuotaExhausted}
-	engine := newQuotaTaskEngine(fx, quotas)
+	quotas := &stubTaskQuotas{quoteErr: memberquotas.ErrQuotaExhausted, txErr: memberquotas.ErrQuotaExhausted}
+	accounts := v1testsupport.FakeBillingAccounts{Personal: true}
+	engine := newQuotaTaskEngineWithAccounts(fx, quotas, accounts)
 
-	status, payload := quoteTask(t, engine, fx.ws.PublicID, 3, quoteRenderBody(""))
-	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeMemberQuotaExhausted) {
-		t.Fatalf("quota quote = %d %v, want 403 member_quota_exhausted", status, payload)
-	}
-	if quotas.quotes != 1 {
-		t.Fatalf("quote quota checks = %d, want 1", quotas.quotes)
-	}
-	// Unlimited (nil error) keeps the funded quote green on the same seam.
-	quotas.quoteErr = nil
-	status, payload = quoteTask(t, engine, fx.ws.PublicID, 3, quoteRenderBody(""))
+	status, _ := quoteTask(t, engine, fx.ws.PublicID, 3, quoteRenderBody(""))
 	if status != http.StatusOK {
-		t.Fatalf("unlimited quote = %d %v, want 200", status, payload)
+		t.Fatalf("shared-fake personal quote = %d, want 200 (quota skipped)", status)
+	}
+	if quotas.quotes != 0 {
+		t.Fatalf("shared-fake personal quote quota checks = %d, want 0 (checker never consulted)", quotas.quotes)
+	}
+	status, _, payload := doV1(t, engine, v1Call{
+		method: http.MethodPost, path: "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks", userID: 3,
+		body:    v1CreateTaskBodyJSON("render"),
+		headers: map[string]string{contract.IdempotencyKeyHeader: "shared-fake-personal-submit"},
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("shared-fake personal submit = %d %v, want 202 (quota skipped)", status, payload)
+	}
+	if quotas.txChecks != 0 {
+		t.Fatalf("shared-fake personal submit quota checks = %d, want 0 (checker never consulted)", quotas.txChecks)
 	}
 }
 
 func TestV1TaskSubmitQuotaExhausted(t *testing.T) {
 	t.Parallel()
 	fx := newV1TaskFixture(t)
+	orgWS := newOrgQuotaWorkspace(t, fx)
 	quotas := &stubTaskQuotas{txErr: memberquotas.ErrQuotaExhausted}
 	engine := newQuotaTaskEngine(fx, quotas)
 
 	status, _, payload := doV1(t, engine, v1Call{
-		method: http.MethodPost, path: "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks", userID: 3,
+		method: http.MethodPost, path: "/api/v1/workspaces/" + orgWS.PublicID + "/tasks", userID: 3,
 		body:    v1CreateTaskBodyJSON("render"),
 		headers: map[string]string{contract.IdempotencyKeyHeader: "quota-submit-1"},
 	})
@@ -319,11 +309,32 @@ func TestV1TaskSubmitQuotaExhausted(t *testing.T) {
 		t.Fatalf("submit quota checks = %d, want 1", quotas.txChecks)
 	}
 	// The blocked submit leaves no task behind.
-	status, _, list := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks", userID: 3})
+	status, _, list := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + orgWS.PublicID + "/tasks", userID: 3})
 	if status != http.StatusOK {
 		t.Fatalf("list after blocked submit = %d", status)
 	}
 	if items, _ := v1Data(t, list).([]any); len(items) != 0 {
 		t.Fatalf("tasks after blocked submit = %d, want 0 (no residue)", len(items))
 	}
+}
+
+// newOrgQuotaWorkspace creates an Organization workspace with user 3 as a
+// direct member so Org-intent quota tests prove the gate on the workspace
+// scope (ADR-0042: Organization checks, Personal skips).
+func newOrgQuotaWorkspace(t *testing.T, fx *v1TaskFixture) *tenancy.Workspace {
+	t.Helper()
+	ctx := context.Background()
+	org, err := fx.store.CreateOrganization(ctx, 1, "quota-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgWS, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 1, "org-tasks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Organization scopes are join-first (EffectiveWorkspaceRole): user 3
+	// joins the org as Member, then holds the explicit workspace row.
+	fx.store.SeedOrganizationMember(org.PublicID, 3, tenancy.RoleMember)
+	fx.store.SeedWorkspaceMember(orgWS.PublicID, 3, tenancy.RoleMember)
+	return orgWS
 }

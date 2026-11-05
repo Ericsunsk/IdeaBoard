@@ -35,8 +35,8 @@
     <!-- Loaded Content: Invite Bar & Roster List -->
     <template v-else>
       <!-- Personal Default is private (#952): no invite bar. Other Personal
-        workspaces invite freely; consumption charges the holder's shared
-        Personal account. -->
+        workspaces invite freely; consumption bills each submitter's own
+        Personal account (payer = actor, #973). -->
       <!-- Invite Member Card (when canManage, never on Default) -->
       <section
         v-if="section.canManage.value && !section.isDefaultWorkspace.value"

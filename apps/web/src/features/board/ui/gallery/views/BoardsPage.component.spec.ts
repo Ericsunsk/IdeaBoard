@@ -32,6 +32,7 @@ function renderCatalog(mode: CatalogSortMode) {
       commands: {
         hydrate: vi.fn(),
         create: vi.fn(),
+        createAndOpen: vi.fn(),
         rename: vi.fn(),
         duplicate: vi.fn(),
         delete: vi.fn(),
@@ -80,6 +81,7 @@ function createRecoveryCatalog(initialBoards: BoardMeta[] = []) {
     commands: {
       hydrate: vi.fn(),
       create: vi.fn(),
+      createAndOpen: vi.fn(),
       rename: vi.fn(),
       duplicate: vi.fn(),
       delete: vi.fn(),

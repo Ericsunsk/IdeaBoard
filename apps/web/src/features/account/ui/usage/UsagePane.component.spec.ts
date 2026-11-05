@@ -1,10 +1,10 @@
 import { cleanup } from '@testing-library/vue'
-import { defineComponent, nextTick, type Ref } from 'vue'
+import { nextTick, type Ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, within } from '../../../../test/render'
+import { screen, within } from '../../../../test/render'
 import { mockAppToast, expectToastFeedback, type AppToastMocks } from '../../../../test/toast'
 import { setUserLocale } from '../../../../core/i18n'
-import UsagePane from './UsagePane.vue'
+import { renderUsagePane } from './testing'
 
 const usageState = await vi.hoisted(async () => {
   const { ref } = await import('vue')
@@ -43,27 +43,6 @@ vi.mock('../../session/usage/useUsage', () => {
 })
 
 vi.mock('../../../../core/composables/useAppToast')
-
-const ButtonStub = defineComponent({
-  template: '<button type="button"><slot /></button>',
-})
-
-const chartStub = defineComponent({
-  props: {
-    data: { type: Object, required: true },
-    options: { type: Object, required: true },
-    canvasProps: { type: Object, required: true },
-  },
-  template:
-    '<div data-testid="usage-trend-chart" :data-points="String(data.datasets[0].data.length)" :data-datasets="String(data.datasets.length)"><canvas v-bind="canvasProps" /></div>',
-})
-
-function renderUsagePane() {
-  return renderWithUser(UsagePane, {
-    props: { active: true },
-    global: { stubs: { Button: ButtonStub, ChartRenderer: chartStub } },
-  })
-}
 
 describe('UsagePane', () => {
   let toast: AppToastMocks
@@ -297,31 +276,6 @@ describe('UsagePane', () => {
     await expectToastFeedback(toast, 'Please try again later.')
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(usageState.retry).toHaveBeenCalledOnce()
-  })
-
-  it('names the shared account behind the usage snapshot', () => {
-    usageState.usage.value = {
-      timezone: 'Asia/Shanghai',
-      lifetime: {
-        total_credits: 99,
-        peak_daily_credits: 42,
-        average_daily_credits: 3.3,
-        task_count: 5,
-        active_days: 4,
-      },
-      trend: buildZeroTrend(),
-    }
-    usageState.billingAccountId.value = 'ba_1'
-    usageState.isShared.value = true
-    usageState.isInitialPending.value = false
-    usageState.error.value = null
-
-    renderUsagePane()
-
-    expect(screen.getByRole('status')).toHaveTextContent('ba_1')
-
-    usageState.billingAccountId.value = undefined
-    usageState.isShared.value = false
   })
 
   it('renders the restricted title as a neutral state without a toast', () => {

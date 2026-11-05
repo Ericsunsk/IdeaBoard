@@ -23,7 +23,6 @@
   --color-admin-text-3: var(--palette-dark-text-3);
   --color-admin-text-disabled: var(--palette-dark-text-disabled);
   --color-admin-text-inverse: var(--palette-dark-0);
-  --color-admin-title-color: var(--palette-dark-title);
   --color-admin-accent: var(--primitive-neutral-25);
   --color-admin-accent-hover: var(--primitive-neutral-175);
   --color-admin-accent-pressed: var(--primitive-neutral-225);
@@ -42,16 +41,6 @@
   --color-admin-status-success-glow: var(--primitive-green-675-alpha-10);
   --color-admin-status-danger-glow: var(--primitive-rose-550-alpha-9p5);
   --color-admin-status-wash: var(--primitive-neutral-0-alpha-74);
-  /*
-   * Provider brand hues (model catalog badges). Semantic success/info/warning
-   * cover openai/google/workers; the four hues below have no semantic
-   * equivalent, so each provider owns one token and derives soft/border
-   * carriers via opacity modifiers.
-   */
-  --color-provider-purple: var(--primitive-purple-400);
-  --color-provider-orange: var(--primitive-orange-400);
-  --color-provider-blue: var(--primitive-blue-400);
-  --color-provider-rose: var(--primitive-rose-400);
   --color-admin-surface-muted: var(--palette-dark-2);
   --color-admin-surface-hover: var(--palette-dark-surface-hover);
   --color-admin-surface-pressed: var(--palette-dark-surface-pressed);
@@ -109,7 +98,6 @@
     --color-admin-text-label: var(--palette-light-text-label);
     --color-admin-text-3: var(--palette-light-text-3);
     --color-admin-text-disabled: var(--palette-light-border-hover);
-    --color-admin-title-color: var(--palette-light-title);
 
     /* ── Admin light interactive surfaces ── */
     --color-admin-surface-muted: var(--palette-light-2);
@@ -136,12 +124,6 @@
     --color-admin-status-success-glow: var(--primitive-green-675-alpha-10);
     --color-admin-status-danger-glow: var(--primitive-rose-550-alpha-9p5);
     --color-admin-status-wash: var(--primitive-neutral-0-alpha-74);
-
-    /* Provider hues use the light-surface palette. */
-    --color-provider-purple: var(--primitive-purple-700);
-    --color-provider-orange: var(--primitive-orange-700);
-    --color-provider-blue: var(--primitive-blue-700);
-    --color-provider-rose: var(--primitive-rose-700);
 
     --color-admin-model-indigo: var(--primitive-blue-575);
     --color-admin-model-purple: var(--color-brand-creative-accent);

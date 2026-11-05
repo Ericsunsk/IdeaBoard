@@ -16,25 +16,27 @@ package billing
 // Block reasons surface on quote/submit as 402 task_insufficient_credits
 // vs 403 member_quota_exhausted vs 403 billing_wallet_restricted.
 //
-// Role matrix (#953, ADR-0038): Organization Owner is always unlimited
-// (the settlement check short-circuits, and capped writes for an Owner
-// render 403); Owner may set Admin quotas; Owner/Admin may set Member
-// quotas; Admin cannot edit Owner/Admin quotas (403). Personal scopes
-// aggregate by (Personal Billing Account, User) with the account holder
-// as manager (Billing Owner gate; space-only admins render
-// billing_account_forbidden).
+// Role matrix (#953, ADR-0038, Org-only per #975): Organization Owner is
+// always unlimited (the settlement check short-circuits, and capped
+// writes for an Owner render 403); Owner may set Admin quotas; Owner/Admin
+// may set Member quotas; Admin cannot edit Owner/Admin quotas (403).
+// Personal scopes carry no quota concept: Personal lists and writes render
+// 403 billing_account_forbidden, and Personal self reads return unlimited
+// without touching quota rows.
 //
 // Agreed surface (same prefix/chain as the workspace billing group):
 //
 //	GET /workspaces/{workspace_id}/member-quotas (managers only:
-//	      Organization Owner/Admin on org scopes, Billing Owner on
-//	      personal scopes; lists every explicitly set quota on the resolved
+//	      Organization Owner/Admin on org scopes; Personal scopes render
+//	      403 billing_account_forbidden (no Personal quota concept);
+//	      lists every explicitly set quota on the resolved
 //	      account with live usage + remaining; other members render
 //	      billing_account_forbidden)
 //	GET /workspaces/{workspace_id}/member-quotas/self (any member reads
 //	      their own quota with live usage + remaining on the resolved
 //	      account; absent means unlimited; Organization Owners always read
-//	      unlimited)
+//	      unlimited; Personal scopes always read unlimited without touching
+//	      quota rows)
 //	PUT /workspaces/{workspace_id}/member-quotas/{user_id} (managers only
 //	      per the same matrix; Admin editing Owner/Admin renders 403;
 //	      capped writes for an Owner render 403; no Idempotency-Key, the
@@ -140,16 +142,23 @@ func (h *contractV1BillingHandler) getMemberQuotaSelf(c *gin.Context) {
 	})
 }
 
-// requireQuotaManager enforces the #953 write/list matrix and returns the
-// resolved account. Personal scopes require the Billing Owner gate
-// (the holder manages collaborators); Organization scopes require Org
-// Owner/Admin (Admins need not hold a Billing grant to manage Members).
+// requireQuotaManager enforces the Org-only (#975) write/list matrix and
+// returns the resolved account. Personal scopes carry no quota concept,
+// so Personal lists and writes fail closed here with 403
+// billing_account_forbidden (never a silent success); Organization scopes
+// require Org Owner/Admin (Admins need not hold a Billing grant to manage
+// Members).
 func (h *contractV1BillingHandler) requireQuotaManager(c *gin.Context, workspace *tenancy.Workspace, actorUserID int64) (tenancy.BillingAccount, bool) {
+	if workspace.IsPersonal() {
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
+		c.Abort()
+		return tenancy.BillingAccount{}, false
+	}
 	account, resolved := h.billingAccountForWorkspace(c, workspace)
 	if !resolved {
 		return tenancy.BillingAccount{}, false
 	}
-	allowed, err := h.canManageMemberQuotas(c.Request.Context(), workspace, account.InternalID, actorUserID)
+	allowed, err := h.canManageMemberQuotas(c.Request.Context(), workspace, actorUserID)
 	if err != nil {
 		renderBillingAccountError(c, err)
 		return tenancy.BillingAccount{}, false
@@ -164,27 +173,24 @@ func (h *contractV1BillingHandler) requireQuotaManager(c *gin.Context, workspace
 
 // canManageMemberQuotas supplies the same capability to the account projection
 // and the quota endpoint gate; consumption visibility is not authorization.
-func (h *contractV1BillingHandler) canManageMemberQuotas(ctx context.Context, workspace *tenancy.Workspace, accountID, actorUserID int64) (bool, error) {
-	personalOwner := false
-	if workspace.OrganizationID == nil {
-		role, member, err := h.deps.BillingAccounts.GetBillingAccountRole(ctx, accountID, actorUserID)
-		if err != nil {
-			return false, err
-		}
-		personalOwner = member && role == tenancy.BillingRoleOwner
+// Org-only quotas (#975): Personal scopes fail closed by returning
+// ErrPersonalQuotaUnsupported (never (false, nil): callers map the error to
+// 403 billing_account_forbidden, never a silent denial or success).
+func (h *contractV1BillingHandler) canManageMemberQuotas(ctx context.Context, workspace *tenancy.Workspace, actorUserID int64) (bool, error) {
+	if workspace.IsPersonal() {
+		return false, memberquotas.ErrPersonalQuotaUnsupported
 	}
-	return h.quotaPolicy().CanManage(ctx, memberquotas.ScopeForWorkspace(workspace), actorUserID, personalOwner)
+	return h.quotaPolicy().CanManage(ctx, memberquotas.ScopeForWorkspace(workspace), actorUserID)
 }
 
 // checkQuotaTargetRole delegates the #953 write matrix to the quota policy
-// and maps its result to the HTTP contract. requireQuotaManager supplies
-// the Personal holder fact; period is the validated request period.
+// and maps its result to the HTTP contract. Org-only (#975): Personal
+// scopes fail closed with ErrPersonalQuotaUnsupported, mapped to 403
+// billing_account_forbidden (never 503, never a silent success).
 func (h *contractV1BillingHandler) checkQuotaTargetRole(c *gin.Context, workspace *tenancy.Workspace, actorUserID, targetUserID int64, period string) bool {
-	// requireQuotaManager already established the Personal holder fact.
-	allowed, err := h.quotaPolicy().CanSet(c.Request.Context(), memberquotas.ScopeForWorkspace(workspace), actorUserID, targetUserID, period, workspace.OrganizationID == nil)
+	allowed, err := h.quotaPolicy().CanSet(c.Request.Context(), memberquotas.ScopeForWorkspace(workspace), actorUserID, targetUserID, period)
 	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-		c.Abort()
+		RenderBillingAccountError(c, err)
 		return false
 	}
 	if !allowed {
@@ -266,6 +272,15 @@ func (h *contractV1BillingHandler) readMemberQuotaSelf(c *gin.Context, workspace
 	if !resolved {
 		return v1MemberQuotaDTO{}, false
 	}
+	if workspace.IsPersonal() {
+		// Personal carries no quota concept (#975): return the unlimited
+		// constant directly without a Reader/Policy/Scope call.
+		userPublicID, ok := h.memberQuotaPublicID(c, userID)
+		if !ok {
+			return v1MemberQuotaDTO{}, false
+		}
+		return quotaReadingDTO(account.PublicID, userPublicID, memberquotas.Reading{UserID: userID, Period: memberquotas.PeriodUnlimited}), true
+	}
 	reading, err := (memberquotas.Reader{Store: h.deps.Quotas, Policy: h.quotaPolicy()}).Self(c.Request.Context(), memberquotas.ScopeForWorkspace(workspace), account.InternalID, userID)
 	if err != nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
@@ -294,10 +309,10 @@ func (h *contractV1BillingHandler) setMemberQuota(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		// Role matrix (#953): Personal scopes require the Billing Owner
-		// gate (the holder manages collaborators; space-only admins render
-		// billing_account_forbidden). Organization scopes require Org
-		// Owner/Admin. API and UI permissions agree off the same read.
+		// Role matrix (#953, Org-only per #975): Organization scopes
+		// require Org Owner/Admin. Personal scopes never reach here
+		// (requireQuotaManager rejects them); API and UI permissions agree
+		// off the same read.
 		account, ok := h.requireQuotaManager(c, workspace, wctx.Principal.UserID())
 		if !ok {
 			return

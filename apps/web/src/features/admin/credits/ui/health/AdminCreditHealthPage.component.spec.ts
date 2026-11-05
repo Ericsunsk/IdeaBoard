@@ -271,7 +271,7 @@ describe('AdminCreditHealthPage', () => {
     expect(screen.getByRole('columnheader', { name: '最近发现' })).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '查看Wallet 余额投影不一致诊断' }))
-    expect(await screen.findByText('Fingerprint')).toBeVisible()
+    expect(await screen.findByText('指纹')).toBeVisible()
     expect(screen.getByText('a'.repeat(64))).toBeVisible()
     expect(screen.getByText('account_id')).toBeVisible()
     expect(screen.getAllByText('17')).toHaveLength(2)

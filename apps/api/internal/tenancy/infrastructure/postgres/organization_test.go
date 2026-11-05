@@ -11,6 +11,56 @@ import (
 	"ideaboard/api/internal/tenancy"
 )
 
+func TestOrganizationMembersListIncludesEveryMember(t *testing.T) {
+	db := newTenancyTestDB(t)
+	ctx := context.Background()
+	store := NewOrganizationStore(db)
+	owner := createTenancyTestUser(t, db)
+	org, err := store.CreateOrganization(ctx, owner, "complete-roster")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := map[int64]string{owner: tenancy.RoleOwner}
+	// Put the Admin after the former 500-row boundary: dropping this role
+	// would incorrectly hide legitimate quota management from its caller.
+	for i := 0; i < 501; i++ {
+		userID := createTenancyTestUser(t, db)
+		role := tenancy.RoleMember
+		if i == 500 {
+			role = tenancy.RoleAdmin
+		}
+		if _, err := store.AddOrganizationMember(ctx, org.PublicID, userID, role); err != nil {
+			t.Fatalf("add member %d: %v", i, err)
+		}
+		expected[userID] = role
+	}
+	outsider := createTenancyTestUser(t, db)
+	if _, err := store.CreateOrganization(ctx, outsider, "other-organization"); err != nil {
+		t.Fatal(err)
+	}
+	members, err := store.ListOrganizationMembers(ctx, org.PublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(members) != len(expected) {
+		t.Fatalf("member count = %d, want %d", len(members), len(expected))
+	}
+	var previousID int64
+	for _, member := range members {
+		role, ok := expected[member.UserID]
+		if !ok || member.Role != role || member.OrganizationPublicID != org.PublicID {
+			t.Fatalf("unexpected organization member: %+v", member)
+		}
+		if member.UserID <= previousID {
+			t.Fatalf("member ids are not strictly ordered: %d after %d", member.UserID, previousID)
+		}
+		if _, err := tenancy.ParseUserPublicID(member.UserExternalID); err != nil {
+			t.Fatalf("member %d external id: %v", member.UserID, err)
+		}
+		previousID = member.UserID
+	}
+}
+
 // Exercise the standalone lifecycle interface through one caller transaction:
 // reads must see its uncommitted writes, and no nested mutation may escape it.
 func TestOrganizationLifecycleUsesCallerTransaction(t *testing.T) {

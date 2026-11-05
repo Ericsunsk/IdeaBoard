@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { makeBoardState } from '../../testing'
+import { makeBoardState, primeAuthenticatedWorkspace } from '../../testing'
 import { makeSessionUser } from '../../../../test/factories'
 import {
   clearStoredAuth,
@@ -7,7 +7,7 @@ import {
   getAuthStorageUserScope,
   setStoredAuth,
 } from '../../../../core/utils/auth'
-import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
+import { getWorkspaceSelectionStore } from '../../../workspace'
 import { listBoards, replaceBoards } from './boards'
 import { createBoardRepository } from './repository'
 import { getBoardState, replaceBoardStateMap } from '../persistence/state'
@@ -23,17 +23,6 @@ const WORKSPACE_A = 'ws_test123'
 const WORKSPACE_B = 'ws_workspaceB'
 const BOARDS_PREFIX = 'ideaboard.canvas.boards.v2'
 const STATES_PREFIX = 'ideaboard.canvas.boardStates.v2'
-
-function primeAuthenticatedWorkspace(workspaceId: string) {
-  setStoredAuth({
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'tester',
-    avatar: '',
-    role: 'user',
-  })
-  resetWorkspaceSelectionStore()
-  getWorkspaceSelectionStore().select(workspaceId)
-}
 
 function userScope(): string {
   const scope = getAuthStorageUserScope()

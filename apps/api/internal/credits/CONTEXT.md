@@ -24,7 +24,7 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 | Term                      | Meaning                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Credit                    | Indivisible integer currency unit; floating point is forbidden                                                                                        |
-| Credit Wallet             | Account boundary of exactly one Billing Account inside the Credits context (#916). The Wallet holds the account's unified balance; many Workspaces may spend one Wallet through the stable Tenancy resolution, while the Command Actor records the real operator |
+| Credit Wallet             | Account boundary of exactly one Billing Account inside the Credits context (#916). The Wallet holds the account's unified balance; Organization Workspaces share the Organization Wallet through the stable Tenancy resolution, while Personal scopes (org-less, non-Default) spend the actor's own deterministic Personal Billing Account (payer = actor, #973). The Command Actor records the real operator |
 | Billing Account Funds Identity | The stable `billing_accounts.internal_id` (`ba_` on the wire) that owns a Wallet. Workspace records the consumption location, User records the actual operator; financial Owner/Admin never implies Board content access |
 | Initial Personal Account  | The deterministic per-user account (that user's Default personal workspace account, provisioned on demand) that every pre-916 personal balance, history row, and open Hold is attributed to. Personal funds never inject into an organization; new organization/shared accounts start at zero |
 | Wallet Restriction        | Reason-coded spending limit on one account Wallet, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source  |
@@ -43,6 +43,13 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 | Finding                   | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject                                                               |
 | Finding Type              | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely          |
 
+> Superseded (Personal part of the Credit Wallet row, see [ADR-0042](../../../../docs/adr/0042-personal-payer-is-actor.md)):
+> pre-#973 every Personal scope of one user shared the owner's survivor
+> Wallet ("many Workspaces may spend one Wallet"). Personal scopes now
+> spend the actor's own deterministic Personal Billing Account
+> (payer = actor, no sharing, no owner fallback). The Organization
+> shared-Wallet rule is unchanged.
+
 A Refund reverses a Capture; a Purchase Refund settles an external-payment refund. They are distinct accounting operations. Canonical names (see `GLOSSARY.md`): funds identity is only Billing Account (`ba_`), the container is only Credit Wallet, a ledger leg is always the full name Credit Account, and refunds use only the full names linked Refund / linked Purchase Refund. Wallet lifecycle controls the account lifecycle; Wallet Restrictions express independently releasable spending constraints.
 
 ## Public Seams
@@ -55,10 +62,18 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   one Billing Account (`BillingAccountID`, the Wallet identity) with the
   real operator on `Metadata.Actor` (user/service/admin/system); funds
   identity and operator are never conflated. Workspace-scoped spenders
-  (Tasks, Vision Search) resolve the account through the Tenancy stable resolution inside the
-  caller transaction (fail closed); scopeless spenders (Rewards, Payments,
+  (Tasks, Vision Search) resolve the settlement payer inside the
+  caller transaction (fail closed): Organization scopes resolve the shared
+  Organization pool through the stable Tenancy resolution; Personal scopes
+  (org-less, non-Default) resolve the actor's own deterministic Personal
+  account (payer = actor, #973/#974) with no owner fallback; scopeless spenders (Rewards, Payments,
   Welcome, Admin) resolve the deterministic initial personal
   account. There is no user-wallet fallback and no dual settlement.
+
+  > Superseded (Personal part, see [ADR-0042](../../../../docs/adr/0042-personal-payer-is-actor.md)):
+  > pre-#973 Workspace-scoped spenders in Personal scopes resolved the
+  > Workspace owner's stable account (the survivor) through the stable
+  > Tenancy resolution. The Organization shared-pool rule is unchanged.
   External-payment commands use independent typed `SECURITY DEFINER` routines;
   all other commands go through `execute_credit_command_v3`.
 - `Service.Administrative()` / `Service.Settlement()` / `Service.Payment()`

@@ -49,6 +49,7 @@ import (
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/memberquotas"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
@@ -106,7 +107,10 @@ type AccountStore = shared.AccountStore
 
 // billingWalletReader composes the Credits-Ledger read side. Only Credits
 // owns ledger writes; this interface exposes reads. Reads are keyed by the
-// stable Billing Account (#916), never by a user wallet.
+// stable Billing Account (#916), never by a user wallet. Personal scopes
+// resolve the viewer's own account (payer = actor, ADR-0042), so the
+// account key already isolates the (BillingAccount, User) column and SQL
+// applies it before LIMIT; Org scopes keep the shared pool.
 type billingWalletReader interface {
 	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
 	ListLedger(ctx context.Context, input domain.ListLedgerInput) (domain.LedgerPage, error)
@@ -134,8 +138,10 @@ type billingQuoter interface {
 // checkout seam (namespaced idempotency key, server-side PurchaseQuote);
 // webhook settlement stays inside Payments and settles ONLY through
 // credits.Commands transactionally. BillingAccountID is the payer account
-// resolved from the workspace (#919); operatorUserID is the real operator
-// recorded on the order independently.
+// (Org pool, else the actor's own Personal account per payer = actor,
+// ADR-0042); operatorUserID is the real operator recorded on the order
+// independently. The HTTP idempotency scope/hash follow the payer account
+// so distinct payers never share a replay slot.
 // CheckoutService owns checkout sessions bound to the payer Billing Account.
 type CheckoutService interface {
 	CreateWorkspaceCheckout(ctx context.Context, billingAccountID, operatorUserID int64, workspacePublicID, clientKey string, input WorkspaceCheckoutInput) (WorkspaceCheckoutResult, error)
@@ -346,15 +352,12 @@ func (h *contractV1BillingHandler) billingWorkspaceContext(c *gin.Context, p pri
 	return shared.ResolveWorkspaceContext(c, h.deps.Tenancy, p)
 }
 
-// billingAccountForWorkspace resolves the stable funds identity backing
-// workspace reads (#915 resolution, #916 funds identity) through the deep
-// funds kernel. There is no owner-wallet fallback: every read addresses the
-// resolved Billing Account, so sharing a Workspace never exposes another
-// wallet. The handler passes only the ws_ public id and receives the ba_
-// identity; the workspace/org mapping and the InternalID join handle stay
-// inside funds (the handler renders ba_ on the wire and forwards the
-// InternalID opaquely to downstream joins without interpreting it).
-func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancy.BillingAccount, bool) {
+// resolveOwner is the single owner-order funds seam behind
+// billingAccountForWorkspace: the Organization pool for org workspaces,
+// else the workspace owner's Personal account. Nil-store, error mapping
+// and zero-identity fail-closed are shared with resolveActor so the two
+// orders cannot drift.
+func (h *contractV1BillingHandler) resolveOwner(c *gin.Context, workspace *tenancy.Workspace) (tenancy.BillingAccount, bool) {
 	if h.deps.BillingAccounts == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
 		c.Abort()
@@ -375,9 +378,75 @@ func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, wo
 	return identity.ToBillingAccount(), true
 }
 
+// resolveActor is the single payer-order funds seam behind
+// billingAccountForActor (payer = actor): the Organization pool for org
+// workspaces, else the viewer's own Personal account. Fail-closed rules
+// match resolveOwner.
+func (h *contractV1BillingHandler) resolveActor(c *gin.Context, workspace *tenancy.Workspace, actorUserID int64) (tenancy.BillingAccount, bool) {
+	if h.deps.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
+		c.Abort()
+		return tenancy.BillingAccount{}, false
+	}
+	identity, err := h.deps.BillingAccounts.ResolveFundsForActor(
+		c.Request.Context(), workspace.PublicID, actorUserID)
+	if err != nil {
+		renderBillingAccountError(c, err)
+		return tenancy.BillingAccount{}, false
+	}
+	if identity.BillingAccountID <= 0 || identity.BA() == "" {
+		// Creation path without a funds identity fails closed here (never
+		// a zero join handle to downstream stores).
+		renderBillingAccountError(c, tenancy.ErrBillingNotFound)
+		return tenancy.BillingAccount{}, false
+	}
+	return identity.ToBillingAccount(), true
+}
+
+// billingAccountForWorkspace resolves the stable funds identity backing
+// workspace reads (#915 resolution, #916 funds identity) through the deep
+// funds kernel. There is no owner-wallet fallback: every read addresses the
+// resolved Billing Account, so sharing a Workspace never exposes another
+// wallet. The handler passes only the ws_ public id and receives the ba_
+// identity; the workspace/org mapping and the InternalID join handle stay
+// inside funds (the handler renders ba_ on the wire and forwards the
+// InternalID opaquely to downstream joins without interpreting it).
+func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancy.BillingAccount, bool) {
+	return h.resolveOwner(c, workspace)
+}
+
+// billingAccountForActor resolves the read-only funds identity for one
+// viewer (payer = actor, #973/#978): the Organization pool for org
+// workspaces, else the viewer's own Personal account. Billing overview,
+// balance, usage, billing-records, Personal ledger, and Personal checkout
+// reads/writes use it so Personal members each see and top up their own
+// (BillingAccount, User) column; Org manager/write paths keep the
+// owner-based billingAccountForWorkspace.
+func (h *contractV1BillingHandler) billingAccountForActor(c *gin.Context, workspace *tenancy.Workspace, actorUserID int64) (tenancy.BillingAccount, bool) {
+	return h.resolveActor(c, workspace, actorUserID)
+}
+
+// payerAccountForWrite resolves the write-path payer: the actor's own
+// Personal account on Personal scopes (payer = actor, ADR-0042), else the
+// Billing Owner/Admin pool on Org scopes (manager gate unchanged). Read
+// scoping stays with the callers (the ledger adds its consumption filter).
+func (h *contractV1BillingHandler) payerAccountForWrite(c *gin.Context, wctx v1WorkspaceCtx) (tenancy.BillingAccount, bool) {
+	if wctx.Workspace.IsPersonal() {
+		return h.billingAccountForActor(c, wctx.Workspace, wctx.Principal.UserID())
+	}
+	return h.requireBillingManager(c, wctx.Workspace, wctx.Principal.UserID())
+}
+
 // consumptionReadScope is shared by summary and itemized reads. Workspace
-// membership does not confer account-wide financial visibility.
+// membership does not confer account-wide financial visibility. Personal
+// workspaces always return the member filter on the viewer's own account
+// so SQL applies (BillingAccount, User) authorization before aggregation
+// and pagination; Org scopes keep the manager/workspace/member order and
+// never expose another member's amounts to unauthorized viewers.
 func (h *contractV1BillingHandler) consumptionReadScope(c *gin.Context, wctx v1WorkspaceCtx, account tenancy.BillingAccount) (domain.UsageFilter, string, bool) {
+	if wctx.Workspace.IsPersonal() {
+		return domain.UsageFilter{ActorUserID: wctx.Principal.UserID()}, "member", true
+	}
 	role, member, err := h.deps.BillingAccounts.GetBillingAccountRole(c.Request.Context(), account.InternalID, wctx.Principal.UserID())
 	if err != nil {
 		renderBillingAccountError(c, err)
@@ -393,7 +462,6 @@ type v1BillingAccountDTO struct {
 	BillingAccountID      string `json:"billing_account_id"`
 	WorkspaceID           string `json:"workspace_id"`
 	OwnerType             string `json:"owner_type"`
-	Shared                bool   `json:"shared,omitempty"`
 	CreatedAt             string `json:"created_at,omitempty"`
 	UpdatedAt             string `json:"updated_at,omitempty"`
 }
@@ -414,7 +482,7 @@ func (h *contractV1BillingHandler) getWorkspaceBootstrap(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, resolved := h.billingAccountForWorkspace(c, workspace)
+		account, resolved := h.billingAccountForActor(c, workspace, wctx.Principal.UserID())
 		if !resolved {
 			return
 		}
@@ -422,10 +490,14 @@ func (h *contractV1BillingHandler) getWorkspaceBootstrap(c *gin.Context) {
 		if !ok {
 			return
 		}
-		canManageQuotas, err := h.canManageMemberQuotas(ctx, workspace, account.InternalID, wctx.Principal.UserID())
-		if err != nil {
-			renderBillingAccountError(c, err)
-			return
+		canManageQuotas := false
+		if !workspace.IsPersonal() {
+			var err error
+			canManageQuotas, err = h.canManageMemberQuotas(ctx, workspace, wctx.Principal.UserID())
+			if err != nil {
+				renderBillingAccountError(c, err)
+				return
+			}
 		}
 		billingAccountDTO := toBillingAccountDTO(workspace, account, scope, canManageQuotas)
 
@@ -460,7 +532,7 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, resolved := h.billingAccountForWorkspace(c, workspace)
+		account, resolved := h.billingAccountForActor(c, workspace, wctx.Principal.UserID())
 		if !resolved {
 			return
 		}
@@ -468,10 +540,14 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 		if !ok {
 			return
 		}
-		canManageQuotas, err := h.canManageMemberQuotas(c.Request.Context(), workspace, account.InternalID, wctx.Principal.UserID())
-		if err != nil {
-			renderBillingAccountError(c, err)
-			return
+		canManageQuotas := false
+		if !workspace.IsPersonal() {
+			var err error
+			canManageQuotas, err = h.canManageMemberQuotas(c.Request.Context(), workspace, wctx.Principal.UserID())
+			if err != nil {
+				renderBillingAccountError(c, err)
+				return
+			}
 		}
 		contract.RenderSuccess(c, toBillingAccountDTO(workspace, account, scope, canManageQuotas))
 	})
@@ -486,9 +562,6 @@ func toBillingAccountDTO(workspace *tenancy.Workspace, account tenancy.BillingAc
 		BillingAccountID:      account.PublicID,
 		WorkspaceID:           workspace.PublicID,
 		OwnerType:             account.OwnerType,
-	}
-	if account.Shared {
-		dto.Shared = true
 	}
 	if !account.CreatedAt.IsZero() {
 		dto.CreatedAt = account.CreatedAt.UTC().Format(time.RFC3339)
@@ -507,7 +580,8 @@ func toBillingAccountDTO(workspace *tenancy.Workspace, account tenancy.BillingAc
 // provisioning failures stay 503 service_unavailable (transient).
 func RenderBillingAccountError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, tenancy.ErrBillingForbidden),
+	case errors.Is(err, memberquotas.ErrPersonalQuotaUnsupported),
+		errors.Is(err, tenancy.ErrBillingForbidden),
 		errors.Is(err, tenancy.ErrBillingLastOwner):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
 	case errors.Is(err, tenancy.ErrBillingConflict),
@@ -625,7 +699,7 @@ func (h *contractV1BillingHandler) getCreditsBalance(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, ok := h.billingAccountForWorkspace(c, workspace)
+		account, ok := h.billingAccountForActor(c, workspace, wctx.Principal.UserID())
 		if !ok {
 			return
 		}
@@ -662,6 +736,39 @@ func billingToLedgerEntryDTO(tx domain.LedgerTransaction) v1BillingLedgerEntryDT
 	}
 }
 
+// decodeLedgerCursor parses the ledger/record keyset cursor (empty means
+// first page). Malformed cursors fail closed with the frozen
+// pagination_cursor_invalid code, before any store is reached.
+func decodeLedgerCursor(c *gin.Context) (int64, bool) {
+	raw := strings.TrimSpace(c.Query(contract.CursorParam))
+	if raw == "" {
+		return 0, true
+	}
+	cursor, decodeErr := contract.DecodeCursor[v1BillingLedgerCursor](raw)
+	if decodeErr != nil || cursor == nil || cursor.BeforeSequence < 0 {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
+		c.Abort()
+		return 0, false
+	}
+	return cursor.BeforeSequence, true
+}
+
+// ledgerPageMeta projects the next keyset position into list meta.
+// unavailableMsg preserves each caller's frozen 503 message (codes match).
+func ledgerPageMeta(c *gin.Context, nextBeforeSequence int64, unavailableMsg string) (contract.PageMeta, bool) {
+	meta := contract.NewPageMeta("", false)
+	if nextBeforeSequence <= 0 {
+		return meta, true
+	}
+	next, encodeErr := contract.EncodeCursor(v1BillingLedgerCursor{BeforeSequence: nextBeforeSequence})
+	if encodeErr != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, unavailableMsg)
+		c.Abort()
+		return meta, false
+	}
+	return contract.NewPageMeta(next, true), true
+}
+
 func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		workspace := wctx.Workspace
@@ -674,19 +781,23 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 		if !ok {
 			return
 		}
-		var beforeSequence int64
-		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-			cursor, decodeErr := contract.DecodeCursor[v1BillingLedgerCursor](raw)
-			if decodeErr != nil || cursor == nil || cursor.BeforeSequence < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-				c.Abort()
-				return
-			}
-			beforeSequence = cursor.BeforeSequence
-		}
-		account, ok := h.requireBillingManager(c, workspace, wctx.Principal.UserID())
+		beforeSequence, ok := decodeLedgerCursor(c)
 		if !ok {
 			return
+		}
+		// Personal scopes (payer = actor, ADR-0042) read the viewer's own
+		// account: payerAccountForWrite + consumptionReadScope select the
+		// (BillingAccount, User) column before ListLedger paginates, so a
+		// collaborator sees only their own entries. Org scopes keep the
+		// manager-only full-account read unchanged.
+		account, ok := h.payerAccountForWrite(c, wctx)
+		if !ok {
+			return
+		}
+		if workspace.IsPersonal() {
+			if _, _, ok := h.consumptionReadScope(c, wctx, account); !ok {
+				return
+			}
 		}
 		page, err := h.deps.Wallets.ListLedger(c.Request.Context(), domain.ListLedgerInput{
 			BillingAccountID: account.InternalID,
@@ -706,15 +817,9 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 		for _, tx := range page.Transactions {
 			entries = append(entries, billingToLedgerEntryDTO(tx))
 		}
-		meta := contract.NewPageMeta("", false)
-		if page.NextBeforeSequence > 0 {
-			next, encodeErr := contract.EncodeCursor(v1BillingLedgerCursor{BeforeSequence: page.NextBeforeSequence})
-			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable42)
-				c.Abort()
-				return
-			}
-			meta = contract.NewPageMeta(next, true)
+		meta, ok := ledgerPageMeta(c, page.NextBeforeSequence, runtimehttp.MsgServiceUnavailable42)
+		if !ok {
+			return
 		}
 		contract.RenderPaginated(c, entries, meta)
 	})
@@ -741,17 +846,11 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 		if !ok {
 			return
 		}
-		var beforeSequence int64
-		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-			cursor, decodeErr := contract.DecodeCursor[v1BillingLedgerCursor](raw)
-			if decodeErr != nil || cursor == nil || cursor.BeforeSequence < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, runtimehttp.MsgPaginationCursorInvalid3)
-				c.Abort()
-				return
-			}
-			beforeSequence = cursor.BeforeSequence
+		beforeSequence, ok := decodeLedgerCursor(c)
+		if !ok {
+			return
 		}
-		account, ok := h.billingAccountForWorkspace(c, workspace)
+		account, ok := h.billingAccountForActor(c, workspace, wctx.Principal.UserID())
 		if !ok {
 			return
 		}
@@ -781,15 +880,9 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 				AvailableCreditsAfter: record.AvailableCreditsAfter,
 			})
 		}
-		meta := contract.NewPageMeta("", false)
-		if page.NextBeforeSequence > 0 {
-			next, encodeErr := contract.EncodeCursor(v1BillingLedgerCursor{BeforeSequence: page.NextBeforeSequence})
-			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-				c.Abort()
-				return
-			}
-			meta = contract.NewPageMeta(next, true)
+		meta, ok := ledgerPageMeta(c, page.NextBeforeSequence, runtimehttp.MsgServiceUnavailable39)
+		if !ok {
+			return
 		}
 		contract.RenderPaginated(c, records, meta)
 	})
@@ -805,7 +898,9 @@ type v1CreateCheckoutBody struct {
 }
 
 type v1CheckoutSessionDTO struct {
-	SessionID        string `json:"session_id"`
+	SessionID string `json:"session_id"`
+	// BillingAccountID is the payer account: the actor's own Personal
+	// account on Personal scopes (payer = actor, ADR-0042), else the Org pool.
 	BillingAccountID string `json:"billing_account_id"`
 	Status           string `json:"status,omitempty"`
 	IdeaQuantity     int64  `json:"idea_quantity,omitempty"`
@@ -823,10 +918,14 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		// Financial management (#915): recharge requires Billing
-		// Owner/Admin. Workspace Owner/Admin standing alone (space-only
-		// admin) renders billing_account_forbidden and cannot top up.
-		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		// Financial management (#915) on Org scopes: recharge requires
+		// Billing Owner/Admin; Workspace Owner/Admin standing alone
+		// (space-only admin) renders billing_account_forbidden and cannot
+		// top up. Personal scopes (payer = actor, ADR-0042) skip the
+		// manager gate: any workspace member tops up their own account,
+		// bound with operatorUserID = actor and the payer-account
+		// idempotency scope/hash (no cross-account replay).
+		account, ok := h.payerAccountForWrite(c, wctx)
 		if !ok {
 			return
 		}
@@ -928,18 +1027,18 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 
 func (h *contractV1BillingHandler) getCheckoutSession(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
-		workspace := wctx.Workspace
 		if h.deps.Checkout == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
 			return
 		}
-		// Return-status reads address the persisted payer account (#919):
-		// only its Billing Owner/Admin may observe the order. The browser
-		// back-jump is never a payment fact; the server re-reads the
-		// Stripe Checkout Session inside the service.
-		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		// Return-status reads address the persisted payer account: Org scopes
+		// allow only its Billing Owner/Admin to observe the order; Personal
+		// scopes (payer = actor, ADR-0042) bind the actor's own account so a
+		// member reads only their own sessions (others stay 404). The
+		// browser back-jump is never a payment fact; the server re-reads
+		// the Stripe Checkout Session inside the service.
+		account, ok := h.payerAccountForWrite(c, wctx)
 		if !ok {
 			return
 		}
@@ -1082,6 +1181,9 @@ func (a *PaymentsCheckoutAdapter) GetWorkspaceCheckout(ctx context.Context, bill
 //
 // Schemas (all money integer minor units; snapshots immutable):
 //
+// Payer rule (ADR-0042): Personal scopes bind the caller's own account
+// (payer = actor, one (BillingAccount, User) column per viewer); Org
+// scopes share the pool with the manager/workspace/member read order.
 //	WorkspaceBillingAccount: {workspace_id: WorkspaceId, owner_type: {const: workspace}, created_at?, updated_at?}
 //	WorkspaceCreditsBalance: {billing_account_id: {pattern: ^ba_} (stable funds identity shared across workspaces), workspace_id, available_credits: int64>=0, reserved_credits: int64>=0, status: {enum: [active, frozen]}, active_restrictions?: string[]}
 //	CreditsLedgerEntry: {transaction_id: string, command_type: string, amount_credits: int64, available_credits_after: int64, reserved_credits_after: int64, created_at: date-time}

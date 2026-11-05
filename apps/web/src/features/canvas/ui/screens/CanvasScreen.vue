@@ -739,7 +739,7 @@ useCanvasScreenLifecycle({
   --color-page-dot: var(--color-canvas-dot);
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--canvas-z-flow-wrap);
   overscroll-behavior: none;
   overscroll-behavior-x: none;
 }

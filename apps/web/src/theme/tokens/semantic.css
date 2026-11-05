@@ -82,7 +82,7 @@
     --sidebar-accent-foreground: var(--primitive-neutral-0);
     --sidebar-border: var(--primitive-neutral-0-alpha-8);
     --sidebar-ring: var(--primary);
-    /* Workspace, tool, text, tooltip and progress roles consumed by scoped Canvas tokens. */
+    /* Workspace, tool, text and tooltip roles consumed by scoped Canvas tokens. */
     --color-workspace-bg: var(--palette-dark-0);
     --color-workspace-surface: var(--palette-dark-3);
     --color-tool-border: var(--primitive-neutral-0-alpha-12);
@@ -111,12 +111,19 @@
     --color-text-inverse: var(--palette-dark-0);
     --color-tooltip-bg: var(--primitive-neutral-910-alpha-96);
     --color-tooltip-foreground: var(--palette-dark-text-1);
-    --color-progress-from: var(--primitive-violet-400);
-    --color-progress-to: var(--primitive-sky-400);
     --color-tool-glass: var(--primitive-neutral-890-alpha-78);
     --color-workspace-preview-node: var(--primitive-neutral-0-alpha-28);
     --color-workspace-preview-viewport: var(--primitive-neutral-0-alpha-38);
     --color-workspace-preview-mask: var(--primitive-neutral-0-alpha-12);
+    /* Page chrome resolves through board-card chrome in both modes (single source). */
+    --color-page-chrome-border: var(--color-board-card-border);
+    --color-page-chrome-border-hover: var(--color-board-card-border-hover);
+    --color-page-chrome-bg: var(--color-board-control-bg);
+    --color-page-chrome-bg-hover: var(--accent-hover);
+    --color-page-chrome-color: var(--color-board-card-action);
+    --color-page-chrome-color-hover: var(--color-board-card-action-hover);
+    --color-page-chrome-color-disabled: var(--color-board-card-text);
+    --color-page-chrome-focus-ring: var(--color-board-focus-ring);
   }
 
   .light {
@@ -212,7 +219,6 @@
     --color-board-surface: var(--primitive-neutral-0-alpha-90);
     --color-board-surface-strong: var(--card);
     --color-board-control-bg: var(--primitive-neutral-0-alpha-85);
-    --color-page-chrome-bg-hover: var(--accent-hover);
     --color-board-control-text: var(--color-board-card-title);
     --color-board-control-input-text: var(--color-board-card-title);
     --color-board-control-icon: var(--palette-light-text-3);
@@ -334,13 +340,6 @@
     --color-primary-line-emphasis: color-mix(in srgb, var(--primary) 50%, transparent);
     --color-primary-line-bold: color-mix(in srgb, var(--primary) 60%, transparent);
     --color-brand-creative-focus-accent: var(--color-brand-creative-accent);
-    --color-page-chrome-border: var(--color-board-card-border);
-    --color-page-chrome-border-hover: var(--color-board-card-border-hover);
-    --color-page-chrome-bg: var(--color-board-control-bg);
-    --color-page-chrome-color: var(--color-board-card-action);
-    --color-page-chrome-color-hover: var(--color-board-card-action-hover);
-    --color-page-chrome-color-disabled: var(--color-board-card-text);
-    --color-page-chrome-focus-ring: var(--color-board-focus-ring);
     --color-overlay-danger: var(--destructive);
     --color-overlay-danger-hover-bg: color-mix(
       in srgb,
@@ -358,7 +357,7 @@
       var(--muted-foreground)
     );
     --color-auth-error-ring: color-mix(in srgb, var(--destructive) 10%, transparent);
-    /* Workspace, tool, text, tooltip and progress roles. */
+    /* Workspace, tool, text and tooltip roles. */
     --color-workspace-bg: var(--primitive-neutral-190);
     --color-workspace-surface: var(--primitive-neutral-75);
     --color-tool-border: var(--primitive-zinc-350-alpha-65);
@@ -385,8 +384,6 @@
     --color-text-inverse: var(--primitive-neutral-0);
     --color-tooltip-bg: var(--primitive-zinc-900-alpha-94);
     --color-tooltip-foreground: var(--primitive-zinc-100);
-    --color-progress-from: var(--primitive-violet-450);
-    --color-progress-to: var(--primitive-sky-350);
     --color-tool-glass: var(--primitive-neutral-0-alpha-85);
     --color-workspace-preview-node: var(--primitive-neutral-1000-alpha-28);
     --color-workspace-preview-viewport: var(--primitive-neutral-1000-alpha-38);

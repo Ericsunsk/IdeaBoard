@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminMonitorListItemModel } from '../resource'
+import { makeAdminMonitorTask } from '@/test/factories'
 import {
   formatTaskDuration,
   formatTaskResultDebug,
@@ -48,7 +48,7 @@ describe('task result presentation', () => {
 
   it('reads the result image from result metadata', () => {
     const contentUrl = '/api/v1/workspaces/ws_test123/media-assets/asset_123/content'
-    const task = makeTask({
+    const task = makeAdminMonitorTask({
       status: adminTaskStatuses.completed,
       result: JSON.stringify({
         platform: 'google',
@@ -60,7 +60,7 @@ describe('task result presentation', () => {
   })
 
   it('formats duration and tone consistently', () => {
-    const task = makeTask({
+    const task = makeAdminMonitorTask({
       created_at: '2026-07-06T00:00:00Z',
       completed_at: '2026-07-06T00:01:01Z',
     })
@@ -70,11 +70,11 @@ describe('task result presentation', () => {
   })
 
   it('sanitizes failed task errors from explicit and result payload sources', () => {
-    const failedFromError = makeTask({
+    const failedFromError = makeAdminMonitorTask({
       status: adminTaskStatuses.failed,
       error_msg: 'provider failed with token=secret',
     })
-    const failedFromResult = makeTask({
+    const failedFromResult = makeAdminMonitorTask({
       status: adminTaskStatuses.failed,
       result: 'provider failed with token=secret',
     })
@@ -110,26 +110,8 @@ describe('task result presentation', () => {
         image_count: 0,
       },
     })
-    expect(getTaskErrorReason(makeTask({ status: adminTaskStatuses.failed, result }))).toBe(
+    expect(getTaskErrorReason(makeAdminMonitorTask({ status: adminTaskStatuses.failed, result }))).toBe(
       '图案生成输出不符合 workflow contract',
     )
   })
 })
-
-function makeTask(overrides: Partial<AdminMonitorListItemModel> = {}): AdminMonitorListItemModel {
-  return {
-    task_id: 'task_1',
-    user_public_id: '00000000-0000-0000-0000-000000000001',
-    user_display_name: 'User 1',
-    prompt: 'Prompt',
-    service: 'render',
-    credits: 0,
-    priority: 2,
-    status: adminTaskStatuses.completed,
-    error_msg: '',
-    result: '',
-    created_at: '2026-07-06T00:00:00Z',
-    completed_at: null,
-    ...overrides,
-  } as AdminMonitorListItemModel
-}

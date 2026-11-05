@@ -87,6 +87,24 @@ func TestReaderPageNormalizesBeforeGroupingUsageWindows(t *testing.T) {
 	}
 }
 
+func TestReaderSelfPersonalFailsClosed(t *testing.T) {
+	// Personal scopes never reach Self in production (callers return the
+	// unlimited constant directly); a Personal scope here fails closed.
+	reader := Reader{Store: &quotaReadStore{}, Policy: Policy{}}
+	_, err := reader.Self(t.Context(), Scope{Kind: ScopePersonal}, 77, 11)
+	if !errors.Is(err, ErrPersonalQuotaUnsupported) {
+		t.Fatalf("personal self error = %v, want ErrPersonalQuotaUnsupported", err)
+	}
+}
+
+func TestReaderPagePersonalFailsClosed(t *testing.T) {
+	reader := Reader{Store: &quotaReadStore{}, Policy: Policy{}}
+	_, err := reader.Page(t.Context(), Scope{Kind: ScopePersonal}, 77, []QuotaRow{{UserID: 1, Period: PeriodUnlimited}})
+	if !errors.Is(err, ErrPersonalQuotaUnsupported) {
+		t.Fatalf("personal page error = %v, want ErrPersonalQuotaUnsupported", err)
+	}
+}
+
 func TestReaderPageFailsClosedOnRoleAndUsageErrors(t *testing.T) {
 	cause := errors.New("read unavailable")
 	for _, owner := range []string{"roles", "usage"} {

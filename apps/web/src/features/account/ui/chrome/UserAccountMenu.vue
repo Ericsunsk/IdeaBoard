@@ -435,7 +435,11 @@ const workspaceLoadError = computed(() =>
     : null,
 )
 // Own the shared list failure feedback for both the dropdown and settings dialog.
-useFailureToast(workspaceLoadError, (message) => String(message ?? ''))
+// Guests never see the workspace row, so skip their mount even if a stale
+// error prop arrives with the guest pills.
+useFailureToast(workspaceLoadError, (message) => String(message ?? ''), {
+  skip: () => isGuest.value || !isWorkspaceRowVisible.value,
+})
 const workspaceNameMaxLength = computed(
   () => props.workspace?.nameMaxLength ?? WORKSPACE_NAME_MAX_LENGTH_FALLBACK,
 )

@@ -265,12 +265,16 @@
                   :is-default-workspace="isDefaultWorkspaceItem(activeWorkspace)"
                 />
 
-                <!-- Quota management uses the account's server-resolved capability. -->
+                <!-- Member quotas are Org-only (ADR-0042 §2): Personal carries no
+                  quota concept, so the card mounts only here at the call site. -->
                 <WorkspaceLimitsSection
+                  v-if="activeWorkspace.organizationId != null"
                   :key="`limits-${activeWorkspace.publicId}`"
                   :workspace-id="activeWorkspace.publicId"
+                  :organization-id="activeOrganizationId"
                   :can-manage="billingAccount.canManageMemberQuotas.value"
-                  :is-expanded="true"
+                  :is-expanded="billingAccount.isReady.value"
+                  :current-user-id="props.currentUserId"
                 />
 
                 <!-- Delete row: hidden for the Default workspace (never deleted). -->
@@ -470,6 +474,10 @@ watch(
 const activeWorkspace = computed(() => {
   return workspaceItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
 })
+
+// Org-only contract value for WorkspaceLimitsSection: the v-if above guarantees
+// non-null when the card mounts; the empty fallback never renders.
+const activeOrganizationId = computed(() => activeWorkspace.value?.organizationId ?? '')
 
 interface WorkspaceCapabilities {
   canRename: boolean

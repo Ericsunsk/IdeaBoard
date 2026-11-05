@@ -54,7 +54,7 @@ func (h *contractV1BillingHandler) getUsage(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, ok := h.billingAccountForWorkspace(c, workspace)
+		account, ok := h.billingAccountForActor(c, workspace, wctx.Principal.UserID())
 		if !ok {
 			return
 		}

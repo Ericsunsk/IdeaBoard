@@ -3,7 +3,9 @@ package workspacetasks
 // Member cross-workspace quota settlement tests (#946).
 //
 // The quota check joins the submit settlement transaction after Quote
-// and before Hold: over-quota submits fail closed
+// and before Hold on Organization scopes only (#973/#974: Personal scopes
+// bill the actor with no quota concept, so the settlement skips the
+// check there): over-quota submits fail closed
 // with ErrMemberQuotaExhausted (403 member_quota_exhausted, distinct from
 // 402 insufficiency and 403 wallet
 // restriction) and leave no task row, no Hold, and no queue entry.
@@ -17,19 +19,97 @@ package workspacetasks
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/tasking/settlement"
 )
 
 func openQuotaAtomicEnv(t *testing.T) (*atomicEnv, *memberquotas.Store) {
 	t.Helper()
-	env := openAtomicEnv(t, 10)
+	env := openQuotaOrgEnv(t)
 	quotas := memberquotas.NewStore(env.pool)
 	env.serviceDeps.Quotas = quotas
 	env.service = NewService(env.serviceDeps)
 	return env, quotas
+}
+
+// openQuotaOrgEnv re-scopes the atomic fixture onto an Organization
+// workspace so the quota tests keep proving the unchanged Organization
+// path (#974: Personal scopes skip the member quota check, Organization
+// scopes keep enforcing it). The submitter (env.userID) joins as org
+// admin: admins keep submit access without the Organization-Owner
+// unlimited short-circuit, so the cap actually gates.
+func openQuotaOrgEnv(t *testing.T) *atomicEnv {
+	t.Helper()
+	env := openAtomicEnv(t, 10)
+	ctx := context.Background()
+	ownerStorageUID := "T" + strings.ToUpper(randomAtomicHex(t, 3))[:5]
+	var orgOwner int64
+	if err := env.pool.QueryRow(ctx,
+		`INSERT INTO users (display_name, storage_uid, role, status) VALUES ('quota-org-owner', $1, 'user', 1) RETURNING id`,
+		ownerStorageUID,
+	).Scan(&orgOwner); err != nil {
+		t.Fatalf("seed quota org owner: %v", err)
+	}
+	orgPublicID := "org_quota" + randomAtomicHex(t, 4)
+	var orgID int64
+	if err := env.pool.QueryRow(ctx,
+		`INSERT INTO organizations (public_id, name) VALUES ($1, 'quota-org') RETURNING internal_id`,
+		orgPublicID,
+	).Scan(&orgID); err != nil {
+		t.Fatalf("seed quota organization: %v", err)
+	}
+	if _, err := env.pool.Exec(ctx,
+		`INSERT INTO organization_memberships (organization_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'admin')`,
+		orgID, orgOwner, env.userID); err != nil {
+		t.Fatalf("seed quota org memberships: %v", err)
+	}
+	orgAccountPublicID := "ba_orgquota" + randomAtomicHex(t, 4)
+	var orgAccount int64
+	if err := env.pool.QueryRow(ctx,
+		`INSERT INTO billing_accounts (public_id, workspace_id, organization_id) VALUES ($1, NULL, $2) RETURNING internal_id`,
+		orgAccountPublicID, orgID,
+	).Scan(&orgAccount); err != nil {
+		t.Fatalf("seed quota org billing account: %v", err)
+	}
+	orgWS := "ws_orgquota" + randomAtomicHex(t, 4)
+	if _, err := env.pool.Exec(ctx,
+		`INSERT INTO workspaces (public_id, organization_id, owner_user_id, name) VALUES ($1, $2, NULL, 'quota-org-ws')`,
+		orgWS, orgID); err != nil {
+		t.Fatalf("seed quota org workspace: %v", err)
+	}
+	tx, err := env.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := env.credits.LifecycleInTx(tx).ProvisionAccountWallet(ctx, orgAccount); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("provision quota org wallet: %v", err)
+	}
+	grantAmount, err := domain.NewCreditAmount(1000)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if _, err := env.credits.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: orgAccount, Amount: grantAmount, Metadata: domain.CommandMetadata{
+		IdempotencyKey: "quota-org-seed-" + randomAtomicHex(t, 4),
+		Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
+		Source:         "test", Reason: "quota org seed",
+		BusinessReference: domain.BusinessReference{Type: "test", ID: "quota-org-seed"},
+	}}); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("grant quota org funds: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	env.ws = orgWS
+	env.accountID = orgAccount
+	return env
 }
 
 func setDailyQuota(t *testing.T, quotas *memberquotas.Store, accountID, userID, limit int64) {
@@ -140,22 +220,15 @@ func TestQuotaCrossWorkspaceFailRecovery(t *testing.T) {
 	env, quotas := openQuotaAtomicEnv(t)
 	ctx := context.Background()
 
-	// Second workspace of the same owner: it shares the Personal
-	// survivor by creation scope (no link), so quota accumulates.
-	ws2 := "ws_atomic2" + randomAtomicHex(t, 6)
-	if _, err := env.pool.Exec(ctx, `INSERT INTO workspaces (public_id, owner_user_id, name) VALUES ($1, $2, 'atomic-settle-ws-2')`, ws2, env.userID); err != nil {
+	// Second workspace of the same Organization: it shares the
+	// Organization pool, so quota accumulates across spaces.
+	ws2 := "ws_orgquota2" + randomAtomicHex(t, 6)
+	var orgID int64
+	if err := env.pool.QueryRow(ctx, `SELECT organization_id FROM workspaces WHERE public_id = $1`, env.ws).Scan(&orgID); err != nil {
+		t.Fatalf("resolve quota organization: %v", err)
+	}
+	if _, err := env.pool.Exec(ctx, `INSERT INTO workspaces (public_id, organization_id, owner_user_id, name) VALUES ($1, $2, NULL, 'atomic-settle-ws-2')`, ws2, orgID); err != nil {
 		t.Fatalf("seed second workspace: %v", err)
-	}
-	var ws2ID int64
-	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, ws2).Scan(&ws2ID); err != nil {
-		t.Fatalf("resolve second workspace: %v", err)
-	}
-	var wsID int64
-	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, env.ws).Scan(&wsID); err != nil {
-		t.Fatalf("resolve first workspace: %v", err)
-	}
-	if _, err := env.pool.Exec(ctx, `INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`, ws2ID, env.userID); err != nil {
-		t.Fatalf("seed sibling membership: %v", err)
 	}
 	setDailyQuota(t, quotas, env.accountID, env.userID, 15)
 

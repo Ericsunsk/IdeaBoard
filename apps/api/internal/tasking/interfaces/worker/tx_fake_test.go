@@ -40,6 +40,7 @@ import (
 	taskmemory "ideaboard/api/internal/tasking/infrastructure/memory"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskports "ideaboard/api/internal/tasking/ports/tasks"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -225,13 +226,13 @@ func workerNoopSnapshotSaver(context.Context, pgx.Tx, string, routing.RoutingSna
 	return nil
 }
 
-// workerTestBillingAccounts serves the stable funds-identity seam from a
+// workerTestBillingAccounts serves the payer seam from a
 // fixed fixture account: in-memory settlement spends the fixture account,
 // never an owner wallet.
 type workerTestBillingAccounts struct{}
 
-func (workerTestBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
-	return 7001, nil
+func (workerTestBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, _ int64) (int64, string, error) {
+	return 7001, funds.OwnerTypeWorkspace, nil
 }
 
 // newTxWorkerService wires one in-memory settlement through createInTx for

@@ -99,7 +99,7 @@ describe('AdminPromptConfigPage', () => {
 
     const row = await screen.findByRole('row', { name: /cutout/ })
     expect(within(row).getAllByText('—')).toHaveLength(4)
-    expect(within(row).queryByText('未配置')).not.toBeInTheDocument()
+    expect(within(row).queryByText('未设置')).not.toBeInTheDocument()
     expect(within(row).queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -127,11 +127,11 @@ describe('AdminPromptConfigPage', () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getAllByText('已配置').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('已设置').length).toBeGreaterThan(0)
     })
 
-    // Click row-level "配置" button
-    const configureBtn = screen.getByRole('button', { name: '配置 Image · 草图成图 提示词' })
+    // Click row-level "设置" button
+    const configureBtn = screen.getByRole('button', { name: '设置 Image · 草图成图 提示词' })
     await fireEvent.click(configureBtn)
 
     // Dialog should open
@@ -164,7 +164,7 @@ describe('AdminPromptConfigPage', () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getAllByText('已配置').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('已设置').length).toBeGreaterThan(0)
     })
 
     // The status filter is a reka Select, so it reports `combobox`. It used to be
@@ -195,7 +195,7 @@ describe('AdminPromptConfigPage', () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getAllByText('已配置').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('已设置').length).toBeGreaterThan(0)
     })
 
     // Table headers should be present
@@ -205,11 +205,11 @@ describe('AdminPromptConfigPage', () => {
     expect(screen.getAllByText('系统提示词预览').length).toBeGreaterThan(0)
     expect(screen.getAllByText('操作').length).toBeGreaterThan(0)
 
-    expect(screen.getAllByText('已配置').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('未配置').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('已设置').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('未设置').length).toBeGreaterThan(0)
 
     // Click row-level action button for render feature
-    const rowBtn = screen.getByRole('button', { name: '配置 Image · 草图成图 提示词' })
+    const rowBtn = screen.getByRole('button', { name: '设置 Image · 草图成图 提示词' })
     await fireEvent.click(rowBtn)
 
     await waitFor(() => {

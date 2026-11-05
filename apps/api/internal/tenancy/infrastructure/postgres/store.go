@@ -416,11 +416,12 @@ func createWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, publicID string
 // same workspace transaction (ADR-0038). Organization pools are ensured
 // and locked before the Workspace insert. Default rows mint
 // their own deterministic personal account (the owner's Personal
-// survivor); other personal workspaces need no billing write (they resolve
-// to the owner's Personal survivor at read time).
+// account); other personal workspaces need no billing write (they resolve
+// to the owner's Personal account at read time, and settlement bills the
+// actor's own account).
 func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Workspace, params tenancy.CreateWorkspaceParams) error {
 	// Personal scope: only the Default row owns a billing write (the
-	// Personal survivor anchor). Other personal workspaces resolve to it.
+	// Personal account anchor). Other personal workspaces resolve to it.
 	if params.IsDefault {
 		return ensureWorkspaceAccountWithQueries(ctx, q, row.InternalID, params.OwnerUserID)
 	}
@@ -577,7 +578,7 @@ FROM workspaces WHERE public_id = $1 FOR UPDATE`, publicID).Scan(&workspaceID, &
 // submissions/invites serialize here). It resolves the creation-scope
 // payer without provisioning (deletion must never mint a wallet as a side
 // effect): the Organization pool for org scopes, the owner's Personal
-// survivor for personal scopes. Unsettled payment orders and live pending
+// account for personal scopes. Unsettled payment orders and live pending
 // handover invites converge on the stored payer first. Lapsed (expired)
 // invites never block: they move nothing and the owner may re-issue after
 // the scope is gone. Wallets, Ledger, snapshots, and operation rows are
@@ -596,15 +597,15 @@ func guardWorkspaceDeleteFunds(ctx context.Context, tx pgx.Tx, workspaceID int64
 			return fmt.Errorf("tenancy: workspace delete: resolve org account: %w", err)
 		}
 	} else if ownerID.Valid && ownerID.Int64 > 0 {
-		// Personal survivor without provisioning: the Default-anchored
+		// Personal account without provisioning: the Default-anchored
 		// account when it exists, otherwise no payer and no guard.
-		var survivor int64
+		var personalAccountID int64
 		if err := tx.QueryRow(ctx, `SELECT ba.internal_id FROM billing_accounts AS ba
 JOIN workspaces AS def ON def.internal_id = ba.workspace_id
-WHERE def.owner_user_id = $1 AND def.organization_id IS NULL AND def.is_default LIMIT 1`, ownerID.Int64).Scan(&survivor); err == nil {
-			payerID = &survivor
+WHERE def.owner_user_id = $1 AND def.organization_id IS NULL AND def.is_default LIMIT 1`, ownerID.Int64).Scan(&personalAccountID); err == nil {
+			payerID = &personalAccountID
 		} else if !database.IsNotFound(err) {
-			return fmt.Errorf("tenancy: workspace delete: resolve personal survivor: %w", err)
+			return fmt.Errorf("tenancy: workspace delete: resolve personal account: %w", err)
 		}
 	}
 	if payerID == nil {
@@ -806,8 +807,8 @@ func ensureDefaultWorkspaceWithQueries(ctx context.Context, q *dbsqlc.Queries, u
 }
 
 // EnsureDefaultWorkspace idempotently provisions the user's Default
-// workspace plus its deterministic Personal Billing Account (the survivor
-// anchor, ADR-0038). Concurrent
+// workspace plus its deterministic Personal Billing Account (the
+// Default-anchored account, ADR-0038). Concurrent
 // callers collapse on ux_workspaces_default_owner
 // (INSERT ... ON CONFLICT DO NOTHING) and all read back the same row.
 // Users holding only non-Default personal rows get a fresh Default row;

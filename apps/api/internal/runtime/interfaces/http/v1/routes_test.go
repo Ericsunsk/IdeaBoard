@@ -11,6 +11,8 @@ import (
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
+	taskapp "ideaboard/api/internal/tasking/application/workspacetasks"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/testsupport"
 	"net/http"
@@ -1710,9 +1712,12 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 			TaskBillingAccounts: v1FakeBillingAccounts{},
 			// #917: the preflight resolves the same fixture account submit
 			// holds and gates the same fixture funds.
-			TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
-			TaskQuoteWallets:         newV1FakeQuoteWallets(),
-			TaskAcceptance:           &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
+			TaskReadiness: taskapp.NewReadiness(taskapp.ReadinessDeps{
+				Workspaces: &taskadapters.ReadinessWorkspaceReader{Store: store},
+				Boards:     nil, Quoter: quoter, Resolver: allowTestPoolResolver(),
+				BillingAccounts: v1FakeBillingAccounts{}, Wallets: newV1FakeQuoteWallets(), Quotas: nil,
+			}),
+			TaskAcceptance: &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
 		},
 	})
 	return &phase4Fixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, media: media, lib: lib, queue: queue}

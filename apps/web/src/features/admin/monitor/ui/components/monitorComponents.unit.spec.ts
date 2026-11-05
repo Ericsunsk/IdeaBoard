@@ -52,7 +52,7 @@ describe('Monitor Components', () => {
       },
     })
 
-    expect(screen.getByText('Events')).toBeVisible()
+    expect(screen.getByText('事件')).toBeVisible()
     const collapseBtn = screen.getByRole('button', { name: '折叠图表' })
     await user.click(collapseBtn)
     expect(onUpdateCollapse).toHaveBeenCalledWith(true)

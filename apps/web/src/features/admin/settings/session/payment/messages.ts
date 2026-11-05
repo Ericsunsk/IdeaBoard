@@ -8,10 +8,10 @@ export const PAYMENTS_MESSAGES = {
   stripeSettingsSaved: 'Stripe 设置已保存',
   // Stripe settings dialog.
   stripeHeader: 'Stripe 设置',
-  stripeDescription: '配置 Stripe 密钥与税务编码后保存。',
+  stripeDescription: '设置 Stripe 密钥与税务编码后保存。',
   stripeLoading: '加载 Stripe 设置',
   accountLabel: '账户',
-  accountUnset: '尚未配置',
+  accountUnset: '尚未设置',
   modeLabel: '模式',
   productReadyState: (isReady: boolean) => (isReady ? 'Product Ready' : 'Product Not ready'),
   webhookReadyState: (isReady: boolean) => (isReady ? 'Webhook Ready' : 'Webhook Not ready'),
@@ -25,7 +25,7 @@ export const PAYMENTS_MESSAGES = {
   pmcInvalid: '请输入有效的 pmc_... ID',
   productTaxCodeRequired: '请输入 Product Tax Code',
   apiKeyPlaceholder: (isConfigured: boolean) =>
-    isConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
+    isConfigured ? '已设置，留空则保持不变' : '输入 Stripe API Key',
   stripeLoadFailed: '加载 Stripe 设置失败，请重试',
   stripeSaveFailed: '保存 Stripe 设置失败，请重试',
 } as const

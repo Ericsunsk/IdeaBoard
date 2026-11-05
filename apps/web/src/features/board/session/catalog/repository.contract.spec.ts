@@ -69,6 +69,10 @@ function createHarness() {
     emit()
     return { isOk: true as const }
   })
+  const createAndOpen = vi.fn(async () => ({
+    isOk: true as const,
+    board: board('board-2', 'Untitled'),
+  }))
   const dependencies: BoardRepositoryDependencies = {
     listBoards,
     subscribe: (listener) => {
@@ -82,6 +86,7 @@ function createHarness() {
     },
     createCommands: () => ({
       create,
+      createAndOpen,
       renameOptimistic,
       rollbackOptimisticRename,
       duplicate,
@@ -187,6 +192,10 @@ describe('BoardRepository contract', () => {
           ? { isOk: true as const, board: board('board-2', 'Untitled') }
           : { isOk: false as const, reason: 'scope-changed' as const }
       }),
+      createAndOpen: vi.fn(async () => ({
+        isOk: true as const,
+        board: board('board-2', 'Untitled'),
+      })),
       renameOptimistic: harness.renameOptimistic,
       rollbackOptimisticRename: harness.rollbackOptimisticRename,
       duplicate,

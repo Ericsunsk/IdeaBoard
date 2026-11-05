@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-3">
-    <!-- 头部：板块名 + 副标题，配置按钮右上 -->
+    <!-- 头部：板块名 + 副标题，设置按钮右上 -->
     <div class="flex flex-wrap items-center justify-between gap-3 pb-1">
       <div class="flex min-w-0 flex-col gap-0.5">
         <div class="flex items-center gap-2">
@@ -69,12 +69,12 @@ useFailureToast(
 )
 
 const summary = computed(() => query.data.value)
-// 方案 A：收款配置是配置态（占位/空态），走中性避免蹭健康色；
+// 方案 A：收款设置是设置态（占位/空态），走中性避免蹭健康色；
 // Product/Webhook 是健康态：Ready=正常(success)、Not ready=未验证(neutral)。
 const rows = computed(() => [
   {
     key: 'configured',
-    label: '收款配置',
+    label: '收款设置',
     status: M.paymentConfiguredState(summary.value?.isConfigured ?? false),
     tone: 'neutral' as const,
   },

@@ -23,14 +23,16 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Bell } from '@iconoir/vue'
-import { createPageChromeRoundControlClass, pageChromeClasses } from '@/core/lib/pageChrome'
+import { pageChromeClasses } from '@/core/lib/pageChrome'
+import { cn } from '@/lib/utils'
 import NotificationPopover from './NotificationPopover.vue'
 import { useNotifications } from '../session/useNotifications'
 
 const { t } = useI18n()
 const session = useNotifications({ isVisible: false })
 
-const bellButtonClass = createPageChromeRoundControlClass(
+const bellButtonClass = cn(
+  pageChromeClasses.roundControl,
   'page-chrome-icon-button',
   'hit-target-32',
   'relative',

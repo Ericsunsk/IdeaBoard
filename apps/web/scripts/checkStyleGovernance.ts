@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { findMotionPolicyViolations, findStaleMotionAllowances } from './motionPolicyGuard'
+import { RETIRED_PRODUCT_TOKEN_FRAGMENT } from './checkTokenGraph'
 
 type Violation = {
   file: string
@@ -36,7 +37,8 @@ export const darkVariantUtilityPattern = /\bdark:(?=[\w![(-])/g
 export const rawMotionUtilityPattern =
   /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-easing\)\])|animate-\[)[^\]]+\]/g
 export const rawDialogWidthPattern = /w-\[min\(420px,[^\]]+\]/g
-export const rawWhiteOverlayPattern = /white(?:\/\d+|_)/g
+export const rawWhiteOverlayPattern =
+  /(?:white(?:\/\d+|_|\s+\d+(?:\.\d+)?%)|(?:bg|text)-white(?![\w/%-]))/g
 export const rawClipboardPattern = /navigator\?\.clipboard/g
 
 const styleCountRules = [
@@ -239,27 +241,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     reason:
       'Account usage chart palette is a domain visual contract (dark + light fallbacks for accent/axis/surface/text).',
   },
-  'src/features/board/ui/gallery/styling/skin.ts': {
-    counts: {
-      'hex-color': 0,
-    },
-    reason:
-      'Board empty-card preview surface keeps the exact retired serializer surface (no hex); the allowance stays registered at zero so reintroduction is caught as an overage.',
-  },
-  'src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue': {
-    counts: {
-      'hex-color': 0,
-    },
-    reason:
-      'Cleared: outpaint handle fill now resolves through canvas tokens; allowance stays registered at zero so reintroduction is caught as an overage.',
-  },
-  'src/features/canvas/ui/nodes/primitives/tools/NodeActionButton.vue': {
-    counts: {
-      'hex-color': 0,
-    },
-    reason:
-      'Cleared: stage ghost/primary button ink now resolves through canvas tokens; allowance stays registered at zero so reintroduction is caught as an overage.',
-  },
   'src/features/canvas/ui/styles/node-input-thumbnails.css': {
     counts: {
       'hex-color': 2,
@@ -283,12 +264,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
       'hex-color': 1,
     },
     reason: 'Retouch control-point overlay uses canvas drawing constants.',
-  },
-  'src/features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css': {
-    counts: {
-      'hex-color': 1,
-    },
-    reason: 'Retouch histogram plot uses canvas drawing constants.',
   },
 }
 
@@ -371,6 +346,27 @@ const rawClipboardAllowances: Record<string, CountAllowance<TokenCountRuleId>> =
   },
 }
 
+// Image-overlay white veils stay paper-white in both modes for legibility over
+// arbitrary imagery: a mode-aware Canvas veil would flip dark and lose contrast
+// with the dark icon ink. Counts mirror the canvas drawing-constant treatment
+// (see hex-color allowances for the same files).
+const rawWhiteOverlayAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/canvas/ui/styles/node-input-thumbnails.css': {
+    counts: {
+      'raw-white-overlay': 2,
+    },
+    reason:
+      'Thumbnail remove chip floats over arbitrary images; white 88% veil plus slate icon keeps contrast in both modes where a mode-aware veil would flip dark.',
+  },
+  'src/features/canvas/ui/nodes/workflows/FusionStage.vue': {
+    counts: {
+      'raw-white-overlay': 1,
+    },
+    reason:
+      'Blend-weight badge floats over imagery; white 80% veil keeps the caption legible in both modes where a mode-aware veil would flip dark.',
+  },
+}
+
 // Component-layer legacy domain color usage is
 // pinned at the counts below. New usages fail the Web Quality lane; shrinking
 // a count trips the stale-allowance check and must narrow the allowance here.
@@ -383,13 +379,6 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     },
     reason:
       'Task status banner gradients resolve glow/wash through admin status tokens (5 banners × glow/wash refs); dot halos use shadow-admin-status-dot-* utilities. Table and detail views share this one domain visual contract.',
-  },
-  'src/features/admin/monitor/ui/AdminTaskResultDialog.vue': {
-    counts: {
-      'legacy-token': 0,
-    },
-    reason:
-      'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/board/ui/gallery/styling/skin.ts': {
     counts: {
@@ -408,9 +397,12 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
 
 // Product-prefixed aliases were the previous cross-feature token layer. They
 // are forbidden even in token-owner files so a new alias cannot be introduced
-// in the source-of-truth CSS while component scans remain green.
-const forbiddenTokenAliasPattern =
-  /(?:var\(\s*)?--(?:color-ib-[a-z0-9-]+|text-ib-[a-z0-9-]+|shadow-ib-(?:control|overlay|focus)(?=[\s:),]))/g
+// in the source-of-truth CSS while component scans remain green. The matcher
+// derives from the token-graph single source (RETIRED_PRODUCT_TOKEN_FRAGMENT).
+const forbiddenTokenAliasPattern = new RegExp(
+  `(?:var\\(\\s*)?--(?:${RETIRED_PRODUCT_TOKEN_FRAGMENT})`,
+  'g',
+)
 
 function checkForbiddenTokenAliases(file: SourceFile, content: string): Violation[] {
   if (isStyleSpecFile(file)) return []
@@ -462,7 +454,7 @@ function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
   pushOver('arbitrary-breakpoint', arbitraryBreakpointAllowances)
   pushOver('dark-variant', {})
   pushOver('raw-dialog-width', rawDialogWidthAllowances)
-  pushOver('raw-white-overlay', {})
+  pushOver('raw-white-overlay', rawWhiteOverlayAllowances)
   pushOver('raw-clipboard', rawClipboardAllowances)
 
   return violations
@@ -687,6 +679,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
     ...checkAllowanceReasons(arbitraryBreakpointAllowances, 'arbitraryBreakpointAllowances'),
     ...checkAllowanceReasons(legacyTokenAllowances, 'legacyTokenAllowances'),
     ...checkAllowanceReasons(rawDialogWidthAllowances, 'rawDialogWidthAllowances'),
+    ...checkAllowanceReasons(rawWhiteOverlayAllowances, 'rawWhiteOverlayAllowances'),
     ...checkAllowanceReasons(rawClipboardAllowances, 'rawClipboardAllowances'),
   ]
 
@@ -759,6 +752,12 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       tokenCountRules,
       rawDialogWidthAllowances,
       'stale-raw-dialog-width-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      rawWhiteOverlayAllowances,
+      'stale-raw-white-overlay-allowance',
     ),
     ...checkStaleAllowances(
       contents,

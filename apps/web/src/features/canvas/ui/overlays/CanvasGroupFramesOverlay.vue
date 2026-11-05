@@ -132,11 +132,11 @@ function onResizePointerDown(
 }
 
 .canvas-group-frame-resize-handle.is-edge-handle {
-  z-index: 1;
+  z-index: var(--canvas-z-local-base);
 }
 
 .canvas-group-frame-resize-handle.is-corner-handle {
-  z-index: 2;
+  z-index: var(--canvas-z-local-raised);
   width: var(--canvas-group-frame-corner-hit-size);
   height: var(--canvas-group-frame-corner-hit-size);
 }

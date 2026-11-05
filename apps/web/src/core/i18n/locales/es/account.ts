@@ -105,8 +105,6 @@ export default {
     retryLoad: 'Reintentar',
     loadMore: 'Cargar más',
     unknownTime: 'Hora desconocida',
-    sharedAccount:
-      'Cuenta de saldo compartido {account}: todos los espacios de trabajo de esta cuenta muestran el mismo saldo.',
     forbiddenTitle: 'Acceso restringido',
     forbiddenDescription:
       'Tu rol actual no puede ver estos registros. Contacta con un administrador del espacio o de facturación.',
@@ -139,7 +137,6 @@ export default {
     rangeWeek: 'Semana',
     rangeMonth: 'Mes',
     rangeYear: 'Año',
-    sharedAccount: 'Uso de la cuenta compartida {account}.',
     forbiddenTitle: 'Acceso restringido',
     forbiddenDescription:
       'Tu rol actual no puede ver este uso. Contacta con un administrador del espacio o de facturación.',
