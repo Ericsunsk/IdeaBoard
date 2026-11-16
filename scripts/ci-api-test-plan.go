@@ -70,7 +70,6 @@ func listPackages(root string) ([]goPackage, error) {
 var contractTests = map[string][]string{
 	"internal/boards/policy_test.go":                                  {"TestBoardsDomainHasNoHandlerOrRuntimeImports", "TestRoleAdaptersDelegateToUnifiedPolicy", "TestBoardRoleRulesStayUncopiedOutsideBoards"},
 	"internal/platform/riverpolicy/policy_ownership_test.go":          nil,
-	"internal/platform/riverpolicy/matrix_consistency_test.go":        nil,
 	"internal/library/domain/validation_test.go":                      {"TestLibrarySourceFixturesContract"},
 	"internal/boards/workspace_test.go":                               {"TestPreviewCatalogQueryNeverReadsDocuments"},
 	"internal/platform/contract/contract_test.go":                     {"TestErrorCodeRegistryConsistency"},
@@ -81,7 +80,6 @@ var contractTests = map[string][]string{
 	"internal/runtime/interfaces/http/control/guard_test.go":          {"TestControlNeverTouchesEventLayer"},
 	"internal/workflow/features_test.go":                              {"TestAIImageFeatureSlugsMatchFrontendOpenAPIAndAdminContracts"},
 	"internal/workflow/generation_contract_test.go":                   {"TestGenerationContractMatchesFrontendAndOpenAPI"},
-	"internal/tasking/workspacetasks/status_parity_test.go":           nil,
 	"internal/events/webhook/event_parity_test.go":                    nil,
 }
 
