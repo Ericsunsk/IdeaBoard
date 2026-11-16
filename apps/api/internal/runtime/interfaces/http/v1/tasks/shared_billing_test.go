@@ -36,7 +36,6 @@ import (
 	v1testsupport "ideaboard/api/internal/runtime/interfaces/http/v1/testsupport"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -170,25 +169,6 @@ func (s *stubTaskQuotas) CheckQuotaForQuote(_ context.Context, _, _ int64, _ int
 func (s *stubTaskQuotas) CheckQuotaInTx(_ context.Context, _ pgx.Tx, _, _ int64, _ int64, _ time.Time) error {
 	s.txChecks++
 	return s.txErr
-}
-
-// v1PersonalBillingAccounts mirrors the Personal scope for the quota
-// preflight: the resolved account is actor-owned (Shared=false), so the
-// Org-only quota gate must skip without consulting the checker.
-type v1PersonalBillingAccounts struct{}
-
-func (v1PersonalBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string, _ int64) (int64, string, error) {
-	return 7001, tenancypg.BillingOwnerWorkspace, nil
-}
-
-func (v1PersonalBillingAccounts) ResolveFundsForActor(_ context.Context, workspacePublicID string, _ int64) (funds.Identity, error) {
-	return funds.Identity{
-		WorkspaceInternalID:    7001,
-		WorkspacePublicID:      workspacePublicID,
-		BillingAccountID:       7001,
-		BillingAccountPublicID: "ba_quote0000001",
-		OwnerType:              tenancypg.BillingOwnerWorkspace,
-	}, nil
 }
 
 // newQuotaTaskEngine rebuilds the task surface of fx with the quota
