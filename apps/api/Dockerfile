@@ -5,7 +5,7 @@ FROM --platform=$BUILDPLATFORM golang:1.26.11-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG ATLAS_VERSION=1.3.7-0a182ba-canary
+ARG ATLAS_VERSION=1.3.11-ede06dc-canary
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
