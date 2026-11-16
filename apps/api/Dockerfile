@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Canonical source: apps/api/go.mod 'go' directive (enforced by scripts/handbook-version-contract.sh).
-FROM --platform=$BUILDPLATFORM golang:1.26.10-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.11-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
