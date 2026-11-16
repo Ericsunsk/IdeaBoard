@@ -696,6 +696,17 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		}
 	})
 
+	t.Run("truncated body rejected before store", func(t *testing.T) {
+		// Valid PNG header/config with a cut tail: the old header-only
+		// sniff accepted it and the preview render (imgproxy full decode)
+		// broke. Full-body inspection must fail the upload with 400.
+		truncated := png[:len(png)/2]
+		status, payload := serveUpload(h.engine, newUploadRequest(t, "ext-up-trunc", truncated, "logo.png"))
+		if status != http.StatusBadRequest {
+			t.Fatalf("truncated status = %d (%v), want 400", status, payload)
+		}
+	})
+
 	t.Run("happy path replays on key reuse and conflicts on divergent content", func(t *testing.T) {
 		status, payload := serveUpload(h.engine, newUploadRequest(t, "ext-up-4", png, "logo.png"))
 		if status != http.StatusOK {

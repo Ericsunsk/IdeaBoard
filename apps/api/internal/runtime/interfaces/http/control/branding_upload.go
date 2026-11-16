@@ -209,6 +209,14 @@ func hashControlUploadFile(fh *multipart.FileHeader) (string, error) {
 // validateControlUploadFileHeader centralises branding-logo validation:
 // size cap, detected-format inspection from actual bytes, and allow-list
 // enforcement (never trust the filename). Failures render directly.
+//
+// The body is fully decoded (InspectCompleteDetectedBytes), not just
+// header-sniffed: a tail-cut PNG still passes DecodeConfig but fails the
+// imgproxy render at preview time, storing bytes that can never display.
+// This mirrors the workspace bytes PUT / complete path
+// (putUploadBytes, verifyStagedUploadBytes). AVIF behaves the same as
+// workspace uploads (config-only decoder, no full pixel decoder
+// registered): consistent rejection, not a branding special case.
 func validateControlUploadFile(c *gin.Context, fh *multipart.FileHeader) (string, bool) {
 	if fh == nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest6)
@@ -219,7 +227,25 @@ func validateControlUploadFile(c *gin.Context, fh *multipart.FileHeader) (string
 			fmt.Sprintf(runtimehttp.MsgValidateControlUploadFile, controlBrandingLogoMaxBytes/1024/1024))
 		return "", false
 	}
-	facts, err := imageformat.InspectFileHeader(fh)
+	src, err := fh.Open()
+	if err != nil {
+		slog.Warn("control branding logo open failed", "err", err)
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest8)
+		return "", false
+	}
+	defer src.Close()
+	data, err := io.ReadAll(io.LimitReader(src, controlBrandingLogoMaxBytes+1))
+	if err != nil {
+		slog.Warn("control branding logo read failed", "err", err)
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest8)
+		return "", false
+	}
+	if int64(len(data)) > controlBrandingLogoMaxBytes || int64(len(data)) != fh.Size {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest,
+			fmt.Sprintf(runtimehttp.MsgValidateControlUploadFile, controlBrandingLogoMaxBytes/1024/1024))
+		return "", false
+	}
+	facts, err := imageformat.InspectCompleteDetectedBytes(data)
 	if err != nil {
 		slog.Warn("control branding logo inspect failed", "err", err)
 		if errors.Is(err, imageformat.ErrUnsupportedImageFormat) {
