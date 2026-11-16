@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Canonical source: root .node-version (enforced by scripts/handbook-version-contract.sh).
-ARG NODE_VERSION=22.23.4
+ARG NODE_VERSION=22.23.5
 
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 
