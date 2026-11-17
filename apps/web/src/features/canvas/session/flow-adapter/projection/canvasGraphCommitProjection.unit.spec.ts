@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
+import { effectScope, shallowRef } from 'vue'
+import type { FlowNodeData } from '../../../core/nodes/flowTypes'
+import { useFlowCanvasNodeAdapter } from './useFlowCanvasNodeAdapter'
 import type {
   CanvasGraphCommitPatch,
   CanvasGraphEdgeRecord,
@@ -67,6 +70,49 @@ function flowNode(id: string, url = ''): Node {
 }
 
 describe('projectCanvasGraphCommit', () => {
+  it('keeps a dropped local image visible when its position commits during upload', () => {
+    const before = imageRecord(1, '')
+    const localUpload = { previewUrl: 'blob:uploading-local-image' }
+    const currentNode = shallowRef<Node>({
+      ...flowNode('image-1'),
+      data: { kind: 'image', snapshotNode: before.snapshot, localUpload },
+    })
+    const scope = effectScope()
+    try {
+      const presentation = scope.run(() =>
+        useFlowCanvasNodeAdapter({
+          data: () => currentNode.value.data as FlowNodeData,
+          uiState: () => undefined,
+          imageDirectGenerating: () => false,
+          outpaintModeActive: () => false,
+          isRetouchActive: () => false,
+        }),
+      )!
+      expect(presentation.displayImage.value?.url).toBe(localUpload.previewUrl)
+      const result = projectCanvasGraphCommit({
+        current: { nodes: [currentNode.value], edges: [] },
+        patch: patch({
+          nodes: {
+            records: [
+              {
+                id: 'image-1',
+                before,
+                after: { ...before, snapshot: { ...before.snapshot, x: 240, y: 160 } },
+              },
+            ],
+            order: [],
+          },
+        }),
+      })
+      currentNode.value = result.graph.nodes[0]!
+      expect(presentation.displayImage.value?.url).toBe(localUpload.previewUrl)
+      expect(presentation.localUpload.value).toEqual(localUpload)
+      expect(currentNode.value.position).toEqual({ x: 240, y: 160 })
+    } finally {
+      scope.stop()
+    }
+  })
+
   it('replaces only the changed node and preserves all other Flow identities', () => {
     const unchangedNode = flowNode('image-2', 'unchanged')
     const changedNode = {

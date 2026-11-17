@@ -9,13 +9,16 @@ export function useTierFallback(
   const tierErrorFallbackUrl = ref('')
   const src = computed(() => tierErrorFallbackUrl.value || toValue(displayUrl) || undefined)
   const isLoaded = ref(false)
+  let lastLoadedUrl: string | undefined
 
   watch([() => sourceIdentity()[0], () => sourceIdentity()[1]], () => {
+    const hasErrorFallback = !!tierErrorFallbackUrl.value
     tierErrorFallbackUrl.value = ''
-    isLoaded.value = false
+    isLoaded.value = !hasErrorFallback && !!src.value && src.value === lastLoadedUrl
   })
 
   function onLoad() {
+    lastLoadedUrl = src.value
     isLoaded.value = true
   }
 

@@ -51,6 +51,9 @@ function canDisplayImage(url: string, signal: AbortSignal, metricName: string): 
   return new Promise((resolve) => {
     const finishTiming = beginCanvasInteractionTiming(metricName)
     const image = new Image()
+    // This detached image gates a visible Canvas frame; automatic priority can
+    // defer its request as if it were speculative background work.
+    image.fetchPriority = 'high'
     let isSettled = false
     const finish = (isDisplayable: boolean) => {
       if (isSettled) return

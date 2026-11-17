@@ -132,7 +132,9 @@ function mergeProjectedNode(
   return {
     ...current,
     ...projected,
-    data: projected.data,
+    // Local upload/import previews belong to this renderer attachment, so
+    // canonical position and selection commits must not discard them.
+    data: Object.assign({}, current.data, projected.data),
     position: projected.position,
     dimensions: projected.dimensions,
     selected: isSelectionChanged
