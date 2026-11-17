@@ -1,4 +1,5 @@
-import type { TaskImageObservation } from '../task-runner/taskImageOutcome'
+import { createTaskImageObserver, type TaskImageObservation } from '../task-runner/taskImageOutcome'
+import { extractWorkspaceTaskImageResults } from '../workspace/canvasTaskWaiting'
 import { CANVAS_FOREGROUND_WAIT_MS, CANVAS_TOTAL_WAIT_MS } from '../canvasBudgets'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError, TaskResultPendingError } from '../task-runner/taskResultErrors'
@@ -187,6 +188,36 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.onSuccess).not.toHaveBeenCalled()
     expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.transport.observe).toHaveBeenCalledOnce()
+  })
+
+  it('keeps partial completed outputs and settles every missing slot without polling again', async () => {
+    const harness = createHarness(['task-1', 'task-1', 'task-1', 'task-1'])
+    const results = extractWorkspaceTaskImageResults('ws_task123', [
+      { kind: 'asset', asset_id: 'asset_result123', role: 'image', result_index: 0 },
+    ])
+    const wait = vi.fn(async () => ({ kind: 'completed' as const, results }))
+    harness.transport.observe.mockImplementation(
+      createTaskImageObserver(
+        wait,
+        async () => ({ width: 400, height: 200 }),
+        async () => {},
+      ),
+    )
+    await harness.runner.execute(harness.intent)
+    expect(harness.core.snapshot().executions.map((fact) => fact.status)).toEqual([
+      'succeeded',
+      'failed',
+      'failed',
+      'failed',
+    ])
+    expect(harness.pendingResults.removePendingResults).toHaveBeenCalledExactlyOnceWith([
+      'image-2', 'image-3', 'image-4',
+    ])
+    expect(wait).toHaveBeenCalledOnce()
+    expect(harness.transport.observe).toHaveBeenCalledOnce()
+    expect(harness.cancelTasks).not.toHaveBeenCalled()
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledOnce()
   })
 
   it.each(['completed', 'failed'] as const)(
