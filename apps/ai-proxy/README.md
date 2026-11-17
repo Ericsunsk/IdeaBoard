@@ -186,7 +186,10 @@ Go wire 定义统一由 `apps/api/internal/platform/workerwire` 拥有；Runtime
 
 ## 部署
 
-Cloudflare Git 直连、production/preview 隔离、环境变量同步及回滚步骤统一见
+Cloudflare Git 直连：main 使用 `wrangler deploy` 发布；非 production 分支使用
+`wrangler versions upload --dry-run` 仅构建验证，不上传、不生成 Preview URL，
+不需要 dev Secrets 或 `[previews]`。该 CLI dry-run 与 Worker 业务接口 `/v1/dry-run` 不同。
+Watch paths、生产环境变量同步、验收及回滚步骤统一见
 [部署 runbook](../../docs/runbooks/deployment.md#ai-proxy-worker-部署cloudflare-git-直连)。
 
 ## 待首单实测确认项（P0）

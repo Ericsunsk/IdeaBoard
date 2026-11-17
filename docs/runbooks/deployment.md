@@ -582,8 +582,14 @@ ls -lh /opt/stacks/ideaboard-backups/
 
 ## ai-proxy Worker 部署（Cloudflare Git 直连）
 
-VPS 镜像通道之外，`apps/ai-proxy`（唯一的 AI 出口适配器）不走 CI 发版、不跑 `wrangler deploy`：在 CF dashboard 把本仓库连到 Worker `ideaboard-ai-proxy`，Root directory 填 `apps/ai-proxy`，Watch paths 只含 `apps/ai-proxy/**`（改 Go/前端不触发 Worker 重建），production 分支绑 main，PR 自动出 preview 部署（只做 dry-run 验证，永不配给任何 VPS）。
+VPS 镜像通道之外，`apps/ai-proxy`（唯一的 AI 出口适配器）由 Cloudflare Git 直连发布；GitHub `AI Proxy` lane 只验证、不部署。Dashboard 连接 Worker `ideaboard-ai-proxy`，production 分支绑 main。production 与 Preview base 的 Root directory 均为 `apps/ai-proxy`，Build command 均为 `npm run build`；Deploy command 分别为 `npx wrangler deploy` 与 **`npx wrangler versions upload --dry-run`**。
 
-变量在 dashboard 上按 environment 分开配：`[vars]` 非密钥（`CF_ACCOUNT_ID`/`CF_GATEWAY_ID`）toml 明文或 dashboard 二选一；Secrets 只放 dashboard Secrets——production 填 Infisical prod 同名 key 的值（`CF_AIG_TOKEN`、`WORKER_INTERNAL_SECRET`），preview 填 dev 的值。`wrangler secret put` 与 dashboard 写的是同一份，任选其一。生产推荐走 Infisical 原生 Cloudflare Workers 集成自动同步（project 选 `ideaboard`、env 选 prod、path 只圈 `/ai-proxy`），配好后改值自动推，不再手动。
+这里 Preview base 只做非 production 分支的构建验证：CLI `--dry-run` 在本地完成 bundle 后退出，不上传 Worker version、不部署、不生成 Preview URL，因此不需要 dev Gateway bindings 或 Secrets，也不需要 `[previews]`。这与已部署 Worker 的业务接口 `/v1/dry-run` 是两种操作。不要改为 `wrangler preview`、去掉 `--dry-run`，或为了让非 production 构建通过而复制 production Secrets。
+
+Watch paths 在 production 与 Preview base 两边保持一致：Include 填 `apps/ai-proxy/**` 和 `.node-version`，Exclude 留空，路径相对仓库根目录。Worker 目录包含 package manifest / lock；根 `.node-version` 是 Cloudflare 构建实际使用的 Node version 输入。Go、前端和 CI 文件的普通变更不在触发范围内；Cloudflare 对空变更、3,000 个及以上文件或 20 个及以上 commits 的 push 可能绕过路径过滤，详见 [Build watch paths](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)。
+
+生产变量仍在 Dashboard 配置：`[vars]` 非密钥（`CF_ACCOUNT_ID` / `CF_GATEWAY_ID`）可选 toml 明文或 Dashboard；Secrets 只放 Dashboard，值来自 Infisical prod `/ai-proxy` 的 `CF_AIG_TOKEN` / `WORKER_INTERNAL_SECRET`。生产推荐走 Infisical 原生 Cloudflare Workers 集成自动同步（project `ideaboard`、env `prod`、path `/ai-proxy`）。Preview base 不新增运行时密钥，不改 production bindings 或发布命令。
+
+本地验证：`cd apps/ai-proxy && npm ci && npm run build && npx wrangler versions upload --dry-run`。Cloudflare 验收则先重新加载设置、核对 Preview base 命令包含 `--dry-run`，再重试一次既有非 production 失败构建，确认成功且日志含 `--dry-run: exiting now.`；检查 production 配置未变化。Watch paths 需保存后重新加载两边核对。回退时可恢复原 Watch paths；若恢复旧 Preview 命令，缺少 `[previews]` 的原始失败会重现，不能借回退触发 production 部署。
 
 VPS 侧 prod `WORKER_BASE_URL` 填 production Worker 地址（`https://ideaboard-ai-proxy.<account>.workers.dev` 或自定域名），与 preview 无关。回滚 = CF dashboard 回滚 Worker 版本（无状态，无需数据回滚）。本地 bindings 与启动步骤见 [ai-proxy README](../../apps/ai-proxy/README.md#运行与验证)。

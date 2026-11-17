@@ -13,7 +13,7 @@
 - [AI Proxy affected CI](operations/static-analysis-baseline.md#2026-11-17--ai-proxy-affected-ci-补齐) — 2026-11-17 补齐 Worker 专属验证、共享 wire/toolchain 依赖与路径选择对照；远端首次运行和成本仍待验证。
 - [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, repository-free signed deployment bundles, and 2026-11-05 worktree fingerprints / isolated DB evidence.
 - [UI/UX Audit](operations/ui-ux-audit.md) — Token, component, and copy/state orphan scan; 2026-11-05 uncommitted-worktree P1/P2/P3 review (BASE c8d1b5fa1).
-- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — 生产网关诊断（2026-11-03）；GWLLM protocol/BYOK 证据、multipart 编码与网站审查历史，#982–#985 冻结分辨率、多输出和单图 wire 修复（2026-11-17，`Ericsunsk/IdeaBoard@39411e7e9`），以及 #986/#987 Cloudflare Preview 缺少 `[previews]` 与 Watch paths 偏差的只读诊断（2026-11-17）。
+- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — 生产网关诊断（2026-11-03）；GWLLM protocol/BYOK 证据、multipart 编码与网站审查历史，#982–#985 冻结分辨率、多输出和单图 wire 修复（2026-11-17，`Ericsunsk/IdeaBoard@39411e7e9`），以及 #986/#987 Cloudflare Preview 失败诊断、用户选定非 production 仅构建验证及 clean archive 零 API 请求证据（2026-11-17）。
 
 
 ## 2026-11-05 — Repair follow-up (uncommitted worktree)
