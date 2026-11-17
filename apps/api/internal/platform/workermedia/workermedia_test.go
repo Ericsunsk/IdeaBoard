@@ -7,13 +7,13 @@ import (
 )
 
 func TestMintOutputKeyAlignsWithMediaScheme(t *testing.T) {
-	if got := MintOutputKey("ws_abc", "task-1"); got != "uploads/ws/abc/task-1/result-0.png" {
+	if got := MintOutputKey("ws_abc", "task-1", 0); got != "uploads/ws/abc/task-1/result-0.png" {
 		t.Fatalf("key = %q, want uploads/ws/abc/task-1/result-0.png", got)
 	}
-	if got := MintOutputKey("", ""); !strings.HasPrefix(got, "uploads/ws/") || !strings.HasSuffix(got, "/result-0.png") {
+	if got := MintOutputKey("", "", 0); !strings.HasPrefix(got, "uploads/ws/") || !strings.HasSuffix(got, "/result-0.png") {
 		t.Fatalf("fallback key = %q, want uploads/ws/.../result-0.png", got)
 	}
-	for _, segment := range strings.Split(MintOutputKey("ws_../evil", "task-1"), "/") {
+	for _, segment := range strings.Split(MintOutputKey("ws_../evil", "task-1", 0), "/") {
 		if segment == ".." {
 			t.Fatal("traversal key accepted, want contained key")
 		}

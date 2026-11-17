@@ -43,6 +43,11 @@ It is not a business context and must never decay into a wiring package; no busi
   the slot owns exact-key binding, bounded object reads, complete image validation
   and actual/stored/reported MIME agreement, returning only an accepted data URL.
   Executors do not choose output policies or orchestrate acceptance checks.
+  Image execution consumes the frozen requested output count as ordered single-image
+  Worker calls, each with an indexed slot. Later call failures preserve accepted
+  outputs for normal Complete and actual-output CaptureSplit settlement; cancellation
+  keeps its existing context semantics. Slots alone carry no accepted receipt or
+  execution fence and must not be treated as a crash-recovery idempotency record.
   Worker JSON requests, responses, endpoint paths and error codes are owned by
   the neutral `platform/workerwire` module, shared with ModelRegistry. Runtime
   keeps timeout, resilience, metrics and local execution metadata outside the wire.

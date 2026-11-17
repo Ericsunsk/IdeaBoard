@@ -83,7 +83,7 @@ func testWorkerTransfer(objects *fakeWorkerObjects) *workerTransfer {
 
 func TestPrepareOutputBindsFixedImagePolicy(t *testing.T) {
 	transfer := testWorkerTransfer(nil)
-	slot, err := transfer.PrepareOutput("ws_abc", "task-1")
+	slot, err := transfer.PrepareOutput("ws_abc", "task-1", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestWorkerOutputSlotAcceptsActualImageFormats(t *testing.T) {
 	for _, mime := range []string{"image/png", "image/jpeg", "image/webp"} {
 		t.Run(mime, func(t *testing.T) {
 			objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
-			slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "format")
+			slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "format", 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -158,15 +158,19 @@ func TestWorkerOutputSlotAcceptsActualImageFormats(t *testing.T) {
 func TestWorkerOutputSlotRejectsOtherSlotsBeforeReading(t *testing.T) {
 	objects := &fakeWorkerObjects{}
 	transfer := testWorkerTransfer(objects)
-	slot, err := transfer.PrepareOutput("ws_test", "first")
+	slot, err := transfer.PrepareOutput("ws_test", "first", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := transfer.PrepareOutput("ws_test", "second")
+	other, err := transfer.PrepareOutput("ws_test", "second", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, raw := range []string{other.UploadURL(), "https://api.example.test/other/x.png", ""} {
+	sibling, err := transfer.PrepareOutput("ws_test", "first", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{sibling.UploadURL(), other.UploadURL(), "https://api.example.test/other/x.png", ""} {
 		if _, err := slot.Accept(context.Background(), raw, "image/png"); err == nil {
 			t.Fatal("unbound image URL accepted")
 		}
@@ -199,7 +203,7 @@ func TestWorkerOutputSlotRejectsUntrustedImages(t *testing.T) {
 		} {
 			t.Run(mime+"/"+name, func(t *testing.T) {
 				objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
-				slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "invalid")
+				slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "invalid", 0)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -221,7 +225,7 @@ func TestWorkerOutputSlotRejectsUntrustedImages(t *testing.T) {
 
 func TestWorkerOutputSlotEnforcesSizeEvenForInvalidStoreAdapter(t *testing.T) {
 	objects := &fakeWorkerObjects{data: map[string][]byte{}, ct: map[string]string{}}
-	slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "oversized")
+	slot, err := testWorkerTransfer(objects).PrepareOutput("ws_test", "oversized", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +242,7 @@ func TestWorkerOutputSlotEnforcesSizeEvenForInvalidStoreAdapter(t *testing.T) {
 
 func TestWorkerOutputSlotFailsClosedWithoutConfiguration(t *testing.T) {
 	for _, transfer := range []*workerTransfer{nil, {objects: &fakeWorkerObjects{}, secret: "test"}, {objects: &fakeWorkerObjects{}, origin: "https://api.test"}, {origin: "https://api.test", secret: "test"}} {
-		if _, err := transfer.PrepareOutput("ws_test", "task"); err == nil {
+		if _, err := transfer.PrepareOutput("ws_test", "task", 0); err == nil {
 			t.Fatal("unconfigured output slot prepared")
 		}
 	}
