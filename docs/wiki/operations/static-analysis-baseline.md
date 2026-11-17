@@ -2,6 +2,13 @@
 
 Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
+## 2026-11-17 — AI Proxy affected CI 补齐
+
+- 2026-11-17，审计 `Ericsunsk/IdeaBoard@7988bc7d5` 确认已有按应用分类、Go/Vitest affected planner、成功 `main` push 祖先的累计比较、`CI Gate` 与 release component image reuse。本轮不替换这些机制。缺口是 `apps/ai-proxy/**` 落入 unknown 全量分类，却没有执行 Worker 自身测试。
+- `Ericsunsk/IdeaBoard@27f5f4f6b` 新增独立 Worker lane，执行 TypeScript build、98 个本地 mocked 单测、Go↔Worker wire contract；依赖 manifest/lock 变化另做 production dependency audit。`workerwire/**`、Go module/lock、Node/Go setup 等共享输入选择 Worker，其他应用的原有要求保留；`CI Gate` 拒绝所选 Worker lane 失败、取消或 skipped。Cloudflare Git 直连发布、签名 bundle、Production Environment、手动全量与 unknown 全量回退保持原有规则。
+- 2026-11-17，对上述两个 commit 的真实 selector 以 `apps/ai-proxy/src/index.ts` 为输入比较：旧结果选择 Web/API/Auth/Realtime/Migration Integration/Ops、preview images 与 browser smoke，新结果只选择 AI Proxy；always-run Media/Handbook/PR size/Gate 未缩小。`workerwire/contract.go` 的 API/browser 要求保留，并增加 AI Proxy；docs-only 与 Web-only 结果保留。累计范围若仍有其他应用未验证改动，仍须运行其 lane，不能把单路径对照当作每次 PR 的保证。
+- 2026-11-17，本地 22 行路径选择表、Gate 终态矩阵、baseline rename/delete/new-branch fixtures、workflow 正反 fixtures、derived dependency map（51 edges / 28 inputs）、`actionlint`、ShellCheck、Worker build/98 tests/wire contract 与 production audit（0 vulnerabilities）通过；独立安全复核通过。未触发部署或更改 GitHub/Cloudflare settings，未运行全量应用 suites；新增 workflow 的 GitHub-hosted 首次执行与实际 runner 成本仍待远端证据，不以本地时长推断节省金额。
+
 ## 2026-11-01 — auth/realtime/ai-proxy PASS
 
 - As of `IdeaBoard@782e87c00` (2026-11-01), background static-analysis subagent reported:
