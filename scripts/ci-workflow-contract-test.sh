@@ -60,6 +60,13 @@ reject_mutation .github/workflows/auth.yml '/      - name: Prepare Go contract t
 reject_mutation .github/workflows/ci.yml 's/run_sqlc: .*/run_sqlc: false/' 'API must consume its precise check requirement'
 reject_mutation .github/workflows/ci.yml '/          BROWSER_SMOKE_REQUIRED:/d' 'Browser smoke must use the explicit runtime-impact flag'
 reject_mutation .github/workflows/ci.yml 's#./scripts/ci-baseline.sh#./scripts/untrusted-baseline.sh#' 'Incremental CI must use the trusted ancestor resolver'
+reject_mutation .github/workflows/ci.yml '/          AI_PROXY_RESULT:/d' 'CI Gate must receive the AI Proxy result'
+reject_mutation .github/workflows/ci.yml "s/if: needs.changes.outputs.ai_proxy == 'true'/if: false/" 'AI Proxy must use its selected scope'
+reject_mutation .github/workflows/ai-proxy.yml 's/inputs.source_commit || github.sha/github.sha/' 'ai-proxy.yml must checkout the exact verified source'
+reject_mutation .github/workflows/ai-proxy.yml '/      - name: Verify Go Worker wire contract/,+2d' 'Missing step: Verify Go Worker wire contract'
+reject_mutation .github/workflows/ai-proxy.yml '/      - name: Test AI Proxy/a\
+        continue-on-error: true
+' 'AI Proxy check failures must fail verification'
 reject_mutation .github/workflows/api.yml 's/API_TEST_PLAN: .*/API_TEST_PLAN: wrong-plan.json/' 'API shards must consume the single verified plan'
 reject_mutation .github/workflows/web.yml 's/CI_FORCE_FULL: .*/CI_FORCE_FULL: false/' 'Web planner must preserve full-release mode'
 reject_mutation .github/workflows/api.yml "s/ATLAS_BASE_SHA: .*/ATLAS_BASE_SHA: \${{ github.event.before }}/" 'Migration review must use the cumulative verified baseline'

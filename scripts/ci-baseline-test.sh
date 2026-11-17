@@ -101,6 +101,19 @@ response "${head_sha}"
 run_baseline
 assert_line "base_sha=${head_sha}"
 assert_line "head_sha=${merge_sha}"
+# Deletions and both rename endpoints remain visible, including on a new branch.
+git checkout -qb new-worker-branch
+mkdir -p apps/ai-proxy/src
+git mv code.go apps/ai-proxy/src/renamed.ts
+git rm -q README.md
+git commit -qm 'rename Worker input and delete documentation'
+response "${head_sha}"
+run_baseline
+assert_line force_full=false
+assert_line "base_sha=${head_sha}"
+grep -Fqx code.go "${fixture_dir}/paths"
+grep -Fqx apps/ai-proxy/src/renamed.ts "${fixture_dir}/paths"
+grep -Fqx README.md "${fixture_dir}/paths"
 # Shallow history cannot establish coverage safely.
 git clone -q --depth=1 "file://${fixture_dir}/repo" "${fixture_dir}/shallow"
 cd "${fixture_dir}/shallow"

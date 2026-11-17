@@ -219,6 +219,8 @@ func app(path string) string {
 		switch parts[1] {
 		case "web", "api", "auth", "realtime":
 			return parts[1]
+		case "ai-proxy":
+			return "ai_proxy"
 		}
 	}
 	return ""

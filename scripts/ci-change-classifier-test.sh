@@ -74,10 +74,54 @@ for verification_path in \
   verification_output="$(printf '%s\n' "${verification_path}" | "${classifier}")"
   assert_output_line "${verification_output}" 'ops=true'
   assert_output_line "${verification_output}" 'docs_only=false'
-  for lane in web api auth realtime migration_integration docker api_tests api_sqlc api_migrations api_build api_images browser_smoke web_audit api_audit auth_audit realtime_audit; do
+  for lane in web api auth realtime ai_proxy migration_integration docker api_tests api_sqlc api_migrations api_build api_images browser_smoke web_audit api_audit auth_audit realtime_audit ai_proxy_audit; do
     assert_output_line "${verification_output}" "${lane}=false"
   done
 done
+
+# Compare complete lane selection for isolated applications and shared inputs.
+# Paths are classified independently of whether Git reports add/delete/rename.
+while IFS='|' read -r changed_path expected_lanes; do
+  table_output="$(printf '%s\n' "${changed_path}" | "${classifier}")"
+  for lane in web api auth realtime ai_proxy migration_integration ops; do
+    expected=false
+    case " ${expected_lanes} " in *" ${lane} "*) expected=true ;; esac
+    assert_output_line "${table_output}" "${lane}=${expected}"
+  done
+done <<'CASES'
+docs/runbooks/deployment.md|
+apps/ai-proxy/README.md|
+apps/ai-proxy/src/providers/gateway/openai.ts|ai_proxy
+apps/ai-proxy/src/removed.test.ts|ai_proxy
+apps/ai-proxy/wrangler.toml|ai_proxy
+apps/ai-proxy/package-lock.json|ai_proxy
+apps/web/src/main.ts|web
+apps/auth/src/index.ts|auth
+apps/realtime/src/index.ts|realtime
+apps/api/internal/tasking/service.go|api
+apps/api/internal/platform/workerwire/contract.go|api ai_proxy
+apps/api/internal/platform/workerwire/testdata/requests.json|api ai_proxy
+.github/workflows/ai-proxy.yml|ai_proxy ops
+.github/actions/setup-node/action.yml|web auth realtime ai_proxy migration_integration ops
+.github/actions/npm-ci/action.yml|web auth realtime ai_proxy migration_integration ops
+.node-version|web auth realtime ai_proxy migration_integration ops
+.github/actions/setup-go/action.yml|api auth ai_proxy migration_integration ops
+apps/api/go.mod|api auth ai_proxy migration_integration ops
+apps/api/go.sum|api auth ai_proxy migration_integration ops
+apps/api/openapi.public.yaml|web api
+.github/workflows/ci.yml|web api auth realtime ai_proxy migration_integration ops
+tooling/new-config.toml|web api auth realtime ai_proxy migration_integration ops
+CASES
+
+ai_dependency_output="$(printf '%s\n' apps/ai-proxy/package-lock.json | "${classifier}")"
+assert_output_line "${ai_dependency_output}" 'ai_proxy_audit=true'
+assert_output_line "${ai_dependency_output}" 'docker=false'
+ai_source_output="$(printf '%s\n' apps/ai-proxy/src/index.ts | "${classifier}")"
+assert_output_line "${ai_source_output}" 'ai_proxy_audit=false'
+# --no-renames reports both sides: moving across app boundaries selects both.
+renamed_output="$(printf '%s\n' apps/ai-proxy/src/old.ts apps/auth/src/new.ts | "${classifier}")"
+assert_output_line "${renamed_output}" 'ai_proxy=true'
+assert_output_line "${renamed_output}" 'auth=true'
 
 baseline_output="$(printf '%s\n' scripts/ci-baseline.sh | "${classifier}")"
 for lane in web api auth realtime migration_integration docker ops; do
@@ -85,6 +129,7 @@ for lane in web api auth realtime migration_integration docker ops; do
 done
 
 ci_output="$(printf '%s\n' .github/workflows/ci.yml | "${classifier}")"
+assert_output_line "${ci_output}" 'ai_proxy_audit=true'
 
 assert_output_line "${ci_output}" 'web=true'
 assert_output_line "${ci_output}" 'api=true'
