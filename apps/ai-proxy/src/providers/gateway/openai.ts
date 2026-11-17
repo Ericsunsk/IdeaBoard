@@ -4,7 +4,11 @@
 // 不许 import 兄弟 vendor 与 transport 符号（providers.test.ts 静态锁死）。
 
 import type { CanonicalImageRequest } from "../../contracts.js";
-import { decodeBase64Native, type FetchedInput } from "../../io.js";
+import {
+  decodeBase64Native,
+  maskSecrets,
+  type FetchedInput,
+} from "../../io.js";
 import {
   splitImageRoles,
   UnsupportedModelError,
@@ -44,7 +48,26 @@ export function buildGwllmInput(
     throw new UnsupportedModelError(
       "GWLLM supports at most 4 reference images",
     );
-  return buildImagesInput(req, images);
+  const options = req.provider_options ?? {};
+  if (Object.hasOwn(options, "n") && options.n !== 1)
+    throw new UnsupportedModelError(
+      "GWLLM requires n=1; each Worker request produces one task output",
+    );
+  const { width, height } = defaults(req);
+  return buildImagesInput(
+    {
+      ...options,
+      model: req.model,
+      prompt: req.prompt,
+      size:
+        req.width !== undefined || req.height !== undefined
+          ? `${width}x${height}`
+          : (options.size ?? `${width}x${height}`),
+      response_format: options.response_format ?? "b64_json",
+      n: 1,
+    },
+    images,
+  );
 }
 
 export function buildOpenAiInput(
@@ -56,33 +79,48 @@ export function buildOpenAiInput(
     throw new UnsupportedModelError(
       "gateway OpenAI edits supports one input image",
     );
-  return buildImagesInput(req, images, mask);
+  const { width, height } = defaults(req);
+  const fields = {
+    model: req.model,
+    prompt: req.prompt,
+    size: `${width}x${height}`,
+    response_format: "b64_json",
+  };
+  const options = req.provider_options ?? {};
+  // Preserve OpenAI's existing overrides: generations merge all options;
+  // edits keep canonical model/prompt/size and the b64_json response format.
+  return buildImagesInput(
+    images.length === 0
+      ? { ...fields, ...options }
+      : {
+          ...fields,
+          ...Object.fromEntries(
+            Object.entries(options).filter(
+              ([key]) => !Object.hasOwn(fields, key),
+            ),
+          ),
+        },
+    images,
+    mask,
+  );
 }
 
 function buildImagesInput(
-  req: CanonicalImageRequest,
+  fields: Record<string, unknown>,
   images: FetchedInput[],
   mask?: FetchedInput,
 ): Omit<VendorInput, "path_source"> {
-  const { width, height } = defaults(req);
   if (images.length === 0) {
-    const body: Record<string, unknown> = {
-      model: req.model,
-      prompt: req.prompt,
-      size: `${width}x${height}`,
-      response_format: "b64_json",
-      ...((req.provider_options ?? {}) as Record<string, unknown>),
-    };
     return {
-      body,
-      dryBody: dryBodyWithImagePlaceholders(body, 0),
+      body: fields,
+      dryBody: dryBodyWithImagePlaceholders(fields, 0),
     };
   }
   // 有图走 edits（multipart）。via Gateway 的 multipart 映射为 P0 未确认状态；
   // 未确认前保持 fail-closed 语义（默认仍尝试，400/404 即 UPSTREAM_ERROR）。
   const form = new FormData();
-  form.append("model", req.model);
-  form.append("prompt", req.prompt);
+  form.append("model", fields.model as string);
+  form.append("prompt", fields.prompt as string);
   const imageField = images.length > 1 ? "image[]" : "image";
   for (const [index, image] of images.entries()) {
     form.append(
@@ -99,38 +137,29 @@ function buildImagesInput(
       "mask.png",
     );
   }
-  form.append("size", `${width}x${height}`);
-  form.append("response_format", "b64_json");
-  if (req.provider_options) {
-    for (const [k, v] of Object.entries(req.provider_options)) {
-      if (
-        [
-          "model",
-          "prompt",
-          "image",
-          "mask",
-          "size",
-          "response_format",
-        ].includes(k)
-      )
-        continue;
-      form.append(k, typeof v === "string" ? v : JSON.stringify(v));
-    }
+  for (const [key, value] of Object.entries(fields)) {
+    if (key === "model" || key === "prompt") continue;
+    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
   }
+  const previewFields = Object.fromEntries(
+    Object.entries(maskSecrets(fields) as Record<string, unknown>).map(
+      ([key, value]) => [
+        key,
+        typeof value === "string" ? value : JSON.stringify(value),
+      ],
+    ),
+  );
   return {
     body: form,
     dryBody: {
       kind: "multipart/form-data",
       fields: {
-        model: req.model,
-        prompt: req.prompt,
+        ...previewFields,
         [imageField]:
           images.length > 1
             ? images.map((_, index) => `<input-image:${index}:bytes-redacted>`)
             : "<input-image:0:bytes-redacted>",
         ...(mask ? { mask: `<mask:bytes-redacted>` } : {}),
-        size: `${width}x${height}`,
-        response_format: "b64_json",
       },
     },
   };

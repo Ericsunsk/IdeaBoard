@@ -65,7 +65,23 @@ test("GWLLM uses CF BYOK, preserves model identity and maps generation options",
     size: "1536x1024",
     response_format: "url",
     quality: "high",
+    n: 1,
   });
+});
+
+test("GWLLM rejects multiple outputs before sending a billable request", async () => {
+  for (const n of [0, 2, 4, "1", null]) {
+    let calls = 0;
+    const body = { ...req, provider_options: { n } };
+    const response = await handleGenerate(request(body), env, async () => {
+      calls++;
+      return Response.json({ data: [{ b64_json: base64 }] });
+    });
+    assert.equal(response.status, 422);
+    assert.equal(calls, 0);
+    const preview = await handleDryRun(request(body), env);
+    assert.equal(preview.status, 400);
+  }
 });
 
 test("GWLLM single-reference edit uses multipart bytes with browser-set boundary", () => {
@@ -75,8 +91,140 @@ test("GWLLM single-reference edit uses multipart bytes with browser-set boundary
   assert.ok(target.body instanceof FormData);
   assert.equal(target.body.get("model"), "gpt-image-1");
   assert.equal(target.body.get("prompt"), req.prompt);
+  assert.equal(target.body.get("n"), "1");
   assert.ok(target.body.get("image") instanceof Blob);
   assert.equal(target.body.get("mask"), null);
+});
+
+test("GWLLM generation and edits honor canonical size and the same provider options", async () => {
+  for (const count of [0, 1, 4]) {
+    const body = {
+      ...req,
+      width: 2048,
+      height: 3072,
+      ...(count
+        ? { images: Array(count).fill("https://input.test/image") }
+        : {}),
+      provider_options: {
+        size: "1024x1024",
+        response_format: "url",
+        quality: "high",
+        n: 1,
+      },
+    };
+    let fields: Record<string, unknown> | undefined;
+    const response = await handleGenerate(
+      request(body),
+      env,
+      async (url, init) => {
+        if (String(url) === "https://input.test/image")
+          return new Response(png, {
+            headers: { "Content-Type": "image/png" },
+          });
+        if (String(url).startsWith(gatewayUrl)) {
+          fields = count
+            ? Object.fromEntries(
+                await new Request(String(url), init).formData(),
+              )
+            : JSON.parse(init?.body as string);
+          return Response.json({
+            data: [{ url: "https://result.test/image" }],
+          });
+        }
+        if (String(url) === "https://result.test/image")
+          return new Response(png);
+        assert.equal(String(url), req.upload_url);
+        return new Response(null);
+      },
+    );
+    assert.equal(response.status, 200);
+    assert.ok(fields);
+    assert.equal(fields.size, "2048x3072");
+    assert.equal(fields.response_format, "url");
+    assert.equal(fields.quality, "high");
+    assert.equal(fields.n, count ? "1" : 1);
+  }
+});
+
+test("GWLLM multipart preview shows serialized provider fields while redacting nested secrets", async () => {
+  const body = {
+    ...req,
+    images: ["https://input.test/image"],
+    provider_options: {
+      size: "auto",
+      response_format: "url",
+      quality: "high",
+      seed: 0,
+      metadata: { label: "preview", api_key: "nested-private" },
+      auth: "top-level-private",
+    },
+  };
+  const target = prepareRoute(body, env, [input]).target;
+  const wire = await new Request(target.url, {
+    method: target.method,
+    headers: target.headers,
+    body: target.body,
+  }).formData();
+  const response = await handleDryRun(request(body), env);
+  assert.equal(response.status, 200);
+  const preview = (await response.json()) as {
+    target: { body: { fields: Record<string, unknown> } };
+  };
+  const fields = preview.target.body.fields;
+  assert.equal(wire.get("size"), "auto");
+  for (const key of [
+    "model",
+    "prompt",
+    "size",
+    "response_format",
+    "quality",
+    "seed",
+    "n",
+  ])
+    assert.equal(fields[key], wire.get(key));
+  assert.equal(fields.auth, "***");
+  assert.deepEqual(JSON.parse(fields.metadata as string), {
+    label: "preview",
+    api_key: "***",
+  });
+  assert.ok(!JSON.stringify(preview).includes("private"));
+  assert.equal(wire.get("auth"), "top-level-private");
+});
+
+test("GWLLM field policy preserves existing OpenAI generation and edit overrides", async () => {
+  const body = {
+    ...req,
+    provider: "openai",
+    model: "dall-e-3",
+    width: 1536,
+    height: 1024,
+    provider_options: {
+      model: "configured-model",
+      prompt: "configured-prompt",
+      size: "auto",
+      response_format: "url",
+      quality: "high",
+      n: 3,
+    },
+  };
+  const generation = prepareRoute(body, env, []).target;
+  assert.deepEqual(
+    JSON.parse(generation.body as string),
+    body.provider_options,
+  );
+  const edit = prepareRoute(body, env, [input]).target;
+  const form = await new Request(edit.url, {
+    method: edit.method,
+    headers: edit.headers,
+    body: edit.body,
+  }).formData();
+  assert.equal(form.get("model"), "dall-e-3");
+  assert.equal(form.get("prompt"), "A bicycle");
+  assert.equal(form.get("size"), "1536x1024");
+  assert.equal(form.get("response_format"), "b64_json");
+  assert.equal(form.get("quality"), "high");
+  assert.equal(form.get("n"), "3");
+  assert.equal(form.getAll("image").length, 1);
 });
 
 test("GWLLM sends every ordered reference as multipart image[] through generate", async () => {

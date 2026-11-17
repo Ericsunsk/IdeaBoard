@@ -93,11 +93,42 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
 
 Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2–4 张用于多图融合）；
 明确拒绝 mask、超过 4 张参考图、stream，以及 `provider_options` 覆盖 canonical
-`model/prompt` 或图片角色（包括 `image[]`）。`size` 缺省 `1024x1024`，`response_format` 缺省
-`b64_json`；文生图可通过 `provider_options` 覆盖这两项，编辑固定使用 canonical 尺寸
-及 `b64_json`。`quality` 等其他参数按目标模型/渠道支持情况透传；字段兼容性待首单确认。
-回包接受 `data[0].b64_json` 或 `data[0].url`。
+`model/prompt` 或图片角色（包括 `image[]`）。每次 Worker 请求只产生一张 Task Output，
+明确发送 `n: 1`；`provider_options.n` 如有配置，必须为数字 `1`，其他值在调用上游前拒绝。
+网站 `output_count` 由 Go 逐张调用 Worker，不映射成 GWLLM 的批量 `n`。
+
+文生图与编辑使用相同字段规则：canonical `width/height` 任一存在时，`size` 由该尺寸
+生成（另一维缺省 `1024`），优先于 `provider_options.size`；没有 canonical 尺寸时，
+允许显式 `provider_options.size`，缺省 `1024x1024`。
+`response_format` 均取 `provider_options.response_format`，缺省 `b64_json`；
+回包接受 `data[0].b64_json` 或 `data[0].url`。`quality` 等其他参数按目标模型/渠道
+支持情况透传；字段兼容性待首单确认。multipart dry-run 展示实际序列化字段，图片字节
+使用占位符，敏感字段（含嵌套对象）脱敏；预览不验证供应商是否接受这些字段。
 异步/队列回包 fail-closed，不轮询、不新增重试。
+
+可复制的 Worker dry-run body 模板（将 `model` 占位符替换为自己账号可见的精确 model ID；
+不包含任何密钥，不需要上传槽）：
+
+```json
+{
+  "task_id": "gwllm-preview",
+  "provider": "custom-gwllm",
+  "model": "<EXACT_MODEL_ID_FROM_YOUR_GWLLM_ACCOUNT>",
+  "prompt": "A bicycle",
+  "width": 2048,
+  "height": 2048,
+  "provider_options": {
+    "n": 1,
+    "response_format": "b64_json"
+  }
+}
+```
+
+Admin Model Catalog 的 Provider 选择 `custom-gwllm`，Model 使用相同的精确 ID；
+Model Pool 的 Custom Params 可从 `{"n":1,"response_format":"b64_json"}` 开始。
+网站按用户选择生成 canonical 尺寸，无需在 Custom Params 重复填写 `size`；上例只展示
+字段映射，不承诺该 model/channel 支持 `2048x2048`。`quality`、特殊 `size` 或其他模型参数
+应以该账号渠道的协议为准，不根据 GPT Image/Nano 名称自动补参数。
 
 GPT Image 与 Google Nano 模型均通过此 Images API adapter 使用，不按名称改路由或截断参考图。
 2026-11-17 的 GWLLM 公开模型目录列出 `gpt-image-2.6-flare`、`gpt-image-2.6-sunburst`、
@@ -180,4 +211,5 @@ Cloudflare Git 直连、production/preview 隔离、环境变量同步及回滚�
 
 - payload 方言按公开 docs + 基线推断，未经真生成验证；首单可能 400，需按上游报错收敛 `path_source`。
 - mask 必须通过 `mask_index` 标识；省略时全部图片都是普通参考图。
-- `provider_options` 后 spread 可覆盖默认 step/guidance/size；误配直接透传上游，400 归 `UPSTREAM_ERROR`。
+- 各 provider 的字段规则分别生效；GWLLM 的 canonical 尺寸与单张输出约束见上文。
+  其他 provider 的 `provider_options` 可覆盖其默认 step/guidance/size；误配透传上游，400 归 `UPSTREAM_ERROR`。
