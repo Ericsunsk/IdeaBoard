@@ -18,17 +18,54 @@ import {
 
 type FetchFn = typeof fetch;
 
+// GWLLM follows Images API multipart: one image or ordered image[] references.
+export function buildGwllmInput(
+  req: CanonicalImageRequest,
+  inputs: FetchedInput[],
+): Omit<VendorInput, "path_source"> {
+  if (!req.model.trim())
+    throw new UnsupportedModelError("GWLLM requires a non-empty model id");
+  if (req.mask_index !== undefined)
+    throw new UnsupportedModelError("GWLLM image masks are not supported");
+  if (
+    Object.keys(req.provider_options ?? {}).some((key) =>
+      ["model", "prompt", "stream"].includes(key),
+    )
+  )
+    throw new UnsupportedModelError(
+      "GWLLM model/prompt must use canonical fields; streaming is not supported",
+    );
+  if (Object.hasOwn(req.provider_options ?? {}, "image[]"))
+    throw new UnsupportedModelError(
+      "image roles must use canonical images and mask_index",
+    );
+  const { images } = splitImageRoles(req, inputs);
+  if (images.length > 4)
+    throw new UnsupportedModelError(
+      "GWLLM supports at most 4 reference images",
+    );
+  return buildImagesInput(req, images);
+}
+
 export function buildOpenAiInput(
   req: CanonicalImageRequest,
   inputs: FetchedInput[],
 ): Omit<VendorInput, "path_source"> {
-  const { width, height } = defaults(req);
   const { images, mask } = splitImageRoles(req, inputs);
   if (images.length > 1)
     throw new UnsupportedModelError(
       "gateway OpenAI edits supports one input image",
     );
-  if (inputs.length === 0) {
+  return buildImagesInput(req, images, mask);
+}
+
+function buildImagesInput(
+  req: CanonicalImageRequest,
+  images: FetchedInput[],
+  mask?: FetchedInput,
+): Omit<VendorInput, "path_source"> {
+  const { width, height } = defaults(req);
+  if (images.length === 0) {
     const body: Record<string, unknown> = {
       model: req.model,
       prompt: req.prompt,
@@ -46,12 +83,14 @@ export function buildOpenAiInput(
   const form = new FormData();
   form.append("model", req.model);
   form.append("prompt", req.prompt);
-  const first = images[0];
-  form.append(
-    "image",
-    new Blob([first.bytes], { type: first.contentType }),
-    "image-0.png",
-  );
+  const imageField = images.length > 1 ? "image[]" : "image";
+  for (const [index, image] of images.entries()) {
+    form.append(
+      imageField,
+      new Blob([image.bytes], { type: image.contentType }),
+      `image-${index}.png`,
+    );
+  }
   if (mask) {
     const second = mask;
     form.append(
@@ -85,7 +124,10 @@ export function buildOpenAiInput(
       fields: {
         model: req.model,
         prompt: req.prompt,
-        image: `<input-image:0:bytes-redacted>`,
+        [imageField]:
+          images.length > 1
+            ? images.map((_, index) => `<input-image:${index}:bytes-redacted>`)
+            : "<input-image:0:bytes-redacted>",
         ...(mask ? { mask: `<mask:bytes-redacted>` } : {}),
         size: `${width}x${height}`,
         response_format: "b64_json",

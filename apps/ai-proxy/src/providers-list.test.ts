@@ -37,6 +37,12 @@ describe("GET /v1/providers", () => {
     const base64 = Buffer.from(png).toString("base64");
     const cases = [
       {
+        provider: "custom-gwllm",
+        model: "gpt-image-1",
+        suffix: "/custom-gwllm/v1/images/generations",
+        payload: { data: [{ b64_json: base64 }] },
+      },
+      {
         provider: "google",
         model: "nano-banana",
         suffix: "/ai/run",

@@ -6,11 +6,16 @@ import type { FetchedInput } from "../../io.js";
 import {
   gatewayPolicyHeaders,
   UnsupportedModelError,
+  type ChannelResolution,
   type UpstreamTarget,
   type VendorInput,
 } from "../shared.js";
 import { buildFalInput, extractFalImage } from "./fal.js";
-import { buildOpenAiInput, extractOpenAiImage } from "./openai.js";
+import {
+  buildGwllmInput,
+  buildOpenAiInput,
+  extractOpenAiImage,
+} from "./openai.js";
 import {
   buildVertexAiGenerateContentInput,
   buildVertexAiPredictInput,
@@ -22,6 +27,8 @@ export const CF_GATEWAY_BASE = "https://gateway.ai.cloudflare.com/v1";
 // Provider slug（URL path 第一段），必须与 CF provider-specific 规范一致。
 export const PROVIDER_SLUG_FAL = "fal";
 export const PROVIDER_SLUG_OPENAI = "openai";
+// Custom Provider slug=gwllm, base_url=https://api.gwllm.com; keep /v1 here.
+export const PROVIDER_SLUG_GWLLM = "custom-gwllm";
 // Vertex 原生端点 slug：CF 文档固定为 google-vertex-ai，禁止自创变体
 //（如 google-vertex）；输入只认准确 slug，见 provider declarations 精确匹配。
 export const PROVIDER_SLUG_VERTEX_AI = "google-vertex-ai";
@@ -89,12 +96,17 @@ export function buildOpenAiTarget(
   req: CanonicalImageRequest,
   env: Env,
   inputs: FetchedInput[],
+  resolved: ChannelResolution,
 ): UpstreamTarget {
-  const vendor = buildOpenAiInput(req, inputs);
+  const gwllm = resolved.vendor === PROVIDER_SLUG_GWLLM;
+  const vendor = gwllm
+    ? buildGwllmInput(req, inputs)
+    : buildOpenAiInput(req, inputs);
+  const namespace = gwllm ? `${PROVIDER_SLUG_GWLLM}/v1` : PROVIDER_SLUG_OPENAI;
   // Payload form determines the operation; diagnostics are derived afterwards.
   const isGenerations = !(vendor.body instanceof FormData);
   return {
-    url: `${gatewayBase(env)}/${PROVIDER_SLUG_OPENAI}/${isGenerations ? OPENAI_GENERATIONS_PATH : OPENAI_EDITS_PATH}`,
+    url: `${gatewayBase(env)}/${namespace}/${isGenerations ? OPENAI_GENERATIONS_PATH : OPENAI_EDITS_PATH}`,
     method: "POST",
     headers: gatewayHeaders(env, !(vendor.body instanceof FormData)),
     body:
@@ -102,7 +114,7 @@ export function buildOpenAiTarget(
         ? vendor.body
         : JSON.stringify(vendor.body),
     dryBody: vendor.dryBody,
-    path_source: `openai:images:${isGenerations ? "generations" : "edits"}`,
+    path_source: `${gwllm ? PROVIDER_SLUG_GWLLM : PROVIDER_SLUG_OPENAI}:images:${isGenerations ? "generations" : "edits"}`,
   };
 }
 

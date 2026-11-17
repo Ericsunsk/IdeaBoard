@@ -12,7 +12,7 @@
 
 - [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, repository-free signed deployment bundles, and 2026-11-05 worktree fingerprints / isolated DB evidence.
 - [UI/UX Audit](operations/ui-ux-audit.md) — Token, component, and copy/state orphan scan; 2026-11-05 uncommitted-worktree P1/P2/P3 review (BASE c8d1b5fa1).
-- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — Only workers-ai on prod, missing Worker env (2026-11-03).
+- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — Prod gateway diagnosis (2026-11-03); GWLLM protocol/BYOK evidence, multipart encoding, website source-review scope correction and shared parameter gaps (2026-11-17, uncommitted).
 
 
 ## 2026-11-05 — Repair follow-up (uncommitted worktree)

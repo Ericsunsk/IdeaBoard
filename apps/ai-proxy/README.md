@@ -6,7 +6,7 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 ## 冻结合同（唯一出口）
 
 - `POST /v1/generate`，`Authorization: Bearer WORKER_INTERNAL_SECRET`。
-  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai|google-vertex-ai`、`model`、`prompt`、
+  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai|google|krea|google-vertex-ai|custom-gwllm`、`model`、`prompt`、
   `negative_prompt?`、`width?`、`height?`、`steps?`、`guidance_scale?`、`seed?`、
   `images?: string[]`（presigned GET URL）与可选 `mask_index?: number`（显式零基 mask 索引）、`provider_options?`、
   `upload_url`（必填）、`public_url?`。
@@ -45,12 +45,15 @@ channel 决定 transport（host/auth/envelope/回包），vendor 只做 input �
   （缺省 `generateContent`，仅接受 `generateContent` 或 `predict` 前缀族）；
   网关鉴权恒为 `cf-aig-authorization: Bearer CF_AIG_TOKEN`，
   BYOK/直连 Google `Authorization` 场景首单待确认，默认不带）。
+- gateway/custom-gwllm：Cloudflare Custom Provider（slug `gwllm`、Base URL
+  `https://api.gwllm.com`），请求经 `custom-gwllm/v1/images/generations`（无图 JSON）
+  或 `custom-gwllm/v1/images/edits`（1–4 张参考图 multipart）；复用 OpenAI Images 字段与回包解析。
 
 GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言，必须首单真生成确认。
 
 ## Image 映射（首单待确认见下）
 
-图片角色合同：`images` 保留普通参考图顺序（最多 4 张普通图）；可选 `mask_index` 是其中 mask 的零基索引，mask 另占一张，且必须至少有一张普通输入图。不传表示全部为普通参考图。Fal 保留全部参考图，仅显式 mask 映射为 `mask_url`；Gateway OpenAI edits 与 migrated Workers AI 只支持一张普通输入加可选 mask，多参考图明确拒绝。Airun Google/OpenAI/Krea 保留普通参考图，但目前拒绝显式 mask。dry-run 使用相同校验和角色映射。 `provider_options` 不允许注入图片或 mask 角色字段。
+图片角色合同：`images` 保留普通参考图顺序（最多 4 张普通图）；可选 `mask_index` 是其中 mask 的零基索引，mask 另占一张，且必须至少有一张普通输入图。不传表示全部为普通参考图。Fal 保留全部参考图，仅显式 mask 映射为 `mask_url`；Gateway OpenAI edits 与 migrated Workers AI 只支持一张普通输入加可选 mask，多参考图明确拒绝。GWLLM edits 保留最多 4 张普通参考图，拒绝显式 mask。Airun Google/OpenAI/Krea 保留普通参考图，但目前拒绝显式 mask。dry-run 使用相同校验和角色映射。 `provider_options` 不允许注入图片或 mask 角色字段。
 
 - airun/google（nano-banana 系）：无图 text-to-image；有图 `image_input`（data URI，≤3 张）；
   `aspect_ratio` 缺省有图 `match_input_image`/无图 `1:1`，`output_format` 缺省 `png`，
@@ -63,6 +66,9 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
   有图转 data URI（不透传 presigned URL）：`image_url` = 首张，`image_urls` = 全部普通参考图，`mask_url` 仅来自显式 `mask_index`。
 - gateway/openai：无图 `images/generations {model,prompt,size,response_format:b64_json}`；
   有图 `images/edits` multipart（只支持一张普通 `image` 加可选显式 `mask`，`size/response_format` 同带）。
+- gateway/custom-gwllm：无图 JSON 文生图；单参考图 multipart `image`；2–4 张参考图
+  按 canonical 顺序使用重复的 multipart `image[]` 文件字段，上传已拉取的原始图片字节，
+  不透传 presigned URL；不支持 mask。具体模型/渠道是否接受多图须首单确认。
 - gateway/google-vertex-ai（Vertex 原生，provider slug 精确匹配 `google-vertex-ai`，
   禁止 `google-vertex` 等变体）：`generateContent` 走
   `{contents:[{role:"user",parts:[{text}, ...inlineData]}]}`（`prompt` 必填，
@@ -73,6 +79,38 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
   回包：`generateContent` 取 `candidates[0].content.parts` 内首个 `inlineData` 图片
   （纯文本无图即 `UPSTREAM_ERROR`）；`predict` 取 `predictions[0]` 的顶层/嵌套
   `bytesBase64Encoded`（取不到即 `UPSTREAM_ERROR`，绝不猜）。
+
+## GWLLM 接入
+
+1. 在现有 Cloudflare AI Gateway 创建 Custom Provider：slug `gwllm`，Base URL
+   `https://api.gwllm.com`（不带 `/v1`）；在该 Provider 的 BYOK 中保存 GWLLM API key，
+   使用 `default` alias。Worker 只发送 `cf-aig-authorization`，由 Gateway 注入上游
+   `Authorization`；不新增 Worker Secret，不把 GWLLM key 放入 `provider_options`。
+2. 将此 Worker 版本部署后，在 Admin Model Catalog 选择 `custom-gwllm`，填写该 API key
+   可见的精确 model ID（保留大小写、后缀及其自身 namespace），再按需加入 Service Model Pool。
+   不根据 OpenAI model 名猜测 GWLLM 可用模型；模型可见性以 GWLLM 控制台或 `/v1/models` 为准。
+3. Route Preview 仅 dry-run；实际计费、模型可用性及图片参数仍需操作员确认后做首单真生成。
+
+Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2–4 张用于多图融合）；
+明确拒绝 mask、超过 4 张参考图、stream，以及 `provider_options` 覆盖 canonical
+`model/prompt` 或图片角色（包括 `image[]`）。`size` 缺省 `1024x1024`，`response_format` 缺省
+`b64_json`；文生图可通过 `provider_options` 覆盖这两项，编辑固定使用 canonical 尺寸
+及 `b64_json`。`quality` 等其他参数按目标模型/渠道支持情况透传；字段兼容性待首单确认。
+回包接受 `data[0].b64_json` 或 `data[0].url`。
+异步/队列回包 fail-closed，不轮询、不新增重试。
+
+GPT Image 与 Google Nano 模型均通过此 Images API adapter 使用，不按名称改路由或截断参考图。
+2026-11-17 的 GWLLM 公开模型目录列出 `gpt-image-2.6-flare`、`gpt-image-2.6-sunburst`、
+`nano-banana-pro`、`nano-banana-2.1` 及各自的 `-2k` / `-4k` 变体；此目录不证明各模型
+或账号渠道支持 edits/多图。GWLLM 通用文档提及 `image[]`，OpenAI 官方提供四图编辑示例；
+本地测试验证 2/3/4 张图逐张完整编码及顺序，实际可用性仍须按精确 model ID 与渠道首单确认。
+
+协议来源：[GWLLM Images API](https://doc.gwllm.com/api/images)、
+[GWLLM 公开模型目录](https://gwllm.com/api/pricing)、
+[OpenAI Image references 示例](https://platform.openai.com/docs/guides/image-generation)、
+[Cloudflare Custom Providers](https://developers.cloudflare.com/ai-gateway/configuration/custom-providers/)、
+[Cloudflare BYOK](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/)。
+此接入仅完成本地 Mock 验证，未创建线上 Provider/BYOK、未部署、未执行付费生成。
 
 ## 环境变量
 
