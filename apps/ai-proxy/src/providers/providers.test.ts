@@ -799,6 +799,8 @@ describe("iron rule: vendor files are input-only", () => {
     "src/providers/airun/openai.ts",
     "src/providers/gateway/fal.ts",
     "src/providers/gateway/openai.ts",
+    "src/providers/gateway/gwllm.ts",
+    "src/providers/gateway/images.ts",
     "src/providers/gateway/vertexai.ts",
   ];
   const banned = [
@@ -825,7 +827,7 @@ describe("iron rule: vendor files are input-only", () => {
         assert.ok(!src.includes(token), `${file} must not contain ${token}`);
       }
     });
-    test(`${file} imports only contracts/io/shared`, () => {
+    test(`${file} imports only contracts/io/shared or the Images encoder`, () => {
       const src = readFileSync(file, "utf8");
       const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map(
         (m) => m[1],
@@ -834,7 +836,12 @@ describe("iron rule: vendor files are input-only", () => {
         assert.ok(
           spec === "../../contracts.js" ||
             spec === "../../io.js" ||
-            spec === "../shared.js",
+            spec === "../shared.js" ||
+            (spec === "./images.js" &&
+              [
+                "src/providers/gateway/openai.ts",
+                "src/providers/gateway/gwllm.ts",
+              ].includes(file)),
           `${file} must not import ${spec}`,
         );
       }

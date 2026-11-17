@@ -29,7 +29,7 @@ import type { FetchedInput } from "../io.js";
 import { buildAirunTarget, extractAirunImage } from "./airun/index.js";
 import {
   buildFalTarget,
-  buildOpenAiTarget,
+  buildImagesTarget,
   buildVertexAiTarget,
   extractFalImage,
   extractOpenAiImage,
@@ -149,14 +149,14 @@ const providerDeclarations: readonly ProviderDeclaration[] = [
     provider: "custom-gwllm",
     prefixes: ["custom-gwllm/"],
     resolveModel: (model) => gatewayResolution("custom-gwllm", model),
-    buildTarget: buildOpenAiTarget,
+    buildTarget: buildImagesTarget,
     extractImage: extractOpenAiImage,
   },
   {
     provider: "openai",
     prefixes: ["openai/"],
     resolveModel: (model) => gatewayResolution("openai", model),
-    buildTarget: buildOpenAiTarget,
+    buildTarget: buildImagesTarget,
     extractImage: extractOpenAiImage,
   },
   {
