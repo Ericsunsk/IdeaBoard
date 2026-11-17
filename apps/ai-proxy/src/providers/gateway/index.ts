@@ -1,5 +1,5 @@
 // gateway channel transport：host/auth/provider 原生 path 全部归本文件。
-// vendor 文件（./fal、./openai）只做 input 字段映射 + 回包解析，不碰本文件的符号。
+// vendor 文件只做 input 字段映射 + 回包解析，不碰本文件的符号。
 
 import type { CanonicalImageRequest, Env } from "../../contracts.js";
 import type { FetchedInput } from "../../io.js";
@@ -11,11 +11,8 @@ import {
   type VendorInput,
 } from "../shared.js";
 import { buildFalInput, extractFalImage } from "./fal.js";
-import {
-  buildGwllmInput,
-  buildOpenAiInput,
-  extractOpenAiImage,
-} from "./openai.js";
+import { buildGwllmInput } from "./gwllm.js";
+import { buildOpenAiInput, extractOpenAiImage } from "./openai.js";
 import {
   buildVertexAiGenerateContentInput,
   buildVertexAiPredictInput,
@@ -92,7 +89,7 @@ export function buildFalTarget(
   };
 }
 
-export function buildOpenAiTarget(
+export function buildImagesTarget(
   req: CanonicalImageRequest,
   env: Env,
   inputs: FetchedInput[],

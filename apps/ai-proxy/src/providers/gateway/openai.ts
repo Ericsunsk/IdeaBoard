@@ -4,71 +4,20 @@
 // 不许 import 兄弟 vendor 与 transport 符号（providers.test.ts 静态锁死）。
 
 import type { CanonicalImageRequest } from "../../contracts.js";
-import {
-  decodeBase64Native,
-  maskSecrets,
-  type FetchedInput,
-} from "../../io.js";
+import { decodeBase64Native, type FetchedInput } from "../../io.js";
 import {
   splitImageRoles,
   UnsupportedModelError,
   UpstreamError,
   defaults,
-  dryBodyWithImagePlaceholders,
   isQueuePayload,
   type ExtractedImage,
   type VendorInput,
 } from "../shared.js";
 
-type FetchFn = typeof fetch;
+import { encodeImagesInput } from "./images.js";
 
-// GWLLM follows Images API multipart: one image or ordered image[] references.
-export function buildGwllmInput(
-  req: CanonicalImageRequest,
-  inputs: FetchedInput[],
-): Omit<VendorInput, "path_source"> {
-  if (!req.model.trim())
-    throw new UnsupportedModelError("GWLLM requires a non-empty model id");
-  if (req.mask_index !== undefined)
-    throw new UnsupportedModelError("GWLLM image masks are not supported");
-  if (
-    Object.keys(req.provider_options ?? {}).some((key) =>
-      ["model", "prompt", "stream"].includes(key),
-    )
-  )
-    throw new UnsupportedModelError(
-      "GWLLM model/prompt must use canonical fields; streaming is not supported",
-    );
-  if (Object.hasOwn(req.provider_options ?? {}, "image[]"))
-    throw new UnsupportedModelError(
-      "image roles must use canonical images and mask_index",
-    );
-  const { images } = splitImageRoles(req, inputs);
-  if (images.length > 4)
-    throw new UnsupportedModelError(
-      "GWLLM supports at most 4 reference images",
-    );
-  const options = req.provider_options ?? {};
-  if (Object.hasOwn(options, "n") && options.n !== 1)
-    throw new UnsupportedModelError(
-      "GWLLM requires n=1; each Worker request produces one task output",
-    );
-  const { width, height } = defaults(req);
-  return buildImagesInput(
-    {
-      ...options,
-      model: req.model,
-      prompt: req.prompt,
-      size:
-        req.width !== undefined || req.height !== undefined
-          ? `${width}x${height}`
-          : (options.size ?? `${width}x${height}`),
-      response_format: options.response_format ?? "b64_json",
-      n: 1,
-    },
-    images,
-  );
-}
+type FetchFn = typeof fetch;
 
 export function buildOpenAiInput(
   req: CanonicalImageRequest,
@@ -89,7 +38,7 @@ export function buildOpenAiInput(
   const options = req.provider_options ?? {};
   // Preserve OpenAI's existing overrides: generations merge all options;
   // edits keep canonical model/prompt/size and the b64_json response format.
-  return buildImagesInput(
+  return encodeImagesInput(
     images.length === 0
       ? { ...fields, ...options }
       : {
@@ -103,66 +52,6 @@ export function buildOpenAiInput(
     images,
     mask,
   );
-}
-
-function buildImagesInput(
-  fields: Record<string, unknown>,
-  images: FetchedInput[],
-  mask?: FetchedInput,
-): Omit<VendorInput, "path_source"> {
-  if (images.length === 0) {
-    return {
-      body: fields,
-      dryBody: dryBodyWithImagePlaceholders(fields, 0),
-    };
-  }
-  // 有图走 edits（multipart）。via Gateway 的 multipart 映射为 P0 未确认状态；
-  // 未确认前保持 fail-closed 语义（默认仍尝试，400/404 即 UPSTREAM_ERROR）。
-  const form = new FormData();
-  form.append("model", fields.model as string);
-  form.append("prompt", fields.prompt as string);
-  const imageField = images.length > 1 ? "image[]" : "image";
-  for (const [index, image] of images.entries()) {
-    form.append(
-      imageField,
-      new Blob([image.bytes], { type: image.contentType }),
-      `image-${index}.png`,
-    );
-  }
-  if (mask) {
-    const second = mask;
-    form.append(
-      "mask",
-      new Blob([second.bytes], { type: second.contentType }),
-      "mask.png",
-    );
-  }
-  for (const [key, value] of Object.entries(fields)) {
-    if (key === "model" || key === "prompt") continue;
-    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
-  }
-  const previewFields = Object.fromEntries(
-    Object.entries(maskSecrets(fields) as Record<string, unknown>).map(
-      ([key, value]) => [
-        key,
-        typeof value === "string" ? value : JSON.stringify(value),
-      ],
-    ),
-  );
-  return {
-    body: form,
-    dryBody: {
-      kind: "multipart/form-data",
-      fields: {
-        ...previewFields,
-        [imageField]:
-          images.length > 1
-            ? images.map((_, index) => `<input-image:${index}:bytes-redacted>`)
-            : "<input-image:0:bytes-redacted>",
-        ...(mask ? { mask: `<mask:bytes-redacted>` } : {}),
-      },
-    },
-  };
 }
 
 export async function extractOpenAiImage(
