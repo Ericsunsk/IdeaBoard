@@ -545,6 +545,22 @@ validate_env_file() {
     echo "NATS_PASSWORD may only contain URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
     return 1
   fi
+  # Match imgproxy's Go ParseBool grammar; empty retains each Compose default.
+  local boolean_value
+  for key in IMGPROXY_USE_S3 IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE; do
+    if [[ -n "${!key+x}" ]]; then
+      boolean_value="${!key}"
+    else
+      boolean_value="$(env_value "$key")"
+    fi
+    case "$boolean_value" in
+      '' | 1 | t | T | TRUE | true | True | 0 | f | F | FALSE | false | False) ;;
+      *)
+        echo "$key must be a valid boolean (true or false)." >&2
+        return 1
+        ;;
+    esac
+  done
   return 0
 }
 

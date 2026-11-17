@@ -2,6 +2,14 @@
 
 Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
+## 2026-11-17 — imgproxy 启动失败与部署前校验（未提交）
+
+- 2026-11-17（Asia/Shanghai），以 `Ericsunsk/IdeaBoard@fa8f73e2a836f3bc7ad4172b206a79a2018ff3bf` 为本地代码基线，对生产环境只读诊断确认：`IMGPROXY_USE_S3=ture` 拼写错误触发 boolean 解析失败，导致 imgproxy 启动退出并持续重启；浏览器中的外部 Search preview、受管素材 derivative 与 Branding Logo 均返回 503。根因证据来自该日生产容器日志与浏览器请求，不将本地 HEAD 当作生产部署版本。
+- 2026-11-17，同一基线上的未提交修复在既有 [部署环境校验](../../../scripts/deploy-stack.sh) 中验证 `IMGPROXY_USE_S3`，保留 Go `ParseBool` 语法、环境变量优先级和 Compose 空值默认；[回归测试](../../../scripts/deploy-stack-test.sh) 先红后绿，部署脚本 tests、ShellCheck、shell syntax、env schema 与 diff 检查通过。截至本次记录，尚未获准修改生产配置或重建容器，线上未恢复；本地预防性校验不等于线上修复。
+- 2026-11-17，用户切换 Storage Profile 后的只读复查取代此前 active Local 的运行态事实：active profile 已为 S3-compatible，但 Cloud 与容器的 `IMGPROXY_USE_S3` 仍为 `ture`，三类图片请求仍为 503。Profile 与 sidecar 的 endpoint、region、access key、bucket 和 allowlist 对照匹配；Profile 持有 encrypted secret，Cloud 对应 sidecar secret 缺失。UI Apply Profile 只更新应用配置，不能证明 sidecar 配置已同步或容器已重建。
+- 2026-11-17，同一本地基线另确认 S3 credential 映射缺陷：[imgproxy v4.0.14 S3 client](https://github.com/imgproxy/imgproxy/blob/v4.0.14/storage/s3/storage.go) 使用 AWS SDK 默认凭据链，[transport configuration](https://github.com/imgproxy/imgproxy/blob/v4.0.14/fetcher/transport/config.go) 未声明 `IMGPROXY_S3_ACCESS_KEY_ID` / `IMGPROXY_S3_SECRET_ACCESS_KEY` 别名。未提交 [Compose 修复](../../../docker/compose.yml) 保留这两个部署输入，改为输出容器实际读取的 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`，同步 env schema；真实 Compose render 回归先红后绿，前述脚本检查再次通过。Local 与 S3 transport 可同时启用；Workspace Media 和 Search 临时 preview 仍走 Local，Avatar / Branding Logo 随 active profile。此补充说明 typo 并非唯一配置问题；截至本次记录未发布签名 release、未修改生产配置，线上恢复仍未验证。
+- 2026-11-17，同次只读复查另见 active S3 Profile 的 `force_path_style=false`，sidecar 未设置 `IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE`，继承 v4.0.14 的 `true` 默认；这是配置不一致，尚未证明单独导致故障。未提交修复补充该官方开关透传并保留默认 `true`，复用 boolean 校验，验证显式 `false` 与缺省 `true` 的真实 Compose rendering；定向脚本与静态检查通过，生产仍待授权发布与恢复验证。
+
 ## 2026-11-17 — AI Proxy affected CI 补齐
 
 - 2026-11-17，审计 `Ericsunsk/IdeaBoard@7988bc7d5` 确认已有按应用分类、Go/Vitest affected planner、成功 `main` push 祖先的累计比较、`CI Gate` 与 release component image reuse。本轮不替换这些机制。缺口是 `apps/ai-proxy/**` 落入 unknown 全量分类，却没有执行 Worker 自身测试。
