@@ -10,6 +10,7 @@
 
 ## Operations
 
+- [imgproxy 正式恢复与 Local 权限后续](operations/static-analysis-baseline.md#2026-11-17--imgproxy-正式恢复与-local-权限后续) — 2026-11-17 v0.1.39 恢复 Search / S3；Local UID 权限修复隔离验证通过，v0.1.40 因 GitHub status 检索不一致未部署，后续严格校验修复待发布。
 - [imgproxy 启动失败与部署前校验](operations/static-analysis-baseline.md#2026-11-17--imgproxy-启动失败与部署前校验未提交) — 2026-11-17 只读生产日志确认 boolean typo，后续 active S3 复查另发现 sidecar secret 缺失与 AWS credential 名映射缺陷；本地修复未提交，生产写入未授权、线上未恢复（基线 `Ericsunsk/IdeaBoard@fa8f73e2a`）。
 - [AI Proxy affected CI](operations/static-analysis-baseline.md#2026-11-17--ai-proxy-affected-ci-补齐) — 2026-11-17 补齐 Worker 专属验证、共享 wire/toolchain 依赖与路径选择对照；远端首次运行和成本仍待验证。
 - [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, repository-free signed deployment bundles, and 2026-11-05 worktree fingerprints / isolated DB evidence.

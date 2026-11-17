@@ -2,6 +2,12 @@
 
 Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
+## 2026-11-17 — imgproxy 正式恢复与 Local 权限后续
+
+- 2026-11-17（Asia/Shanghai），用户批准生产修复后，`Ericsunsk/IdeaBoard@0840d6f0ee3ac9faef1776e3620c9c621f345f57` 经 [v0.1.39 正式签名发布](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44049510265) 上线，Cloud boolean、path-style 与既有 S3 secret 同步；浏览器 Search 24/24 图片及 active S3 Branding Logo 均 200 并成功解码，取代下方“未授权、线上未恢复”的历史状态。Local 受管素材原图 200、derivatives 404，不能据此声明全部恢复。
+- 2026-11-17，Local 后续根因为 API 写入的 `0700` 目录 / `0600` 文件归 UID/GID `65532`，imgproxy 默认 UID `999` 无权读取；同路径只读 A/B 及同镜像、只读 volume、无网络隔离容器验证：改用 `65532:65532` 后 health 200、两张素材实际渲染并解码成功。修复 `Ericsunsk/IdeaBoard@5e63f27cfacf8897a301c600371c9ba9d641a17b` 保留文件权限与只读挂载。
+- 2026-11-17，[v0.1.40 发布资格检查](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44053050149) 在部署前失败：GitHub runs API 加 `status=success` / `completed` 过滤超过 10 分钟仍遗漏已成功的 exact-main CI；去掉该过滤能读取同一成功 run，no-cache 复查一致。针对 `Ericsunsk/IdeaBoard@5e63f27cfacf8897a301c600371c9ba9d641a17b` 的未提交修复仅移除服务端 status 过滤，保留全部本地 repository、workflow、SHA、main/push、completed/success 及唯一成功 CI Gate 校验，characterization 先红后绿、既有负向 tests 通过；失败 tag 未移动，生产在该记录时仍为 v0.1.39，Local 恢复待后续正式发布验收。
+
 ## 2026-11-17 — imgproxy 启动失败与部署前校验（未提交）
 
 - 2026-11-17（Asia/Shanghai），以 `Ericsunsk/IdeaBoard@fa8f73e2a836f3bc7ad4172b206a79a2018ff3bf` 为本地代码基线，对生产环境只读诊断确认：`IMGPROXY_USE_S3=ture` 拼写错误触发 boolean 解析失败，导致 imgproxy 启动退出并持续重启；浏览器中的外部 Search preview、受管素材 derivative 与 Branding Logo 均返回 503。根因证据来自该日生产容器日志与浏览器请求，不将本地 HEAD 当作生产部署版本。
