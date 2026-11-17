@@ -10,9 +10,10 @@
 
 ## Operations
 
+- [AI Proxy affected CI](operations/static-analysis-baseline.md#2026-11-17--ai-proxy-affected-ci-补齐) — 2026-11-17 补齐 Worker 专属验证、共享 wire/toolchain 依赖与路径选择对照；远端首次运行和成本仍待验证。
 - [Verification Baselines](operations/static-analysis-baseline.md) — Dated static analysis, local CI evidence, the Auth cold-cache fix, clean-break release preparation, image security refresh, deployment topology ownership, repository-free signed deployment bundles, and 2026-11-05 worktree fingerprints / isolated DB evidence.
 - [UI/UX Audit](operations/ui-ux-audit.md) — Token, component, and copy/state orphan scan; 2026-11-05 uncommitted-worktree P1/P2/P3 review (BASE c8d1b5fa1).
-- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — Only workers-ai on prod, missing Worker env (2026-11-03).
+- [Prod Gateway Diagnosis](operations/prod-gateway-diagnosis.md) — 生产网关诊断（2026-11-03），以及 #986/#987 Cloudflare Preview 缺少 `[previews]` 与 Watch paths 偏差的只读诊断（2026-11-17）。
 
 
 ## 2026-11-05 — Repair follow-up (uncommitted worktree)

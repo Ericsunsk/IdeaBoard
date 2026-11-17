@@ -24,6 +24,7 @@ func main() {
 
 	checkCI(ci)
 	checkReusableWorkflows(root)
+	checkAIProxyVerification(root)
 	checkMigrationGate(root)
 	checkRelease(root, release)
 	checkDeployOnly(root)
@@ -157,7 +158,7 @@ func checkCI(ci workflow) {
 		}
 		requireEqual(inputs["force_full"], "${{ needs.changes.outputs.force_full == 'true' }}", lane+" must consume full fallback")
 	}
-	for _, lane := range []string{"auth", "realtime", "ops", "migration-integration"} {
+	for _, lane := range []string{"auth", "realtime", "ai-proxy", "ops", "migration-integration"} {
 		requireEqual(object(object(jobs, lane), "with")["source_commit"], "${{ needs.changes.outputs.head_sha }}", lane+" must verify the same selected source")
 	}
 	for input, output := range map[string]string{"run_tests": "api_tests", "run_sqlc": "api_sqlc", "run_migrations": "api_migrations", "build_api": "api_build"} {
@@ -167,14 +168,24 @@ func checkCI(ci workflow) {
 	requireEqual(object(jobs, "api")["uses"], "./.github/workflows/api.yml", "API job must call api.yml")
 	requireEqual(object(jobs, "auth")["uses"], "./.github/workflows/auth.yml", "Auth job must call auth.yml")
 	requireEqual(object(jobs, "realtime")["uses"], "./.github/workflows/realtime.yml", "Realtime job must call realtime.yml")
+	aiProxy := object(jobs, "ai-proxy")
+	requireEqual(aiProxy["uses"], "./.github/workflows/ai-proxy.yml", "AI Proxy job must call ai-proxy.yml")
+	requireEqual(aiProxy["if"], "needs.changes.outputs.ai_proxy == 'true'", "AI Proxy must use its selected scope")
+	requireStringIn(aiProxy, "needs", "changes", "AI Proxy must wait for classification")
+	requireEqual(object(aiProxy, "with")["audit_dependencies"], "${{ needs.changes.outputs.ai_proxy_audit == 'true' }}", "AI Proxy audit must follow dependency inputs")
+	for _, output := range []string{"ai_proxy", "ai_proxy_audit"} {
+		requireEqual(object(changes, "outputs")[output], "${{ steps.classify.outputs."+output+" }}", "AI Proxy outputs must come from classification")
+	}
 	requireEqual(object(jobs, "migration-integration")["uses"], "./.github/workflows/migration-integration.yml", "Migration job must call migration-integration.yml")
 	rejectKey(jobs, "security", "Scheduled security checks must remain outside CI")
 
 	gate := object(jobs, "ci-gate")
 	requireEqual(gate["name"], "CI Gate", "Required check must remain CI Gate")
+	requireEqual(gate["if"], "always()", "CI Gate must run after skipped or failed lanes")
 	requireStringIn(gate, "needs", "changes", "CI Gate must depend on change classification")
 	requireStringIn(gate, "needs", "api", "CI Gate must depend on API verification")
 	requireStringIn(gate, "needs", "realtime", "CI Gate must depend on realtime")
+	requireStringIn(gate, "needs", "ai-proxy", "CI Gate must depend on AI Proxy")
 	requireStringIn(gate, "needs", "migration-integration", "CI Gate must depend on migration integration")
 	requireStringIn(gate, "needs", "media-contract", "CI Gate must depend on Media contract")
 	mediaContract := object(jobs, "media-contract")
@@ -197,10 +208,12 @@ func checkCI(ci workflow) {
 	requireEqual(gateEnv["MEDIA_CONTRACT_RESULT"], "${{ needs.media-contract.result }}", "CI Gate must receive the Media contract result")
 	requireEqual(gateEnv["REALTIME_REQUIRED"], "${{ needs.changes.outputs.realtime }}", "CI Gate must receive the Realtime required flag")
 	requireEqual(gateEnv["REALTIME_RESULT"], "${{ needs.realtime.result }}", "CI Gate must receive the Realtime result")
+	requireEqual(gateEnv["AI_PROXY_REQUIRED"], "${{ needs.changes.outputs.ai_proxy }}", "CI Gate must receive the AI Proxy required flag")
+	requireEqual(gateEnv["AI_PROXY_RESULT"], "${{ needs.ai-proxy.result }}", "CI Gate must receive the AI Proxy result")
 }
 
 func checkReusableWorkflows(root string) {
-	for _, name := range []string{"web.yml", "api.yml", "auth.yml", "realtime.yml", "migration-integration.yml", "ops.yml"} {
+	for _, name := range []string{"web.yml", "api.yml", "auth.yml", "realtime.yml", "ai-proxy.yml", "migration-integration.yml", "ops.yml"} {
 		parsed := loadWorkflow(root, name)
 		triggers := object(parsed, "on")
 		requireKey(triggers, "workflow_call", name+" must expose workflow_call")
@@ -343,6 +356,27 @@ func checkReusableWorkflows(root string) {
 	manifestBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-all-self-tests.sh"))
 	failIf(err)
 	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
+}
+
+func checkAIProxyVerification(root string) {
+	aiProxy := loadWorkflow(root, "ai-proxy.yml")
+	requireEqual(object(aiProxy, "permissions")["contents"], "read", "AI Proxy verification needs only read access")
+	quality := object(object(aiProxy, "jobs"), "quality")
+	rejectKey(quality, "environment", "AI Proxy CI must not enter a deployment environment")
+	for name, command := range map[string]string{
+		"Build AI Proxy":                 "npm run build",
+		"Test AI Proxy":                  "npm test",
+		"Verify Go Worker wire contract": "npm run test:contract",
+	} {
+		step := requireStep(quality, name)
+		requireEqual(step["run"], command, "AI Proxy verification must execute "+command)
+		requireEqual(step["working-directory"], "apps/ai-proxy", "AI Proxy checks must use the Worker root")
+		rejectKey(step, "if", "AI Proxy checks must not be skipped")
+		rejectKey(step, "continue-on-error", "AI Proxy check failures must fail verification")
+	}
+	requireContains(scalarText(quality), "./.github/actions/setup-go", "AI Proxy wire contract must use the canonical Go setup")
+	requireContains(scalarText(quality), "./.github/actions/setup-node", "AI Proxy must use the canonical Node setup")
+	reject(strings.Contains(scalarText(aiProxy), "wrangler deploy"), "AI Proxy CI must not deploy the Worker")
 }
 
 func checkAPITestMatrix(api workflow) {

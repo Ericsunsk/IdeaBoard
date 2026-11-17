@@ -13,6 +13,7 @@ run_gate() {
     API_REQUIRED="${API_REQUIRED:-false}" API_RESULT="${API_RESULT:-skipped}" \
     AUTH_REQUIRED="${AUTH_REQUIRED:-false}" AUTH_RESULT="${AUTH_RESULT:-skipped}" \
     REALTIME_REQUIRED="${REALTIME_REQUIRED:-false}" REALTIME_RESULT="${REALTIME_RESULT:-skipped}" \
+    AI_PROXY_REQUIRED="${AI_PROXY_REQUIRED:-false}" AI_PROXY_RESULT="${AI_PROXY_RESULT:-skipped}" \
     MIGRATION_REQUIRED="${MIGRATION_REQUIRED:-false}" MIGRATION_RESULT="${MIGRATION_RESULT:-skipped}" \
     BROWSER_SMOKE_REQUIRED="${BROWSER_SMOKE_REQUIRED:-false}" BROWSER_SMOKE_RESULT="${BROWSER_SMOKE_RESULT:-skipped}" \
     OPS_REQUIRED="${OPS_REQUIRED:-false}" OPS_RESULT="${OPS_RESULT:-skipped}" \
@@ -25,6 +26,7 @@ run_gate() {
 : >"${fixture_dir}/summary.md"
 run_gate
 grep -Fq '| Web | false | skipped |' "${fixture_dir}/summary.md"
+grep -Fq '| AI Proxy | false | skipped |' "${fixture_dir}/summary.md"
 grep -Fq '| Backend browser smoke | false | skipped |' "${fixture_dir}/summary.md"
 grep -Fq '| Media contract | true | success |' "${fixture_dir}/summary.md"
 grep -Fq '| Handbook contract | true | success |' "${fixture_dir}/summary.md"
@@ -71,4 +73,17 @@ if PR_SIZE_GUARD_REQUIRED=true PR_SIZE_GUARD_RESULT=failure run_gate; then
   exit 1
 fi
 
+: >"${fixture_dir}/summary.md"
+AI_PROXY_REQUIRED=true AI_PROXY_RESULT=success run_gate
+grep -Fq '| AI Proxy | true | success |' "${fixture_dir}/summary.md"
+for result in failure cancelled skipped ''; do
+  if AI_PROXY_REQUIRED=true AI_PROXY_RESULT="${result}" run_gate; then
+    echo "CI gate unexpectedly accepted required AI Proxy result: ${result}" >&2
+    exit 1
+  fi
+done
+if CHANGES_RESULT=failure run_gate; then
+  echo 'CI gate unexpectedly accepted failed classification' >&2
+  exit 1
+fi
 echo 'CI gate contract tests passed'

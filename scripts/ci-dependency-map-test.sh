@@ -79,6 +79,16 @@ printf 'package fixture\nvar fixturePath = "apps/web/fixtures"\n' > "$repo/apps/
 git -C "$repo" add .
 "$fixture/checker" --root "$repo" --json "$fixture/map.json" >/dev/null
 jq -e '.edges | any(.input == "apps/web/fixtures/payload.json" and .consumer == "api")' "$fixture/map.json" >/dev/null
+# The Worker also consumes Go fixtures and must be discoverable as ai_proxy.
+mkdir -p "$repo/apps/ai-proxy/scripts" "$repo/apps/api/internal/platform/workerwire/testdata"
+printf '{}\n' > "$repo/apps/api/internal/platform/workerwire/testdata/requests.json"
+printf 'const fixture = "../../api/internal/platform/workerwire/testdata/requests.json";\n' > "$repo/apps/ai-proxy/scripts/contract.ts"
+git -C "$repo" add .
+if "$fixture/checker" --root "$repo" > "$fixture/failure" 2>&1; then echo 'missing Worker wire fixture consumer accepted' >&2; exit 1; fi
+grep -Fq 'apps/api/internal/platform/workerwire/testdata/requests.json requires ai_proxy' "$fixture/failure"
+printf 'printf '\''ai_proxy=true\\n'\''\n' >> "$repo/scripts/ci-change-classifier.sh"
+"$fixture/checker" --root "$repo" --json "$fixture/map.json" >/dev/null
+jq -e '.edges | any(.input == "apps/api/internal/platform/workerwire/testdata/requests.json" and .consumer == "ai_proxy")' "$fixture/map.json" >/dev/null
 # Shared shell tooling in reusable workflow run blocks is also a real consumer.
 printf '#!/usr/bin/env bash\n' > "$repo/apps/api/install-atlas.sh"
 printf '      - run: ./apps/api/install-atlas.sh /tmp/atlas\n' >> "$repo/.github/workflows/web.yml"

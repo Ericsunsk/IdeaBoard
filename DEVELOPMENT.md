@@ -277,6 +277,8 @@ Repo-local actions 按实际调用方分类；例如部署 action 只触发 Ops/
 
 `scripts/ci-dependency-map-check.go` 从 reusable workflows/local actions 的实际消费者、Go AST 静态跨 context 路径和 TypeScript tracked path literals 派生依赖边，逐条检验 classifier 是否覆盖消费者；Ops 同时输出 JSON evidence。它不声称覆盖动态依赖，新的动态 contract 仍须登记 ownership 并补 fixture。`apps/api/go.mod` / `go.sum` 同时覆盖 Auth 的 Go contract、Ops checker 与 Migration Integration。在 `apps/api` 运行 `go run ../../scripts/ci-dependency-map-check.go --json /tmp/ci-dependencies.json` 可复核。
 
+`apps/ai-proxy/**` 由独立 `AI Proxy Verification` lane 运行 TypeScript build、单元测试和 Go↔Worker wire contract；仅改 Worker 不再选择 Web、API、Auth、Realtime、Migration Integration 或 preview images。Wire contract 使用本地 mocked fetch，不调用真实网关或存储。`apps/api/internal/platform/workerwire/**`、Go module/lock、Go setup，以及 Node version/setup/npm-ci 的变更同时选择 Worker；其他应用仍保留原有验证范围。Worker dependency manifest/lock 变更执行 production dependency audit；CI workflow 与未知路径继续回退全部 context。`CI Gate` 等待所选 Worker lane 成功，未选 lane 允许 skipped。Worker 的 Cloudflare Git 直连发布边界与正式 release 的签名、组件 image reuse、Production Environment 保持原有规则；此 lane 不部署 Worker。
+
 优化收益先对相同改动类型的多次运行取基线，不以单次 cache hit 或总时长推断。Component image reuse、v2 provenance 与完整签名部署包的发布、验签、回滚 contract 见 [deployment runbook](docs/runbooks/deployment.md)。
 
 部署只支持完整签名 bundle：CI 验证 Git 来源与 build-input fingerprint 并签署 tar，VPS 使用独立可信 verifier 验签后运行，不保留 repository。变更 bundle/部署链路时运行 `bash scripts/deployment-bundle-test.sh`、`bash scripts/production-deploy-entrypoint-test.sh`、`bash scripts/production-deploy-action-test.sh` 与 `bash scripts/deploy-stack-test.sh`。完整目录、安装与 verified-bundle rollback 见 deployment runbook。
