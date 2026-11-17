@@ -12,6 +12,7 @@ import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
+import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 
 function createHarness(taskIds: readonly string[] = ['task-1']) {
   const snapshot = createEmptyBoardSnapshot()
@@ -191,6 +192,11 @@ describe('pendingImageWorkflowRunner', () => {
   })
 
   test('keeps partial completed outputs and settles every missing slot without polling again', async () => {
+    useMswHandlers(
+      http.get('/api/v1/workspaces/ws_task123/media-assets/asset_result123', () =>
+        HttpResponse.json({ data: { width: 400, height: 200 } }),
+      ),
+    )
     const harness = createHarness(['task-1', 'task-1', 'task-1', 'task-1'])
     const results = extractWorkspaceTaskImageResults('ws_task123', [
       { kind: 'asset', asset_id: 'asset_result123', role: 'image', result_index: 0 },
