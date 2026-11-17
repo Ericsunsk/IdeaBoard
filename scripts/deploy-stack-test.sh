@@ -184,6 +184,54 @@ BASH
 printf 'Deploy stack contract tests passed\n'
 
 (
+  for name in env_value is_placeholder is_ideaboard_image_ref image_source_repo_from_ref is_url_userinfo_value validate_env_file; do
+    sed -n "/^${name}() {/,/^}/p" "$deploy_script" >> "$fixture_dir/imgproxy-functions.sh"
+  done
+  # shellcheck source=/dev/null
+  source "$fixture_dir/imgproxy-functions.sh"
+  ENV_FILE="$fixture_dir/imgproxy.env"
+  IMAGE_ENV_FILE="$fixture_dir/imgproxy-images.env"
+  unset IDEABOARD_SECRETS_SOURCE IMGPROXY_USE_S3 IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE
+  printf 'PUBLIC_ORIGIN=https://ideaboard.test\n' > "$ENV_FILE"
+  for key in POSTGRES_PASSWORD API_PG_PASSWORD AUTH_PG_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY CREDITS_WELCOME_IDENTITY_KEY REWARDS_CODE_HMAC_KEYS RT_TICKET_SECRET BETTER_AUTH_SECRET NATS_PASSWORD IMGPROXY_KEY IMGPROXY_SALT; do
+    printf '%s=fixture-valid-value\n' "$key" >> "$ENV_FILE"
+  done
+  for component in api api-migrate auth auth-migrate realtime; do
+    key="$(printf '%s' "$component" | tr '[:lower:]-' '[:upper:]_')"
+    printf 'IDEABOARD_%s_IMAGE=ghcr.io/test/ideaboard/ideaboard-%s@sha256:%s\n' "$key" "$component" "$digest" >> "$IMAGE_ENV_FILE"
+  done
+  validate_env_file || fail 'omitted IMGPROXY_USE_S3 must retain the Compose false default'
+  for value in 1 t T TRUE true True 0 f F FALSE false False ''; do
+    export IMGPROXY_USE_S3="$value"
+    validate_env_file || fail "imgproxy must accept Go ParseBool value: $value"
+  done
+  export IMGPROXY_USE_S3=ture
+  assert_fails_with 'IMGPROXY_USE_S3 must be a valid boolean' validate_env_file
+  export IMGPROXY_USE_S3=true IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE=false
+  validate_env_file || fail 'imgproxy must accept the profile path-style setting'
+  export IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE=fales
+  assert_fails_with 'IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE must be a valid boolean' validate_env_file
+  unset IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE
+  unset IMGPROXY_USE_S3
+  printf 'IMGPROXY_USE_S3=ture\n' >> "$ENV_FILE"
+  assert_fails_with 'IMGPROXY_USE_S3 must be a valid boolean' validate_env_file
+  export IMGPROXY_USE_S3=true
+  validate_env_file || fail 'exported imgproxy value must override the offline env file as Compose does'
+  export IMGPROXY_USE_S3=''
+  validate_env_file || fail 'an exported empty imgproxy value must use the Compose false default'
+  export IMGPROXY_USE_S3=true
+  export IDEABOARD_SECRETS_SOURCE=infisical
+  for key in PUBLIC_ORIGIN API_PG_PASSWORD AUTH_PG_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY CREDITS_WELCOME_IDENTITY_KEY REWARDS_CODE_HMAC_KEYS RT_TICKET_SECRET BETTER_AUTH_SECRET NATS_PASSWORD IMGPROXY_KEY IMGPROXY_SALT; do
+    export "$key=fixture-valid-value"
+  done
+  validate_env_file || fail 'Cloud imgproxy validation must use the injected value'
+  export IMGPROXY_USE_S3=ture
+  assert_fails_with 'IMGPROXY_USE_S3 must be a valid boolean' validate_env_file
+)
+
+printf 'Deploy stack imgproxy configuration tests passed\n'
+
+(
   functions_file="$fixture_dir/dotenvx.sh"
   {
     sed -n '/^dotenvx_encrypted_file() {/,/^}/p' "$deploy_script"
@@ -511,10 +559,20 @@ printf 'Production signed bootstrap recipe contract passed\n'
 # Render the actual override: all proxy upstreams keep the private network,
 # while storage, messaging and worker services remain private-only.
 for proxy_network in npm-nw fixture-npm; do
-  NPM_NETWORK_NAME="$proxy_network" docker compose \
+  IMGPROXY_USE_S3=true IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE=false IMGPROXY_S3_ACCESS_KEY_ID=fixture-s3-id \
+    IMGPROXY_S3_SECRET_ACCESS_KEY=fixture-s3-secret NPM_NETWORK_NAME="$proxy_network" docker compose \
     -f "$repo_root/docker/compose.yml" -f "$repo_root/docker/compose.npm.yml" \
     --env-file "$repo_root/docker/.env.example" --env-file "$repo_root/docker/images.env.example" \
     config --format json > "$fixture_dir/npm-compose.json"
+  jq -e '.services.imgproxy.environment |
+    .IMGPROXY_USE_S3 == "true" and
+    .IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE == "false" and
+    .AWS_ACCESS_KEY_ID == "fixture-s3-id" and
+    .AWS_SECRET_ACCESS_KEY == "fixture-s3-secret" and
+    (has("IMGPROXY_S3_ACCESS_KEY_ID") | not) and
+    (has("IMGPROXY_S3_SECRET_ACCESS_KEY") | not)' \
+    "$fixture_dir/npm-compose.json" >/dev/null ||
+    fail 'imgproxy S3 credentials must reach the AWS SDK environment'
   jq -e --arg network "$proxy_network" '
     . as $compose |
     .networks["npm-network"].external == true and
@@ -525,4 +583,10 @@ for proxy_network in npm-nw fixture-npm; do
       ($compose.services[$service].networks | keys) == ["ideaboard-network"])
   ' "$fixture_dir/npm-compose.json" >/dev/null || fail 'NPM override must connect every proxy upstream and preserve private services'
 done
+IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE='' docker compose \
+  -f "$repo_root/docker/compose.yml" \
+  --env-file "$repo_root/docker/.env.example" --env-file "$repo_root/docker/images.env.example" \
+  config --format json > "$fixture_dir/default-compose.json"
+jq -e '.services.imgproxy.environment.IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE == "true"' \
+  "$fixture_dir/default-compose.json" >/dev/null || fail 'imgproxy must retain the upstream path-style default'
 printf 'Rendered NPM API/Auth/Realtime network contracts passed\n'
