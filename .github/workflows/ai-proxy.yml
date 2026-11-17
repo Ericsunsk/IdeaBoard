@@ -1,0 +1,48 @@
+name: AI Proxy
+
+on:
+  workflow_call:
+    inputs:
+      source_commit:
+        type: string
+        default: ''
+      audit_dependencies:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: AI Proxy Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ inputs.source_commit || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/ai-proxy/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/ai-proxy
+      - uses: ./.github/actions/setup-go
+        with:
+          build-cache-scope: ai-proxy-contract
+      - name: Build AI Proxy
+        working-directory: apps/ai-proxy
+        run: npm run build
+      - name: Test AI Proxy
+        working-directory: apps/ai-proxy
+        run: npm test
+      - name: Verify Go Worker wire contract
+        working-directory: apps/ai-proxy
+        run: npm run test:contract
+      - name: Production dependency audit
+        if: inputs.audit_dependencies
+        working-directory: apps/ai-proxy
+        run: npm audit --omit=dev --audit-level=high

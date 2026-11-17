@@ -35,6 +35,7 @@ jobs:
       api: ${{ steps.classify.outputs.api }}
       auth: ${{ steps.classify.outputs.auth }}
       realtime: ${{ steps.classify.outputs.realtime }}
+      ai_proxy: ${{ steps.classify.outputs.ai_proxy }}
       migration_integration: ${{ steps.classify.outputs.migration_integration }}
       docker: ${{ steps.classify.outputs.docker }}
       ops: ${{ steps.classify.outputs.ops }}
@@ -42,6 +43,7 @@ jobs:
       api_audit: ${{ steps.classify.outputs.api_audit }}
       auth_audit: ${{ steps.classify.outputs.auth_audit }}
       realtime_audit: ${{ steps.classify.outputs.realtime_audit }}
+      ai_proxy_audit: ${{ steps.classify.outputs.ai_proxy_audit }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
       base_sha: ${{ steps.baseline.outputs.base_sha }}
       head_sha: ${{ steps.baseline.outputs.head_sha }}
@@ -117,6 +119,14 @@ jobs:
       source_commit: ${{ needs.changes.outputs.head_sha }}
       build_images: ${{ needs.changes.outputs.docker == 'true' && (inputs.preview_images || !inputs.source_commit) }}
       audit_dependencies: ${{ needs.changes.outputs.realtime_audit == 'true' }}
+  ai-proxy:
+    name: AI Proxy Verification
+    if: needs.changes.outputs.ai_proxy == 'true'
+    needs: [changes]
+    uses: ./.github/workflows/ai-proxy.yml
+    with:
+      source_commit: ${{ needs.changes.outputs.head_sha }}
+      audit_dependencies: ${{ needs.changes.outputs.ai_proxy_audit == 'true' }}
   migration-integration:
     name: Migration Integration
     if: needs.changes.outputs.migration_integration == 'true'
@@ -224,7 +234,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [changes, web, api, auth, realtime, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
+    needs: [changes, web, api, auth, realtime, ai-proxy, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -244,6 +254,8 @@ jobs:
           AUTH_RESULT: ${{ needs.auth.result }}
           REALTIME_REQUIRED: ${{ needs.changes.outputs.realtime }}
           REALTIME_RESULT: ${{ needs.realtime.result }}
+          AI_PROXY_REQUIRED: ${{ needs.changes.outputs.ai_proxy }}
+          AI_PROXY_RESULT: ${{ needs.ai-proxy.result }}
           MIGRATION_REQUIRED: ${{ needs.changes.outputs.migration_integration }}
           MIGRATION_RESULT: ${{ needs.migration-integration.result }}
           BROWSER_SMOKE_REQUIRED: ${{ needs.changes.outputs.browser_smoke }}
