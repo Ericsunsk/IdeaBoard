@@ -265,10 +265,9 @@ func (c *Executor) workerClientForCall(ctx context.Context) (runtimeports.Worker
 	return client, nil
 }
 
-// callWorker is the single Worker send for one execution: presign inputs +
-// output, POST CanonicalImageRequest, verify the landed key exactly, read
-// back landed bytes. Transport errors carry on unchanged; context.Canceled
-// passes through so interruption converges as requeue, not failure.
+// callWorker executes ordered single-image sends with independent signed slots.
+// Accepted bytes survive later send failures through the normal Complete path.
+// Context cancellation keeps the existing interruption and retry semantics.
 func (c *Executor) callWorker(
 	ctx context.Context,
 	taskID, feature string,
@@ -283,77 +282,94 @@ func (c *Executor) callWorker(
 	if c.transfer == nil {
 		return providerCallResult{}, fmt.Errorf("worker transfer is not configured")
 	}
-	// Presigned GETs for inputs (inputs first, mask last).
-	var inputURLs []string
-	for _, ref := range workerInputRefs(params) {
-		publicID := strings.TrimSpace(ref.PublicAssetID)
-		if publicID == "" {
-			return providerCallResult{}, fmt.Errorf("worker input asset is missing a public asset id")
+	count := 1
+	if params.ExecutionPlan != nil {
+		count = params.ExecutionPlan.RequestedOutputCount().Int()
+	}
+	result := providerCallResult{Model: provider + "/" + model, ParsedOutputKind: "image-results"}
+outputs:
+	for index := 0; index < count; index++ {
+		if err := ctx.Err(); err != nil {
+			return result, err
 		}
-		signed, _, err := c.transfer.PresignInputGET(ctx, workspaceID, publicID)
+		// Presigned GETs for inputs (inputs first, mask last).
+		var inputURLs []string
+		for _, ref := range workerInputRefs(params) {
+			publicID := strings.TrimSpace(ref.PublicAssetID)
+			if publicID == "" {
+				return providerCallResult{}, fmt.Errorf("worker input asset is missing a public asset id")
+			}
+			signed, _, err := c.transfer.PresignInputGET(ctx, workspaceID, publicID)
+			if err != nil {
+				if len(result.ImageURLs) > 0 && ctx.Err() == nil {
+					break outputs
+				}
+				return result, err
+			}
+			inputURLs = append(inputURLs, signed)
+		}
+		var maskIndex *int
+		if params.Canonical != nil && params.Canonical.Media != nil && params.Canonical.Media.Mask != nil {
+			mask := params.Canonical.Media.Mask
+			if mask.AssetID > 0 || strings.TrimSpace(mask.PublicAssetID) != "" {
+				i := len(inputURLs) - 1
+				maskIndex = &i
+			}
+		}
+		slot, err := c.transfer.PrepareOutput(workspaceID, taskID, index)
 		if err != nil {
-			return providerCallResult{}, err
+			if len(result.ImageURLs) > 0 && ctx.Err() == nil {
+				break
+			}
+			return result, err
 		}
-		inputURLs = append(inputURLs, signed)
-	}
-	var maskIndex *int
-	if params.Canonical != nil && params.Canonical.Media != nil && params.Canonical.Media.Mask != nil {
-		mask := params.Canonical.Media.Mask
-		if mask.AssetID > 0 || strings.TrimSpace(mask.PublicAssetID) != "" {
-			i := len(inputURLs) - 1
-			maskIndex = &i
+		width, height := workerImageSize(params)
+		var seed uint64
+		if params.Canonical != nil && params.Canonical.Generation != nil {
+			seed = params.Canonical.Generation.Seed
+			if count > 1 {
+				// Batch outputs use stable uint32 seeds: exact in JavaScript,
+				// distinct by index, with defined unsigned wrap. Single-output
+				// tasks keep their existing uint64 seed unchanged.
+				seed = uint64(uint32(seed) + uint32(index))
+			}
 		}
-	}
-	// The slot owns the output key, signed policy and trusted acceptance.
-	slot, err := c.transfer.PrepareOutput(workspaceID, taskID)
-	if err != nil {
-		return providerCallResult{}, err
-	}
-	width, height := workerImageSize(nil)
-	if params.Canonical != nil && params.Canonical.Controls != nil {
-		width, height = workerImageSize(params.Canonical.Controls)
-	}
-	var seed uint64
-	if params.Canonical != nil && params.Canonical.Generation != nil {
-		seed = params.Canonical.Generation.Seed
-	}
-	timeout := runtimeports.WorkerDefaultTimeout
-	resp, err := client.Do(ctx, runtimeports.WorkerRequest{
-		TaskID:          taskID,
-		Provider:        provider,
-		Model:           model,
-		Prompt:          prompt,
-		Width:           width,
-		Height:          height,
-		Seed:            seed,
-		Images:          inputURLs,
-		MaskIndex:       maskIndex,
-		ProviderOptions: providerOptions,
-		UploadURL:       slot.UploadURL(),
-		Feature:         feature,
-		Timeout:         timeout,
-	})
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return providerCallResult{Receipt: resp.Receipt}, err
+		resp, err := client.Do(ctx, runtimeports.WorkerRequest{
+			TaskID: taskID, Provider: provider, Model: model, Prompt: prompt,
+			Width: width, Height: height, Seed: seed, Images: inputURLs, MaskIndex: maskIndex,
+			ProviderOptions: providerOptions, UploadURL: slot.UploadURL(), Feature: feature,
+			Timeout: runtimeports.WorkerDefaultTimeout,
+		})
+		if err != nil {
+			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				return result, err
+			}
+			if len(result.ImageURLs) == 0 {
+				return providerCallResult{Receipt: resp.Receipt}, fmt.Errorf("worker image call failed: %w", err)
+			}
+			// A successful output must never trigger whole-task fallback/requeue.
+			// Complete captures only these outputs and releases the unused hold.
+			slog.Warn("worker stopped with partial outputs", "task_id", taskID, "requested", count, "completed", len(result.ImageURLs), "category", providerFailureCategory(err))
+			break
 		}
-		return providerCallResult{Receipt: resp.Receipt}, fmt.Errorf("worker image call failed: %w", err)
+		dataURL, err := slot.Accept(ctx, resp.ImageURL, resp.ContentType)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || ctx.Err() != nil || len(result.ImageURLs) == 0 {
+				return providerCallResult{Receipt: resp.Receipt}, err
+			}
+			slog.Warn("worker stopped after output acceptance failed", "task_id", taskID, "requested", count, "completed", len(result.ImageURLs))
+			break
+		}
+		result.Receipt = resp.Receipt
+		result.ImageURLs = append(result.ImageURLs, dataURL)
+		if index == 0 {
+			result.ImageURL = dataURL
+		}
+		result.RawOutputPreview = strings.TrimSpace(resp.RawPreview)
 	}
-	dataURL, err := slot.Accept(ctx, resp.ImageURL, resp.ContentType)
-	if err != nil {
-		return providerCallResult{Receipt: resp.Receipt}, err
+	result.ParsedOutputCount = len(result.ImageURLs)
+	if count > 1 || result.RawOutputPreview == "" || strings.Contains(result.RawOutputPreview, "base64,") {
+		result.RawOutputPreview = providerRawOutputPreview(fmt.Sprintf("%d worker image(s)", len(result.ImageURLs)))
 	}
-	preview := strings.TrimSpace(resp.RawPreview)
-	if preview == "" || strings.Contains(preview, "base64,") {
-		preview = providerRawOutputPreview("1 worker image")
-	}
-	return providerCallResult{
-		ImageURL:          dataURL,
-		ImageURLs:         []string{dataURL},
-		Model:             provider + "/" + model,
-		Receipt:           resp.Receipt,
-		RawOutputPreview:  preview,
-		ParsedOutputKind:  "image-results",
-		ParsedOutputCount: 1,
-	}, nil
+	return result, nil
 }

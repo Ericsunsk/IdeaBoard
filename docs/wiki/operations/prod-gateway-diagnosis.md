@@ -2,6 +2,32 @@
 
 Related: [Wiki Index](../index.md), [Verification Baselines](./static-analysis-baseline.md)
 
+## 2026-11-17 — 网站冻结执行合同修复（#982–#985）
+
+- 2026-11-17，`Ericsunsk/IdeaBoard@04e6b05d4`（[#983](https://github.com/Ericsunsk/IdeaBoard/issues/983)）改为从冻结 Execution Plan 推导 Worker 尺寸，覆盖 1k/2k/4k，并保留旧任务和显式自定义尺寸的兼容路径。这条记录取代下方历史审查中“按 Quality 选尺寸”的未修复结论；outpaint geometry 与 upscale scale 不在本次修复范围。
+- 2026-11-17，`Ericsunsk/IdeaBoard@9d88df00c`、`c72910813`（[#984](https://github.com/Ericsunsk/IdeaBoard/issues/984)）按冻结 Requested Output Count 逐张调用同一单图 Worker，各张使用独立 Output Slot，保持稳定顺序。后续上游或下一张输入签名失败保留已有结果，复用既有 Complete / CaptureSplit 按实际产物结算；首张失败及取消/超时沿用既有策略。该修复取代下方历史审查中的网站多结果缺口；Worker wire 仍为单图契约。
+- 2026-11-17，`Ericsunsk/IdeaBoard@fbe2e3b20`（[#985](https://github.com/Ericsunsk/IdeaBoard/issues/985)）令 GWLLM 的 JSON/multipart 请求明确携带 numeric `n=1`，其他 `provider_options.n` 在发送前拒绝；保留 1–4 张参考图、BYOK、mask 拒绝及 preview 安全边界。该修复取代下方历史审查中“允许 n>1 但仅解码 data[0]”的配置风险结论。
+- 2026-11-17，以上实现经 `Ericsunsk/IdeaBoard@39411e7e9` 整合至 [PR #986](https://github.com/Ericsunsk/IdeaBoard/pull/986)，来源为 [Spec #982](https://github.com/Ericsunsk/IdeaBoard/issues/982)。验证仅使用本地 tests / HTTP fake Worker；未访问付费上游、部署或更改线上配置。上游 model/account/channel 能力仍未经实测；系统没有上游幂等保证，崩溃重投仍可能重复付费。下方未提交工作区记录保留为历史，不代表修复后的行为。
+
+## 2026-11-17 — 网站代码审查与适配范围纠正（未提交工作区）
+
+- 2026-11-17，本轮审查以 `Ericsunsk/IdeaBoard@7988bc7d574aeccb476207ef89fd07701c50c6af` 为基线并核对未提交工作区；该 commit 不包含前两节记载的 GWLLM adapter 变更。前两节的协议与 mock 验证不能证明网站全部功能已适配，也不能证明 GWLLM 各 model/account/channel 的实际图像能力。
+- 2026-11-17，代码审查将 generation、render、variations、fusion 归为可映射 Images API 的任务；工作区 [GWLLM mapper](../../../apps/ai-proxy/src/providers/gateway/openai.ts) 拒绝 mask，因而不能将依赖 mask 的功能声明为已支持。模型目录中存在 model ID 也不能替代逐 channel 的 generation、edits 和 multi-reference 验证。
+- 2026-11-17，同一基线及工作区的共享链路存在网站合同缺口：[GenerationControls](../../../apps/api/internal/tasking/domain/params.go) 未定义 UI 的 `output_resolution`（2k/4k），[canonical intake](../../../apps/api/internal/tasking/application/task/canonical_intake.go) 只读取 `quality`，而 [workerImageSize](../../../apps/api/internal/runtime/interfaces/worker/providers/executor.go) 按 `Quality` 选尺寸；UI `output_count`（1–4）仍提交一次 Task，[Worker wire](../../../apps/api/internal/platform/workerwire/contract.go) 只返回单张 `image_url`。outpaint geometry 与 upscale scale 也未传入 wire；这些缺口不能归因为 GWLLM mapper 独有问题。
+- 2026-11-17，同一工作区的 [Prompt engine](../../../apps/api/internal/prompts/engine.go) 已承载 variations strength 与 fusion weights 的 Prompt 合同，不能因缺少专用上游字段就判定参数丢失。[Images mapper](../../../apps/ai-proxy/src/providers/gateway/openai.ts) 允许透传 `n > 1`，但只解码 `data[0]`；这是继承 mapper 的配置风险，不是网站多结果支持的证据。
+- 2026-11-17，用户纠正了首轮仅按上游协议实现、未先核对网站功能的审查范围。本轮改为先读网站源码再判断适配，仅记录上述结论；未继续编码、未做 browser 验证、未部署或执行付费请求。该记录补充并限定前两节的适用范围，不追溯宣称前轮完成了网站端到端验证。
+
+## 2026-11-17 — GWLLM adapter 协议与验证边界（未提交工作区）
+
+- 2026-11-17，基于 `Ericsunsk/IdeaBoard@7988bc7d574aeccb476207ef89fd07701c50c6af` 的未提交工作区准备了 `custom-gwllm` Image adapter；该基线 commit 尚不包含此 adapter。配置与能力边界记录于 [ai-proxy README](../../../apps/ai-proxy/README.md#gwllm-接入)。
+- 2026-11-17，官方 [GWLLM Images API](https://doc.gwllm.com/api/images)、[Cloudflare Custom Providers](https://developers.cloudflare.com/ai-gateway/configuration/custom-providers/) 与 [BYOK](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/) 文档支持拟定配置：Custom Provider slug `gwllm`、Base URL `https://api.gwllm.com`、route `custom-gwllm/v1/images/*`，provider key 由 CF BYOK 保存。当轮未执行外部配置、部署或付费生成；account/model 兼容性留待实际请求验证。
+
+## 2026-11-17 — GWLLM multi-reference 编码补充（未提交工作区）
+
+- 2026-11-17，基于 `Ericsunsk/IdeaBoard@7988bc7d574aeccb476207ef89fd07701c50c6af` 的未提交工作区后续改动取代初版 adapter 的单参考图限制。[GWLLM input mapper](../../../apps/ai-proxy/src/providers/gateway/openai.ts) 保留单文件 `image` 兼容性，2–4 张有序参考图编码为重复 multipart `image[]` 文件；mask 拒绝、Cloudflare sole egress 与 BYOK 归属保持原约束。
+- 2026-11-17，官方 [GWLLM Images API](https://doc.gwllm.com/api/images) 文档提及 `image[]` 及各 model 的兼容性限制；官方 [OpenAI image references 示例](https://platform.openai.com/docs/guides/image-generation) 展示四个重复 `image[]` 文件。公开 [GWLLM model catalog](https://gwllm.com/api/pricing) 列出 GPT Image 与 Nano families，但 `image-generation` endpoint 标签不能证明逐 account/channel 的 edits 或 multi-reference 支持。当轮 adapter 使用文档格式且未加入 model-name whitelist；真实 GPT Image/Nano multi-reference 生成未经验证，也未执行付费调用或外部配置。
+- 2026-11-17，该未提交工作区的 [GWLLM regression tests](../../../apps/ai-proxy/src/providers/gateway/gwllm.test.ts) 检查 2/3/4 张参考图在 multipart wire 序列化后的 bytes/order、四图 dry-run 脱敏，以及 `provider_options["image[]"]` role injection 拒绝。当轮 TypeScript build、105 unit tests 与 Go→Edge wire contract 通过；独立验证也通过 build 与 105 tests。这些本地 mock 检查不能证明上游 model 可用性。
+
 ## 2026-11-03 — Only workers-ai on prod, no BYOK (diagnosed via browser, uncommitted)
 
 - On 2026-11-03, user reported prod (`ideaboard.art`) gateway provider list shows only workers-ai, no BYOK. Probed with logged-in ego-browser session: `GET /api/control/v1/platform/ai-gateway/providers` → 200 with single entry `workers-ai` (Pages proxy + control auth healthy; 401 without session as expected); `POST /platform/ai-gateway/route-preview` → `valid:true, reachable:false`, message `模型标识有效（未配置 Worker，未 dry-run）`, proving prod API has no `WORKER_BASE_URL`/`WORKER_INTERNAL_SECRET`.

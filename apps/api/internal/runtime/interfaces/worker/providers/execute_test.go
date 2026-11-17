@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
@@ -20,9 +21,11 @@ import (
 	"ideaboard/api/internal/media/workertransfer"
 	"ideaboard/api/internal/media/workspacemedia"
 	platformworkermedia "ideaboard/api/internal/platform/workermedia"
+	"ideaboard/api/internal/prompts"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
+	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
@@ -106,15 +109,16 @@ func (f *fakeWorkerHTTPObjects) PutObjectAtProfile(_ context.Context, _ string, 
 // returns GenerateSuccess. It is the httptest stand-in for the
 // ai-proxy during independent verification.
 type fakeWorkerServer struct {
-	t             *testing.T
-	server        *httptest.Server
-	transfer      *fakeWorkerTransfer
-	capturedBody  map[string]interface{}
-	capturedAuth  string
-	fetchedInputs int
-	respond       func(taskID, uploadURL string) (int, string)
-	rawPNG        []byte
-	outputType    string
+	t              *testing.T
+	server         *httptest.Server
+	transfer       *fakeWorkerTransfer
+	capturedBody   map[string]interface{}
+	capturedBodies []map[string]interface{}
+	capturedAuth   string
+	fetchedInputs  int
+	respond        func(taskID, uploadURL string) (int, string)
+	rawPNG         []byte
+	outputType     string
 }
 
 func newFakeWorkerServer(t *testing.T, inputPNG []byte) *fakeWorkerServer {
@@ -153,14 +157,17 @@ func (fw *fakeWorkerServer) serveGenerate(c *gin.Context) {
 		return
 	}
 	fw.capturedBody = decoded
+	fw.capturedBodies = append(fw.capturedBodies, decoded)
 	fw.capturedAuth = c.GetHeader("Authorization")
 	taskID, _ := decoded["task_id"].(string)
 	uploadURL, _ := decoded["upload_url"].(string)
 	if fw.respond != nil {
 		status, body := fw.respond(taskID, uploadURL)
-		c.Header("Content-Type", "application/json")
-		c.String(status, body)
-		return
+		if status != 0 {
+			c.Header("Content-Type", "application/json")
+			c.String(status, body)
+			return
+		}
 	}
 	// Default success path: fetch every presigned input, PUT the output,
 	// echo the landed URL.
@@ -295,7 +302,7 @@ func TestCallWorkerAPISuccess(t *testing.T) {
 	// Exact-key presigned PUT: key aligns with future Media scheme,
 	// content-type bound, short TTL.
 	uploadURL, _ := fw.capturedBody["upload_url"].(string)
-	wantKey := platformworkermedia.MintOutputKey("", "task-prompt")
+	wantKey := platformworkermedia.MintOutputKey("", "task-prompt", 0)
 	for _, want := range []string{"/api/v1/worker/media/" + wantKey, "ct=worker-image-v1", "exp=", "sig="} {
 		if !strings.Contains(uploadURL, want) {
 			t.Fatalf("upload_url = %q, want %q", uploadURL, want)
@@ -507,33 +514,6 @@ func TestCallWorkerAPISurfacesUpstreamErrors(t *testing.T) {
 	}
 }
 
-func TestCallWorkerAPISendsPlannedSize(t *testing.T) {
-	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
-	defer fw.server.Close()
-	executor := workerTestExecutor(fw, nil)
-	task := &tasks.TaskPayload{
-		TaskID: "task-size",
-		UserID: 42,
-		Prompt: "wide banner",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-			Controls: &tasks.GenerationControls{
-				CustomWidth: 512, CustomHeight: 256, Quality: "2k",
-			},
-		}),
-	}
-	if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
-		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
-	}); err != nil {
-		t.Fatalf("CallWorkerAPI returned error: %v", err)
-	}
-	// 512x256 custom at 2k quality scales to 1024x512.
-	if fw.capturedBody["width"] != float64(1024) || fw.capturedBody["height"] != float64(512) {
-		t.Fatalf("size = %v/%v, want 1024/512", fw.capturedBody["width"], fw.capturedBody["height"])
-	}
-}
-
 func TestCallWorkerUsesActualOutputMIME(t *testing.T) {
 	var jpg bytes.Buffer
 	if err := jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {
@@ -557,7 +537,7 @@ func TestCallWorkerUsesActualOutputMIME(t *testing.T) {
 			if result.ImageURL != want {
 				t.Fatalf("output data URL MIME or bytes mismatch: %s", result.ImageURL)
 			}
-			key := platformworkermedia.MintOutputKey("ws_test", "task-mime")
+			key := platformworkermedia.MintOutputKey("ws_test", "task-mime", 0)
 			if fw.transfer.putCT[key] != mime {
 				t.Fatalf("stored MIME %q", fw.transfer.putCT[key])
 			}
@@ -582,7 +562,7 @@ func TestCallWorkerRejectsTruncatedLandedImages(t *testing.T) {
 			}
 			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
 			defer fw.server.Close()
-			key := platformworkermedia.MintOutputKey("ws_test", "truncated")
+			key := platformworkermedia.MintOutputKey("ws_test", "truncated", 0)
 			fw.transfer.puts[key] = data
 			fw.transfer.putCT[key] = mime
 			fw.respond = func(taskID, uploadURL string) (int, string) {
@@ -592,6 +572,197 @@ func TestCallWorkerRejectsTruncatedLandedImages(t *testing.T) {
 			_, err := executor.callWorker(context.Background(), "truncated", "generation", "ws_test", "fal", "flux", "p", providerTaskParams{}, nil)
 			if err == nil {
 				t.Fatal("truncated landed image accepted")
+			}
+		})
+	}
+}
+
+func TestCallWorkerAPIExecutesRequestedOutputs(t *testing.T) {
+	for _, count := range []int{1, 2, 3, 4} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+			defer fw.server.Close()
+			executor := workerTestExecutor(fw, nil)
+			items := make([]taskmedia.MaterializedResult, count)
+			for i := range items {
+				items[i] = taskmedia.MaterializedResult{ImageURL: fmt.Sprintf("/output/%d.png", i), Output: tasks.TaskOutput{AssetID: fmt.Sprintf("asset_%d", i), Role: "image", ResultIndex: i}}
+			}
+			executor.resultMaterializer = &captureResultMaterializer{remoteResult: taskmedia.MaterializedResults{Items: items}}
+			task := generationTaskForTest(t, "task-multiple")
+			task.Params = marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Service: workflow.FeatureSlugGeneration, Controls: &tasks.GenerationControls{OutputCount: count}, Generation: &tasks.GenerationRequestSnapshot{Seed: ^uint64(0)}})
+			output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{Task: task, Model: "openai/gpt-image-1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(output.Outputs) != count || len(fw.capturedBodies) != count {
+				t.Fatalf("outputs=%d calls=%d, want %d", len(output.Outputs), len(fw.capturedBodies), count)
+			}
+			slots := map[string]bool{}
+			for i, request := range fw.capturedBodies {
+				wantSeeds := []float64{4294967295, 0, 1, 2}
+				wantSeed := wantSeeds[i]
+				if count == 1 {
+					wantSeed = float64(^uint64(0))
+				}
+				if request["seed"] != wantSeed {
+					t.Fatalf("wire seed[%d]=%v, want %v", i, request["seed"], wantSeed)
+				}
+				key, err := platformworkermedia.ParseKey(request["upload_url"].(string))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if slots[key] {
+					t.Fatalf("output slot reused: %s", key)
+				}
+				slots[key] = true
+				if !strings.HasSuffix(key, fmt.Sprintf("/result-%d.png", i)) {
+					t.Fatalf("output %d key=%q", i, key)
+				}
+				if output.Outputs[i].ResultIndex != i {
+					t.Fatalf("result index=%d, want %d", output.Outputs[i].ResultIndex, i)
+				}
+			}
+			var result map[string]interface{}
+			if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
+				t.Fatal(err)
+			}
+			if result["parsed_output"].(map[string]interface{})["image_count"] != float64(count) {
+				t.Fatalf("result=%s", output.Result)
+			}
+		})
+	}
+}
+
+func TestCallWorkerAPIKeepsOutputsBeforeLaterFailure(t *testing.T) {
+	for _, successful := range []int{0, 1, 2, 3} {
+		t.Run(fmt.Sprint(successful), func(t *testing.T) {
+			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+			defer fw.server.Close()
+			fw.respond = func(taskID, uploadURL string) (int, string) {
+				if len(fw.capturedBodies) == successful+1 {
+					return 503, fmt.Sprintf(`{"task_id":%q,"status":"failed","error":{"code":"UPSTREAM_ERROR","message":"unavailable"}}`, taskID)
+				}
+				return 0, ""
+			}
+			executor := workerTestExecutor(fw, nil)
+			items := make([]taskmedia.MaterializedResult, successful)
+			for i := range items {
+				items[i] = taskmedia.MaterializedResult{ImageURL: fmt.Sprintf("/output/%d.png", i), Output: tasks.TaskOutput{AssetID: fmt.Sprintf("asset_%d", i), Role: "image", ResultIndex: i}}
+			}
+			materializer := &captureResultMaterializer{remoteResult: taskmedia.MaterializedResults{Items: items}}
+			executor.resultMaterializer = materializer
+			task := generationTaskForTest(t, "task-partial")
+			task.Params = marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Service: workflow.FeatureSlugGeneration, Controls: &tasks.GenerationControls{OutputCount: 4}})
+			output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{Task: task, Model: "openai/gpt-image-1"})
+			if successful == 0 {
+				if err == nil {
+					t.Fatal("first output failure was swallowed")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("successful outputs lost: %v", err)
+				}
+				if len(output.Outputs) != successful || len(materializer.remoteSourceURLs) != successful {
+					t.Fatalf("outputs=%d ingested=%d, want %d", len(output.Outputs), len(materializer.remoteSourceURLs), successful)
+				}
+			}
+			if len(fw.capturedBodies) != successful+1 {
+				t.Fatalf("calls=%d, want %d without retry", len(fw.capturedBodies), successful+1)
+			}
+		})
+	}
+}
+
+func TestCallWorkerAPIPreservesCancellationAfterOneOutput(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	fw.respond = func(taskID, uploadURL string) (int, string) {
+		if len(fw.capturedBodies) == 2 {
+			cancel()
+			return 503, `{}`
+		}
+		return 0, ""
+	}
+	task := generationTaskForTest(t, "task-cancelled-batch")
+	task.Params = marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Service: workflow.FeatureSlugGeneration, Controls: &tasks.GenerationControls{OutputCount: 4}})
+	output, err := workerTestExecutor(fw, nil).CallWorkerAPI(ctx, runtimeports.WorkerCallInput{Task: task, Model: "openai/gpt-image-1"})
+	if !errors.Is(err, context.Canceled) || len(output.Outputs) != 0 {
+		t.Fatalf("outputs=%v err=%v, want cancellation", output.Outputs, err)
+	}
+	if len(fw.capturedBodies) != 2 {
+		t.Fatalf("calls=%d after cancellation", len(fw.capturedBodies))
+	}
+}
+
+func TestCallWorkerAPIKeepsOutputWhenNextInputSigningFails(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	fw.respond = func(taskID, uploadURL string) (int, string) {
+		// The first send already resolved its input. A disappearing source
+		// makes the next presign fail through the real transfer adapter.
+		delete(fw.transfer.assets, "asset_input1")
+		return 0, ""
+	}
+	task := generationTaskForTest(t, "task-later-input-unavailable")
+	task.Params = marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Service:       workflow.FeatureSlugRender,
+		Controls:      &tasks.GenerationControls{OutputCount: 4},
+		Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{PublicAssetID: "asset_input1"}}},
+	})
+	executor := workerTestExecutor(fw, nil)
+	output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{Task: task, Model: "fal/flux"})
+	if err != nil || len(output.Outputs) != 1 {
+		t.Fatalf("outputs=%d err=%v; want one completed output", len(output.Outputs), err)
+	}
+	if len(fw.capturedBodies) != 1 || fw.fetchedInputs != 1 {
+		t.Fatalf("calls=%d fetched inputs=%d; want one without batch retry", len(fw.capturedBodies), fw.fetchedInputs)
+	}
+}
+
+func TestCallWorkerAPISendsCanonicalOutputResolution(t *testing.T) {
+	cases := []struct {
+		name   string
+		params map[string]interface{}
+		width  int
+		height int
+	}{
+		{"default 1k", nil, 1024, 1024},
+		{"1k", map[string]interface{}{"output_resolution": "1k"}, 1024, 1024},
+		{"2k", map[string]interface{}{"output_resolution": "2k"}, 2048, 2048},
+		{"4k", map[string]interface{}{"output_resolution": "4k"}, 4096, 4096},
+		{"normalized resolution", map[string]interface{}{"output_resolution": " 2K "}, 2048, 2048},
+		{"landscape 1k", map[string]interface{}{"output_resolution": "1k", "ratio": "16:9"}, 1024, 576},
+		{"landscape 2k", map[string]interface{}{"output_resolution": "2k", "ratio": "16:9"}, 2048, 1152},
+		{"landscape 4k", map[string]interface{}{"output_resolution": "4k", "ratio": "16:9"}, 4096, 2304},
+		{"portrait snapped to 64px", map[string]interface{}{"output_resolution": "2k", "ratio": "2:3"}, 1344, 2048},
+		{"custom 1k", map[string]interface{}{"output_resolution": "1k", "custom_width": 512, "custom_height": 256}, 512, 256},
+		{"custom 2k", map[string]interface{}{"output_resolution": "2k", "custom_width": 512, "custom_height": 256}, 1024, 512},
+		{"custom 4k overrides ratio", map[string]interface{}{"output_resolution": "4k", "custom_width": 512, "custom_height": 256, "ratio": "1:1"}, 2048, 1024},
+		{"quality cannot set resolution", map[string]interface{}{"quality": "4k"}, 1024, 1024},
+		{"custom quality cannot set resolution", map[string]interface{}{"output_resolution": "1k", "custom_width": 512, "custom_height": 256, "quality": "4k"}, 512, 256},
+		{"quality independent of resolution", map[string]interface{}{"output_resolution": "2k", "quality": "high"}, 2048, 2048},
+		{"original aspect ratio", map[string]interface{}{"output_resolution": "2k", "ratio": "3:2", "original_image_width": 900, "original_image_height": 600}, 2048, 1344},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+			defer fw.server.Close()
+			executor := workerTestExecutor(fw, nil)
+			params, err := taskapp.CompileWorkspaceParams(workflow.FeatureSlugGeneration, "resolution probe", tc.params, prompts.FeaturePromptRuntimeConfig{})
+			if err != nil {
+				t.Fatalf("compile workspace params: %v", err)
+			}
+			task := &tasks.TaskPayload{TaskID: "task-resolution", UserID: 42, Params: params}
+			if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+				Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
+			}); err != nil {
+				t.Fatalf("CallWorkerAPI returned error: %v", err)
+			}
+			if fw.capturedBody["width"] != float64(tc.width) || fw.capturedBody["height"] != float64(tc.height) {
+				t.Fatalf("size = %v/%v, want %d/%d", fw.capturedBody["width"], fw.capturedBody["height"], tc.width, tc.height)
 			}
 		})
 	}

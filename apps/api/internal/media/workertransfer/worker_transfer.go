@@ -18,7 +18,7 @@ import (
 type WorkerTransfer interface {
 	// PresignInputGET mints a presigned GET for one canonical input asset.
 	PresignInputGET(ctx context.Context, workspaceID, publicAssetID string) (url, key string, err error)
-	PrepareOutput(workspaceID, taskID string) (*WorkerOutputSlot, error)
+	PrepareOutput(workspaceID, taskID string, resultIndex int) (*WorkerOutputSlot, error)
 }
 
 // WorkerOutputSlot binds one upload to its trusted result. Its key, policy and
@@ -130,9 +130,12 @@ func (t *workerTransfer) PresignInputGET(ctx context.Context, workspaceID, publi
 	return signed, asset.StorageKey, nil
 }
 
-// PrepareOutput creates the single fixed-policy slot and keeps its storage key
+// PrepareOutput creates one indexed fixed-policy slot and keeps its storage key
 // inside the acceptance handle. An unconfigured object reader fails before send.
-func (t *workerTransfer) PrepareOutput(workspaceID, taskID string) (*WorkerOutputSlot, error) {
+func (t *workerTransfer) PrepareOutput(workspaceID, taskID string, resultIndex int) (*WorkerOutputSlot, error) {
+	if resultIndex < 0 {
+		return nil, fmt.Errorf("worker output index must not be negative")
+	}
 	if t == nil || t.objects == nil {
 		return nil, fmt.Errorf("worker object store is not configured")
 	}
@@ -140,7 +143,7 @@ func (t *workerTransfer) PrepareOutput(workspaceID, taskID string) (*WorkerOutpu
 	if err != nil {
 		return nil, err
 	}
-	key := platformworkermedia.MintOutputKey(workspaceID, taskID)
+	key := platformworkermedia.MintOutputKey(workspaceID, taskID, resultIndex)
 	if !platformworkermedia.ValidSlotKey(key) {
 		return nil, fmt.Errorf("worker media key is invalid")
 	}

@@ -11,6 +11,7 @@
 //      - "google" 进 airun/google；"krea" 进 airun（通用 input）；
 //      - "openai" 看裸 model：gpt-image 系进 airun/openai，其余进 gateway/openai；
 //      - "fal" 进 gateway/fal；"google-vertex-ai" 精确匹配进 gateway。
+//      - "custom-gwllm" 进 Gateway Custom Provider 的 OpenAI Images API。
 //   2. 其次模型前缀回落（未知/custom-<slug> provider）：对 `${provider}/${model}`
 //      小写全引用做前缀匹配：google/、openai/gpt-image、krea/ 进 airun；
 //      fal/、google-vertex-ai/ 进 gateway；workers-ai/、@cf/ 进 airun（migrated）；openai/ 非 gpt-image
@@ -28,7 +29,7 @@ import type { FetchedInput } from "../io.js";
 import { buildAirunTarget, extractAirunImage } from "./airun/index.js";
 import {
   buildFalTarget,
-  buildOpenAiTarget,
+  buildImagesTarget,
   buildVertexAiTarget,
   extractFalImage,
   extractOpenAiImage,
@@ -145,10 +146,17 @@ const providerDeclarations: readonly ProviderDeclaration[] = [
     extractImage: extractVertexAiImage,
   },
   {
+    provider: "custom-gwllm",
+    prefixes: ["custom-gwllm/"],
+    resolveModel: (model) => gatewayResolution("custom-gwllm", model),
+    buildTarget: buildImagesTarget,
+    extractImage: extractOpenAiImage,
+  },
+  {
     provider: "openai",
     prefixes: ["openai/"],
     resolveModel: (model) => gatewayResolution("openai", model),
-    buildTarget: buildOpenAiTarget,
+    buildTarget: buildImagesTarget,
     extractImage: extractOpenAiImage,
   },
   {

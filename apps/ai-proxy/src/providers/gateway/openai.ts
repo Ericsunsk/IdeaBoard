@@ -10,11 +10,12 @@ import {
   UnsupportedModelError,
   UpstreamError,
   defaults,
-  dryBodyWithImagePlaceholders,
   isQueuePayload,
   type ExtractedImage,
   type VendorInput,
 } from "../shared.js";
+
+import { encodeImagesInput } from "./images.js";
 
 type FetchFn = typeof fetch;
 
@@ -22,76 +23,35 @@ export function buildOpenAiInput(
   req: CanonicalImageRequest,
   inputs: FetchedInput[],
 ): Omit<VendorInput, "path_source"> {
-  const { width, height } = defaults(req);
   const { images, mask } = splitImageRoles(req, inputs);
   if (images.length > 1)
     throw new UnsupportedModelError(
       "gateway OpenAI edits supports one input image",
     );
-  if (inputs.length === 0) {
-    const body: Record<string, unknown> = {
-      model: req.model,
-      prompt: req.prompt,
-      size: `${width}x${height}`,
-      response_format: "b64_json",
-      ...((req.provider_options ?? {}) as Record<string, unknown>),
-    };
-    return {
-      body,
-      dryBody: dryBodyWithImagePlaceholders(body, 0),
-    };
-  }
-  // 有图走 edits（multipart）。via Gateway 的 multipart 映射为 P0 未确认状态；
-  // 未确认前保持 fail-closed 语义（默认仍尝试，400/404 即 UPSTREAM_ERROR）。
-  const form = new FormData();
-  form.append("model", req.model);
-  form.append("prompt", req.prompt);
-  const first = images[0];
-  form.append(
-    "image",
-    new Blob([first.bytes], { type: first.contentType }),
-    "image-0.png",
-  );
-  if (mask) {
-    const second = mask;
-    form.append(
-      "mask",
-      new Blob([second.bytes], { type: second.contentType }),
-      "mask.png",
-    );
-  }
-  form.append("size", `${width}x${height}`);
-  form.append("response_format", "b64_json");
-  if (req.provider_options) {
-    for (const [k, v] of Object.entries(req.provider_options)) {
-      if (
-        [
-          "model",
-          "prompt",
-          "image",
-          "mask",
-          "size",
-          "response_format",
-        ].includes(k)
-      )
-        continue;
-      form.append(k, typeof v === "string" ? v : JSON.stringify(v));
-    }
-  }
-  return {
-    body: form,
-    dryBody: {
-      kind: "multipart/form-data",
-      fields: {
-        model: req.model,
-        prompt: req.prompt,
-        image: `<input-image:0:bytes-redacted>`,
-        ...(mask ? { mask: `<mask:bytes-redacted>` } : {}),
-        size: `${width}x${height}`,
-        response_format: "b64_json",
-      },
-    },
+  const { width, height } = defaults(req);
+  const fields = {
+    model: req.model,
+    prompt: req.prompt,
+    size: `${width}x${height}`,
+    response_format: "b64_json",
   };
+  const options = req.provider_options ?? {};
+  // Preserve OpenAI's existing overrides: generations merge all options;
+  // edits keep canonical model/prompt/size and the b64_json response format.
+  return encodeImagesInput(
+    images.length === 0
+      ? { ...fields, ...options }
+      : {
+          ...fields,
+          ...Object.fromEntries(
+            Object.entries(options).filter(
+              ([key]) => !Object.hasOwn(fields, key),
+            ),
+          ),
+        },
+    images,
+    mask,
+  );
 }
 
 export async function extractOpenAiImage(

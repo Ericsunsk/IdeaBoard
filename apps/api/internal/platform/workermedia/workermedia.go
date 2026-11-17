@@ -45,10 +45,10 @@ func AllowedOutputContentType(contentType string) bool {
 	}
 }
 
-// MintOutputKey renders the exact storage key for the single result:
-// uploads/ws/<ws-suffix>/<task-suffix>/result-0.png. Workspace and task ids
+// MintOutputKey renders the exact storage key for one ordered result:
+// uploads/ws/<ws-suffix>/<task-suffix>/result-<index>.png. Workspace and task ids
 // fall back to closed constants (never empty, never traversal).
-func MintOutputKey(workspaceID, taskID string) string {
+func MintOutputKey(workspaceID, taskID string, resultIndex int) string {
 	ws := strings.TrimPrefix(strings.TrimSpace(workspaceID), "ws_")
 	if ws == "" {
 		ws = "unknown"
@@ -57,7 +57,7 @@ func MintOutputKey(workspaceID, taskID string) string {
 	if task == "" {
 		task = "unknown"
 	}
-	return fmt.Sprintf("%s%s/%s/result-0.png", SlotKeyRoot, SafeSegment(ws), SafeSegment(task))
+	return fmt.Sprintf("%s%s/%s/result-%d.png", SlotKeyRoot, SafeSegment(ws), SafeSegment(task), resultIndex)
 }
 
 // SafeSegment sanitizes one key segment (no slashes, no traversal).
