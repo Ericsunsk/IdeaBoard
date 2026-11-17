@@ -26,7 +26,11 @@ set -euo pipefail
 [[ "${API_FAIL:-false}" == false ]] || exit 75
 case "$*" in
   *'/actions/workflows/ci.yml/runs?'*)
-    [[ "$*" == *"head_sha=$FIXTURE_COMMIT&branch=main&event=push&status=success&per_page=100"* ]] || exit 72
+    [[ "$*" == *"head_sha=$FIXTURE_COMMIT&branch=main&event=push&"* ]] || exit 72
+    if [[ "${STALE_STATUS_INDEX:-false}" == true && "$*" == *'&status='* ]]; then
+      printf '[{"workflow_runs":[]}]\n'
+      exit 0
+    fi
     jq -n --arg commit "$FIXTURE_COMMIT" '[{workflow_runs:[{id:123,head_sha:$commit,head_branch:"main",event:"push",head_repository:{full_name:"Ericsunsk/IdeaBoard"},path:".github/workflows/ci.yml",status:"completed",conclusion:"success"}]}]' | jq "${RUN_MUTATION:-.}"
     ;;
   *'/actions/runs/123/jobs?filter=latest&per_page=100'*)
@@ -41,6 +45,8 @@ run_check() { (cd "$fixture/repo" && env REQUESTED_REF="$REQUESTED_REF" RUN_MUTA
 run_check || { cat "$fixture/output" >&2; exit 1; }
 grep -Fxq "source_commit=$commit" "$fixture/output"
 grep -Fxq 'trusted_ci_run_id=123' "$fixture/output"
+# GitHub's server-side status index can omit a completed successful run.
+STALE_STATUS_INDEX=true run_check || { cat "$fixture/output" >&2; exit 1; }
 for mutation in \
   '.[0].workflow_runs=[]' \
   '.[0].workflow_runs[0].head_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \

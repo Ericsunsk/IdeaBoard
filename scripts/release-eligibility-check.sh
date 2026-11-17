@@ -16,7 +16,8 @@ git diff --cached --quiet || exit 1
 git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main --no-tags || exit 1
 git merge-base --is-ancestor "${source_commit}" origin/main || exit 1
 
-runs="$(gh api --paginate --slurp "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${source_commit}&branch=main&event=push&status=success&per_page=100")" || exit 1
+# Check run status below; GitHub's status index can omit completed runs.
+runs="$(gh api --paginate --slurp "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${source_commit}&branch=main&event=push&per_page=100")" || exit 1
 candidate_ids="$(jq -er --arg commit "${source_commit}" --arg repository "${GITHUB_REPOSITORY}" '
   [.[].workflow_runs[] | select(
     .head_sha == $commit and .head_branch == "main" and .event == "push" and
