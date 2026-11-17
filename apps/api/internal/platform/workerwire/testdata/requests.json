@@ -23,6 +23,17 @@
     "prompt": "minimal prompt",
     "upload_url": "https://media.test/output/minimal?sig=output"
   },
+  "inherited": {
+    "task_id": "wire-inherited",
+    "provider": "gwllm",
+    "model": "gpt-image-2.6-flare",
+    "prompt": "follow the input",
+    "width": 925,
+    "height": 1024,
+    "images": ["https://media.test/reference?sig=reference"],
+    "provider_options": {"size": "1024x1024"},
+    "upload_url": "https://media.test/output/inherited?sig=output"
+  },
   "probe": {
     "task_id": "probe",
     "provider": "workers-ai",

@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 
@@ -16,6 +17,27 @@ import (
 // snapshot semantics.
 func emptyPromptConfig() prompts.FeaturePromptRuntimeConfig {
 	return prompts.FeaturePromptRuntimeConfig{}
+}
+
+func TestCompileWorkspaceParamsRejectsInvalidAutoInputDimensions(t *testing.T) {
+	for _, width := range []any{nil, 0, -1, 466.5, float64(1 << 40), math.Inf(1), math.NaN()} {
+		params := map[string]interface{}{
+			"ratio": "auto", "original_image_height": 516,
+			CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+		}
+		if width != nil {
+			params["original_image_width"] = width
+		}
+		if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "follow the input", params, emptyPromptConfig()); err == nil {
+			t.Errorf("original_image_width = %v, want validation error before submission", width)
+		}
+	}
+	if _, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "follow the input", map[string]interface{}{
+		"ratio": "auto", "original_image_width": 1, "original_image_height": 16384,
+		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+	}, emptyPromptConfig()); err == nil {
+		t.Fatal("aspect ratio that rounds to zero pixels must fail before submission")
+	}
 }
 
 // promptConfigForFeature builds the runtime config an Admin-saved template

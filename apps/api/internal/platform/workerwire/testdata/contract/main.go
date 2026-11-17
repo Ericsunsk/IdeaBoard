@@ -16,9 +16,10 @@ import (
 )
 
 type requests struct {
-	Full    workerwire.GenerateRequest `json:"full"`
-	Minimal workerwire.GenerateRequest `json:"minimal"`
-	Probe   workerwire.DryRunRequest   `json:"probe"`
+	Full      workerwire.GenerateRequest `json:"full"`
+	Minimal   workerwire.GenerateRequest `json:"minimal"`
+	Inherited workerwire.GenerateRequest `json:"inherited"`
+	Probe     workerwire.DryRunRequest   `json:"probe"`
 }
 
 type response struct {
@@ -80,7 +81,11 @@ func main() {
 		if err := json.NewDecoder(os.Stdin).Decode(&responses); err != nil {
 			panic(err)
 		}
-		check(len(responses) == 10, "expected two successes, one dry-run and seven failure codes")
+		check(len(responses) == 11, "expected three successes, one dry-run and seven failure codes")
+		var inherited workerwire.Success
+		roundTrip(responses["inherited"].Body, &inherited)
+		check(responses["inherited"].Status == 200 && inherited.TaskID == "wire-inherited" && inherited.Provider == "gwllm", "input-aspect generation did not complete")
+		check(inherited.ImageURL == "https://media.test/output/inherited", "input-aspect output URL changed")
 		for _, name := range []string{"full", "minimal"} {
 			result := responses[name]
 			check(result.Status == 200, name+" generation did not complete")

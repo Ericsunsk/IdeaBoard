@@ -131,6 +131,9 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 	if err != nil {
 		return "", err
 	}
+	if _, _, err := typed.ResolveAutoInputSize(plan.OutputLongEdgePixels()); err != nil {
+		return "", err
+	}
 	snapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
 		Plan: plan, UserPrompt: prompt, SystemPrompt: systemPrompt, CompiledPrompt: compiled,
 		Params: typed,

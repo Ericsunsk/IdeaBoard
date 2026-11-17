@@ -745,6 +745,7 @@ func TestCallWorkerAPISendsCanonicalOutputResolution(t *testing.T) {
 		{"custom quality cannot set resolution", map[string]interface{}{"output_resolution": "1k", "custom_width": 512, "custom_height": 256, "quality": "4k"}, 512, 256},
 		{"quality independent of resolution", map[string]interface{}{"output_resolution": "2k", "quality": "high"}, 2048, 2048},
 		{"original aspect ratio", map[string]interface{}{"output_resolution": "2k", "ratio": "3:2", "original_image_width": 900, "original_image_height": 600}, 2048, 1344},
+		{"text auto keeps existing default", map[string]interface{}{"output_resolution": "2k", "ratio": "auto"}, 2048, 2048},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -765,5 +766,79 @@ func TestCallWorkerAPISendsCanonicalOutputResolution(t *testing.T) {
 				t.Fatalf("size = %v/%v, want %d/%d", fw.capturedBody["width"], fw.capturedBody["height"], tc.width, tc.height)
 			}
 		})
+	}
+}
+
+func TestCallWorkerAPIAutoFollowsInputAspectRatio(t *testing.T) {
+	for _, service := range []string{workflow.FeatureSlugGeneration, workflow.FeatureSlugVariations} {
+		for _, tc := range []struct {
+			resolution    string
+			width, height int
+		}{
+			{"1k", 925, 1024},
+			{"2k", 1850, 2048},
+			{"4k", 3699, 4096},
+		} {
+			t.Run(service+"/"+tc.resolution, func(t *testing.T) {
+				fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+				defer fw.server.Close()
+				inputParams := map[string]interface{}{
+					"ratio": "auto", "output_resolution": tc.resolution,
+					"original_image_width": 466, "original_image_height": 516,
+					taskapp.CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+				}
+				if service == workflow.FeatureSlugVariations {
+					inputParams["variation"] = map[string]interface{}{"strength": 40}
+				}
+				params, err := taskapp.CompileWorkspaceParams(service, "follow the input", inputParams, prompts.FeaturePromptRuntimeConfig{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = workerTestExecutor(fw, nil).CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+					Task:  &tasks.TaskPayload{TaskID: "task-input-ratio", UserID: 42, Params: params},
+					Model: "gwllm/gpt-image-2.6-flare",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if fw.capturedBody["width"] != float64(tc.width) || fw.capturedBody["height"] != float64(tc.height) {
+					t.Fatalf("size = %v x %v, want %d x %d following 466:516", fw.capturedBody["width"], fw.capturedBody["height"], tc.width, tc.height)
+				}
+				if fw.fetchedInputs != 1 {
+					t.Fatalf("fetched inputs = %d, want 1", fw.fetchedInputs)
+				}
+			})
+		}
+	}
+}
+
+func TestCallWorkerAPIAutoInputRequiresOriginalDimensions(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	params, err := taskapp.CompileWorkspaceParams(workflow.FeatureSlugGeneration, "follow the input", map[string]interface{}{
+		"ratio":                "auto",
+		"original_image_width": 466, "original_image_height": 516,
+		taskapp.CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},
+	}, prompts.FeaturePromptRuntimeConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise a malformed persisted task independently of ingress validation.
+	typed, err := tasks.UnmarshalParams(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	typed.Controls.OriginalWidth = 0
+	typed.Generation.Controls.OriginalWidth = 0
+	_, err = workerTestExecutor(fw, nil).CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
+		Task:  &tasks.TaskPayload{TaskID: "task-missing-dimensions", UserID: 42, Params: marshalWorkflowTaskParamsForTest(t, typed)},
+		Model: "gwllm/gpt-image-2.6-flare",
+	})
+	_, category, ok := runtimeports.ExecutionFailureDetails(err)
+	if !ok || category != tasks.FailureCategoryInputInvalid {
+		t.Fatalf("error = %v, want input-invalid failure", err)
+	}
+	if len(fw.capturedBodies) != 0 || fw.fetchedInputs != 0 {
+		t.Fatal("missing input dimensions must fail before Worker sends")
 	}
 }
