@@ -11,7 +11,7 @@
 //      - "google" 进 airun/google；"krea" 进 airun（通用 input）；
 //      - "openai" 看裸 model：gpt-image 系进 airun/openai，其余进 gateway/openai；
 //      - "fal" 进 gateway/fal；"google-vertex-ai" 精确匹配进 gateway。
-//      - "custom-gwllm" 进 Gateway Custom Provider 的 OpenAI Images API。
+//      - "gwllm" 进 Gateway Custom Provider 的 OpenAI Images API（兼容旧 custom-gwllm）。
 //   2. 其次模型前缀回落（未知/custom-<slug> provider）：对 `${provider}/${model}`
 //      小写全引用做前缀匹配：google/、openai/gpt-image、krea/ 进 airun；
 //      fal/、google-vertex-ai/ 进 gateway；workers-ai/、@cf/ 进 airun（migrated）；openai/ 非 gpt-image
@@ -146,9 +146,13 @@ const providerDeclarations: readonly ProviderDeclaration[] = [
     extractImage: extractVertexAiImage,
   },
   {
-    provider: "custom-gwllm",
-    prefixes: ["custom-gwllm/"],
-    resolveModel: (model) => gatewayResolution("custom-gwllm", model),
+    provider: "gwllm",
+    prefixes: ["gwllm/", "custom-gwllm/"],
+    resolveModel: (model) => ({
+      channel: "gateway",
+      vendor: "gwllm",
+      model: model.replace(/^(?:custom-)?gwllm\//i, ""),
+    }),
     buildTarget: buildImagesTarget,
     extractImage: extractOpenAiImage,
   },
@@ -188,6 +192,8 @@ function selectProvider(req: { provider: string; model: string }): {
     // fal-ai is a model namespace, accepted only by this legacy migration.
     if (provider === "fal-ai") provider = "fal";
   }
+  // Preserve published pool/snapshot identities; advertise only the CF slug.
+  if (provider === "custom-gwllm") provider = "gwllm";
   const declared = providerDeclarations.find(
     (entry) =>
       entry.provider === provider &&

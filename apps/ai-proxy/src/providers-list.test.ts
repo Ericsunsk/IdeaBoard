@@ -1,5 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import worker from "./index.js";
 import { handleListProviders } from "./handler.js";
 import { listProviders, prepareRoute } from "./providers/index.js";
@@ -20,6 +21,21 @@ function getReq(auth = "Bearer internal-abc"): Request {
 }
 
 describe("GET /v1/providers", () => {
+  test("the discovery fixture matches the real Worker capability response", async () => {
+    const response = await worker.fetch(getReq(), env);
+    assert.equal(response.status, 200);
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(
+          "../../api/internal/platform/workerwire/testdata/providers.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    assert.deepEqual(await response.json(), fixture);
+  });
+
   test("派生自 provider declarations：至少含 fal 和 workers-ai", () => {
     const providers = listProviders();
     // 兼容 slug 和去重保持稳定。
@@ -37,7 +53,7 @@ describe("GET /v1/providers", () => {
     const base64 = Buffer.from(png).toString("base64");
     const cases = [
       {
-        provider: "custom-gwllm",
+        provider: "gwllm",
         model: "gpt-image-1",
         suffix: "/custom-gwllm/v1/images/generations",
         payload: { data: [{ b64_json: base64 }] },

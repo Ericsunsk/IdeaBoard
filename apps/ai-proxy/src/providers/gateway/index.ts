@@ -21,11 +21,12 @@ import {
 
 export const CF_GATEWAY_BASE = "https://gateway.ai.cloudflare.com/v1";
 
-// Provider slug（URL path 第一段），必须与 CF provider-specific 规范一致。
+// Configured provider identities; transport namespaces stay in this module.
 export const PROVIDER_SLUG_FAL = "fal";
 export const PROVIDER_SLUG_OPENAI = "openai";
-// Custom Provider slug=gwllm, base_url=https://api.gwllm.com; keep /v1 here.
-export const PROVIDER_SLUG_GWLLM = "custom-gwllm";
+export const PROVIDER_SLUG_GWLLM = "gwllm";
+// CF custom-provider routes add custom-; base_url=https://api.gwllm.com has no /v1.
+const GWLLM_GATEWAY_NAMESPACE = "custom-gwllm/v1";
 // Vertex 原生端点 slug：CF 文档固定为 google-vertex-ai，禁止自创变体
 //（如 google-vertex）；输入只认准确 slug，见 provider declarations 精确匹配。
 export const PROVIDER_SLUG_VERTEX_AI = "google-vertex-ai";
@@ -99,7 +100,7 @@ export function buildImagesTarget(
   const vendor = gwllm
     ? buildGwllmInput(req, inputs)
     : buildOpenAiInput(req, inputs);
-  const namespace = gwllm ? `${PROVIDER_SLUG_GWLLM}/v1` : PROVIDER_SLUG_OPENAI;
+  const namespace = gwllm ? GWLLM_GATEWAY_NAMESPACE : PROVIDER_SLUG_OPENAI;
   // Payload form determines the operation; diagnostics are derived afterwards.
   const isGenerations = !(vendor.body instanceof FormData);
   return {
