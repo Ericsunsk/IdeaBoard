@@ -194,7 +194,18 @@ describe('pendingImageWorkflowRunner', () => {
   test('keeps partial completed outputs and settles every missing slot without polling again', async () => {
     useMswHandlers(
       http.get('/api/v1/workspaces/ws_task123/media-assets/asset_result123', () =>
-        HttpResponse.json({ data: { width: 400, height: 200 } }),
+        HttpResponse.json({
+          data: {
+            id: 'asset_result123',
+            status: 'ready',
+            mime_type: 'image/png',
+            width: 400,
+            height: 200,
+            size_bytes: 1,
+            content_url: '/api/v1/workspaces/ws_task123/media-assets/asset_result123/content',
+            derivatives: {},
+          },
+        }),
       ),
     )
     const harness = createHarness(['task-1', 'task-1', 'task-1', 'task-1'])
@@ -202,12 +213,9 @@ describe('pendingImageWorkflowRunner', () => {
       { kind: 'asset', asset_id: 'asset_result123', role: 'image', result_index: 0 },
     ])
     const wait = vi.fn(async () => ({ kind: 'completed' as const, results }))
+    const loadImageSize = vi.fn(async () => null)
     harness.transport.observe.mockImplementation(
-      createTaskImageObserver(
-        wait,
-        async () => ({ width: 400, height: 200 }),
-        async () => {},
-      ),
+      createTaskImageObserver(wait, loadImageSize, async () => {}),
     )
     await harness.runner.execute(harness.intent)
     expect(harness.core.snapshot().executions.map((fact) => fact.status)).toEqual([
@@ -222,6 +230,7 @@ describe('pendingImageWorkflowRunner', () => {
       'image-4',
     ])
     expect(wait).toHaveBeenCalledOnce()
+    expect(loadImageSize).not.toHaveBeenCalled()
     expect(harness.transport.observe).toHaveBeenCalledOnce()
     expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.onSuccess).not.toHaveBeenCalled()
