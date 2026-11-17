@@ -280,11 +280,10 @@ describe('useDisplayImagePreview', () => {
 
   it('uses the canonical media derivative and never falls back to the original asset', async () => {
     const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
+    const assetId = ref('asset-42')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
-    const preview = scope.run(() =>
-      useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42' }),
-    )
+    const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId }))
     if (!preview) throw new Error('preview composable was not created')
 
     await vi.waitFor(() =>
@@ -296,6 +295,9 @@ describe('useDisplayImagePreview', () => {
       '/api/v1/workspaces/ws_test123/media-assets/asset-42',
       expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
     )
+    expect(preview.naturalSize.value).toEqual({ width: 2048, height: 1024 })
+    assetId.value = 'asset-other'
+    expect(preview.naturalSize.value).toBeNull()
     scope.stop()
   })
 

@@ -19,7 +19,6 @@ import {
   buildExecutionSizeParams,
   type ExecutionImageSize,
 } from '../../../core/execution/sizeParams.ts'
-import { buildPromptAspectRatioTaskParams } from '../../../core/execution/promptAspectRatioTaskParams.ts'
 import { assertRequestedOutputCount } from '../../../../../core/contracts/generationContract'
 import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { PromptAspectRatio } from '../../../../board/ports/canvas'
@@ -44,6 +43,27 @@ function requireImageAssetId(source: { assetId?: string | undefined }): string {
     )
   }
   return id
+}
+
+function buildPromptAspectRatioTaskParams(
+  ratio: PromptAspectRatio,
+  sourceImageSize?: ExecutionImageSize | null,
+) {
+  if (ratio !== 'auto') return { ratio }
+  if (sourceImageSize === undefined) return {}
+  if (
+    !sourceImageSize ||
+    !Number.isInteger(sourceImageSize.width) ||
+    sourceImageSize.width <= 0 ||
+    !Number.isInteger(sourceImageSize.height) ||
+    sourceImageSize.height <= 0
+  )
+    throw new Error(i18n.global.t('canvas.execution.inputImageSizeUnavailable'))
+  return {
+    ratio,
+    original_image_width: sourceImageSize.width,
+    original_image_height: sourceImageSize.height,
+  }
 }
 
 type ImageInpaintTaskRequestInput = {
@@ -153,6 +173,7 @@ export function buildGenerationTaskRequest(input: {
   /** Opaque `asset_...` refs; the only media inputs the v1 transport sends. */
   mediaAssetIds?: string[] | undefined
   outputCount: number
+  imageSize?: ExecutionImageSize | null | undefined
   outputResolution?:
     import('../../../../../core/contracts/generationContract').OutputResolution | undefined
 }): CanvasTaskRequestData {
@@ -164,7 +185,10 @@ export function buildGenerationTaskRequest(input: {
     params: {
       output_count: outputCount,
       output_resolution: input.outputResolution ?? '1k',
-      ...buildPromptAspectRatioTaskParams(input.aspectRatio),
+      ...buildPromptAspectRatioTaskParams(
+        input.aspectRatio,
+        input.mediaAssetIds?.length ? (input.imageSize ?? null) : undefined,
+      ),
     },
   })
 }
@@ -179,7 +203,10 @@ export function buildDirectActionTaskRequest(input: {
   outputResolution?: OutputResolution | undefined
 }): CanvasTaskRequestData {
   const execution = requireImageActionExecution(input.action)
-  const sizeParams = buildExecutionSizeParams(input.imageSize)
+  const sizeParams =
+    execution.service === EXECUTION_SERVICE.variations
+      ? buildPromptAspectRatioTaskParams('auto', input.imageSize ?? null)
+      : buildExecutionSizeParams(input.imageSize)
   const strengthConfig = execution.strength
   const outputParams = buildOutputBillingParams(
     { outputCount: input.outputCount, outputResolution: input.outputResolution },
@@ -361,6 +388,7 @@ export function buildImageExecutionTaskRequest(
         mediaAssetIds: plan.referenceImages.map(requireImageAssetId),
         outputCount: plan.outputCount,
         outputResolution: plan.outputResolution,
+        imageSize: plan.referenceImages.length ? imageSize : undefined,
       })
     case 'fusion':
       return buildFusionTaskRequest({

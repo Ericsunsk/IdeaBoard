@@ -16,8 +16,10 @@ import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { useImageWorkflowExecution } from './imageWorkflowExecution'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
+import { getMediaAssetMetadata } from '@/api/media/mediaAssetDelivery'
 
-vi.mock('../../../../../core/media/imageDimensions', () => ({
+vi.mock('../../../../../core/media/imageDimensions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../core/media/imageDimensions')>()),
   readImageNaturalSize: vi.fn(async () => ({ width: 1200, height: 800 })),
 }))
 vi.mock('../media/inpaintMask', () => ({
@@ -31,6 +33,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
   }
 })
 vi.mock('@/api/media/mediaAssetDelivery', () => ({
+  getMediaAssetMetadata: vi.fn(async () => ({ width: 466, height: 516 })),
   resolveMediaAssetProcessingURL: vi.fn(
     async (assetId: string) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),
@@ -48,7 +51,7 @@ function imageActionPlan() {
     prompt: '',
     outputCount: 1,
     resultOptions: {},
-  } as never
+  } as const
 }
 
 function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
@@ -127,6 +130,44 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
 }
 
 describe('useImageWorkflowExecution', () => {
+  it('uses original asset metadata for variations before submitting an auto-sized task', async () => {
+    const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
+      taskId: 'task-auto',
+    }))
+    const harness = createPublicHarness({
+      submit,
+      observe: async () => ({
+        resolve: async () => ({ kind: 'completed', result: { url: 'result', ratio: 1 } }),
+      }),
+    })
+    const plan = { ...imageActionPlan(), action: 'variations', outputResolution: '2k' }
+
+    await harness.execution.executeImageWorkflow(plan as never)
+
+    expect(getMediaAssetMetadata).toHaveBeenCalledWith('asset_source42')
+    expect(submit.mock.calls[0]?.[0].params).toMatchObject({
+      ratio: 'auto',
+      original_image_width: 466,
+      original_image_height: 516,
+      output_resolution: '2k',
+    })
+    expect(submit.mock.calls[0]?.[0].params).not.toHaveProperty('custom_width')
+  })
+
+  it('does not submit variations when original asset metadata cannot be read', async () => {
+    vi.mocked(getMediaAssetMetadata).mockRejectedValueOnce(new Error('Metadata unavailable'))
+    const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>()
+    const harness = createPublicHarness({ submit, observe: vi.fn() })
+
+    await expect(
+      harness.execution.executeImageWorkflow({
+        ...imageActionPlan(),
+        action: 'variations',
+      } as never),
+    ).rejects.toThrow('Metadata unavailable')
+    expect(submit).not.toHaveBeenCalled()
+  })
+
   it('does not show a stale save warning when the scope is disposed during a pending flush', async () => {
     const scope = effectScope()
     const graphSession = CanvasGraphSession.hydrate('board-a', createEmptyBoardSnapshot())

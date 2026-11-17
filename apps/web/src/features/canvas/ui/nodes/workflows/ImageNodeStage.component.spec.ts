@@ -13,12 +13,14 @@ const previewValues = vi.hoisted(() => ({
   contentFallbackUrl: '' as string,
   isVisible: false,
   retainDisplayUrl: vi.fn(() => vi.fn()),
+  naturalSize: null as { width: number; height: number } | null,
 }))
 const previewState = reactive(previewValues)
 
 afterEach(() => {
   previewState.displayUrl = null
   previewState.contentFallbackUrl = ''
+  previewState.naturalSize = null
   previewState.retainDisplayUrl.mockClear()
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -50,6 +52,7 @@ vi.mock('../../../session/flow-adapter/projection/useDisplayImagePreview', () =>
         return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
       }),
       contentFallbackUrl: computed(() => previewState.contentFallbackUrl),
+      naturalSize: computed(() => previewState.naturalSize),
       retainDisplayUrl: previewState.retainDisplayUrl,
     }),
   ),
@@ -80,6 +83,56 @@ function renderImageStage(isToolActive: boolean) {
 }
 
 describe('ImageNodeStage image tool quality', () => {
+  it.each(['outpaint', 'inpaint', 'adjust'] as const)(
+    'keeps the %s tool stage height when asset dimensions become available',
+    (mode) => {
+      previewState.naturalSize = { width: 1254, height: 1254 }
+      const view = render(ImageNodeStage, {
+        props: {
+          nodeId: 'image-1',
+          stageWidth: 260,
+          stageHeight: 288,
+          displayImage: { url: '/output-preview', assetId: 'asset_square' },
+          isOutpaintModeActive: mode === 'outpaint',
+          imageToolStageBinding:
+            mode === 'outpaint' ? null : ({ mode, isActive: false } as ImageToolStageBinding),
+          isActive: false,
+          isDragging: false,
+        },
+      })
+
+      expect(view.container.querySelector<HTMLElement>('.node-stage-frame')?.style.height).toBe(
+        '288px',
+      )
+    },
+  )
+
+  it.each([260, 390])(
+    'displays the asset ratio at the saved node width %i without document mutation',
+    async (width) => {
+      const node = Object.freeze({ width, x: 12, y: 34, sourceImageRatio: 516 / 466 })
+      const view = render(ImageNodeStage, {
+        props: {
+          nodeId: 'image-1',
+          stageWidth: node.width,
+          stageHeight: Math.round(node.width * node.sourceImageRatio),
+          displayImage: { url: '/output-preview', assetId: 'asset_square' },
+          isActive: false,
+          isDragging: false,
+        },
+      })
+      const frame = view.container.querySelector<HTMLElement>('.node-stage-frame')!
+      expect(frame.style.height).toBe(`${Math.round((width * 516) / 466)}px`)
+
+      previewState.naturalSize = { width: 1254, height: 1254 }
+      await nextTick()
+
+      expect(frame.style.height).toBe(`${width}px`)
+      expect(node).toEqual({ width, x: 12, y: 34, sourceImageRatio: 516 / 466 })
+      expect(view.emitted()).toEqual({})
+    },
+  )
+
   it.each(['adjust', 'inpaint', 'outpaint'] as const)(
     'waits for both entry and exit movements on repeated %s sessions',
     async (tool) => {

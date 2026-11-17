@@ -7,6 +7,7 @@ import { BoardGraphSession } from '../pending-execution/boardGraphSession'
 import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { collectPendingImageTasks } from '../pending-execution/taskSnapshot'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
+import { submitTaskRequest } from './canvasTaskSubmissionAdapter'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import {
   resetMediaWorkspaceIdResolver,
@@ -130,6 +131,86 @@ function createReattachWorkspace(
 }
 
 describe('useCanvasExecutionWorkspace', () => {
+  it('submits auto generation from the first original asset rather than the node display ratio', async () => {
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/media-assets/:assetId', ({ params }) => {
+        const envelope = workspaceAssetEnvelope(String(params.assetId))
+        return HttpResponse.json({
+          data: {
+            ...envelope.data,
+            width: params.assetId === 'asset_second' ? 1000 : 466,
+            height: params.assetId === 'asset_second' ? 1000 : 516,
+          },
+        })
+      }),
+    )
+    const graph = createStore()
+    const core = createPendingImageExecutionCore()
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: graph }))
+    const reservePendingResults = vi.fn(() => ({ resultNodeIds: ['image-1'] }))
+    vi.mocked(submitTaskRequest).mockClear()
+    const workspace = useCanvasExecutionWorkspace({
+      nodes: ref([]),
+      edges: ref([]),
+      readCanvasGraphStore: () => graph.store,
+      rendererMetrics,
+      boardBaseSnapshot: ref(createEmptyBoardSnapshot()),
+      pendingResults: {
+        reservePendingResults,
+        attachPendingTaskIds: vi.fn(),
+        removePendingResults: vi.fn(),
+      },
+      executionCore: core,
+      cancelTasks: vi.fn(),
+      onSuccess: vi.fn(),
+      onWarning: vi.fn(),
+      waitTaskImageOutcome: async () => ({
+        kind: 'completed',
+        results: [
+          {
+            workspaceId: WORKSPACE_ID,
+            assetId: 'asset_output',
+            width: 1254,
+            height: 1254,
+            resultIndex: 0,
+          },
+        ],
+      }),
+    })
+    const firstReference = { url: '/preview', assetId: 'asset_first', ratio: 1 }
+
+    await workspace.commands.runGeneration({
+      kind: 'generation',
+      activationId: 'auto',
+      sourceNodeId: 'prompt-1',
+      source: firstReference,
+      referenceImages: [
+        firstReference,
+        { url: '/second-preview', assetId: 'asset_second', ratio: 1 },
+      ],
+      prompt: 'edit',
+      outputCount: 1,
+      outputResolution: '2k',
+      aspectRatio: 'auto',
+      resultOptions: {},
+    })
+
+    expect(submitTaskRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media_asset_ids: ['asset_first', 'asset_second'],
+        params: expect.objectContaining({
+          ratio: 'auto',
+          original_image_width: 466,
+          original_image_height: 516,
+          output_resolution: '2k',
+        }),
+      }),
+    )
+    expect(reservePendingResults).toHaveBeenCalledWith(
+      expect.objectContaining({ source: expect.objectContaining({ ratio: 516 / 466 }) }),
+    )
+  })
+
   it.each([1, 4])(
     'observes one Task for %i prepared outputs and flushes persisted task identity',
     async (outputCount) => {
@@ -221,6 +302,37 @@ describe('useCanvasExecutionWorkspace', () => {
       status: 'succeeded',
       taskId: 'task-1',
       clientActionId: 'canvas:restored-action',
+    })
+  })
+
+  it('replaces an inherited source ratio with the completed output asset dimensions', async () => {
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/media-assets/:assetId', ({ params }) => {
+        const envelope = workspaceAssetEnvelope(String(params.assetId))
+        return HttpResponse.json({
+          data: { ...envelope.data, width: 1254, height: 1254 },
+        })
+      }),
+    )
+    const graph = createStore()
+    graph.store
+      .beginTransaction('node-update')
+      .updateNode('image-1', { width: 260, sourceImageRatio: 516 / 466 })
+      .commit()
+    const core = createPendingImageExecutionCore()
+    core.attachBoard(BoardGraphSession.create('board-a', { graphSession: graph }))
+    const workspace = createReattachWorkspace(graph, core, async () => ({
+      kind: 'completed',
+      results: [{ assetId: 'asset_square', workspaceId: WORKSPACE_ID, resultIndex: 0 }],
+    }))
+
+    await workspace.commands.reattachPendingImageResults()
+
+    expect(graph.store.getNode('image-1')?.snapshot).toMatchObject({
+      sourceMediaRef: { assetId: 'asset_square', derivativeTier: 'preview' },
+      sourceImageRatio: 1,
+      width: 260,
+      outputStatus: 'ready',
     })
   })
 

@@ -137,7 +137,7 @@ async function waitForTaskImagePreview(
   }
 }
 
-async function resolveProbedSize(
+async function resolveTaskImageSize(
   normalized: NonNullable<ReturnType<typeof normalizeTaskImageResult>>,
   url: string,
   loadImageSize: ImageSizeLoader,
@@ -145,6 +145,18 @@ async function resolveProbedSize(
 ): Promise<{ width: number; height: number } | null> {
   const existing = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
   if (existing) return existing
+  try {
+    const metadata = await getWorkspaceMediaAssetMetadata(
+      normalized.workspaceId,
+      normalized.assetId,
+      { signal },
+    )
+    const originalSize = normalizeNaturalSize(Number(metadata.width), Number(metadata.height))
+    if (originalSize) return originalSize
+  } catch (error) {
+    signal?.throwIfAborted()
+    console.warn('[canvas] failed to read task image dimensions', error)
+  }
   try {
     return await loadImageSize(url, undefined, signal)
   } catch (error) {
@@ -173,7 +185,7 @@ export async function resolveTaskImageResultDisplay(
 
   await waitForTaskImagePreview(normalized, waitForReceiptDerivative, signal)
 
-  const size = await resolveProbedSize(normalized, url, loadImageSize, signal)
+  const size = await resolveTaskImageSize(normalized, url, loadImageSize, signal)
   signal?.throwIfAborted()
   const ratio = size ? size.height / size.width : fallbackRatio > 0 ? fallbackRatio : 1
   const mediaRef: MediaRef = { assetId: normalized.assetId, derivativeTier: 'preview' }

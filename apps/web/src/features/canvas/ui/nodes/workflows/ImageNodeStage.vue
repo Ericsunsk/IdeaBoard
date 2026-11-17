@@ -9,7 +9,7 @@
       'is-retouch-active': isImageToolActive,
     }"
     layout="center"
-    :height="stageHeight"
+    :height="displayStageHeight"
     :is-active="isActive && !isOutpaintModeActive"
     :is-connection-drop-target="isConnectionDropTarget"
     :is-loading="!!isDirectGenerating && !stageDisplayImage"
@@ -151,7 +151,7 @@ import { useCanvasViewportContext } from '../../../session/flow-adapter'
 import type { OutpaintDragAnchor } from '../../../tools/outpaint'
 import { ImageToolStagePresentation as StagePresentation } from '../../../tools/image-tools/ui/stage'
 import type { ImageToolStageBinding } from '../../../tools/image-tools'
-import type { LibraryImportFact } from '../../../../board/ports/canvas'
+import { resolveImageNodeStageHeight, type LibraryImportFact } from '../../../../board/ports/canvas'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasImagePreviewQuality } from '../../../session/flow-adapter'
 import { useDisplayImagePreview, useTierFallback } from '../../../session/flow-adapter'
@@ -230,6 +230,7 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 const {
   displayUrl: stageDisplayUrl,
   contentFallbackUrl: stageContentFallbackUrl,
+  naturalSize,
   retainDisplayUrl,
 } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
@@ -237,6 +238,12 @@ const {
   isVisible: isStageVisible,
   shouldKeepPreviousOnSourceChange: true,
   isDisplayCommitEnabled: canvasViewport.imageQuality.isSettled,
+})
+const displayStageHeight = computed(() => {
+  const size = naturalSize.value
+  if (!size || props.isOutpaintModeActive || props.imageToolStageBinding?.mode)
+    return props.stageHeight
+  return resolveImageNodeStageHeight(props.stageWidth, size.height / size.width, true)
 })
 // Media assets are authenticated API resources. Do not bind their API URL as
 // an optimistic <img> fallback while the signed delivery URL is loading: the

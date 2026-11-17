@@ -17,6 +17,7 @@ import {
 import { resolveMediaDisplayTier } from '../../../../../core/media/displayTier'
 import { isMediaAssetDeliveryPath } from '../../../../../core/media/mediaAssetPath'
 import { useMediaAssetDelivery } from '../../../../../core/media/useMediaAssetDelivery'
+import { normalizeNaturalSize } from '../../../../../core/media/imageDimensions'
 import {
   normalizeMediaAssetId,
   type MediaAssetDeliveryTier,
@@ -305,10 +306,16 @@ export function useDisplayImagePreview(
     if (original?.status === 'ready' && originalUrl) return resolveAssetUrl(originalUrl)
     return ''
   })
+  const naturalSize = computed(() => {
+    const metadata = mediaDelivery.metadata.value
+    if (!metadata || metadata.asset_id !== resolvedAssetId.value) return null
+    return normalizeNaturalSize(metadata.width, metadata.height)
+  })
 
   return {
     displayUrl,
     contentFallbackUrl,
+    naturalSize,
     retainDisplayUrl: previewResources.retain,
   }
 }

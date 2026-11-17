@@ -154,6 +154,7 @@ export default {
     fusionNeedsTwoImages: 'Fusion needs at least 2 images.',
     fusionInputsInvalid: 'Fusion input images are invalid.',
     outpaintMissingOriginalSize: 'Outpaint is missing the original image size.',
+    inputImageSizeUnavailable: 'The original input image dimensions are unavailable. Please retry.',
   },
   tools: {
     nodeWriteFailed: 'Failed to write the image node to the canvas.',

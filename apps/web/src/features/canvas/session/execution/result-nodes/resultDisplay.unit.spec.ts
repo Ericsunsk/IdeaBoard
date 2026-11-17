@@ -8,6 +8,7 @@ import {
   getWorkspaceMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
+  type MediaAssetDeliveryMetadata,
 } from '@/api/media/mediaAssetDelivery'
 
 vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => {
@@ -17,12 +18,17 @@ vi.mock('@/api/media/mediaAssetDelivery', async (importOriginal) => {
 
 const metadataMock = vi.mocked(getWorkspaceMediaAssetMetadata)
 
-function readyMetadata(assetId = 'asset_1') {
+function readyMetadata(assetId = 'asset_1'): MediaAssetDeliveryMetadata {
   return {
     asset_id: assetId,
     status: 'ready',
+    width: 0,
+    height: 0,
+    size_bytes: 1,
+    mime_type: 'image/png',
+    original: { status: 'ready', url: '/api/original' },
     derivatives: { preview: { status: 'ready', url: '/api/preview' } },
-  } as never
+  }
 }
 
 describe('resultDisplay', () => {
@@ -54,8 +60,7 @@ describe('resultDisplay', () => {
     })
     expect(waitForReceiptDerivative).toHaveBeenCalledTimes(1)
     expect(waitForReceiptDerivative).toHaveBeenCalledWith('ws_test123', 'asset_1', undefined)
-    // The injected waiter owns readiness: no metadata GET happens inside resolve.
-    expect(metadataMock).not.toHaveBeenCalled()
+    expect(metadataMock).toHaveBeenCalledTimes(1)
     expect(loadImageSize).toHaveBeenCalled()
   })
 
@@ -179,6 +184,29 @@ describe('resultDisplay', () => {
     })
     expect(loadImageSize).not.toHaveBeenCalled()
   })
+
+  it.each([null, { width: 512, height: 512 }])(
+    'uses original output dimensions instead of source ratio or preview dimensions (%j)',
+    async (previewSize) => {
+      metadataMock.mockResolvedValue({
+        ...readyMetadata(),
+        width: 1254,
+        height: 1254,
+      })
+      const loadImageSize = vi.fn(async () => previewSize)
+
+      await expect(
+        resolveTaskImageResultDisplay(
+          { workspaceId: 'ws_test123', assetId: 'asset_1' },
+          516 / 466,
+          loadImageSize,
+          undefined,
+          vi.fn(async () => {}),
+        ),
+      ).resolves.toMatchObject({ ratio: 1, width: 1254, height: 1254 })
+      expect(loadImageSize).not.toHaveBeenCalled()
+    },
+  )
 
   it('derives a MediaRef delivery URL from the public task output identity', async () => {
     const loadImageSize = vi.fn()

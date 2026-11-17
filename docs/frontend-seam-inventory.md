@@ -5909,6 +5909,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.unit.spec.ts",
+          "to": "src/api/media/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.unit.spec.ts",
           "to": "src/api/media/mediaAssetDelivery.ts",
           "kind": "runtime"
@@ -5984,9 +5989,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 28,
+      "measuredFanIn": 29,
       "measuredFanOut": 3,
-      "targetFanIn": 28,
+      "targetFanIn": 29,
       "targetFanOut": 3,
       "ownershipScope": [
         "src/api/media/mediaAssetDelivery.ts"
@@ -12326,12 +12331,22 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
@@ -12351,9 +12366,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
+      "measuredFanIn": 12,
       "measuredFanOut": 1,
-      "targetFanIn": 10,
+      "targetFanIn": 12,
       "targetFanOut": 1,
       "ownershipScope": [
         "src/core/media/imageDimensions.ts"
@@ -19831,11 +19846,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/canvas/core/execution/promptAspectRatioTaskParams.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/canvas/core/graph/graphGeometry.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
@@ -20303,7 +20313,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
           "to": "src/features/board/ports/canvas.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
@@ -20351,9 +20361,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 100,
+      "measuredFanIn": 99,
       "measuredFanOut": 69,
-      "targetFanIn": 100,
+      "targetFanIn": 99,
       "targetFanOut": 69,
       "ownershipScope": [
         "src/features/board/"
@@ -22143,9 +22153,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 31,
-      "measuredFanOut": 49,
+      "measuredFanOut": 48,
       "targetFanIn": 31,
-      "targetFanOut": 49,
+      "targetFanOut": 48,
       "ownershipScope": [
         "src/features/canvas/session/execution/"
       ],
@@ -22254,7 +22264,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/execution/canvasTaskRequest.ts",
         "src/features/canvas/core/execution/executionContract.ts",
         "src/features/canvas/core/execution/imageActionExecution.ts",
-        "src/features/canvas/core/execution/promptAspectRatioTaskParams.ts",
         "src/features/canvas/core/execution/sizeParams.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/core/nodes/canvasNodeFactory.ts",
@@ -22757,9 +22766,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 64,
-      "measuredFanOut": 34,
+      "measuredFanOut": 35,
       "targetFanIn": 64,
-      "targetFanOut": 34,
+      "targetFanOut": 35,
       "ownershipScope": [
         "src/features/canvas/session/flow-adapter/"
       ],
@@ -22846,6 +22855,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/contracts/generationContract.ts",
         "src/core/i18n/index.ts",
         "src/core/media/displayTier.ts",
+        "src/core/media/imageDimensions.ts",
         "src/core/media/mediaAssetPath.ts",
         "src/core/media/mediaRef.ts",
         "src/core/media/useMediaAssetDelivery.ts",
@@ -26812,7 +26822,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/http/sessionUserType.ts` | canonical | api | 1 | 17 → 17 | 0 → 0 |
 | `src/api/http/stripUndefined.ts` | canonical | api | 2 | 12 → 12 | 0 → 0 |
 | `src/api/http/userSession.ts` | canonical | api | 2 | 3 → 3 | 4 → 4 |
-| `src/api/media/mediaAssetDelivery.ts` | canonical | api | 24 | 28 → 28 | 3 → 3 |
+| `src/api/media/mediaAssetDelivery.ts` | canonical | api | 24 | 29 → 29 | 3 → 3 |
 | `src/api/media/mediaWorkspaceScope.ts` | canonical | api | 3 | 7 → 7 | 0 → 0 |
 | `src/api/media/upload.ts` | canonical | api | 23 | 11 → 11 | 8 → 8 |
 | `src/api/realtime/workspaceEventStream.ts` | canonical | api | 24 | 16 → 16 | 4 → 4 |
@@ -26889,7 +26899,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/lib/chartTimeRange.ts` | canonical | core | 7 | 3 → 3 | 0 → 0 |
 | `src/core/lib/pageChrome.ts` | canonical | core | 2 | 6 → 6 | 0 → 0 |
 | `src/core/media/imageAssetPipeline.ts` | canonical | core | 6 | 8 → 8 | 6 → 6 |
-| `src/core/media/imageDimensions.ts` | canonical | core | 5 | 10 → 10 | 1 → 1 |
+| `src/core/media/imageDimensions.ts` | canonical | core | 5 | 12 → 12 | 1 → 1 |
 | `src/core/media/mediaRef.ts` | canonical | core | 5 | 11 → 11 | 1 → 1 |
 | `src/core/media/visionIngressPolicy.ts` | canonical | core | 8 | 6 → 6 | 2 → 2 |
 | `src/core/motion/chartMotion.ts` | canonical | core | 1 | 3 → 3 | 2 → 2 |
@@ -26998,7 +27008,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue` | canonical | admin | 1 | 2 → 2 | 3 → 3 |
 | `src/features/auth/index.ts` | canonical | auth | 28 | 38 → 38 | 46 → 46 |
 | `src/features/board/index.ts` | canonical | board | 220 | 50 → 50 | 69 → 69 |
-| `src/features/board/ports/canvas.ts` | canonical | board | 66 | 100 → 100 | 69 → 69 |
+| `src/features/board/ports/canvas.ts` | canonical | board | 66 | 99 → 99 | 69 → 69 |
 | `src/features/board/ports/canvasSession.ts` | canonical | board | 27 | 11 → 11 | 69 → 69 |
 | `src/features/board/ports/testing.ts` | canonical | board | 2 | 6 → 6 | 1 → 1 |
 | `src/features/board/testing/index.ts` | canonical | board | 14 | 32 → 32 | 8 → 8 |
@@ -27012,9 +27022,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/board-session/index.ts` | canonical | canvas | 15 | 32 → 32 | 22 → 22 |
 | `src/features/canvas/session/collaboration/index.ts` | canonical | canvas | 5 | 12 → 12 | 7 → 7 |
 | `src/features/canvas/session/execution/board-attachment/index.ts` | canonical | canvas | 2 | 13 → 13 | 0 → 0 |
-| `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 49 → 49 |
+| `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 48 → 48 |
 | `src/features/canvas/session/execution/pending-execution/core.ts` | canonical | canvas | 17 | 14 → 14 | 8 → 8 |
-| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 64 → 64 | 34 → 34 |
+| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 64 → 64 | 35 → 35 |
 | `src/features/canvas/session/graph-editing/groupContracts.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |
 | `src/features/canvas/session/graph-editing/index.ts` | canonical | canvas | 18 | 12 → 12 | 37 → 37 |
 | `src/features/canvas/session/image-workflow/index.ts` | canonical | canvas | 3 | 4 → 4 | 21 → 21 |
