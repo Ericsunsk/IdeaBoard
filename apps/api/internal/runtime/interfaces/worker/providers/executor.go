@@ -171,25 +171,28 @@ func workerInputRefs(params providerTaskParams) []tasks.MediaRef {
 	return out
 }
 
-// workerImageSize derives the planned output pixels from canonical controls:
-// explicit custom dimensions win (scaled by quality tier), else ratio plus
-// quality tier snapped to 64px.
-func workerImageSize(controls *tasks.GenerationControls) (width, height int) {
+// workerImageSize combines canonical controls with the validated plan's
+// resolution. Custom dimensions scale by resolution; otherwise ratio-derived
+// dimensions snap to 64px.
+func workerImageSize(params providerTaskParams) (width, height int) {
 	var customWidth, customHeight int
-	var ratio, quality string
-	if controls != nil {
+	var ratio string
+	if params.Canonical != nil && params.Canonical.Controls != nil {
+		controls := params.Canonical.Controls
 		customWidth, customHeight = int(controls.CustomWidth), int(controls.CustomHeight)
-		ratio, quality = controls.Ratio, controls.Quality
+		ratio = controls.Ratio
+	}
+	k := 1
+	if params.ExecutionPlan != nil {
+		switch params.ExecutionPlan.OutputResolution() {
+		case workflow.OutputResolution2K:
+			k = 2
+		case workflow.OutputResolution4K:
+			k = 4
+		}
 	}
 	if customWidth > 0 && customHeight > 0 {
-		w, h := customWidth, customHeight
-		switch strings.ToLower(strings.TrimSpace(quality)) {
-		case "2k":
-			w, h = w*2, h*2
-		case "4k":
-			w, h = w*4, h*4
-		}
-		return w, h
+		return customWidth * k, customHeight * k
 	}
 	wr, hr := 1.0, 1.0
 	if trimmed := strings.TrimSpace(ratio); trimmed != "" {
@@ -201,13 +204,6 @@ func workerImageSize(controls *tasks.GenerationControls) (width, height int) {
 				wr, hr = wVal, hVal
 			}
 		}
-	}
-	k := 1
-	switch strings.ToLower(strings.TrimSpace(quality)) {
-	case "2k":
-		k = 2
-	case "4k":
-		k = 4
 	}
 	baseLength := float64(1024 * k)
 	r := wr / hr
