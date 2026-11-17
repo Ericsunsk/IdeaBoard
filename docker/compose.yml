@@ -274,6 +274,8 @@ services:
   imgproxy:
     image: ghcr.io/imgproxy/imgproxy:v4.0.14
     container_name: ideaboard-imgproxy
+    # Local media stays private to the API storage owner (0700 dirs / 0600 files).
+    user: "65532:65532"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

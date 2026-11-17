@@ -558,6 +558,8 @@ printf 'Production signed bootstrap recipe contract passed\n'
 
 # Render the actual override: all proxy upstreams keep the private network,
 # while storage, messaging and worker services remain private-only.
+api_runtime_user="$(awk '/^FROM / { runtime = ($NF == "runtime") } runtime && /^USER / { print $2; exit }' "$repo_root/apps/api/Dockerfile")"
+[[ -n "$api_runtime_user" ]] || fail 'API runtime image must declare its storage owner'
 for proxy_network in npm-nw fixture-npm; do
   IMGPROXY_USE_S3=true IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE=false IMGPROXY_S3_ACCESS_KEY_ID=fixture-s3-id \
     IMGPROXY_S3_SECRET_ACCESS_KEY=fixture-s3-secret NPM_NETWORK_NAME="$proxy_network" docker compose \
@@ -573,6 +575,15 @@ for proxy_network in npm-nw fixture-npm; do
     (has("IMGPROXY_S3_SECRET_ACCESS_KEY") | not)' \
     "$fixture_dir/npm-compose.json" >/dev/null ||
     fail 'imgproxy S3 credentials must reach the AWS SDK environment'
+  jq -e --arg api_user "$api_runtime_user" '
+    . as $compose |
+    ($compose.services.api.user // $api_user) as $storage_owner |
+    ($compose.services.api.volumes[] | select(.target == "/app/uploads") | .source) as $uploads |
+    $compose.services.imgproxy.user == $storage_owner and
+    any($compose.services.imgproxy.volumes[];
+      .target == "/data/uploads" and .source == $uploads and .read_only == true)
+  ' "$fixture_dir/npm-compose.json" >/dev/null ||
+    fail 'imgproxy must read the shared uploads volume as the API storage owner with a read-only mount'
   jq -e --arg network "$proxy_network" '
     . as $compose |
     .networks["npm-network"].external == true and
