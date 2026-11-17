@@ -87,7 +87,8 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
    使用 `default` alias。Worker 只发送 `cf-aig-authorization`，由 Gateway 注入上游
    `Authorization`；不新增 Worker Secret，不把 GWLLM key 放入 `provider_options`。
 2. 将此 Worker 版本部署后，在 Admin Model Catalog 选择 `custom-gwllm`，填写该 API key
-   可见的精确 model ID（保留大小写、后缀及其自身 namespace），再按需加入 Service Model Pool。
+   可见的精确 model ID（保留大小写、后缀及其自身 namespace），只加入已核对能力的
+   `generation` / `render` / `variations` / `fusion` Service Model Pool。
    不根据 OpenAI model 名猜测 GWLLM 可用模型；模型可见性以 GWLLM 控制台或 `/v1/models` 为准。
 3. Route Preview 仅 dry-run；实际计费、模型可用性及图片参数仍需操作员确认后做首单真生成。
 
@@ -125,8 +126,9 @@ Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2
 ```
 
 Admin Model Catalog 的 Provider 选择 `custom-gwllm`，Model 使用相同的精确 ID；
-Model Pool 的 Custom Params 可从 `{"n":1,"response_format":"b64_json"}` 开始。
-网站按用户选择生成 canonical 尺寸，无需在 Custom Params 重复填写 `size`；上例只展示
+Model Pool 的 Custom Params 可留空；只有渠道明确要求时才配置 `response_format` / `quality`。
+网站的 Output Resolution 由冻结 Execution Plan 转成 canonical 尺寸，再映射为 GWLLM `size`；
+Output Count 由 Go 逐张执行，无需在 Custom Params 配置 `n` 或 `size`。上例只展示
 字段映射，不承诺该 model/channel 支持 `2048x2048`。`quality`、特殊 `size` 或其他模型参数
 应以该账号渠道的协议为准，不根据 GPT Image/Nano 名称自动补参数。
 
