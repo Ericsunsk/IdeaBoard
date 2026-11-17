@@ -6,7 +6,7 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 ## 冻结合同（唯一出口）
 
 - `POST /v1/generate`，`Authorization: Bearer WORKER_INTERNAL_SECRET`。
-  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai|google|krea|google-vertex-ai|custom-gwllm`、`model`、`prompt`、
+  Body `CanonicalImageRequest`：`task_id`、`provider: workers-ai|fal|openai|google|krea|google-vertex-ai|gwllm`、`model`、`prompt`、
   `negative_prompt?`、`width?`、`height?`、`steps?`、`guidance_scale?`、`seed?`、
   `images?: string[]`（presigned GET URL）与可选 `mask_index?: number`（显式零基 mask 索引）、`provider_options?`、
   `upload_url`（必填）、`public_url?`。
@@ -23,7 +23,7 @@ VPS 后端只发 CanonicalImageRequest，图片输入/输出全走 presigned URL
 - 所有 Gateway transport（Fal/OpenAI 与携带 gateway id 的 `@cf/` Airun）强制 `cf-aig-skip-cache: true`、`cf-aig-collect-log-payload: false`，`provider_options` 无权覆盖。
 - S3/网关密钥永不进 Worker 日志；`safeLog` 只记 `task_id/provider/model/path_source/upstream_status/duration_ms/code/message`（`message` 仅为 Worker 自产校验文案，不含上游原文/密钥）。所有 400（含校验失败）都经 `badRequest` 留痕。
 - `WORKER_INTERNAL_SECRET` 缺失即 fail-closed：任何请求都 401。
-- `GET /v1/providers`（需 `Authorization: Bearer WORKER_INTERNAL_SECRET`，与 generate/dry-run 一致；无 task 上下文，401 body 为 `{error:{code,message}}` 不带 `task_id`）：回 `{providers: string[]}`，例如 `{"providers":["fal","google","google-vertex-ai","krea","openai","workers-ai"]}`。列表从 `src/providers/index.ts` 的 `PROVIDER_REGISTRY` key（`${channel}:${vendor}`）派生 vendor 去重排序，内部 vendor `migrated` 对外为 `workers-ai`，新增 vendor 加表项即自动出现（见 `listProviders`；VPS 侧不硬编码名单）。
+- `GET /v1/providers`（需 `Authorization: Bearer WORKER_INTERNAL_SECRET`，与 generate/dry-run 一致；无 task 上下文，401 body 为 `{error:{code,message}}` 不带 `task_id`）：回 `{providers: string[]}`，例如 `{"providers":["fal","google","google-vertex-ai","gwllm","krea","openai","workers-ai"]}`。列表从 `src/providers/index.ts` 的可执行 provider declarations 派生 provider identity，去重排序（见 `listProviders`；VPS 侧不硬编码名单）。Legacy identity 只兼容已有引用，不重复列入能力列表。
 
 ## Endpoint slug（置顶常量，见 `src/providers/airun/index.ts` 与 `src/providers/gateway/index.ts`）
 
@@ -45,7 +45,7 @@ channel 决定 transport（host/auth/envelope/回包），vendor 只做 input �
   （缺省 `generateContent`，仅接受 `generateContent` 或 `predict` 前缀族）；
   网关鉴权恒为 `cf-aig-authorization: Bearer CF_AIG_TOKEN`，
   BYOK/直连 Google `Authorization` 场景首单待确认，默认不带）。
-- gateway/custom-gwllm：Cloudflare Custom Provider（slug `gwllm`、Base URL
+- gateway/gwllm：Cloudflare Custom Provider（slug `gwllm`、Base URL
   `https://api.gwllm.com`），请求经 `custom-gwllm/v1/images/generations`（无图 JSON）
   或 `custom-gwllm/v1/images/edits`（1–4 张参考图 multipart）；复用 OpenAI Images 字段与回包解析。
 
@@ -66,7 +66,7 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
   有图转 data URI（不透传 presigned URL）：`image_url` = 首张，`image_urls` = 全部普通参考图，`mask_url` 仅来自显式 `mask_index`。
 - gateway/openai：无图 `images/generations {model,prompt,size,response_format:b64_json}`；
   有图 `images/edits` multipart（只支持一张普通 `image` 加可选显式 `mask`，`size/response_format` 同带）。
-- gateway/custom-gwllm：无图 JSON 文生图；单参考图 multipart `image`；2–4 张参考图
+- gateway/gwllm：无图 JSON 文生图；单参考图 multipart `image`；2–4 张参考图
   按 canonical 顺序使用重复的 multipart `image[]` 文件字段，上传已拉取的原始图片字节，
   不透传 presigned URL；不支持 mask。具体模型/渠道是否接受多图须首单确认。
 - gateway/google-vertex-ai（Vertex 原生，provider slug 精确匹配 `google-vertex-ai`，
@@ -86,11 +86,15 @@ GET Probe（如 `/v1/models`）验不出计费/模型可用性与 payload 方言
    `https://api.gwllm.com`（不带 `/v1`）；在该 Provider 的 BYOK 中保存 GWLLM API key，
    使用 `default` alias。Worker 只发送 `cf-aig-authorization`，由 Gateway 注入上游
    `Authorization`；不新增 Worker Secret，不把 GWLLM key 放入 `provider_options`。
-2. 将此 Worker 版本部署后，在 Admin Model Catalog 选择 `custom-gwllm`，填写该 API key
+2. 将此 Worker 版本部署后，在 Admin Model Catalog 选择 `gwllm`，填写该 API key
    可见的精确 model ID（保留大小写、后缀及其自身 namespace），只加入已核对能力的
    `generation` / `render` / `variations` / `fusion` Service Model Pool。
    不根据 OpenAI model 名猜测 GWLLM 可用模型；模型可见性以 GWLLM 控制台或 `/v1/models` 为准。
 3. Route Preview 仅 dry-run；实际计费、模型可用性及图片参数仍需操作员确认后做首单真生成。
+
+Provider identity 为 CF 配置的 slug `gwllm`；Gateway 路径中的 `custom-gwllm/v1`
+由 Worker transport 添加。既有 `custom-gwllm` Catalog / RoutingSnapshot 引用仍可执行，
+不需要迁移；Admin 只显示 `gwllm`。
 
 Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2–4 张用于多图融合）；
 明确拒绝 mask、超过 4 张参考图、stream，以及 `provider_options` 覆盖 canonical
@@ -113,7 +117,7 @@ Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2
 ```json
 {
   "task_id": "gwllm-preview",
-  "provider": "custom-gwllm",
+  "provider": "gwllm",
   "model": "<EXACT_MODEL_ID_FROM_YOUR_GWLLM_ACCOUNT>",
   "prompt": "A bicycle",
   "width": 2048,
@@ -125,7 +129,7 @@ Adapter 能力范围：同步文生图、1–4 张参考图 multipart 编辑（2
 }
 ```
 
-Admin Model Catalog 的 Provider 选择 `custom-gwllm`，Model 使用相同的精确 ID；
+Admin Model Catalog 的 Provider 选择 `gwllm`，Model 使用相同的精确 ID；
 Model Pool 的 Custom Params 可留空；只有渠道明确要求时才配置 `response_format` / `quality`。
 网站的 Output Resolution 由冻结 Execution Plan 转成 canonical 尺寸，再映射为 GWLLM `size`；
 Output Count 由 Go 逐张执行，无需在 Custom Params 配置 `n` 或 `size`。上例只展示

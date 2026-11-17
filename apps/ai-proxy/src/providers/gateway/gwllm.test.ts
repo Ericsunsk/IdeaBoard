@@ -19,6 +19,46 @@ const req: CanonicalImageRequest = {
   prompt: "A bicycle",
   upload_url: "https://storage.test/output?signature=private",
 };
+
+test("configured GWLLM identity and published references share one route", () => {
+  for (const provider of [
+    "gwllm",
+    "custom-gwllm",
+    "workers-ai",
+    "unknown-provider",
+  ]) {
+    const models =
+      provider === "workers-ai" || provider === "unknown-provider"
+        ? [
+            "gwllm/Vendor/Case-Sensitive-Model",
+            "custom-gwllm/Vendor/Case-Sensitive-Model",
+          ]
+        : [
+            "Vendor/Case-Sensitive-Model",
+            "gwllm/Vendor/Case-Sensitive-Model",
+            "custom-gwllm/Vendor/Case-Sensitive-Model",
+          ];
+    for (const model of models) {
+      const target = prepareRoute({ ...req, provider, model }, env, []).target;
+      assert.equal(target.url, `${gatewayUrl}generations`);
+      assert.equal(
+        JSON.parse(target.body as string).model,
+        "Vendor/Case-Sensitive-Model",
+      );
+    }
+  }
+  for (const [model, nativeModel] of [
+    ["gwllm/custom-gwllm/Vendor/Model", "custom-gwllm/Vendor/Model"],
+    ["custom-gwllm/gwllm/Vendor/Model", "gwllm/Vendor/Model"],
+  ]) {
+    const target = prepareRoute(
+      { ...req, provider: "gwllm", model },
+      env,
+      [],
+    ).target;
+    assert.equal(JSON.parse(target.body as string).model, nativeModel);
+  }
+});
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const base64 = Buffer.from(png).toString("base64");
 const input: FetchedInput = {

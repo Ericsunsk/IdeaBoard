@@ -8,7 +8,7 @@ export type Channel = "airun" | "gateway";
 export interface ChannelResolution {
   channel: Channel;
   // channel 内 vendor：airun 下为 "google" | "openai" | "krea" | "migrated"，
-  // gateway 下为 "fal" | "openai" | "google-vertex-ai" | "custom-gwllm"。
+  // gateway 下为 "fal" | "openai" | "google-vertex-ai" | "gwllm"。
   vendor: string;
   // Native model: airun uses author/model or @cf/...; gateway removes only its routing prefix.
   model: string;

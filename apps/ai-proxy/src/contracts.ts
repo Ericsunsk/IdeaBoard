@@ -10,8 +10,9 @@ export type ImageProvider =
   | "openai"
   | "google"
   | "krea"
-  | "custom-gwllm"
-  // registry 自定义 slug（Go 侧合成 custom-<slug>）同样允许：dispatch 走模型前缀回落，
+  | "gwllm"
+  | "custom-gwllm" // Legacy Catalog / RoutingSnapshot identity.
+  // registry 自定义 slug 同样允许：dispatch 走模型前缀回落，
   // 未命中直接 422，未知永不 400 误导。
   | (string & {});
 

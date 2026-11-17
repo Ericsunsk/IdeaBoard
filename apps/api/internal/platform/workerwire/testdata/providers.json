@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "fal",
+    "google",
+    "google-vertex-ai",
+    "gwllm",
+    "krea",
+    "openai",
+    "workers-ai"
+  ]
+}
