@@ -105,6 +105,8 @@ Graph specs cover snapshot roundtrips, transaction commit/cancel and dirty summa
 
 ## Invariants
 
+- Generation `auto` with reference images follows the first input asset's original aspect ratio; Variations uses the same input-ratio contract. Submission sends `ratio: 'auto'` plus `original_image_width` / `original_image_height` from Media metadata and rejects unavailable dimensions before creating a Task. Backend execution owns resolution-to-pixel sizing. Text-only generation and Fusion keep their separate sizing rules.
+- Image pixel dimensions come from Task output facts or original Media metadata, independently of the saved node display width. Completed results materialize that ratio; existing managed images may correct their displayed stage ratio from current-asset metadata without mutating the Board, width, position, or active image-tool geometry.
 - `viewModel.flowPane.nodes` / `viewModel.flowPane.edges` are Vue Flow binding only (e.g. `const { nodes, edges } = viewModel.flowPane` in `CanvasPage.vue`); never use them for business decisions.
 - Pages use `isValidConnection` / `onConnect` only through `commands.flowPane.connectionAdapter`; no independent connection commands.
 - Canvas submodules import only the connection adapter public contract from `session/flow-adapter/index.ts`; never deep-import adapter implementation.

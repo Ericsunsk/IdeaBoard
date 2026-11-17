@@ -7,6 +7,7 @@ import { extractWorkspaceTaskImageResults } from '../workspace/canvasTaskWaiting
 import type { ReceiptDerivativeWaiter } from '../result-nodes/resultDisplay'
 import { createTaskImageObserver } from './taskImageOutcome'
 import { waitForReceiptDerivativeReady } from '../result-nodes/receiptDerivativeEvent'
+import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 
 vi.mock('../result-nodes/receiptDerivativeEvent', () => ({
   waitForReceiptDerivativeReady: vi.fn(async () => {}),
@@ -26,6 +27,23 @@ function waitOptions() {
 describe('Task image observation Workspace identity', () => {
   beforeEach(() => {
     receiptDerivativeReadyMock.mockClear()
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/media-assets/:assetId', ({ params }) => {
+        expect(params.workspaceId).toBe(workspaceId)
+        expect(params.assetId).toBe(assetId)
+        return HttpResponse.json({
+          data: {
+            id: assetId,
+            status: 'ready',
+            width: 400,
+            height: 200,
+            size_bytes: 1,
+            content_url: `/api/v1/workspaces/${workspaceId}/media-assets/${assetId}/content`,
+            derivatives: {},
+          },
+        })
+      }),
+    )
   })
 
   afterEach(() => {
@@ -52,7 +70,7 @@ describe('Task image observation Workspace identity', () => {
         assetId,
         expect.any(Object),
       )
-      expect(loadImageSize).toHaveBeenCalledWith(url, undefined, expect.any(AbortSignal))
+      expect(loadImageSize).not.toHaveBeenCalled()
       expect(wait).toHaveBeenCalledTimes(1)
     },
   )

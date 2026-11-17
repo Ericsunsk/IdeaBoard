@@ -7,6 +7,7 @@ import {
   resolveUpscaleScale,
 } from '../../../core/execution/imageActionExecution.ts'
 import { EXECUTION_SERVICE } from '../../../core/execution/executionContract.ts'
+import { toWorkspaceCreateInput } from '../workspace/canvasTaskContractMapping'
 import type {
   OutpaintExecutionPlan,
   ImageActionExecutionPlan,
@@ -39,7 +40,7 @@ describe('imageTaskRequests', () => {
     const request = buildDirectActionTaskRequest({
       source: { ...source, url: '' },
       action: IMAGE_NODE_ACTION.variations,
-      imageSize: null,
+      imageSize: { width: 466, height: 516 },
       prompt: 'vary this image',
       outputCount: 1,
     })
@@ -154,6 +155,45 @@ describe('imageTaskRequests', () => {
     )
   })
 
+  it('submits the original first-reference dimensions for image generation auto sizing', () => {
+    const plan: GenerationExecutionPlan = {
+      kind: 'generation',
+      sourceNodeId: 'prompt-1',
+      source,
+      referenceImages: [source],
+      prompt: 'edit this image',
+      outputCount: 1,
+      outputResolution: '2k',
+      aspectRatio: 'auto',
+      resultOptions: {},
+    }
+    const request = buildImageExecutionTaskRequest(plan, { width: 466, height: 516 })
+
+    expect(request.params).toEqual({
+      output_count: 1,
+      output_resolution: '2k',
+      ratio: 'auto',
+      original_image_width: 466,
+      original_image_height: 516,
+    })
+    expect(toWorkspaceCreateInput(request)).toMatchObject({
+      service: 'generation',
+      media_asset_ids: ['asset_source42'],
+      quantity: 1,
+      resolution: '2k',
+      params: { ratio: 'auto', original_image_width: 466, original_image_height: 516 },
+    })
+    expect(buildImageExecutionTaskRequest({ ...plan, aspectRatio: '16:9' }).params).toEqual({
+      output_count: 1,
+      output_resolution: '2k',
+      ratio: '16:9',
+    })
+    expect(buildImageExecutionTaskRequest({ ...plan, referenceImages: [] }).params).toEqual({
+      output_count: 1,
+      output_resolution: '2k',
+    })
+  })
+
   it('builds style variation params under the nested variation contract', () => {
     const request = buildDirectActionTaskRequest({
       source,
@@ -166,8 +206,7 @@ describe('imageTaskRequests', () => {
     })
 
     expect(request.params).toMatchObject({
-      custom_width: 1024,
-      custom_height: 1024,
+      ratio: 'auto',
       original_image_width: 1024,
       original_image_height: 1024,
       variation: {
@@ -176,7 +215,33 @@ describe('imageTaskRequests', () => {
       output_resolution: '2k',
     })
     expect(request.params).not.toHaveProperty('variation_strength')
+    expect(request.params).not.toHaveProperty('custom_width')
+    expect(request.params).not.toHaveProperty('custom_height')
   })
+
+  it.each([undefined, null, { width: 0, height: 516 }, { width: 466.5, height: 516 }])(
+    'rejects image auto sizing with invalid original dimensions (%j) before submission',
+    (imageSize) => {
+      expect(() =>
+        buildGenerationTaskRequest({
+          prompt: 'edit',
+          aspectRatio: 'auto',
+          mediaAssetIds: ['asset_source42'],
+          outputCount: 1,
+          imageSize,
+        }),
+      ).toThrow('The original input image dimensions are unavailable.')
+      expect(() =>
+        buildDirectActionTaskRequest({
+          source,
+          action: IMAGE_NODE_ACTION.variations,
+          imageSize: imageSize!,
+          prompt: 'vary this image',
+          outputCount: 1,
+        }),
+      ).toThrow('The original input image dimensions are unavailable.')
+    },
+  )
 
   it('rejects direct action requests without an AssetID', () => {
     expect(() =>
@@ -255,7 +320,7 @@ describe('imageTaskRequests', () => {
       buildDirectActionTaskRequest({
         source,
         action: IMAGE_NODE_ACTION.variations,
-        imageSize: null,
+        imageSize: { width: 466, height: 516 },
         prompt,
         outputCount: 4,
         strength: 35,

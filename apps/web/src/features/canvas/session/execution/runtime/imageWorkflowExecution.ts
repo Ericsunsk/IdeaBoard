@@ -3,6 +3,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
+import { EXECUTION_SERVICE } from '../../../core/execution/executionContract'
 import {
   buildImageExecutionTaskRequest,
   buildPreparedImageInpaintTaskRequest,
@@ -24,7 +25,10 @@ import type { TaskImageOutcomeWaiter } from '../task-runner/taskImageOutcome'
 import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
-import { resolveMediaAssetProcessingURL } from '@/api/media/mediaAssetDelivery'
+import {
+  getMediaAssetMetadata,
+  resolveMediaAssetProcessingURL,
+} from '@/api/media/mediaAssetDelivery'
 
 export type ImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
@@ -93,18 +97,23 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
     const source = await resolveExecutionSource(plan.source)
-    const taskRequest = buildImageExecutionTaskRequest(
-      { ...plan, source },
-      await readImageNaturalSize(source.url),
-    )
+    const imageSize =
+      plan.action === EXECUTION_SERVICE.variations && source.assetId
+        ? await getMediaAssetMetadata(source.assetId)
+        : await readImageNaturalSize(source.url)
+    const taskRequest = buildImageExecutionTaskRequest({ ...plan, source }, imageSize)
+    const resultSource =
+      plan.action === EXECUTION_SERVICE.variations && imageSize
+        ? { ...source, ratio: imageSize.height / imageSize.width }
+        : source
     await workflowRunner.execute({
-      source,
+      source: resultSource,
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
       attachment,
       outputCount: plan.outputCount,
       taskRequest,
-      fallbackRatio: source.ratio,
+      fallbackRatio: resultSource.ratio,
     })
   }
 

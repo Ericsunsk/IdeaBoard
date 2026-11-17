@@ -151,6 +151,7 @@ export default {
     fusionNeedsTwoImages: '融合至少需要 2 张图片。',
     fusionInputsInvalid: '融合输入图片无效。',
     outpaintMissingOriginalSize: '画面扩展缺少原始图片尺寸。',
+    inputImageSizeUnavailable: '无法读取输入图片的原始尺寸，请稍后重试。',
   },
   tools: {
     nodeWriteFailed: '将图像节点写入画布失败。',

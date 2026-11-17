@@ -15,7 +15,10 @@ import type { PendingImageExecutionCore } from '../pending-execution/core'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
 import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'
 import { createTaskImageObserver } from '../task-runner/taskImageOutcome'
-import { resolveMediaAssetProcessingURL } from '@/api/media/mediaAssetDelivery'
+import {
+  getMediaAssetMetadata,
+  resolveMediaAssetProcessingURL,
+} from '@/api/media/mediaAssetDelivery'
 
 type CanvasExecutionWorkspaceState = {
   readonly executionCore: PendingImageExecutionCore
@@ -104,15 +107,23 @@ export function useCanvasExecutionWorkspace(
       ? { ...plan.source, url: await resolveMediaAssetProcessingURL(plan.source.assetId) }
       : plan.source
     const resolvedPlan = { ...plan, source, referenceImages: resolvedReferences }
-    const taskRequest = buildImageExecutionTaskRequest(resolvedPlan)
+    const firstReference = resolvedReferences[0]
+    const imageSize =
+      plan.aspectRatio === 'auto' && firstReference?.assetId
+        ? await getMediaAssetMetadata(firstReference.assetId)
+        : null
+    const taskRequest = buildImageExecutionTaskRequest(resolvedPlan, imageSize)
+    const resultSource = imageSize
+      ? { ...source, ratio: imageSize.height / imageSize.width }
+      : source
     await workflowRunner.execute({
-      source,
+      source: resultSource,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      fallbackRatio: source.ratio,
+      fallbackRatio: resultSource.ratio,
     })
   }
 

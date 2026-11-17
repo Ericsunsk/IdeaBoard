@@ -158,6 +158,7 @@ export default {
     fusionNeedsTwoImages: '퓨전은 최소 2개의 이미지가 필요합니다.',
     fusionInputsInvalid: '퓨전 입력 이미지가 올바르지 않습니다.',
     outpaintMissingOriginalSize: '아웃페인트에 원본 이미지 크기가 없습니다.',
+    inputImageSizeUnavailable: '입력 이미지의 원본 크기를 읽을 수 없습니다. 다시 시도해 주세요.',
   },
   tools: {
     nodeWriteFailed: '이미지 노드를 캔버스에 기록하지 못했습니다.',

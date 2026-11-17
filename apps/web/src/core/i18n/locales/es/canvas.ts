@@ -162,6 +162,8 @@ export default {
     fusionNeedsTwoImages: 'La fusión necesita al menos 2 imágenes.',
     fusionInputsInvalid: 'Las imágenes de entrada de fusión no son válidas.',
     outpaintMissingOriginalSize: 'Falta el tamaño original de la imagen para la extensión.',
+    inputImageSizeUnavailable:
+      'No se pueden leer las dimensiones originales de la imagen. Inténtalo de nuevo.',
   },
   tools: {
     nodeWriteFailed: 'Error al escribir el nodo de imagen en el lienzo.',
