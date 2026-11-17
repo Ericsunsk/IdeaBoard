@@ -2,6 +2,10 @@
 
 Related: [Wiki Index](../index.md), [Verification Baselines](./static-analysis-baseline.md)
 
+## 2026-11-17 — GWLLM provider identity 修复（线上待验）
+
+- 2026-11-17，生产 Admin 的只读 providers API 返回 `gwllm` / `available:false`，下拉框显示“缺适配器”；`Ericsunsk/IdeaBoard@b77a10711` 确认 CF configured provider identity `gwllm` 与 Worker 广告的 transport namespace `custom-gwllm` 混淆。修复只广告 `gwllm`，将 `custom-gwllm/v1` 留在 transport 内，并兼容已发布的旧 Catalog / RoutingSnapshot identity 和新旧 full model reference，不迁移数据。真实 Worker GET 与共享 capability fixture、Go HTTP discovery 和 native model reference 回归先红后绿；115 Worker tests、TypeScript build/lint、Go ModelRegistry/Workflow tests 及 wire contract 通过。该记录取代上文/下文接入说明将 `custom-gwllm` 当作新 Admin provider identity 的历史约定；截至该 commit 尚未合入或部署，线上可选状态及实际上游生成仍待验证，未执行付费调用。
+
 ## 2026-11-17 — 网站冻结执行合同修复（#982–#985）
 
 - 2026-11-17，`Ericsunsk/IdeaBoard@04e6b05d4`（[#983](https://github.com/Ericsunsk/IdeaBoard/issues/983)）改为从冻结 Execution Plan 推导 Worker 尺寸，覆盖 1k/2k/4k，并保留旧任务和显式自定义尺寸的兼容路径。这条记录取代下方历史审查中“按 Quality 选尺寸”的未修复结论；outpaint geometry 与 upscale scale 不在本次修复范围。
