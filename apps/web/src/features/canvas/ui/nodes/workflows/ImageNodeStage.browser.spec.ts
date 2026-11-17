@@ -1,25 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { render } from '../../../../../test/render'
-import { createDeferred } from '../../../../../test/deferred'
-import type { MediaAssetDeliveryMetadata } from '@/api/media/mediaAssetMetadata'
-import {
-  setMediaWorkspaceIdResolver,
-  resetMediaWorkspaceIdResolver,
-} from '@/api/media/mediaWorkspaceScope'
 import ImageNodeStage from './ImageNodeStage.vue'
 
-const media = vi.hoisted(() => ({ getMetadata: vi.fn() }))
-vi.mock('@/api/media/mediaAssetMetadata', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/api/media/mediaAssetMetadata')>()),
-  getMediaAssetMetadata: media.getMetadata,
-  ensureWorkspaceMediaInvalidation: () => () => {},
-  subscribeAssetInvalidation: () => () => {},
+vi.mock('@/api/media/mediaWorkspaceScope', () => ({
+  readMediaWorkspaceId: () => 'ws_test123',
+  setMediaWorkspaceIdResolver: () => {},
+  resetMediaWorkspaceIdResolver: () => {},
 }))
 
 afterEach(() => {
-  resetMediaWorkspaceIdResolver()
-  vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 async function imageBlob(color: string) {
@@ -32,9 +23,23 @@ async function imageBlob(color: string) {
 }
 
 it('keeps the decoded local image through upload handoff until the managed image is ready', async () => {
-  setMediaWorkspaceIdResolver(() => 'ws_test123')
-  const metadata = createDeferred<MediaAssetDeliveryMetadata>()
-  media.getMetadata.mockReturnValue(metadata.promise)
+  let resolveMetadata!: (response: Response) => void
+  const metadata = new Promise<Response>((resolve) => {
+    resolveMetadata = resolve
+  })
+  const nativeFetch = globalThis.fetch
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, options) => {
+    const url = input instanceof Request ? input.url : input.toString()
+    if (url.endsWith('/media-assets/asset_handoff')) return metadata
+    if (url.includes('/events')) {
+      return new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')),
+        )
+      })
+    }
+    return nativeFetch(input, options)
+  })
   const localUrl = URL.createObjectURL(await imageBlob('red'))
   const managedUrl = URL.createObjectURL(await imageBlob('blue'))
   const view = render(ImageNodeStage, {
@@ -69,16 +74,27 @@ it('keeps the decoded local image through upload handoff until the managed image
     expect(image).not.toHaveClass('is-tier-loading')
     expect(view.queryByLabelText('Preparing image preview')).toBeNull()
 
-    metadata.resolve({
-      asset_id: 'asset_handoff',
-      status: 'ready',
-      mime_type: 'image/png',
-      width: 32,
-      height: 32,
-      size_bytes: 100,
-      original: { status: 'ready', url: managedUrl },
-      derivatives: { preview: { status: 'ready', url: managedUrl } },
-    })
+    resolveMetadata(
+      new Response(
+        JSON.stringify({
+          data: {
+            id: 'asset_handoff',
+            workspace_id: 'ws_test123',
+            status: 'ready',
+            media_kind: 'image',
+            mime_type: 'image/png',
+            width: 32,
+            height: 32,
+            size_bytes: 100,
+            content_url: '/api/v1/workspaces/ws_test123/media-assets/asset_handoff/content',
+            derivatives: { preview: { status: 'ready', url: managedUrl } },
+            created_at: '2026-11-17T00:00:00Z',
+            updated_at: '2026-11-17T00:00:00Z',
+          },
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      ),
+    )
     await expect.poll(() => view.container.querySelector('img')?.src).toBe(managedUrl)
     await expect.poll(() => view.container.querySelector('img')?.naturalWidth).toBe(32)
   } finally {

@@ -1,5 +1,4 @@
 import type { Edge, Node } from '@vue-flow/core'
-import type { FlowNodeData } from '../../../core/nodes/flowTypes'
 import type {
   CanvasGraphCommitPatch,
   CanvasGraphEdgeRecord,
@@ -135,7 +134,7 @@ function mergeProjectedNode(
     ...projected,
     // Local upload/import previews belong to this renderer attachment, so
     // canonical position and selection commits must not discard them.
-    data: { ...(current.data as FlowNodeData), ...(projected.data as FlowNodeData) },
+    data: Object.assign({}, current.data, projected.data),
     position: projected.position,
     dimensions: projected.dimensions,
     selected: isSelectionChanged
