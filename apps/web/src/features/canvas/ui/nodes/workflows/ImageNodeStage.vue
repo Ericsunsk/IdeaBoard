@@ -257,22 +257,21 @@ const {
   stageDisplayImage.value?.assetId,
 ])
 const presentationSource = ref(sourceDisplayUrl.value)
-const presentationKey = computed(() =>
-  JSON.stringify([sourceDisplayUrl.value, presentationSource.value]),
-)
+const presentationKey = computed(() => presentationSource.value ?? '')
 const presentedToolBinding = computed(() =>
   stageDisplayUrl.value ? props.imageToolStageBinding : null,
 )
 const stageImageRef = ref<HTMLImageElement | null>(null)
 const leavingImageReleases = new Map<Element, () => void>()
+watch([sourceDisplayUrl, renderedStageUrl], ([source, next], [, previous]) => {
+  // The source identity may stabilize before its replacement has decoded.
+  // Keep the existing DOM frame until the displayed URL actually changes.
+  if (next !== previous) presentationSource.value = source
+})
 watch(
   renderedStageUrl,
   (next, previous) => {
-    const source = sourceDisplayUrl.value
-    if (presentationSource.value !== source) {
-      presentationSource.value = source
-      return
-    }
+    if (presentationSource.value !== sourceDisplayUrl.value) return
     const image = stageImageRef.value
     const renderedUrl = image?.getAttribute('src')
     if (!image || !renderedUrl || presentedToolBinding.value) return

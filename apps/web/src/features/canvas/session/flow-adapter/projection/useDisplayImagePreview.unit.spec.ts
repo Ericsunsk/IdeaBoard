@@ -299,6 +299,53 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('shows a restored visible image without waiting for deferred image scheduling', async () => {
+    vi.stubGlobal(
+      'Image',
+      class {
+        fetchPriority = 'auto'
+        scheduledPriority = 'auto'
+
+        set src(url: string) {
+          if (url) this.scheduledPriority = this.fetchPriority
+        }
+
+        decode() {
+          // Chromium can defer automatic detached image requests even when the
+          // visible Canvas is waiting for their first frame.
+          return this.scheduledPriority === 'high'
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => window.setTimeout(resolve, 15_000))
+        }
+      },
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const isVisible = ref(false)
+    const scope = effectScope()
+    vi.useFakeTimers()
+    try {
+      const preview = scope.run(() =>
+        useDisplayImagePreview('/api/v1/workspaces/ws_test123/media-assets/asset-42/content', {
+          maxSide: 640,
+          assetId: 'asset-42',
+          isVisible,
+        }),
+      )!
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(fetch).not.toHaveBeenCalled()
+      expect(preview.displayUrl.value).toBe('')
+
+      isVisible.value = true
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+      )
+      expect(fetch).toHaveBeenCalledTimes(1)
+    } finally {
+      scope.stop()
+    }
+  })
+
   it('keeps the current media derivative visible while a zoom tier refreshes', async () => {
     const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const maxSide = ref(256)

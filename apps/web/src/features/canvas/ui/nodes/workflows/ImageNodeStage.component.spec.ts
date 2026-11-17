@@ -643,7 +643,9 @@ describe('ImageNodeStage decoded image transitions', () => {
       'src',
       'blob:other-image',
     )
-    expect(previewState.retainDisplayUrl.mock.results[0]?.value).toHaveBeenCalledOnce()
+    for (const result of previewState.retainDisplayUrl.mock.results) {
+      expect(result.value).toHaveBeenCalledOnce()
+    }
   })
 
   it('replaces the image immediately without a retained layer under reduced motion', async () => {
