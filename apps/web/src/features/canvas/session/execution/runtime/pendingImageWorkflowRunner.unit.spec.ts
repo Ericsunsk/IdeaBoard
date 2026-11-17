@@ -211,7 +211,9 @@ describe('pendingImageWorkflowRunner', () => {
       'failed',
     ])
     expect(harness.pendingResults.removePendingResults).toHaveBeenCalledExactlyOnceWith([
-      'image-2', 'image-3', 'image-4',
+      'image-2',
+      'image-3',
+      'image-4',
     ])
     expect(wait).toHaveBeenCalledOnce()
     expect(harness.transport.observe).toHaveBeenCalledOnce()

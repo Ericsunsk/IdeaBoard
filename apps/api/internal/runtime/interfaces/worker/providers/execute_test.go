@@ -693,3 +693,29 @@ func TestCallWorkerAPIPreservesCancellationAfterOneOutput(t *testing.T) {
 		t.Fatalf("calls=%d after cancellation", len(fw.capturedBodies))
 	}
 }
+
+func TestCallWorkerAPIKeepsOutputWhenNextInputSigningFails(t *testing.T) {
+	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
+	defer fw.server.Close()
+	fw.respond = func(taskID, uploadURL string) (int, string) {
+		// The first send already resolved its input. A disappearing source
+		// makes the next presign fail through the real transfer adapter.
+		delete(fw.transfer.assets, "asset_input1")
+		return 0, ""
+	}
+	task := generationTaskForTest(t, "task-later-input-unavailable")
+	task.Params = marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Service:       workflow.FeatureSlugRender,
+		Controls:      &tasks.GenerationControls{OutputCount: 4},
+		Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{PublicAssetID: "asset_input1"}}},
+	})
+	executor := workerTestExecutor(fw, nil)
+	output, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{Task: task, Model: "fal/flux"})
+	if err != nil || len(output.Outputs) != 1 {
+		t.Fatalf("outputs=%d err=%v; want one completed output", len(output.Outputs), err)
+	}
+	if len(fw.capturedBodies) != 1 || fw.fetchedInputs != 1 {
+		t.Fatalf("calls=%d fetched inputs=%d; want one without batch retry", len(fw.capturedBodies), fw.fetchedInputs)
+	}
+}
