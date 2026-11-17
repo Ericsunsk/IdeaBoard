@@ -172,9 +172,9 @@ func workerInputRefs(params providerTaskParams) []tasks.MediaRef {
 }
 
 // workerImageSize combines canonical controls with the validated plan's
-// resolution. Custom dimensions scale by resolution; otherwise ratio-derived
-// dimensions snap to 64px.
-func workerImageSize(params providerTaskParams) (width, height int) {
+// resolution. Image auto follows the original aspect ratio at the requested
+// resolution; legacy custom dimensions and explicit ratios keep their sizing.
+func workerImageSize(params providerTaskParams) (width, height int, err error) {
 	var customWidth, customHeight int
 	var ratio string
 	if params.Canonical != nil && params.Canonical.Controls != nil {
@@ -182,17 +182,16 @@ func workerImageSize(params providerTaskParams) (width, height int) {
 		customWidth, customHeight = int(controls.CustomWidth), int(controls.CustomHeight)
 		ratio = controls.Ratio
 	}
-	k := 1
+	longEdge := 1024
 	if params.ExecutionPlan != nil {
-		switch params.ExecutionPlan.OutputResolution() {
-		case workflow.OutputResolution2K:
-			k = 2
-		case workflow.OutputResolution4K:
-			k = 4
-		}
+		longEdge = params.ExecutionPlan.OutputLongEdgePixels()
 	}
+	if width, height, err := params.Canonical.ResolveAutoInputSize(longEdge); err != nil || width > 0 {
+		return width, height, err
+	}
+	k := longEdge / 1024
 	if customWidth > 0 && customHeight > 0 {
-		return customWidth * k, customHeight * k
+		return customWidth * k, customHeight * k, nil
 	}
 	wr, hr := 1.0, 1.0
 	if trimmed := strings.TrimSpace(ratio); trimmed != "" {
@@ -205,7 +204,7 @@ func workerImageSize(params providerTaskParams) (width, height int) {
 			}
 		}
 	}
-	baseLength := float64(1024 * k)
+	baseLength := float64(longEdge)
 	r := wr / hr
 	var wFloat, hFloat float64
 	if r >= 1.0 {
@@ -217,7 +216,7 @@ func workerImageSize(params providerTaskParams) (width, height int) {
 	}
 	w := int(math.Max(64, math.Round(wFloat/64.0)*64.0))
 	h := int(math.Max(64, math.Round(hFloat/64.0)*64.0))
-	return w, h
+	return w, h, nil
 }
 
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {

@@ -79,6 +79,18 @@ func (p FeatureExecutionPlan) OutputResolutionPolicy() OutputResolutionPolicy {
 
 func (p FeatureExecutionPlan) OutputResolution() string { return p.outputResolution }
 
+// OutputLongEdgePixels translates the frozen resolution class for image sizing.
+func (p FeatureExecutionPlan) OutputLongEdgePixels() int {
+	switch p.outputResolution {
+	case OutputResolution2K:
+		return 2048
+	case OutputResolution4K:
+		return 4096
+	default:
+		return 1024
+	}
+}
+
 func (p FeatureExecutionPlan) RoutingRequirement() RoutingRequirement { return p.routing }
 
 func (p FeatureExecutionPlan) RuntimeOperation() RuntimeOperation { return p.runtimeOperation }

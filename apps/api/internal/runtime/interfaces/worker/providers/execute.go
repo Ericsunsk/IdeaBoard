@@ -282,6 +282,10 @@ func (c *Executor) callWorker(
 	if c.transfer == nil {
 		return providerCallResult{}, fmt.Errorf("worker transfer is not configured")
 	}
+	width, height, err := workerImageSize(params)
+	if err != nil {
+		return providerCallResult{}, runtimeports.NewWorkerError(runtimeports.WorkerErrorBadRequest, err.Error(), taskID, http.StatusBadRequest, 0, 0)
+	}
 	count := 1
 	if params.ExecutionPlan != nil {
 		count = params.ExecutionPlan.RequestedOutputCount().Int()
@@ -323,7 +327,6 @@ outputs:
 			}
 			return result, err
 		}
-		width, height := workerImageSize(params)
 		var seed uint64
 		if params.Canonical != nil && params.Canonical.Generation != nil {
 			seed = params.Canonical.Generation.Seed

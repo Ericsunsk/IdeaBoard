@@ -23,11 +23,12 @@ const encoded = JSON.parse(
   requests: {
     full: CanonicalImageRequest;
     minimal: CanonicalImageRequest;
+    inherited: CanonicalImageRequest;
     probe: CanonicalImageRequest;
   };
   jpeg: string;
 };
-const { full, minimal, probe } = encoded.requests;
+const { full, minimal, inherited, probe } = encoded.requests;
 const jpeg = Buffer.from(encoded.jpeg, "base64");
 const env: Env = {
   CF_ACCOUNT_ID: "contract-account",
@@ -150,6 +151,37 @@ for (const [name, request] of [
   assert.equal(uploads, 1);
   assert.equal(inputs, name === "full" ? 2 : 0);
 }
+
+let inheritedInputs = 0;
+let inheritedUpstreams = 0;
+let inheritedUploads = 0;
+await execute("inherited", inherited, async (url, init) => {
+  if (String(url) === inherited.images?.[0]) {
+    inheritedInputs++;
+    return new Response(jpeg, { headers: { "content-type": "image/jpeg" } });
+  }
+  if (String(url).includes("/custom-gwllm/v1/images/edits")) {
+    inheritedUpstreams++;
+    const form = await new Request(String(url), init).formData();
+    assert.equal(form.get("size"), "925x1024");
+    assert.equal(form.get("model"), inherited.model);
+    assert.equal(form.get("n"), "1");
+    assert.deepEqual(
+      Buffer.from(await (form.get("image") as Blob).arrayBuffer()),
+      jpeg,
+    );
+    return Response.json({ data: [{ b64_json: encoded.jpeg }] });
+  }
+  assert.equal(String(url), inherited.upload_url, "unexpected external fetch");
+  assert.equal(init?.method, "PUT");
+  assert.deepEqual(Buffer.from(init?.body as ArrayBuffer), jpeg);
+  inheritedUploads++;
+  return new Response(null, { status: 200 });
+});
+assert.equal(responses.inherited.status, 200);
+assert.equal(inheritedInputs, 1);
+assert.equal(inheritedUpstreams, 1);
+assert.equal(inheritedUploads, 1);
 
 let dryFetches = 0;
 await execute(

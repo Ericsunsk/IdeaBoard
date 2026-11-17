@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"ideaboard/api/internal/workflow/paramkeys"
@@ -223,6 +224,37 @@ type GenerationControls struct {
 	OutputCount      int     `json:"output_count,omitempty"`
 	ImageCount       int     `json:"image_count,omitempty"`
 	PromptUpsampling *bool   `json:"prompt_upsampling,omitempty"`
+}
+
+// ResolveAutoInputSize follows the input's aspect ratio at the requested long
+// edge. Intake and replay share validation and pixel rounding. A zero size means
+// legacy/custom sizing or text-only auto applies instead.
+func (p *WorkflowTaskParams) ResolveAutoInputSize(longEdgePixels int) (width, height int, err error) {
+	if p == nil || p.Controls == nil || strings.TrimSpace(p.Controls.Ratio) != "auto" {
+		return 0, 0, nil
+	}
+	controls := p.Controls
+	if controls.CustomWidth > 0 && controls.CustomHeight > 0 {
+		return 0, 0, nil
+	}
+	if p.Media == nil || len(p.Media.Inputs)+len(p.Media.References) == 0 && p.Media.Original == nil {
+		return 0, 0, nil
+	}
+	for field, dimension := range map[string]float64{
+		paramkeys.OriginalImageWidth:  controls.OriginalWidth,
+		paramkeys.OriginalImageHeight: controls.OriginalHeight,
+	} {
+		if !(dimension > 0) || dimension > math.MaxInt32 || math.Trunc(dimension) != dimension {
+			return 0, 0, NewValidationError(FieldError{Field: "params." + field, Message: "invalid"})
+		}
+	}
+	longest := math.Max(controls.OriginalWidth, controls.OriginalHeight)
+	width = int(math.Round(controls.OriginalWidth / longest * float64(longEdgePixels)))
+	height = int(math.Round(controls.OriginalHeight / longest * float64(longEdgePixels)))
+	if width < 1 || height < 1 {
+		return 0, 0, NewValidationError(FieldError{Field: "params." + paramkeys.Ratio, Message: "invalid"})
+	}
+	return width, height, nil
 }
 
 type VariationsParams struct {
