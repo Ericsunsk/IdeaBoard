@@ -20186,6 +20186,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.browser.spec.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -20346,9 +20351,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 99,
+      "measuredFanIn": 100,
       "measuredFanOut": 69,
-      "targetFanIn": 99,
+      "targetFanIn": 100,
       "targetFanOut": 69,
       "ownershipScope": [
         "src/features/board/"
@@ -22566,6 +22571,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.browser.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
@@ -22746,9 +22756,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 63,
+      "measuredFanIn": 64,
       "measuredFanOut": 34,
-      "targetFanIn": 63,
+      "targetFanIn": 64,
       "targetFanOut": 34,
       "ownershipScope": [
         "src/features/canvas/session/flow-adapter/"
@@ -23209,9 +23219,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 5,
-      "measuredFanOut": 26,
+      "measuredFanOut": 27,
       "targetFanIn": 5,
-      "targetFanOut": 26,
+      "targetFanOut": 27,
       "ownershipScope": [
         "src/features/canvas/session/workspace/"
       ],
@@ -23242,6 +23252,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/image-workflow/index.ts",
         "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
+        "src/features/canvas/ui/nodes/index.ts",
         "src/features/library/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
@@ -24035,6 +24046,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.browser.spec.ts",
+          "to": "src/features/canvas/ui/nodes/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
           "to": "src/features/canvas/ui/nodes/index.ts",
           "kind": "runtime"
@@ -24055,9 +24071,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 5,
       "measuredFanOut": 40,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 40,
       "ownershipScope": [
         "src/features/canvas/ui/nodes/"
@@ -26982,7 +26998,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue` | canonical | admin | 1 | 2 → 2 | 3 → 3 |
 | `src/features/auth/index.ts` | canonical | auth | 28 | 38 → 38 | 46 → 46 |
 | `src/features/board/index.ts` | canonical | board | 220 | 50 → 50 | 69 → 69 |
-| `src/features/board/ports/canvas.ts` | canonical | board | 66 | 99 → 99 | 69 → 69 |
+| `src/features/board/ports/canvas.ts` | canonical | board | 66 | 100 → 100 | 69 → 69 |
 | `src/features/board/ports/canvasSession.ts` | canonical | board | 27 | 11 → 11 | 69 → 69 |
 | `src/features/board/ports/testing.ts` | canonical | board | 2 | 6 → 6 | 1 → 1 |
 | `src/features/board/testing/index.ts` | canonical | board | 14 | 32 → 32 | 8 → 8 |
@@ -26998,13 +27014,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/execution/board-attachment/index.ts` | canonical | canvas | 2 | 13 → 13 | 0 → 0 |
 | `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 49 → 49 |
 | `src/features/canvas/session/execution/pending-execution/core.ts` | canonical | canvas | 17 | 14 → 14 | 8 → 8 |
-| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 63 → 63 | 34 → 34 |
+| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 64 → 64 | 34 → 34 |
 | `src/features/canvas/session/graph-editing/groupContracts.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |
 | `src/features/canvas/session/graph-editing/index.ts` | canonical | canvas | 18 | 12 → 12 | 37 → 37 |
 | `src/features/canvas/session/image-workflow/index.ts` | canonical | canvas | 3 | 4 → 4 | 21 → 21 |
 | `src/features/canvas/session/media/preloadImage.ts` | canonical | canvas | 1 | 2 → 2 | 0 → 0 |
 | `src/features/canvas/session/media/serviceImageActionText.ts` | canonical | canvas | 2 | 2 → 2 | 3 → 3 |
-| `src/features/canvas/session/workspace/index.ts` | canonical | canvas | 2 | 5 → 5 | 26 → 26 |
+| `src/features/canvas/session/workspace/index.ts` | canonical | canvas | 2 | 5 → 5 | 27 → 27 |
 | `src/features/canvas/session/workspace/useCanvasFeedback.ts` | canonical | canvas | 3 | 10 → 10 | 2 → 2 |
 | `src/features/canvas/tools/image-tools/core/index.ts` | canonical | canvas | 1 | 1 → 1 | 1 → 1 |
 | `src/features/canvas/tools/image-tools/index.ts` | canonical | canvas | 13 | 10 → 10 | 21 → 21 |
@@ -27017,7 +27033,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/retouch/testing/browser.ts` | canonical | canvas | 2 | 1 → 1 | 4 → 4 |
 | `src/features/canvas/ui/chrome/components/index.ts` | canonical | canvas | 6 | 1 → 1 | 17 → 17 |
 | `src/features/canvas/ui/nodes/groups/index.ts` | canonical | canvas | 4 | 4 → 4 | 8 → 8 |
-| `src/features/canvas/ui/nodes/index.ts` | canonical | canvas | 10 | 4 → 4 | 40 → 40 |
+| `src/features/canvas/ui/nodes/index.ts` | canonical | canvas | 10 | 5 → 5 | 40 → 40 |
 | `src/features/canvas/ui/nodes/primitives/index.ts` | canonical | canvas | 21 | 14 → 14 | 20 → 20 |
 | `src/features/canvas/ui/nodes/useFlowNodeUiState.ts` | canonical | canvas | 1 | 2 → 2 | 6 → 6 |
 | `src/features/canvas/ui/nodes/workflows/index.ts` | canonical | canvas | 7 | 2 → 2 | 25 → 25 |
