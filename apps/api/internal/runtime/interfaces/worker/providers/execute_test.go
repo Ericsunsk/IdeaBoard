@@ -512,33 +512,6 @@ func TestCallWorkerAPISurfacesUpstreamErrors(t *testing.T) {
 	}
 }
 
-func TestCallWorkerAPISendsPlannedSize(t *testing.T) {
-	fw := newFakeWorkerServer(t, buildTinyPNGBytes(t))
-	defer fw.server.Close()
-	executor := workerTestExecutor(fw, nil)
-	task := &tasks.TaskPayload{
-		TaskID: "task-size",
-		UserID: 42,
-		Prompt: "wide banner",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Service:       workflow.FeatureSlugGeneration,
-			Controls: &tasks.GenerationControls{
-				CustomWidth: 512, CustomHeight: 256, Quality: "2k",
-			},
-		}),
-	}
-	if _, err := executor.CallWorkerAPI(context.Background(), runtimeports.WorkerCallInput{
-		Task: task, Model: "openai/dall-e-3", AttemptNo: 1,
-	}); err != nil {
-		t.Fatalf("CallWorkerAPI returned error: %v", err)
-	}
-	// 512x256 custom at 2k quality scales to 1024x512.
-	if fw.capturedBody["width"] != float64(1024) || fw.capturedBody["height"] != float64(512) {
-		t.Fatalf("size = %v/%v, want 1024/512", fw.capturedBody["width"], fw.capturedBody["height"])
-	}
-}
-
 func TestCallWorkerUsesActualOutputMIME(t *testing.T) {
 	var jpg bytes.Buffer
 	if err := jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err != nil {

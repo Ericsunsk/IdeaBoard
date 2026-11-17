@@ -323,10 +323,7 @@ outputs:
 			}
 			return result, err
 		}
-		width, height := workerImageSize(nil)
-		if params.Canonical != nil && params.Canonical.Controls != nil {
-			width, height = workerImageSize(params.Canonical.Controls)
-		}
+		width, height := workerImageSize(params)
 		var seed uint64
 		if params.Canonical != nil && params.Canonical.Generation != nil {
 			seed = params.Canonical.Generation.Seed
