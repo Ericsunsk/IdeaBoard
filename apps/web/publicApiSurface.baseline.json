@@ -3946,6 +3946,7 @@
     "parseFlowNodeId",
     "parseHandlePort",
     "patchFlowSnapshotParam",
+    "projectCanvasNodeReplacement",
     "projectCanvasRenderEdges",
     "provideCanvasHandleProximityCoordinator",
     "provideCanvasNodeUiStateContext",

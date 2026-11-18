@@ -11,6 +11,7 @@ import type {
 import {
   createCanvasGraphCommitProjectionController,
   projectCanvasGraphCommit,
+  projectCanvasNodeReplacement,
   type CanvasFlowGraphProjection,
 } from './canvasGraphCommitProjection'
 
@@ -68,6 +69,78 @@ function flowNode(id: string, url = ''): Node {
     data: { snapshotNode: { sourceImageUrl: url } },
   }
 }
+
+describe('projectCanvasNodeReplacement', () => {
+  it('retains live previews without carrying other runtime data into a full replacement', () => {
+    const localUpload = { previewUrl: 'blob:local-image' }
+    const libraryImportPreviewUrl = 'blob:library-image'
+    const snapshotNode = imageRecord(1, 'managed-image').snapshot
+    const current = {
+      ...flowNode('image-1'),
+      data: {
+        kind: 'image',
+        localUpload,
+        libraryImportPreviewUrl,
+        runtimeOnly: 'old-runtime-data',
+        snapshotNode: imageRecord(1, 'old-image').snapshot,
+      },
+    }
+    const next = {
+      ...flowNode('image-1'),
+      data: { kind: 'image', title: 'new-title', snapshotNode },
+    }
+
+    const projected = projectCanvasNodeReplacement({ current: [current], next: [next] })[0]!
+
+    expect(projected.data).toEqual({ ...next.data, localUpload, libraryImportPreviewUrl })
+    expect(projected.data.snapshotNode).toBe(snapshotNode)
+    expect(next.data).not.toHaveProperty('localUpload')
+    expect(snapshotNode).not.toHaveProperty('localUpload')
+    expect(current.data.snapshotNode).toMatchObject({ sourceImageUrl: 'old-image' })
+
+    const incremental = projectCanvasGraphCommit({
+      current: { nodes: [current], edges: [] },
+      patch: patch({
+        nodes: {
+          records: [
+            {
+              id: 'image-1',
+              before: imageRecord(1, 'old-image'),
+              after: imageRecord(1, 'managed-image'),
+            },
+          ],
+          order: [],
+        },
+      }),
+    })
+    expect(incremental.graph.nodes[0]!.data.runtimeOnly).toBe('old-runtime-data')
+  })
+
+  it.each(['detached', 'different-kind', 'removed', 'cleared'] as const)(
+    'does not restore previews after %s',
+    (state) => {
+      const next = { ...flowNode('image-1'), data: { kind: 'image' } }
+      const current = {
+        ...flowNode('image-1'),
+        data: {
+          kind: state === 'different-kind' ? 'prompt' : 'image',
+          ...(state === 'cleared'
+            ? {}
+            : {
+                localUpload: { previewUrl: 'blob:local-image' },
+                libraryImportPreviewUrl: 'blob:library-image',
+              }),
+        },
+      }
+      const projected = projectCanvasNodeReplacement({
+        current: state === 'detached' ? null : [current],
+        next: state === 'removed' ? [] : [next],
+      })
+
+      expect(projected).toEqual(state === 'removed' ? [] : [next])
+    },
+  )
+})
 
 describe('projectCanvasGraphCommit', () => {
   it('keeps a dropped local image visible when its position commits during upload', () => {

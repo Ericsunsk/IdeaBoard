@@ -71,6 +71,33 @@ function mapById<T extends { id: string }>(items: readonly T[]): Map<string, T> 
   return new Map(items.map((item) => [item.id, item]))
 }
 
+/**
+ * Replaces canonical node projections while retaining only live image previews.
+ * `current` must belong to the same attachment; pass null for a fresh hydration.
+ * Upload/import owners still clear previews and release their resources.
+ */
+export function projectCanvasNodeReplacement(input: {
+  current: readonly Node[] | null
+  next: Node[]
+}): Node[] {
+  if (!input.current) return input.next
+  const currentNodes = mapById(input.current)
+  return input.next.map((node) => {
+    const current = currentNodes.get(node.id)
+    if (!current || current.data?.kind !== node.data?.kind) return node
+    const { localUpload, libraryImportPreviewUrl } = current.data ?? {}
+    if (!localUpload && !libraryImportPreviewUrl) return node
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        ...(localUpload ? { localUpload } : {}),
+        ...(libraryImportPreviewUrl ? { libraryImportPreviewUrl } : {}),
+      },
+    }
+  })
+}
+
 function hasOrderChange<Record extends { id: string }>(patch: OrderedRecordPatch<Record>): boolean {
   return (patch.order?.length ?? 0) > 0
 }
@@ -132,8 +159,8 @@ function mergeProjectedNode(
   return {
     ...current,
     ...projected,
-    // Local upload/import previews belong to this renderer attachment, so
-    // canonical position and selection commits must not discard them.
+    // Incremental commits retain runtime data; full replacements use the
+    // narrower preview-only policy in projectCanvasNodeReplacement.
     data: Object.assign({}, current.data, projected.data),
     position: projected.position,
     dimensions: projected.dimensions,

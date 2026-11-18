@@ -5,7 +5,7 @@ import type { BoardSession } from '../../board-session'
 import type { CanvasGraphHistory } from '../../graph-editing'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter'
+import { boardSnapshotToFlow, projectCanvasNodeReplacement } from '../../../session/flow-adapter'
 import type { CanvasGraphStore } from '../../../core/graph'
 import { CanvasGraphSession } from '../../board-session'
 import { canvasGraphStoreTelemetryProbe } from '../../graph-editing'
@@ -93,34 +93,16 @@ export function createCanvasGraphSessionRuntime(
     return requireGraphSession().store
   }
 
-  function preserveAttachedNodePreviews(nextNodes: Node[]): Node[] {
-    if (!isAttached()) return nextNodes
-    const currentNodes = new Map(options.nodes.value.map((node) => [node.id, node]))
-    return nextNodes.map((node) => {
-      const current = currentNodes.get(node.id)
-      if (!current || current.data?.kind !== node.data?.kind) return node
-      const { localUpload, libraryImportPreviewUrl } = current.data ?? {}
-      if (!localUpload && !libraryImportPreviewUrl) return node
-      // Full projections contain canonical facts only. These previews belong
-      // to the live attachment and are released by their upload/import owner.
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          ...(localUpload ? { localUpload } : {}),
-          ...(libraryImportPreviewUrl ? { libraryImportPreviewUrl } : {}),
-        },
-      }
-    })
-  }
-
   function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
     const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
     const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
     const savedEdgeEndpointKeys = new Set(savedGraph.edges.map(createFlowEdgeEndpointKey))
     return {
       nodes: [
-        ...preserveAttachedNodePreviews(savedGraph.nodes),
+        ...projectCanvasNodeReplacement({
+          current: isAttached() ? options.nodes.value : null,
+          next: savedGraph.nodes,
+        }),
         ...options.nodes.value.filter(
           (node) => !savedNodesById.has(node.id) && options.isNodeExecutionActive(node.id),
         ),
@@ -198,7 +180,10 @@ export function createCanvasGraphSessionRuntime(
         const flow = boardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
         return {
           nodes: options.projectCurrentGroupNodeLayers(
-            preserveAttachedNodePreviews(flow.nodes as Node[]),
+            projectCanvasNodeReplacement({
+              current: isAttached() ? options.nodes.value : null,
+              next: flow.nodes as Node[],
+            }),
           ),
           edges: flow.edges as Edge[],
         }
@@ -235,7 +220,10 @@ export function createCanvasGraphSessionRuntime(
     options.graphAdapter.replaceFullProjection(
       options.preserveCurrentSelection({
         nodes: options.projectCurrentGroupNodeLayers(
-          preserveAttachedNodePreviews(flow.nodes as Node[]),
+          projectCanvasNodeReplacement({
+            current: isAttached() ? options.nodes.value : null,
+            next: flow.nodes as Node[],
+          }),
         ),
         edges: flow.edges as Edge[],
       }),

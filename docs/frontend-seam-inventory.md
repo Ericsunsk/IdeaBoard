@@ -22813,6 +22813,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "parseFlowNodeId",
         "parseHandlePort",
         "patchFlowSnapshotParam",
+        "projectCanvasNodeReplacement",
         "projectCanvasRenderEdges",
         "provideCanvasHandleProximityCoordinator",
         "provideCanvasNodeUiStateContext",
@@ -27024,7 +27025,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/execution/board-attachment/index.ts` | canonical | canvas | 2 | 13 → 13 | 0 → 0 |
 | `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 48 → 48 |
 | `src/features/canvas/session/execution/pending-execution/core.ts` | canonical | canvas | 17 | 14 → 14 | 8 → 8 |
-| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 64 → 64 | 35 → 35 |
+| `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 71 | 64 → 64 | 35 → 35 |
 | `src/features/canvas/session/graph-editing/groupContracts.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |
 | `src/features/canvas/session/graph-editing/index.ts` | canonical | canvas | 18 | 12 → 12 | 37 → 37 |
 | `src/features/canvas/session/image-workflow/index.ts` | canonical | canvas | 3 | 4 → 4 | 21 → 21 |
