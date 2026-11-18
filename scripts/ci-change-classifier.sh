@@ -18,6 +18,7 @@ while IFS= read -r changed_path; do
   case "${changed_path}" in
     # Verification tooling is exercised by Ops; it does not change app runtimes.
     .github/workflows/ops.yml | scripts/ci-change-classifier* | scripts/ci-workflow-contract* | scripts/ci-baseline-test.sh | scripts/ci-gate-test.sh) ops=true ;;
+    scripts/ci-parity-test.sh | scripts/ci-api-test-plan-test.sh | scripts/ci-api-test-plan_test.go) ops=true ;;
     .github/workflows/ci.yml | scripts/ci-baseline* | scripts/ci-gate*) mark_all_contexts ;;
     .github/actions/deploy-production/* | .github/actions/setup-grype/* | .github/actions/pipeline-metrics/*) ops=true ;;
     .github/actions/setup-go/*) mark_api_all; auth=true; ai_proxy=true; migration_integration=true; ops=true ;;
@@ -32,7 +33,7 @@ while IFS= read -r changed_path; do
     .github/workflows/docker-images.yml | .github/workflows/deploy-production.yml) ops=true ;;
     scripts/ci-migration-integration* | scripts/atlas-migration-check*) mark_api_all; auth=true; migration_integration=true; ops=true ;;
     scripts/sql-workspace-scope-check* | scripts/openapi-pattern-check* | scripts/check-backend-copy*) mark_api; ops=true ;;
-    scripts/ci-parity.sh | scripts/ci-parity-test.sh) mark_all_contexts ;;
+    scripts/ci-parity.sh) mark_all_contexts ;;
     scripts/ci-api-* ) mark_api_all; ops=true ;;
     scripts/ci-web-*) web=true; ops=true ;;
     apps/*/CONTEXT.md | apps/*/README.md | apps/*/DESIGN.md) continue ;;

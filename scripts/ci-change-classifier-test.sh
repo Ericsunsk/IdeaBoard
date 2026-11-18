@@ -70,7 +70,10 @@ for verification_path in \
   scripts/ci-workflow-contract-check.go \
   scripts/ci-workflow-contract-test.sh \
   scripts/ci-baseline-test.sh \
-  scripts/ci-gate-test.sh; do
+  scripts/ci-gate-test.sh \
+  scripts/ci-parity-test.sh \
+  scripts/ci-api-test-plan-test.sh \
+  scripts/ci-api-test-plan_test.go; do
   verification_output="$(printf '%s\n' "${verification_path}" | "${classifier}")"
   assert_output_line "${verification_output}" 'ops=true'
   assert_output_line "${verification_output}" 'docs_only=false'
@@ -111,6 +114,8 @@ apps/api/go.sum|api auth ai_proxy migration_integration ops
 apps/api/openapi.public.yaml|web api
 .github/workflows/ci.yml|web api auth realtime ai_proxy migration_integration ops
 tooling/new-config.toml|web api auth realtime ai_proxy migration_integration ops
+scripts/ci-parity.sh|web api auth realtime ai_proxy migration_integration ops
+scripts/ci-api-test-plan.go|api ops
 CASES
 
 ai_dependency_output="$(printf '%s\n' apps/ai-proxy/package-lock.json | "${classifier}")"
@@ -336,6 +341,13 @@ assert_output_line "${parity_output}" 'auth=true'
 assert_output_line "${parity_output}" 'realtime=true'
 assert_output_line "${parity_output}" 'docker=true'
 assert_output_line "${parity_output}" 'ops=true'
+for lane in ai_proxy migration_integration api_tests api_sqlc api_migrations api_build api_images browser_smoke web_audit api_audit auth_audit realtime_audit ai_proxy_audit; do
+  assert_output_line "${parity_output}" "${lane}=true"
+done
+planner_output="$(printf '%s\n' scripts/ci-api-test-plan.go | "${classifier}")"
+for lane in api_tests api_sqlc api_migrations api_build; do
+  assert_output_line "${planner_output}" "${lane}=true"
+done
 
 migration_integration_output="$(printf '%s\n' scripts/ci-migration-integration.sh | "${classifier}")"
 

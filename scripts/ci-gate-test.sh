@@ -86,4 +86,11 @@ if CHANGES_RESULT=failure run_gate; then
   echo 'CI gate unexpectedly accepted failed classification' >&2
   exit 1
 fi
+# The reusable Web result aggregates shard/test/upload failures without report jobs.
+for result in failure cancelled skipped ''; do
+  if WEB_REQUIRED=true WEB_RESULT="${result}" run_gate; then
+    echo "CI gate unexpectedly accepted required Web result: ${result}" >&2
+    exit 1
+  fi
+done
 echo 'CI gate contract tests passed'

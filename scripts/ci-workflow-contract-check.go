@@ -182,7 +182,9 @@ func checkCI(ci workflow) {
 	gate := object(jobs, "ci-gate")
 	requireEqual(gate["name"], "CI Gate", "Required check must remain CI Gate")
 	requireEqual(gate["if"], "always()", "CI Gate must run after skipped or failed lanes")
+	rejectKey(gate, "continue-on-error", "CI Gate failures must block CI")
 	requireStringIn(gate, "needs", "changes", "CI Gate must depend on change classification")
+	requireStringIn(gate, "needs", "web", "CI Gate must depend on aggregate Web verification")
 	requireStringIn(gate, "needs", "api", "CI Gate must depend on API verification")
 	requireStringIn(gate, "needs", "realtime", "CI Gate must depend on realtime")
 	requireStringIn(gate, "needs", "ai-proxy", "CI Gate must depend on AI Proxy")
@@ -200,8 +202,11 @@ func checkCI(ci workflow) {
 	gateStep := requireStep(gate, "Summarize and verify required lanes")
 	requireEqual(gateStep["run"], "./scripts/ci-gate.sh", "CI Gate must use the lane policy module")
 	requireEqual(gateStep["if"], "always()", "CI Gate policy must run after failed or skipped lanes")
+	rejectKey(gateStep, "continue-on-error", "CI Gate policy failures must block CI")
 	gateEnv := object(gateStep, "env")
 	requireEqual(gateEnv["BROWSER_SMOKE_REQUIRED"], "${{ needs.changes.outputs.browser_smoke }}", "Browser smoke must use the explicit runtime-impact flag")
+	requireEqual(gateEnv["WEB_REQUIRED"], "${{ needs.changes.outputs.web }}", "CI Gate must receive the Web required flag")
+	requireEqual(gateEnv["WEB_RESULT"], "${{ needs.web.result }}", "CI Gate must receive the aggregate Web result")
 	requireEqual(gateEnv["API_REQUIRED"], "${{ needs.changes.outputs.api }}", "CI Gate must receive the API required flag")
 	requireEqual(gateEnv["API_RESULT"], "${{ needs.api.result }}", "CI Gate must receive the aggregate API result")
 	requireEqual(gateEnv["MEDIA_CONTRACT_REQUIRED"], "true", "Media contract must always be a required CI lane")
@@ -518,17 +523,68 @@ func checkWebVerification(root string, web workflow) {
 	requireEqual(planEnv["CI_BASE_SHA"], "${{ inputs.base_sha }}", "Web planner must consume the trusted baseline")
 	requireEqual(planEnv["CI_FORCE_FULL"], "${{ inputs.force_full }}", "Web planner must preserve full-release mode")
 	rejectKey(planStep, "continue-on-error", "Web planning failures must fail verification")
+	rejectKey(planStep, "if", "Web planning must not be skipped")
 	unit := object(jobs, "unit")
 	requireStringIn(unit, "needs", "unit-plan", "Web unit shards must depend on the canonical plan")
 	requireEqual(requireStep(unit, "Unit tests (shard)")["run"], "node scripts/ciUnitPlan.mjs run", "Full and related Web tests must share one runner")
 
 	comment := object(jobs, "bundle-comment")
 	requireContains(stringValue(comment["if"]), "github.event.pull_request.head.repo.full_name == github.repository", "Bundle comments must skip read-only fork PRs")
-	for _, name := range []string{"unit", "browser"} {
-		upload := requireStep(object(jobs, name), "Upload shard blob report")
-		requireEqual(object(upload, "with")["include-hidden-files"], true, name+" reports must include the hidden report directory")
+	for _, name := range []string{"unit-plan", "unit", "browser", "typecheck-app", "typecheck-node", "build"} {
+		requireKey(jobs, name, "Missing required Web verification job: "+name)
+		job := object(jobs, name)
+		rejectKey(job, "if", "Required Web verification jobs must not be skipped")
+		rejectKey(job, "continue-on-error", "Required Web verification jobs must propagate failures")
+	}
+	for name, command := range map[string]string{
+		"typecheck-app":  "npm run typecheck:app",
+		"typecheck-node": "npm run typecheck:node",
+	} {
+		requireStepRun(object(jobs, name), command)
 	}
 	requireStepRun(object(jobs, "typecheck-node"), "npm run test:typecheck")
+	build := requireStep(object(jobs, "build"), "Build")
+	requireEqual(build["run"], "npx vite build && npm run bundle:size:check", "Web CI build must bundle and enforce its budget without repeating typechecks")
+	for _, name := range []string{"typecheck-app", "typecheck-node", "build"} {
+		for _, step := range steps(object(jobs, name)) {
+			if step["name"] != "Build" && !strings.HasPrefix(stringValue(step["run"]), "npm run typecheck:") && step["run"] != "npm run test:typecheck" {
+				continue
+			}
+			rejectKey(step, "if", "Web typecheck and build steps must not be skipped")
+			rejectKey(step, "continue-on-error", "Web typecheck and build steps must propagate failures")
+		}
+	}
+	for _, name := range []string{"unit", "browser"} {
+		job := object(jobs, name)
+		strategy := object(job, "strategy")
+		requireEqual(strategy["fail-fast"], false, "Web shards must all complete")
+		testName := "Unit tests (shard)"
+		if name == "unit" {
+			requireEqual(strategy["matrix"], "${{ fromJSON(needs.unit-plan.outputs.matrix) }}", "Web unit shards must consume the canonical matrix")
+		} else {
+			testName = "Browser tests (shard)"
+			requireEqual(object(strategy, "matrix")["shard"], []any{1, 2}, "Web browser must run both shards")
+			rejectKey(object(strategy, "matrix"), "exclude", "Web browser must not omit shards")
+			rejectKey(object(strategy, "matrix"), "include", "Web browser must not duplicate shards")
+			requireEqual(requireStep(job, testName)["run"], `npm run test:browser -- --shard="${{ matrix.shard }}/2" --reporter=blob --reporter=default "--outputFile.blob=./.vitest-reports/blob-shard-${{ matrix.shard }}.json"`, "Web browser must execute each shard and propagate failures")
+		}
+		test := requireStep(job, testName)
+		rejectKey(test, "if", "Web test shards must not be skipped")
+		rejectKey(test, "continue-on-error", "Web test shards must propagate failures")
+		upload := requireStep(job, "Upload shard blob report")
+		requireEqual(upload["if"], "always()", "Web shard reports must survive failed tests")
+		requireEqual(upload["uses"], "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", "Web shard reports must use the pinned artifact uploader")
+		rejectKey(upload, "continue-on-error", "Missing Web shard reports must fail verification")
+		uploadInputs := object(upload, "with")
+		requireEqual(uploadInputs["include-hidden-files"], true, name+" reports must include the hidden report directory")
+		requireEqual(uploadInputs["if-no-files-found"], "error", "Missing Web shard reports must fail verification")
+		requireEqual(uploadInputs["path"], "apps/web/.vitest-reports", "Web shard reports must retain the blob directory")
+		reportName := "vitest-blob-unit-${{ matrix.shard }}-of-${{ matrix.shard_count }}"
+		if name == "browser" {
+			reportName = "vitest-blob-browser-${{ matrix.shard }}-of-2"
+		}
+		requireEqual(uploadInputs["name"], reportName, "Web shard report artifacts must have unique names")
+	}
 }
 
 func checkRelease(root string, release workflow) {
@@ -578,7 +634,28 @@ func checkRelease(root string, release workflow) {
 		rejectKey(step, "continue-on-error", "Image security failures must block release")
 	}
 	rejectKey(reusedSignature, "continue-on-error", "Image security failures must block release")
+	cache := requireStep(publish, "Cache Grype vulnerability database")
+	reject(fmt.Sprint(object(cache, "with")["lookup-only"]) == "true", "Grype cache must restore database bytes")
+	update := requireStep(publish, "Update Grype vulnerability database")
+	requireEqual(update["run"], "grype db update", "Every digest must refresh the vulnerability database even after a cache hit")
 	scan := requireStep(publish, "Scan linux/arm64 image")
+	requireEqual(scan["run"], `grype "registry:${IMAGE}" --platform linux/arm64 --config .grype.yaml --fail-on high --output table`, "Every digest must pass the High/Critical scan")
+	requireEqual(object(cache, "with")["path"], "${{ runner.temp }}/grype-db", "Grype cache and scans must share the database directory")
+	for _, step := range []map[string]any{update, scan} {
+		requireEqual(object(step, "env")["GRYPE_DB_CACHE_DIR"], "${{ runner.temp }}/grype-db", "Grype cache and scans must share the database directory")
+	}
+	updateIndex, scanIndex, signIndex := -1, -1, -1
+	for index, step := range steps(publish) {
+		switch step["name"] {
+		case "Update Grype vulnerability database":
+			updateIndex = index
+		case "Scan linux/arm64 image":
+			scanIndex = index
+		case "Sign image digest":
+			signIndex = index
+		}
+	}
+	reject(!(updateIndex < scanIndex && scanIndex < signIndex), "Image signing must follow a fresh database update and successful scan")
 	requireEqual(object(scan, "env")["IMAGE"], "${{ steps.resolved.outputs.ref }}", "Scanning must consume the resolved immutable digest")
 	aggregate := object(jobs, "aggregate-release-manifest")
 	requireEqual(object(requireStep(aggregate, "Checkout manifest implementation"), "with")["fetch-depth"], uint64(0), "Manifest validation needs source tags and ancestry")
