@@ -38,9 +38,6 @@ const (
 //     so typed Controls agree with the compiled plan.
 //  4. persisted JSON: marshal the typed params with the generation snapshot.
 //
-// Readiness diverges only at stage 2: it compiles a readiness plan with
-// synthesized media facts and never stamps plan facts back into the map.
-//
 // Workflow stays a pure plan/contract library: it never owns this sequencing,
 // performs I/O, or persists anything.
 // CompilerWorkspaceMediaAssetIDsParam carries workspace public asset ids into

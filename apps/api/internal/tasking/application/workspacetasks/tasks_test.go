@@ -561,7 +561,7 @@ func TestResolverEmptyResolutionUsesScalableDefault(t *testing.T) {
 		routingEntry("a/first", true, routing.Resolution1K),
 	)})
 
-	// #851: scalable Services converge with the readiness plan default
+	// #851: scalable Services converge with the Quote default
 	// (1k), never the match-all "default".
 	created, err := env.service.Create(ctx, CreateInput{
 		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render",
@@ -1147,7 +1147,7 @@ func TestAvailabilityPricesIndependentPerServiceResolutionQuantity(t *testing.T)
 }
 
 // TestAvailabilityEmptyResolutionUsesServicePolicyDefault proves an omitted
-// resolution converges with the readiness plan default: every Service gates
+// resolution converges with the Quote default: every Service gates
 // on canonical 1k (not the match-all default).
 func TestAvailabilityEmptyResolutionUsesServicePolicyDefault(t *testing.T) {
 	ctx := context.Background()
