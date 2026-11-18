@@ -1128,7 +1128,7 @@ func TestV1TaskResolverUnavailableRendersFields(t *testing.T) {
 	fx := newV1TaskRoutingFixture(t, map[string]routing.Pool{})
 	base := "/api/v1/workspaces/" + fx.ws.PublicID
 	// #851: an omitted resolution applies the service policy default
-	// (render is scalable, so 1k — converging with the readiness plan),
+	// (render is scalable, so 1k — converging with Quote),
 	// and the unavailable error reports those normalized values.
 	for _, tc := range []struct{ path, body string }{
 		{base + "/task-quotes", `{"data":{"service":"render","quantity":1}}`},

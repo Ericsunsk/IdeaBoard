@@ -197,38 +197,6 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 	}
 }
 
-func TestCompileFeatureReadinessPlanSuppliesContractValidMediaFacts(t *testing.T) {
-	tests := []struct {
-		feature string
-		images  int
-		hasMask bool
-	}{
-		{feature: FeatureSlugGeneration},
-		{feature: FeatureSlugInpaint, images: 1, hasMask: true},
-		{feature: FeatureSlugCutout, images: 1},
-		{feature: FeatureSlugFusion, images: 2},
-		{feature: FeatureSlugRender, images: 1},
-		{feature: FeatureSlugVariations, images: 1},
-		{feature: FeatureSlugUpscale, images: 1},
-		{feature: FeatureSlugOutpaint, images: 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.feature, func(t *testing.T) {
-			plan, err := CompileFeatureReadinessPlan(CompileFeatureExecutionInput{Feature: tt.feature})
-			if err != nil {
-				t.Fatalf("CompileFeatureReadinessPlan() error = %v", err)
-			}
-			if got := plan.RuntimeInputs().ImageInputCount(); got != tt.images {
-				t.Fatalf("image input count = %d, want %d", got, tt.images)
-			}
-			if got := plan.RuntimeInputs().HasMaskInput(); got != tt.hasMask {
-				t.Fatalf("has mask = %v, want %v", got, tt.hasMask)
-			}
-		})
-	}
-}
-
 func TestCompileFeatureExecutionPlanAppliesSelectableOutputParams(t *testing.T) {
 	count := 4
 	resolution := " 2K "
