@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 COMPONENTS = {
@@ -21,7 +22,13 @@ COMPONENTS = {
 }
 PLATFORM = "linux/arm64"
 ISSUER = "https://token.actions.githubusercontent.com"
-POLICY = "ideaboard-component-inputs-v2"
+POLICY = "ideaboard-component-inputs-v3"
+LEGACY_POLICY = "ideaboard-component-inputs-v2"
+# Audited execution-input closure at Ericsunsk/IdeaBoard@2908e14e2: shell
+# bodies/sources, action identities and input bindings. Scalar inputs and action
+# pins remain in the actual recipe fingerprint. Unknown dependencies build anew.
+# Read this evidence from each source commit so later audits preserve history.
+BUILD_INPUT_CLOSURE = "cbe21fdadcd0b678dbc78e8d46bb8dd6457902b69a214d6560713af1201dfa6b"
 COMPONENT_FIELDS = {"input_fingerprint", "source_commit", "source_tag", "source_ref", "source_run_id",
                     "certificate_identity", "certificate_oidc_issuer", "platform", "target", "image",
                     "name", "ref", "digest"}
@@ -69,19 +76,89 @@ def canonical_image(repository, name, image):
 
 
 def build_recipe(root, commit):
-    text = git(root, "show", f"{commit}:.github/workflows/docker-images.yml").decode()
-    # Include actual build setup, action pins, arguments and attestations. Deploy
-    # and scan/sign settings do not alter image bytes; they remain separate gates.
+    path = ".github/workflows/docker-images.yml"
+    text = git(root, "show", f"{commit}:{path}").decode()
     start = text.find("  publish-images:\n")
     end = text.find("  aggregate-release-manifest:\n", start)
+    if start < 0 or end <= start:
+        return None
+    block = text[start:end]
+    require("build-contexts:" not in block, "external build contexts cannot be reused")
+
+    # Take a continuous execution prefix, including workflow env/defaults,
+    # preflight, checkout and every setup step. Later scan/sign/metadata steps
+    # cannot change bytes already built. Derive the boundary from real steps;
+    # do not maintain a second list of build steps or introduce YAML markers.
+    builds = list(re.finditer(r"(?m)^      - name: Build and push image\n", block))
+    following = re.search(r"(?m)^      - ", block[builds[0].end():]) if len(builds) == 1 else None
+    boundary = start + builds[0].end() + following.start() if following else end
+    prefix = text[:boundary]
+    build = block[builds[0].start():boundary-start] if len(builds) == 1 else ""
+    steps = block.find("    steps:\n")
+    known = (len(builds) == 1 and following is not None
+             and re.search(r"(?m)^        uses: docker/build-push-action@[0-9a-f]{40}$", build)
+             and not re.search(r"(?m)^\s*(?:(?:- )?uses: \./|<<:)|[&*][A-Za-z_][A-Za-z_0-9-]*", prefix)
+             and steps >= 0
+             and not re.search(r"(?m)^    [A-Za-z_-]+:", block[steps+len("    steps:\n"):])
+             and not re.search(r"(?m)^(?:env|defaults):", text[boundary:])
+             and set(re.findall(r"needs\.([A-Za-z_0-9-]+)\.", prefix)) <= {"preflight"})
+
+    # Recognize a bounded, audited shell input closure instead of trying to
+    # infer arbitrary shell data flow. A new run or changed script may read any
+    # tracked file, so the conservative path below disables reuse entirely.
+    if not known:
+        return None
+    commands = list(re.finditer(r"(?m)^        run: ([^\n]*)\n((?:          [^\n]*\n|\n)*)", prefix))
+    if len(commands) != len(re.findall(r"(?m)^\s*(?:- )?run:", prefix)):
+        return None
+    actions = re.findall(r"(?m)^        uses: ([^\s]+)$", prefix)
+    if (len(actions) != len(re.findall(r"(?m)^\s*(?:- )?uses:", prefix))
+            or any(not re.fullmatch(r"[^@]+@[0-9a-f]{40}", action) for action in actions)):
+        return None
+    sources = sorted(set(re.findall(r"\bscripts/[A-Za-z0-9_./-]+", prefix)))
+    try:
+        scripts = {source: git(root, "show", f"{commit}:{source}").decode() for source in sources}
+        owner = git(root, "show", f"{commit}:scripts/release-artifacts.py").decode()
+    except subprocess.CalledProcessError:
+        return None
+    closure = {"run": [textwrap.dedent(command[2]).strip() if command[1] == "|"
+                       else command[1].strip() for command in commands], "scripts": scripts,
+               "actions": [action.rsplit("@", 1)[0] for action in actions],
+               "keys": re.findall(r"(?m)^( *)([A-Za-z_][A-Za-z_0-9-]*):", prefix),
+               "bindings": re.findall(r"\$\{\{\s*(.*?)\s*}}", prefix)}
+    encoded = json.dumps(closure, sort_keys=True, separators=(",", ":")).encode()
+    evidence = re.search(r'^BUILD_INPUT_CLOSURE = "([0-9a-f]{64})"$', owner, re.MULTILINE)
+    if evidence is None or hashlib.sha256(encoded).hexdigest() != evidence[1]:
+        return None
+    entries = git(root, "ls-tree", "-rz", "--full-tree", commit, "--",
+                  *sources, "scripts/release-artifacts.py")
+    return prefix.encode() + b"\0" + entries
+
+
+def legacy_fingerprint(root, commit, name):
+    # Historical schema-v2 manifests have no policy field. Keep their exact
+    # digest domain and recipe, so signed old and mixed releases still verify.
+    text = git(root, "show", f"{commit}:.github/workflows/docker-images.yml")
+    start = text.find(b"  publish-images:\n")
+    end = text.find(b"  aggregate-release-manifest:\n", start)
     require(start >= 0 and end > start, "unrecognized image build recipe")
     block = text[start:end]
-    require("      - name: Build and push image\n" in block, "missing canonical image build")
-    require("build-contexts:" not in block, "external build contexts cannot be reused")
-    return block.encode()
+    require(b"      - name: Build and push image\n" in block, "missing canonical image build")
+    require(b"build-contexts:" not in block, "external build contexts cannot be reused")
+    return component_fingerprint(root, commit, name, LEGACY_POLICY, block)
 
 
 def fingerprint(root, commit, name):
+    recipe = build_recipe(root, commit)
+    if recipe is None:
+        # Full tracked-source fallback stays verifiable, but make_plan never
+        # reuses it: unknown execution/data dependencies need a fresh build.
+        recipe = (git(root, "show", f"{commit}:.github/workflows/docker-images.yml") + b"\0"
+                  + git(root, "ls-tree", "-rz", "--full-tree", commit))
+    return component_fingerprint(root, commit, name, POLICY, recipe)
+
+
+def component_fingerprint(root, commit, name, policy, recipe):
     commit_exists(root, commit)
     require(name in COMPONENTS, "unknown component")
     _, context, target = COMPONENTS[name]
@@ -98,8 +175,8 @@ def fingerprint(root, commit, name):
         require(source is None or source.group(1) in stages or source.group(1).isdigit(),
                 "external Docker stage cannot be reused")
     h = hashlib.sha256()
-    for value in [POLICY.encode(), name.encode(), context.encode(), target.encode(), PLATFORM.encode(),
-                  build_recipe(root, commit), *entries]:
+    for value in [policy.encode(), name.encode(), context.encode(), target.encode(), PLATFORM.encode(),
+                  recipe, *entries]:
         h.update(len(value).to_bytes(8, "big"))
         h.update(value)
     if context in ("apps/auth", "apps/realtime"):
@@ -167,8 +244,14 @@ def validate_manifest(manifest, repository, commit=None, tag=None, root=None, al
             if not build_only:
                 source_tag_commit = git(root, "rev-parse", f"refs/tags/{source_tag}^{{commit}}").decode().strip()
                 require(source_tag_commit == source, "component source tag/commit mismatch")
-            require(item["input_fingerprint"] == fingerprint(root, source, name), "component source inputs mismatch")
-            require(item["input_fingerprint"] == fingerprint(root, target, name), "component release inputs changed")
+            recorded = item["input_fingerprint"]
+            if recorded == fingerprint(root, source, name):
+                require(source == target or (build_recipe(root, source) is not None
+                        and build_recipe(root, target) is not None), "unrecognized build inputs cannot be reused")
+                require(recorded == fingerprint(root, target, name), "component release inputs changed")
+            else:
+                require(recorded == legacy_fingerprint(root, source, name), "component source inputs mismatch")
+                require(recorded == legacy_fingerprint(root, target, name), "component release inputs changed")
     return manifest
 
 
@@ -199,11 +282,12 @@ def make_plan(root, repository, commit, tag, run_id, previous=None, ref=None):
             previous_components = {}
     components = {}
     matrix = []
+    reusable = build_recipe(root, commit) is not None
     for name, (display, context, target) in COMPONENTS.items():
         fp = fingerprint(root, commit, name)
         item = {**base_component(repository, commit, tag, run_id, name, fp, ref), "action": "build", "image": ""}
         candidate = previous_components.get(name)
-        if candidate and candidate["input_fingerprint"] == fp:
+        if reusable and candidate and candidate["input_fingerprint"] == fp:
             ancestor(root, candidate["source_commit"], commit)
             item = {**candidate, "action": "reuse"}
         components[name] = item
