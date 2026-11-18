@@ -31,6 +31,10 @@ reject_mutation .github/workflows/docker-images.yml '/      - preflight/d' 'Imag
 reject_mutation .github/workflows/docker-images.yml 's/persist-credentials: false/persist-credentials: true/' 'Release checkout must not persist credentials'
 reject_mutation .github/workflows/docker-images.yml '/          GH_TOKEN:/d' 'Release fetch must use the scoped GitHub token'
 reject_mutation .github/workflows/docker-images.yml 's#./scripts/prepare-release-plan.sh#./scripts/untrusted-plan.sh#' 'Release must authenticate prior component provenance before planning'
+reject_mutation .github/workflows/docker-images.yml 's/context: .*/context: apps\/other/' 'Image build context must match the component plan'
+reject_mutation .github/workflows/docker-images.yml 's/file: .*/file: apps\/other\/Dockerfile/' 'Image Dockerfile must match the component plan'
+reject_mutation .github/workflows/docker-images.yml 's/target: .*/target: other/' 'Image target must match the component plan'
+reject_mutation .github/workflows/docker-images.yml 's/platforms: linux\/arm64/platforms: linux\/amd64/' 'Image platform must match component provenance'
 reject_mutation .github/workflows/docker-images.yml "s/if: matrix.action == 'reuse'/if: false/" 'Reused components require signature verification'
 reject_mutation .github/workflows/docker-images.yml '/      - name: Scan linux\/arm64 image/a\
         if: false

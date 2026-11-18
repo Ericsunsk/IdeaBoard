@@ -28,20 +28,10 @@ class ReleaseArtifactsTests(unittest.TestCase):
         self.git("init", "-q")
         self.git("config", "user.name", "Fixture")
         self.git("config", "user.email", "fixture@example.invalid")
-        self.write(".github/workflows/docker-images.yml", """jobs:
-  publish-images:
-    steps:
-      - name: Set up QEMU
-        uses: setup@pinned
-      - name: Build and push image
-        with:
-          platforms: linux/arm64
-          provenance: mode=max
-  aggregate-release-manifest:
-    steps: []
-  deploy-production:
-    steps: []
-""")
+        self.workflow = (ENGINE.parent.parent / ".github/workflows/docker-images.yml").read_text()
+        self.write(".github/workflows/docker-images.yml", self.workflow)
+        for name in ("release-artifacts.py", "release-eligibility-check.sh", "prepare-release-plan.sh"):
+            self.write(f"scripts/{name}", (ENGINE.parent / name).read_text())
         self.write(".node-version", "22.23.2\n")
         for context in {value[1] for value in engine.COMPONENTS.values()}:
             self.write(f"{context}/Dockerfile", "FROM scratch AS runtime\nFROM scratch AS migrator\n")
@@ -111,9 +101,159 @@ class ReleaseArtifactsTests(unittest.TestCase):
 
     def test_deployment_only_workflow_change_does_not_change_inputs(self):
         workflow = self.root / ".github/workflows/docker-images.yml"
-        workflow.write_text(workflow.read_text().replace("  deploy-production:\n    steps: []", "  deploy-production:\n    steps: [changed]"))
+        workflow.write_text(workflow.read_text().replace("  deploy-production:\n", "  deploy-production:\n    name: Changed deploy display name\n"))
         second = self.commit("v1.0.1")
         self.assertEqual(set(self.actions(self.plan(second, "v1.0.1", self.previous)).values()), {"reuse"})
+
+    def test_actual_postbuild_scan_cache_sign_and_metadata_changes_reuse(self):
+        workflow = self.root / ".github/workflows/docker-images.yml"
+        mutations = [
+            ("name: Scan linux/arm64 image\n        timeout-minutes: 10", "name: Scan linux/arm64 image\n        timeout-minutes: 11"),
+            ("key: grype-db-v6-", "key: grype-db-v7-"),
+            ("run: cosign sign --yes", "run: cosign sign --yes --timeout 2m"),
+            ("name: ideaboard-${{ matrix.name }}-release-metadata", "name: changed-${{ matrix.name }}-release-metadata"),
+            ("name: Set up Grype\n        timeout-minutes: 5", "name: Set up Grype\n        timeout-minutes: 6"),
+        ]
+        for index, (before, after) in enumerate(mutations, 1):
+            with self.subTest(change=before):
+                self.assertIn(before, self.workflow)
+                workflow.write_text(self.workflow.replace(before, after))
+                commit = self.commit(f"v1.0.{index}")
+                plan = self.plan(commit, f"v1.0.{index}", self.previous)
+                self.assertEqual(set(self.actions(plan).values()), {"reuse"})
+                self.manifest(plan)
+
+    def test_actual_build_inputs_and_preflight_sources_invalidate(self):
+        workflow = self.root / ".github/workflows/docker-images.yml"
+        mutations = [
+            ("platforms: linux/arm64", "platforms: linux/amd64"),
+            ("context: ${{ matrix.context }}", "context: apps/other"),
+            ("target: ${{ matrix.target }}", "target: other"),
+            ("docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5", "docker/setup-buildx-action@" + "a" * 40),
+            ("actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10", "actions/checkout@" + "b" * 40),
+            ("provenance: mode=max", "provenance: mode=min"),
+            ("push: true", "build-args: REV=changed\n          push: true"),
+            ("env:\n", "env:\n  BUILD_FLAG: changed\n"),
+            ("runs-on: ubuntu-latest", "runs-on: ubuntu-24.04"),
+        ]
+        for index, (before, after) in enumerate(mutations, 1):
+            with self.subTest(change=before):
+                self.assertIn(before, self.workflow)
+                workflow.write_text(self.workflow.replace(before, after, 1))
+                commit = self.commit(f"v1.1.{index}")
+                plan = self.plan(commit, f"v1.1.{index}", self.previous)
+                self.assertEqual(set(self.actions(plan).values()), {"build"})
+        workflow.write_text(self.workflow)
+        for index, name in enumerate(("release-eligibility-check.sh", "prepare-release-plan.sh", "release-artifacts.py"), 1):
+            with self.subTest(source=name):
+                self.write(f"scripts/{name}", (ENGINE.parent / name).read_text() + "\n# changed policy\n")
+                commit = self.commit(f"v1.2.{index}")
+                self.assertEqual(set(self.actions(self.plan(commit, f"v1.2.{index}", self.previous)).values()), {"build"})
+
+    def test_unknown_layout_and_local_actions_build_without_reuse(self):
+        workflow = self.root / ".github/workflows/docker-images.yml"
+        mutations = [
+            self.workflow.replace("        shell: bash", "        shell: bash -c 'source build-env.sh; bash {0}'", 1),
+            self.workflow.replace("if: matrix.action == 'build'", "if: hashFiles('build-input.txt') != ''", 1),
+            self.workflow.replace("      - name: Set up QEMU", "      - {name: custom, run: cat build-args.txt}\n      - name: Set up QEMU"),
+            self.workflow.replace("      - name: Set up QEMU", '      - "name": custom\n        "run": cat build-args.txt\n      - name: Set up QEMU'),
+            self.workflow.replace("      - name: Set up QEMU", "      - ? run\n        : cat build-args.txt\n      - name: Set up QEMU"),
+            self.workflow.replace("  aggregate-release-manifest:\n", '    "env": {BUILD_FLAG: later}\n\n  aggregate-release-manifest:\n'),
+            self.workflow.replace("      - name: Build and push image", "      - name: Renamed image build"),
+            self.workflow.replace("  publish-images:", "  renamed-images:"),
+            self.workflow.replace("      - name: Set up QEMU", '      - run: cat build-args.txt >> "$GITHUB_ENV"\n      - name: Set up QEMU'),
+            self.workflow.replace("      - name: Set up QEMU", "      - uses: org/custom-build@" + "d" * 40 + "\n      - name: Set up QEMU"),
+            self.workflow.replace("docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5\n", "docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5\n        with:\n          config: ./buildkitd.toml\n"),
+            self.workflow.replace("      - name: Set up QEMU", "      - uses: ./.github/actions/custom-build\n      - name: Set up QEMU"),
+            self.workflow.replace("      - name: Resolve immutable component image", "    env:\n      BUILD_FLAG: later\n      - name: Resolve immutable component image"),
+            self.workflow.replace("docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8", "custom/build-action@" + "c" * 40),
+        ]
+        for index, mutation in enumerate(mutations, 1):
+            with self.subTest(layout=index):
+                workflow.write_text(mutation)
+                commit = self.commit(f"v1.3.{index}")
+                self.assertIsNone(engine.build_recipe(self.root, commit))
+                plan = self.plan(commit, f"v1.3.{index}", self.previous)
+                self.assertEqual(set(self.actions(plan).values()), {"build"})
+                manifest = self.manifest(plan)
+                # Even identical unknown inputs cannot authorize image reuse.
+                again = self.plan(commit, f"v1.3.{index}", manifest)
+                self.assertEqual(set(self.actions(again).values()), {"build"})
+                before = engine.fingerprint(self.root, commit, "api")
+                self.write("custom/build-data", str(index))
+                other = self.commit(f"v1.4.{index}")
+                self.assertNotEqual(before, engine.fingerprint(self.root, other, "api"))
+
+    def test_changed_shell_or_new_helper_disables_reuse(self):
+        planner = self.root / "scripts/prepare-release-plan.sh"
+        planner.write_text(planner.read_text() + '\n"$script_dir/plan-helper.sh"\n')
+        self.write("scripts/plan-helper.sh", "echo first\n")
+        commit = self.commit("v1.5.0")
+        self.assertIsNone(engine.build_recipe(self.root, commit))
+        baseline = self.manifest(self.plan(commit, "v1.5.0"))
+        self.write("scripts/plan-helper.sh", "echo changed\n")
+        other = self.commit("v1.5.1")
+        self.assertEqual(set(self.actions(self.plan(other, "v1.5.1", baseline)).values()), {"build"})
+        planner.write_text(planner.read_text() + '\nsource "$UNKNOWN_HELPER"\n')
+        unknown = self.commit("v1.5.2")
+        self.assertIsNone(engine.build_recipe(self.root, unknown))
+
+    def test_existing_setup_pin_and_build_scalar_reuse_after_rebuild(self):
+        workflow = self.root / ".github/workflows/docker-images.yml"
+        workflow.write_text(self.workflow.replace("docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5", "docker/setup-buildx-action@" + "a" * 40)
+                            .replace("provenance: mode=max", "provenance: mode=min"))
+        second = self.commit("v1.7.0")
+        self.assertIsNotNone(engine.build_recipe(self.root, second))
+        plan = self.plan(second, "v1.7.0", self.previous)
+        self.assertEqual(set(self.actions(plan).values()), {"build"})
+        previous = self.manifest(plan)
+        self.write("deploy/only", "new deploy\n")
+        third = self.commit("v1.7.1")
+        self.assertEqual(set(self.actions(self.plan(third, "v1.7.1", previous)).values()), {"reuse"})
+
+    def test_historical_v3_recognition_uses_source_commit_evidence(self):
+        before = engine.fingerprint(self.root, self.first, "api")
+        owner = self.root / "scripts/release-artifacts.py"
+        owner.write_text(owner.read_text().replace(engine.BUILD_INPUT_CLOSURE, "f" * 64))
+        unknown = self.commit("v1.8.0")
+        self.assertIsNone(engine.build_recipe(self.root, unknown))
+        historical_unknown = self.manifest(self.plan(unknown, "v1.8.0"))
+        owner.write_text(ENGINE.read_text() + "\n# later audited source\n")
+        later = self.commit("v1.8.1")
+        self.assertIsNotNone(engine.build_recipe(self.root, later))
+        original_evidence = engine.BUILD_INPUT_CLOSURE
+        try:
+            engine.BUILD_INPUT_CLOSURE = "e" * 64
+            self.assertEqual(before, engine.fingerprint(self.root, self.first, "api"))
+            engine.validate_manifest(self.previous, REPOSITORY, root=self.root)
+            engine.validate_manifest(historical_unknown, REPOSITORY, root=self.root)
+        finally:
+            engine.BUILD_INPUT_CLOSURE = original_evidence
+
+    def test_historical_v2_manifest_still_validates_but_rebuilds_on_v3(self):
+        legacy = copy.deepcopy(self.previous)
+        for name, item in legacy["components"].items():
+            item["input_fingerprint"] = engine.legacy_fingerprint(self.root, self.first, name)
+        engine.validate_manifest(legacy, REPOSITORY, root=self.root)
+        self.write("deploy/only", "changed deployment\n")
+        second = self.commit("v1.6.0")
+        # A historical v2 reused release remains verifiable under v3 tooling.
+        historical = copy.deepcopy(legacy)
+        historical.update(commit=second, tag="v1.6.0", ref="refs/tags/v1.6.0")
+        historical["cosign"]["certificate_identity"] = engine.identity(REPOSITORY, historical["ref"])
+        engine.validate_manifest(historical, REPOSITORY, root=self.root)
+        self.assertEqual(set(self.actions(self.plan(second, "v1.6.0", legacy)).values()), {"build"})
+        mixed = copy.deepcopy(legacy)
+        mixed["components"]["api"] = copy.deepcopy(self.previous["components"]["api"])
+        engine.validate_manifest(mixed, REPOSITORY, root=self.root)
+        workflow = self.root / ".github/workflows/docker-images.yml"
+        workflow.write_text(self.workflow.replace("name: Scan linux/arm64 image\n        timeout-minutes: 10", "name: Scan linux/arm64 image\n        timeout-minutes: 11"))
+        third = self.commit("v1.6.1")
+        historical.update(commit=third, tag="v1.6.1", ref="refs/tags/v1.6.1")
+        historical["cosign"]["certificate_identity"] = engine.identity(REPOSITORY, historical["ref"])
+        # v3-equivalent target does not make a changed v2 recipe equivalent.
+        with self.assertRaisesRegex(ValueError, "component release inputs changed"):
+            engine.validate_manifest(historical, REPOSITORY, root=self.root)
 
     def test_invalid_or_legacy_optional_candidate_builds_all(self):
         second = self.commit("v1.0.1")

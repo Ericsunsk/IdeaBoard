@@ -121,6 +121,8 @@ VPS: installed verifier → strict signature/content checks → versioned bundle
 
 每个 component 的 build-input fingerprint 覆盖 tracked build context、Dockerfile/ignore、target/platform 和构建步骤，Auth/Realtime 还覆盖 canonical Node pin。只有上一成功发布的 source run、tag→commit、ancestry、相同输入与精确 Cosign signer identity 都可信时，才复用 immutable digest；证据不足则重新构建。五张 image 全部通过最新 Grype database 的 High/Critical gate 后生成 schema v2 `release-manifest.json`。新建 image 使用 keyless OIDC 签名；复用 image 保留原始 signer。当前 Production 使用 `linux/arm64`。BuildKit provenance 与 SBOM 保存在 image attestations。
 
+Component fingerprint 的 v3 policy 连续覆盖 workflow 全局配置、preflight、checkout/setup 与真实 build，排除 build 完成后的 scan、签名和 metadata 步骤。当前已核对的 inline shell、引用脚本、action identity 与输入 bindings 由 source commit 内 `release-artifacts.py` 的 `BUILD_INPUT_CLOSURE` 记录；原有 action pin 和 scalar build input 改动自动改变 fingerprint。新增任意 shell、action 或外部文件输入无法证明闭包时，使用完整 tracked tree 指纹并禁用 reuse，仍正常构建；重新启用前须审核实际依赖并更新该 source 的闭包证据，不自动刷新。历史 v2/v3 metadata 继续按原 source 的算法与证据验证；v2 → v3 首次规划保守重建五张 image，后续相同输入才复用。每个 digest 的 fresh Grype DB、High/Critical scan、精确签名和可信 provenance 门禁保持必需。
+
 Production 发布产出三个不可拆分的 GitHub Release assets：
 
 - `release-manifest.json`：发布 repository/tag/ref/commit/run，以及 API、API migrator、Auth、Auth migrator、Realtime 的 immutable digest 和每个 component 的 source/fingerprint/signer。

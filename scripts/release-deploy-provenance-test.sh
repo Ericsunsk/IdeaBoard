@@ -19,7 +19,9 @@ def write(name,text):
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(text)
 git('init','-q');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid')
-write('.github/workflows/docker-images.yml','jobs:\n  publish-images:\n    steps:\n      - name: Build and push image\n        uses: fixture\n  aggregate-release-manifest:\n    steps: []\n')
+write('.github/workflows/docker-images.yml',(root/'.github/workflows/docker-images.yml').read_text())
+for name in ('release-eligibility-check.sh','prepare-release-plan.sh'):
+    write('scripts/'+name,(root/'scripts'/name).read_text())
 write('.node-version','22\n')
 for context in {v[1] for v in engine.COMPONENTS.values()}:
     write(context+'/Dockerfile','FROM scratch AS runtime\nFROM scratch AS migrator\n')
