@@ -184,7 +184,6 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ runner.temp }}/grype-db
-          lookup-only: true
           key: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-${{ steps.grype-cache.outputs.date }}
           restore-keys: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-
 

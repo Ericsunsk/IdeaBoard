@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 # Lint and type checks run independently; npm run lint remains the local entry.
-# Unit and browser shards produce unique blob reports for their merge jobs.
+# Unit and browser shards retain unique blob reports as debugging artifacts.
 # Bundle reports are generated on budget success or failure for PR comments.
 
 jobs:
@@ -224,33 +224,6 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  unit-merge:
-    name: Web Unit Report
-    needs: [unit]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          ref: ${{ inputs.head_sha || github.sha }}
-      - uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: apps/web/package-lock.json
-      - uses: ./.github/actions/npm-ci
-        with:
-          working-directory: apps/web
-      - name: Download shard blob reports
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          pattern: vitest-blob-unit-*-of-*
-          path: apps/web/.vitest-merge/unit
-          merge-multiple: true
-      - name: Merge shard reports
-        working-directory: apps/web
-        run: npm run test:merge-reports -- ./.vitest-merge/unit
-
   browser:
     name: Web Browser (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
@@ -285,35 +258,6 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  browser-merge:
-    name: Web Browser Report
-    needs: [browser]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Match the shards' /github/workspace root so blob paths resolve on merge.
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          ref: ${{ inputs.head_sha || github.sha }}
-      - uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: apps/web/package-lock.json
-      - uses: ./.github/actions/npm-ci
-        with:
-          working-directory: apps/web
-      - name: Download shard blob reports
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          pattern: vitest-blob-browser-*-of-2
-          path: apps/web/.vitest-merge/browser
-          merge-multiple: true
-      - name: Merge shard reports
-        working-directory: apps/web
-        run: npm run test:browser:merge -- ./.vitest-merge/browser
-
   build:
     name: Web Build
     runs-on: ubuntu-latest
@@ -340,7 +284,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Build
         working-directory: apps/web
-        run: npm run build
+        run: npx vite build && npm run bundle:size:check
       - name: Upload bundle report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

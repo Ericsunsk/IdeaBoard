@@ -72,4 +72,85 @@ reject_mutation .github/workflows/web.yml 's/CI_FORCE_FULL: .*/CI_FORCE_FULL: fa
 reject_mutation .github/workflows/api.yml "s/ATLAS_BASE_SHA: .*/ATLAS_BASE_SHA: \${{ github.event.before }}/" 'Migration review must use the cumulative verified baseline'
 reject_mutation .github/workflows/api.yml "/- name: Check for breaking OpenAPI changes/,/^  static-contracts:/s/BASE_SHA: .*/BASE_SHA: \${{ github.event.before }}/" 'OpenAPI review must use the cumulative verified baseline'
 reject_mutation .github/workflows/api.yml '/A verified ancestor base SHA is required for OpenAPI review/d' 'OpenAPI review must reject missing or invalid comparison history'
+# Restoring cache bytes is compatible with both omitted and explicit false lookup-only.
+sed '/          path: .*grype-db/a\
+          lookup-only: false
+' "${root}/.github/workflows/docker-images.yml" > "${fixture_root}/.github/workflows/docker-images.yml"
+(cd "${fixture_root}/apps/api" && "${fixture_dir}/checker")
+cp "${root}/.github/workflows/docker-images.yml" "${fixture_root}/.github/workflows/docker-images.yml"
+reject_mutation .github/workflows/docker-images.yml '/          path: .*grype-db/a\
+          lookup-only: true
+' 'Grype cache must restore database bytes'
+reject_mutation .github/workflows/docker-images.yml 's/run: grype db update/run: grype version/' 'Every digest must refresh the vulnerability database even after a cache hit'
+reject_mutation .github/workflows/docker-images.yml '/      - name: Update Grype vulnerability database/a\
+        if: false
+' 'Every built or reused image must pass the current vulnerability scan'
+reject_mutation .github/workflows/docker-images.yml '/      - name: Update Grype vulnerability database/a\
+        continue-on-error: true
+' 'Image security failures must block release'
+reject_mutation .github/workflows/docker-images.yml 's/--fail-on high/--fail-on critical/' 'Every digest must pass the High/Critical scan'
+reject_mutation .github/workflows/docker-images.yml '/      - name: Scan linux\/arm64 image/a\
+        continue-on-error: true
+' 'Image security failures must block release'
+reject_mutation .github/workflows/docker-images.yml 's#GRYPE_DB_CACHE_DIR: .*#GRYPE_DB_CACHE_DIR: /tmp/uncached-db#' 'Grype cache and scans must share the database directory'
+# Keep all commands intact while moving the scan ahead of its database refresh.
+python3 - "${fixture_root}/.github/workflows/docker-images.yml" <<'PYTHON'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+source = path.read_text()
+update = source.index("      - name: Update Grype vulnerability database\n")
+scan = source.index("      - name: Scan linux/arm64 image\n")
+sign = source.index("      - name: Sign image digest\n")
+path.write_text(source[:update] + source[scan:sign] + source[update:scan] + source[sign:])
+PYTHON
+if (cd "${fixture_root}/apps/api" && "${fixture_dir}/checker") > "${fixture_dir}/failure.log" 2>&1; then
+  echo 'CI workflow contract accepted scan before DB update' >&2
+  exit 1
+fi
+grep -Fq 'Image signing must follow a fresh database update and successful scan' "${fixture_dir}/failure.log"
+cp "${root}/.github/workflows/docker-images.yml" "${fixture_root}/.github/workflows/docker-images.yml"
+reject_mutation .github/workflows/ci.yml 's/needs: \[changes, web, api/needs: [changes, api/' 'CI Gate must depend on aggregate Web verification'
+reject_mutation .github/workflows/ci.yml '/          WEB_RESULT:/d' 'CI Gate must receive the aggregate Web result'
+reject_mutation .github/workflows/web.yml '/^  typecheck-app:/,/^  typecheck-node:/{ /^  typecheck-node:/!d; }' 'Missing required Web verification job: typecheck-app'
+reject_mutation .github/workflows/web.yml '/^  unit:/a\
+    if: false
+' 'Required Web verification jobs must not be skipped'
+reject_mutation .github/workflows/web.yml '/^  browser:/a\
+    continue-on-error: true
+' 'Required Web verification jobs must propagate failures'
+reject_mutation .github/workflows/web.yml 's/run: npm run typecheck:app/run: true/' 'Missing workflow command: npm run typecheck:app'
+reject_mutation .github/workflows/web.yml 's/run: npm run test:typecheck/run: true/' 'Missing workflow command: npm run test:typecheck'
+reject_mutation .github/workflows/web.yml '/      - name: Typecheck node project/a\
+        continue-on-error: true
+' 'Web typecheck and build steps must propagate failures'
+reject_mutation .github/workflows/web.yml 's/npx vite build \&\& npm run bundle:size:check/npx vite build/' 'Web CI build must bundle and enforce its budget without repeating typechecks'
+reject_mutation .github/workflows/web.yml 's/fail-fast: false/fail-fast: true/' 'Web shards must all complete'
+reject_mutation .github/workflows/web.yml 's/shard: \[1, 2\]/shard: [1]/' 'Web browser must run both shards'
+reject_mutation .github/workflows/web.yml '/      - name: Unit tests (shard)/a\
+        continue-on-error: true
+' 'Web test shards must propagate failures'
+reject_mutation .github/workflows/web.yml '/      - name: Browser tests (shard)/a\
+        if: false
+' 'Web test shards must not be skipped'
+reject_mutation .github/workflows/web.yml '/      - name: Upload shard blob report/a\
+        continue-on-error: true
+' 'Missing Web shard reports must fail verification'
+reject_mutation .github/workflows/web.yml 's/if-no-files-found: error/if-no-files-found: warn/' 'Missing Web shard reports must fail verification'
+reject_mutation .github/workflows/web.yml '/      - name: Upload shard blob report/,+1s/always()/success()/' 'Web shard reports must survive failed tests'
+reject_mutation .github/workflows/web.yml 's/name: vitest-blob-unit-.*/name: vitest-blob-unit/' 'Web shard report artifacts must have unique names'
+reject_mutation .github/workflows/web.yml '/      - name: Plan unit tests/a\
+        if: false
+' 'Web planning must not be skipped'
+reject_mutation .github/workflows/ci.yml '/^  ci-gate:/a\
+    continue-on-error: true
+' 'CI Gate failures must block CI'
+reject_mutation .github/workflows/ci.yml '/      - name: Summarize and verify required lanes/a\
+        continue-on-error: true
+' 'CI Gate policy failures must block CI'
+reject_mutation .github/workflows/web.yml '/        shard: \[1, 2\]/a\
+        exclude: [{shard: 2}]
+' 'Web browser must not omit shards'
+reject_mutation .github/workflows/web.yml '/run: npm run test:browser --/s/$/ || true/' 'Web browser must execute each shard and propagate failures'
+reject_mutation .github/workflows/web.yml '/      - name: Upload shard blob report/,+3s#actions/upload-artifact@#actions/download-artifact@#' 'Web shard reports must use the pinned artifact uploader'
 echo 'CI workflow negative fixtures passed'
