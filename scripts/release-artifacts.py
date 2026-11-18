@@ -25,10 +25,11 @@ ISSUER = "https://token.actions.githubusercontent.com"
 POLICY = "ideaboard-component-inputs-v3"
 LEGACY_POLICY = "ideaboard-component-inputs-v2"
 # Audited execution-input closure at Ericsunsk/IdeaBoard@2908e14e2: shell
-# bodies/sources, action identities and input bindings. Scalar inputs and action
+# bodies/interpreters/conditions/sources, action identities and input bindings.
+# Scalar build inputs and action
 # pins remain in the actual recipe fingerprint. Unknown dependencies build anew.
 # Read this evidence from each source commit so later audits preserve history.
-BUILD_INPUT_CLOSURE = "cbe21fdadcd0b678dbc78e8d46bb8dd6457902b69a214d6560713af1201dfa6b"
+BUILD_INPUT_CLOSURE = "b7d977f62859c79fe5ac60c5e2ae06619d75e51c0f8a4d82efaf5dc6680e35d9"
 COMPONENT_FIELDS = {"input_fingerprint", "source_commit", "source_tag", "source_ref", "source_run_id",
                     "certificate_identity", "certificate_oidc_issuer", "platform", "target", "image",
                     "name", "ref", "digest"}
@@ -75,6 +76,37 @@ def canonical_image(repository, name, image):
             and FINGERPRINT.fullmatch(image[len(prefix):]), "invalid component image digest")
 
 
+def plain_workflow_structure(text):
+    """Recognize the supported block YAML; never interpret unknown mappings."""
+    literal_indent = None
+    parents = {}
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if literal_indent is not None and indent > literal_indent:
+            continue
+        literal_indent = None
+        value = line[indent:]
+        mapping = re.fullmatch(r"(?:- )?([A-Za-z_][A-Za-z_0-9-]*):(?: (.*))?", value)
+        if mapping is None:
+            if (parents.get(indent - 2) in ("tags", "needs")
+                    and re.fullmatch(r"- (?:[A-Za-z_][A-Za-z_0-9-]*|'[^']*'|\"[^\"]*\")", value)):
+                continue
+            return False
+        key, scalar = mapping[1], mapping[2] or ""
+        if indent % 2 or scalar.startswith(("&", "*", "{")):
+            return False
+        if scalar.startswith("[") and not (key == "needs" and re.fullmatch(
+                r"\[[A-Za-z_][A-Za-z_0-9-]*(?:, *[A-Za-z_][A-Za-z_0-9-]*)*\]", scalar)):
+            return False
+        parents = {level: name for level, name in parents.items() if level < indent}
+        parents[indent] = key
+        if scalar in ("|", ">", "|-", ">-"):
+            literal_indent = indent
+    return True
+
+
 def build_recipe(root, commit):
     path = ".github/workflows/docker-images.yml"
     text = git(root, "show", f"{commit}:{path}").decode()
@@ -97,7 +129,7 @@ def build_recipe(root, commit):
     steps = block.find("    steps:\n")
     known = (len(builds) == 1 and following is not None
              and re.search(r"(?m)^        uses: docker/build-push-action@[0-9a-f]{40}$", build)
-             and not re.search(r"(?m)^\s*(?:(?:- )?uses: \./|<<:)|[&*][A-Za-z_][A-Za-z_0-9-]*", prefix)
+             and plain_workflow_structure(text)
              and steps >= 0
              and not re.search(r"(?m)^    [A-Za-z_-]+:", block[steps+len("    steps:\n"):])
              and not re.search(r"(?m)^(?:env|defaults):", text[boundary:])
@@ -108,8 +140,8 @@ def build_recipe(root, commit):
     # tracked file, so the conservative path below disables reuse entirely.
     if not known:
         return None
-    commands = list(re.finditer(r"(?m)^        run: ([^\n]*)\n((?:          [^\n]*\n|\n)*)", prefix))
-    if len(commands) != len(re.findall(r"(?m)^\s*(?:- )?run:", prefix)):
+    commands = list(re.finditer(r"(?m)^        (?:run|shell|if): ([^\n]*)\n((?:          [^\n]*\n|\n)*)", prefix))
+    if len(commands) != len(re.findall(r"(?m)^\s*(?:- )?(?:run|shell|if):", prefix)):
         return None
     actions = re.findall(r"(?m)^        uses: ([^\s]+)$", prefix)
     if (len(actions) != len(re.findall(r"(?m)^\s*(?:- )?uses:", prefix))

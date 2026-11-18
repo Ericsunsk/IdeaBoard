@@ -153,6 +153,12 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def test_unknown_layout_and_local_actions_build_without_reuse(self):
         workflow = self.root / ".github/workflows/docker-images.yml"
         mutations = [
+            self.workflow.replace("        shell: bash", "        shell: bash -c 'source build-env.sh; bash {0}'", 1),
+            self.workflow.replace("if: matrix.action == 'build'", "if: hashFiles('build-input.txt') != ''", 1),
+            self.workflow.replace("      - name: Set up QEMU", "      - {name: custom, run: cat build-args.txt}\n      - name: Set up QEMU"),
+            self.workflow.replace("      - name: Set up QEMU", '      - "name": custom\n        "run": cat build-args.txt\n      - name: Set up QEMU'),
+            self.workflow.replace("      - name: Set up QEMU", "      - ? run\n        : cat build-args.txt\n      - name: Set up QEMU"),
+            self.workflow.replace("  aggregate-release-manifest:\n", '    "env": {BUILD_FLAG: later}\n\n  aggregate-release-manifest:\n'),
             self.workflow.replace("      - name: Build and push image", "      - name: Renamed image build"),
             self.workflow.replace("  publish-images:", "  renamed-images:"),
             self.workflow.replace("      - name: Set up QEMU", '      - run: cat build-args.txt >> "$GITHUB_ENV"\n      - name: Set up QEMU'),
