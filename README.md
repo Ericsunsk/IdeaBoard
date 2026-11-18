@@ -170,58 +170,17 @@ sequenceDiagram
 > [!TIP]
 > **环境要求**：Node.js（见根目录 `.node-version`）| Go（见 `apps/api/go.mod`）| PostgreSQL `>= 17`
 
-<details open>
-<summary><b>1️⃣ 启动本地数据库与依赖 (Docker Compose)</b></summary>
+首次运行前，请按 [DEVELOPMENT.md 的本地开发说明](./DEVELOPMENT.md#本地开发) 准备 Docker、process-compose、Atlas 和 Infisical CLI，安装各应用依赖，完成 Infisical `dev` 登录与配置，并准备本机 `docker/migration.env`（owner credentials 须与本地 PostgreSQL 一致）。AI Proxy 的本地 bindings 按 [AI Proxy 运行说明](./apps/ai-proxy/README.md#运行与验证) 生成。
+
+`docker/.env` 已加密并跟踪在 Git 中，不要用 `.env.example` 覆盖或直接 `source`。Secret 配置和手动排障步骤统一见上述开发说明。
+
+在仓库根目录启动全栈（dashboard 使用 `8081`，避开 imgproxy 的 `8080`）：
 
 ```bash
-cd docker
-cp .env.example .env
-cp migration.env.example migration.env
-docker compose -f compose.local.yml up -d
+PC_PORT_NUM=8081 process-compose up
 ```
-</details>
 
-<details open>
-<summary><b>2️⃣ 初始化数据库 Schema 与 Auth 服务</b></summary>
-
-```bash
-# 初始化 Go API Schema（Atlas + River/权限 finalize）
-cd apps/api && cp .env.example .env
-set -a && source ../../docker/.env && source ../../docker/migration.env && set +a
-go run ./cmd migrate
-
-# 初始化并启动 Auth 服务
-cd ../auth && cp .env.example .env
-npm install
-set -a && source ../../docker/migration.env && set +a
-npm run migrate && npm run dev
-```
-</details>
-
-<details open>
-<summary><b>3️⃣ 启动 Go API 与 Web 前端</b></summary>
-
-```bash
-# 启动 Go API Backend (端口 :6000)
-cd apps/api && go run ./cmd
-
-# 启动 Web 前端 (端口 :5173)
-cd apps/web && npm install && npm run dev
-```
-</details>
-
-<details>
-<summary>🔑 <b>点击展开：初始化超级管理员账号命令</b></summary>
-
-```bash
-cd apps/api
-INIT_ADMIN_EMAIL='admin@ideaboard.art' \
-INIT_ADMIN_DISPLAY_NAME='Admin' \
-INIT_ADMIN_PASSWORD='your-strong-password' \
-  go run ./cmd init-admin
-```
-*注：`INIT_ADMIN_PASSWORD` 必须为 10–128 个字符；命令执行前 Auth Service 必须已启动。*
-</details>
+该入口自动启动本地依赖，依次完成 API → Auth migration，成功后启动 API、Auth、Realtime 和 Web；AI Proxy 独立启动。初始化管理员见 [DEVELOPMENT.md](./DEVELOPMENT.md#本地开发)。
 
 ---
 
