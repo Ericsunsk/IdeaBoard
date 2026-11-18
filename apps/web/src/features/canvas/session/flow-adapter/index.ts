@@ -58,6 +58,7 @@ export {
   parseFlowNodeId,
 } from './projection/flowSnapshotAdapter'
 export { bindCanvasGraphSessionProjection } from './projection/bindCanvasGraphSessionProjection'
+export { projectCanvasNodeReplacement } from './projection/canvasGraphCommitProjection'
 export {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
