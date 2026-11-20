@@ -154,6 +154,8 @@ export default {
     enterPromptFirst: '먼저 프롬프트를 입력하세요.',
     tooManyReferenceImages: '프롬프트 노드는 최대 4개의 참조 이미지를 지원합니다.',
     referenceImageMissingUrl: '참조 이미지에 URL이 없습니다.',
+    referenceImageMissingAsset:
+      '참조 이미지가 아직 업로드된 에셋이 없습니다. 업로드가 끝나기를 기다리거나 제거 후 다시 시도하세요.',
     fusionNodeMissing: '퓨전 노드를 찾을 수 없습니다.',
     fusionNeedsTwoImages: '퓨전은 최소 2개의 이미지가 필요합니다.',
     fusionInputsInvalid: '퓨전 입력 이미지가 올바르지 않습니다.',

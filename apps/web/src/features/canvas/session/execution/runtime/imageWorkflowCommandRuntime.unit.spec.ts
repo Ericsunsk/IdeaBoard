@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PromptAspectRatio } from '../../../../board'
+import { CanvasWorkspaceTaskUnmappableError } from '../workspace/canvasTaskContractMapping'
 import type {
   ActivatedImageExecutionPlan,
   ImageExecutionPlan,
@@ -78,5 +79,30 @@ describe('imageWorkflowCommandRuntime', () => {
     expect(secondPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
     if (!firstPlan || !secondPlan) throw new Error('expected two execution plans')
     expect(firstPlan.activationId).not.toBe(secondPlan.activationId)
+  })
+
+  it('warns instead of throwing when reference images lack asset backing', async () => {
+    const { commands, workflow, onWarning } = createCommandHarness()
+    const unmappable = new CanvasWorkspaceTaskUnmappableError(
+      'media-ids',
+      'Canvas execution requires an asset-backed image so media_asset_ids is populated.',
+    )
+    ;(workflow.executeImageWorkflow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(unmappable)
+
+    await commands.runGeneration('prompt-1', [], 'draft', 1, 'auto')
+
+    expect(onWarning).toHaveBeenCalledTimes(1)
+    expect(onWarning).toHaveBeenCalledWith(expect.stringContaining('asset'))
+  })
+
+  it('rethrows non-planning execution failures after warning plumbing', async () => {
+    const { commands, workflow, onWarning } = createCommandHarness()
+    const transportError = new Error('network down')
+    ;(workflow.executeImageWorkflow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(transportError)
+
+    await expect(commands.runGeneration('prompt-1', [], 'draft', 1, 'auto')).rejects.toBe(
+      transportError,
+    )
+    expect(onWarning).not.toHaveBeenCalled()
   })
 })

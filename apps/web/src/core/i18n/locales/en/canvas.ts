@@ -150,6 +150,8 @@ export default {
     enterPromptFirst: 'Enter a prompt first.',
     tooManyReferenceImages: 'Prompt nodes support up to 4 reference images.',
     referenceImageMissingUrl: 'A reference image is missing its URL.',
+    referenceImageMissingAsset:
+      'A reference image is not backed by an uploaded asset yet. Wait for the upload or remove it and retry.',
     fusionNodeMissing: 'Fusion node not found.',
     fusionNeedsTwoImages: 'Fusion needs at least 2 images.',
     fusionInputsInvalid: 'Fusion input images are invalid.',

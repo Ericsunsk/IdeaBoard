@@ -158,6 +158,8 @@ export default {
     enterPromptFirst: 'Introduzca una indicación primero.',
     tooManyReferenceImages: 'Los nodos de indicación admiten hasta 4 imágenes de referencia.',
     referenceImageMissingUrl: 'Falta la URL de una imagen de referencia.',
+    referenceImageMissingAsset:
+      'Una imagen de referencia aún no tiene un recurso disponible. Espera a que termine la subida o quítala e inténtalo de nuevo.',
     fusionNodeMissing: 'Nodo de fusión no encontrado.',
     fusionNeedsTwoImages: 'La fusión necesita al menos 2 imágenes.',
     fusionInputsInvalid: 'Las imágenes de entrada de fusión no son válidas.',

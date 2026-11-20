@@ -147,6 +147,7 @@ export default {
     enterPromptFirst: '请先输入提示词。',
     tooManyReferenceImages: '提示词节点最多支持 4 张参考图。',
     referenceImageMissingUrl: '参考图缺少图片链接。',
+    referenceImageMissingAsset: '参考图尚未上传为可用素材，请等待上传完成或移除后重试。',
     fusionNodeMissing: '融合节点不存在。',
     fusionNeedsTwoImages: '融合至少需要 2 张图片。',
     fusionInputsInvalid: '融合输入图片无效。',

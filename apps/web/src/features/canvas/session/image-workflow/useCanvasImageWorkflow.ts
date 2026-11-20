@@ -193,6 +193,7 @@ export function useCanvasImageWorkflow(
     cancelFlowOutpaintMode: outpaint.cancelOutpaintMode,
     cancelFlowInpaintMode: imageTools.commands.lifecycle.cancel,
     getMediaInputImages: graph.getMediaInputImages,
+    onWarning: (message) => options.feedback.taskExecution.warning(message),
     runGeneration: execution.runGeneration,
   })
   const outpaintInteractions = useFlowOutpaintInteractionHandlers({

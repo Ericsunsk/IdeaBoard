@@ -9,6 +9,10 @@ import {
 import type { OutpaintRect } from '../../../tools/outpaint/core'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
 import { i18n } from '../../../../../core/i18n'
+import {
+  isCanvasWorkspaceTaskUnmappableError,
+  type CanvasWorkspaceTaskUnmappableError,
+} from '../workspace/canvasTaskContractMapping'
 
 type RunImageDirectActionOptions = {
   prompt?: string
@@ -85,7 +89,22 @@ export type ImageWorkflowCommands = {
   ) => Promise<void>
 }
 
+function unmappableWarningCopy(error: CanvasWorkspaceTaskUnmappableError): string {
+  // Reference images that point at plain URLs or in-flight uploads have no
+  // durable asset identity: tell the user what to do instead of echoing the
+  // wire-shaped English message. Other reasons keep the fail-closed message
+  // verbatim (same contract as the execution runner's warning copy).
+  if (error.reason === 'media-ids' || error.reason === 'media-urls') {
+    return i18n.global.t('canvas.execution.referenceImageMissingAsset')
+  }
+  return error.message
+}
+
 function warnPlanningError(error: unknown, onWarning: (message: string) => void): boolean {
+  if (isCanvasWorkspaceTaskUnmappableError(error)) {
+    onWarning(unmappableWarningCopy(error))
+    return true
+  }
   if (!isImageExecutionPlanError(error)) return false
   onWarning(error.message)
   return true
