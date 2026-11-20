@@ -11022,6 +11022,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/image-workflow/generationIntent.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11317,9 +11322,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 149,
+      "measuredFanIn": 150,
       "measuredFanOut": 7,
-      "targetFanIn": 149,
+      "targetFanIn": 150,
       "targetFanOut": 7,
       "ownershipScope": [
         "src/core/i18n/"
