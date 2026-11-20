@@ -20,3 +20,64 @@ ignore:
       name: github.com/klauspost/compress
       type: go-module
     reason: Atlas-bundled compress v1.18.7; upstream fix pending Ariga rebuild; migrator-only exposure; revert on Atlas bump
+  # Triage 2026-11-20: same Atlas binary (v1.3.11-ede06dc-canary) embeds
+  # Go 1.26.10 stdlib with 8 fresh High CVEs (fixed in go1.26.11).
+  # Our own binaries already run go1.26.11 (verified clean). Scoped to the
+  # exact CVE + stdlib@go1.26.10 so future stdlib versions (ours or a
+  # rebuilt Atlas) are never masked. REVERT once Atlas ships a rebuild.
+  - vulnerability: CVE-2026-97033
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97034
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97035
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97036
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97037
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97038
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97039
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
+  - vulnerability: CVE-2026-97043
+    fix-state: fixed
+    package:
+      name: stdlib
+      version: go1.26.10
+      type: go-module
+    reason: Atlas-bundled stdlib go1.26.10; migrator-only exposure; our binaries run go1.26.11; revert on Atlas rebuild
