@@ -67,7 +67,7 @@ func TestWorkerCompletesBoardBoundTaskAfterRevoke(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: store, Settler: service,
 		Assets: &workerTestAssets{ready: map[string]bool{"asset_input_1": true}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			if len(task.MediaAssetIDs) != 1 || task.MediaAssetIDs[0] != "asset_input_1" {
 				t.Fatalf("provider inputs = %v, want the accepted inputs", task.MediaAssetIDs)
 			}
@@ -159,7 +159,7 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 		worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 			Store: env.tasks, Settler: boundService,
 			Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
-			Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			Provider: WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 				return []tasks.OutputRef{
 					{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 				}, nil

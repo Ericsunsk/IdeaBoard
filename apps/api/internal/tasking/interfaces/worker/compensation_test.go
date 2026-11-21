@@ -278,9 +278,9 @@ func TestWorkerCommitUnknownPreservesCompletedAssets(t *testing.T) {
 	media := newRendererTestEnv(t)
 	settler := &commitUnknownSettler{WorkspaceTaskWorkerSettler: env.service, store: env.store}
 	providerCalls := 0
-	provider := WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	provider := WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		providerCalls++
-		return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, task)
+		return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, ctx, task)
 	})
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: settler, Provider: provider, Renderer: media.renderer(t, nil), Attempts: env.attempts,
@@ -319,9 +319,9 @@ func TestWorkerUnknownSettlementPreservesUnconfirmedAssets(t *testing.T) {
 	providerCalls := 0
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: settler, Renderer: media.renderer(t, nil), Attempts: env.attempts,
-		Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			providerCalls++
-			return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, task)
+			return materializingProvider(t, media.media, media.objects, media.pegged)(ctx, ctx, task)
 		}),
 	})
 	if err != nil {
@@ -430,8 +430,8 @@ func TestWorkerRenderFailureCompensatesOnlyAfterConfirmedFail(t *testing.T) {
 			provider := materializingProvider(t, media.media, media.objects, media.pegged)
 			worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 				Store: env.store, Settler: settler, Attempts: env.attempts, Renderer: counting,
-				Provider: WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
-					refs, err := provider(ctx, task)
+				Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+					refs, err := provider(ctx, ctx, task)
 					if err != nil {
 						return nil, err
 					}

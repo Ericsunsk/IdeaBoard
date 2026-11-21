@@ -144,6 +144,7 @@ func TestRedactLogURLDropsUserinfoQueryFragmentAndDataPayload(t *testing.T) {
 }
 
 type captureResultMaterializer struct {
+	remoteContext    context.Context
 	remoteCalls      int
 	remoteUserID     int64
 	remoteTaskID     string
@@ -154,6 +155,10 @@ type captureResultMaterializer struct {
 }
 
 func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
+	m.remoteContext = ctx
+	if err := ctx.Err(); err != nil {
+		return taskmedia.MaterializedResults{}, err
+	}
 	m.remoteCalls++
 	m.remoteUserID = userID
 	m.remoteTaskID = taskID

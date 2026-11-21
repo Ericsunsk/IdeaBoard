@@ -25,7 +25,10 @@ export type CreateWorkspaceTaskRequestData = {
   prompt?: string
   /** Service params object (unknown fields rejected; no storage URLs; params.prompt still renders 422 unknown_field). */
   params?: CreateWorkspaceTaskRequestDataParams
-  /** @minimum 1 */
+  /**
+   * Billing quantity; omitted input derives from the compiled execution plan output count (params.output_count or the Service default). An explicit value must match that count, otherwise submission returns 422 validation_failed before Quote or Hold.
+   * @minimum 1
+   */
   quantity?: number
   /** Output resolution; omitted input is normalized to the Service policy canonical value. */
   resolution?: string

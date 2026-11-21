@@ -3,10 +3,12 @@ import {
   BOARD_STATE_SCHEMA_VERSION,
   type BoardSnapshot,
   type BoardState,
+  type ImageNodeItem,
 } from '../../core/document/nodes'
 import { readLocalStorageItem, writeLocalStorageItem } from '../../../../core/utils/storage'
 import { normalizeBoardState } from './boardStateSerialization'
-import { scopedBoardStorageKey } from '../catalog/scope'
+import { getBoardScope, isCompleteBoardScope, scopedBoardStorageKey } from '../catalog/scope'
+import { isBoardAccessLost } from '../revocation/accessLoss'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
@@ -43,10 +45,10 @@ function toValidBoardState(
 }
 
 function readRawStateMap(
-  options: { throwOnInvalidBoardId?: string } = {},
+  options: { throwOnInvalidBoardId?: string; storageKey?: string } = {},
 ): Record<string, BoardState> {
   if (typeof window === 'undefined') return {}
-  const scopedKey = getScopedStorageKey()
+  const scopedKey = options.storageKey ?? getScopedStorageKey()
   if (!scopedKey) return {}
   const raw = readStorageValue(scopedKey)
   if (!raw) return {}
@@ -71,11 +73,13 @@ function readRawStateMap(
   }
 }
 
-function writeStateMap(stateMap: Record<string, BoardState>): boolean {
+function writeStateMap(
+  stateMap: Record<string, BoardState>,
+  scopedKey = getScopedStorageKey(),
+): boolean {
   // Strict-only write: only validated content is emitted. Entries absent
   // from the next map — including undecodable leftovers — are dropped.
   if (typeof window === 'undefined') return true
-  const scopedKey = getScopedStorageKey()
   if (!scopedKey) return true
   try {
     const raw = JSON.stringify(stateMap)
@@ -141,12 +145,82 @@ export function setBoardState(boardId: string, state: BoardSnapshot): BoardState
     { boardId: id, throwOnInvalid: true },
   )
   if (!validState) return null
-  stateMap[id] = validState
+  const savedState = mergeAcceptedBoardTaskIdentities(validState, stateMap[id]?.imageNodes ?? [])
+  stateMap[id] = savedState
   // Gallery previews no longer ride the document: without the retired base64
   // cache, a quota failure has nothing left to shed, so it fails closed and
   // the caller surfaces the write error instead of persisting silently.
   if (!writeStateMap(stateMap)) return null
-  return validState
+  return savedState
+}
+
+type AcceptedBoardTaskSlot = Pick<
+  ImageNodeItem,
+  'id' | 'pendingTaskId' | 'pendingClientActionId' | 'pendingResultIndex'
+>
+
+/** Enrich matching pending actions without replacing newer document content or its timestamp. */
+export function mergeAcceptedBoardTaskIdentities(
+  target: BoardState,
+  accepted: readonly AcceptedBoardTaskSlot[],
+): BoardState {
+  const byId = new Map(accepted.map((slot) => [slot.id, slot]))
+  let didChange = false
+  const imageNodes = target.imageNodes.map((node) => {
+    const slot = byId.get(node.id)
+    if (
+      node.outputStatus !== 'running' ||
+      !slot?.pendingTaskId ||
+      !slot.pendingClientActionId ||
+      node.pendingClientActionId !== slot.pendingClientActionId ||
+      node.pendingResultIndex !== slot.pendingResultIndex ||
+      (node.pendingTaskId && node.pendingTaskId !== slot.pendingTaskId) ||
+      node.pendingTaskId === slot.pendingTaskId
+    )
+      return node
+    didChange = true
+    return { ...node, pendingTaskId: slot.pendingTaskId }
+  })
+  return didChange ? { ...target, imageNodes } : target
+}
+
+/**
+ * Capture while authorized, before submit. Acceptance may only enrich these
+ * already-persisted actions under their original User + Workspace key. It
+ * never writes remotely, restores a removed Board/slot, or changes residency.
+ */
+export function capturePendingBoardTask(input: {
+  boardId: string
+  snapshot: BoardSnapshot
+  resultNodeIds: readonly string[]
+  clientActionId: string
+}): (taskId: string) => boolean {
+  const scope = getBoardScope()
+  const boardId = normalizeBoardId(input.boardId)
+  const storageKey = scopedBoardStorageKey(STORAGE_KEY_PREFIX, scope)
+  if (!boardId || !isCompleteBoardScope(scope) || !storageKey || isBoardAccessLost(boardId)) {
+    throw new Error('Cannot preserve pending task recovery outside an authorized Board scope')
+  }
+  const slots = input.resultNodeIds.map((nodeId, resultIndex) => ({
+    id: Number(nodeId.slice('image-'.length)),
+    pendingClientActionId: input.clientActionId,
+    pendingResultIndex: resultIndex,
+  }))
+  if (!setBoardState(boardId, input.snapshot)) {
+    throw new Error('Cannot preserve pending task recovery in local storage')
+  }
+  return (taskId) => {
+    const stateMap = readRawStateMap({ storageKey })
+    const current = stateMap[boardId]
+    if (!current) return true
+    const merged = mergeAcceptedBoardTaskIdentities(
+      current,
+      slots.map((slot) => ({ ...slot, pendingTaskId: taskId })),
+    )
+    if (merged === current) return true
+    stateMap[boardId] = merged
+    return writeStateMap(stateMap, storageKey)
+  }
 }
 
 export function deleteBoardState(boardId: string): boolean {

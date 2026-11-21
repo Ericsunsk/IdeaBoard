@@ -83,7 +83,7 @@ func pinWorkerSnapshot(t *testing.T, store workerSnapshotPinner, task *tasks.Wor
 // modelObservingProvider records the resolved model of every Generate
 // call and replays scripted results per model.
 func modelObservingProvider(seen *[]string, behave func(model string) ([]tasks.OutputRef, error)) WorkspaceTaskProvider {
-	return WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	return WorkspaceTaskGenerateFunc(func(_ context.Context, _ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		*seen = append(*seen, strings.TrimSpace(task.ResolvedModel))
 		return behave(strings.TrimSpace(task.ResolvedModel))
 	})
@@ -143,7 +143,7 @@ func TestWorkspaceTaskWorkerSnapshotTamperFailsClosed(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -189,7 +189,7 @@ func TestWorkspaceTaskWorkerSnapshotCorruptFailsClosed(t *testing.T) {
 	}
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -218,7 +218,7 @@ func TestWorkspaceTaskWorkerMissingSnapshotFailsClosed(t *testing.T) {
 	}
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -421,7 +421,7 @@ func TestWorkspaceTaskWorkerRiverTaskLayer(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, _ context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		if calls == 1 {
 			return nil, workerUpstreamError(503)
@@ -473,7 +473,7 @@ func TestWorkspaceTaskWorkerDeterministicErrorsNeverFallback(t *testing.T) {
 			created = pinWorkerSnapshot(t, env.store, created, snap)
 
 			calls := 0
-			worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+			worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 				calls++
 				return nil, workerUpstreamError(tc.status)
 			}), nil)
@@ -514,7 +514,7 @@ func TestWorkspaceTaskWorkerUnknownFailureNeverFallback(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		return nil, errors.New("mystery failure with no classifier marker")
 	}), nil)
@@ -543,7 +543,7 @@ func TestWorkspaceTaskWorkerCompletedRedeliveryChargesOnce(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, snap)
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		if calls == 1 {
 			return nil, workerUpstreamError(503)
@@ -630,7 +630,7 @@ func TestWorkspaceTaskWorkerSnapshotServiceMismatchFailsClosed(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "generation", []string{"openrouter/model-a"}))
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)

@@ -1,7 +1,9 @@
 import { shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
+import { setStoredAuth } from '../../../../../core/utils/auth'
+import { getWorkspaceSelectionStore } from '../../../../workspace'
 import { CanvasGraphStore } from '../../../core/graph'
 import { CanvasGraphSession } from '../../board-session'
 import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
@@ -107,6 +109,15 @@ function createSnapshotFromFlow(nodes: readonly Node[], edges: readonly Edge[]) 
 }
 
 const source = { url: 'source', ratio: 1 }
+beforeEach(() => {
+  setStoredAuth({
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'tester',
+    avatar: '',
+    role: 'user',
+  })
+  getWorkspaceSelectionStore().select('ws_test123')
+})
 
 describe('usePendingImageResultExecution reservation projection', () => {
   it('reserves a nearby derived image slot and canonical connection before the deferred projection', () => {
@@ -114,6 +125,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     const reservation = harness.actions.reservePendingResults({
       source,
       sourceNodeId: 'image-1',
+      clientActionId: 'action-1',
       outputCount: 1,
     })
 
@@ -137,7 +149,12 @@ describe('usePendingImageResultExecution reservation projection', () => {
     })
     try {
       const harness = createHarness()
-      harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+      harness.actions.reservePendingResults({
+        source,
+        sourceNodeId: 'image-1',
+        clientActionId: 'action-1',
+        outputCount: 1,
+      })
       await Promise.resolve()
       harness.invalidateAttachment()
       frameCallbacks.shift()?.(0)
@@ -165,6 +182,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     const reservation = harness.actions.reservePendingResults({
       source,
       sourceNodeId: 'image-1',
+      clientActionId: 'action-1',
       outputCount: 1,
     })
 
@@ -190,6 +208,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     const reservation = harness.actions.reservePendingResults({
       source,
       sourceNodeId: 'image-1',
+      clientActionId: 'action-1',
       outputCount: 1,
     })
 
@@ -224,6 +243,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     const reservation = harness.actions.reservePendingResults({
       source,
       sourceNodeId: 'image-1',
+      clientActionId: 'action-1',
       outputCount: 1,
     })
     const resultNode = harness.nodes.value.find((node) => node.id === reservation.resultNodeIds[0])
@@ -236,20 +256,15 @@ describe('usePendingImageResultExecution reservation projection', () => {
 
   it('attaches persisted task identity without adding graph history', () => {
     const harness = createHarness()
-    const { resultNodeIds } = harness.actions.reservePendingResults({
+    const reservation = harness.actions.reservePendingResults({
       source,
       sourceNodeId: 'image-1',
+      clientActionId: 'action-1',
       outputCount: 1,
     })
 
-    harness.actions.attachPendingTaskIds([
-      {
-        resultNodeId: resultNodeIds[0]!,
-        resultIndex: 0,
-        taskId: 'task-1',
-        clientActionId: 'canvas:action-1',
-      },
-    ])
+    const { resultNodeIds } = reservation
+    reservation.acceptTask('task-1')
 
     const node = harness.nodes.value.find((item) => item.id === resultNodeIds[0])
     expect(node).toBeDefined()
@@ -257,7 +272,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     expect(node.data.snapshotNode).toMatchObject({
       pendingTaskId: 'task-1',
       pendingResultIndex: 0,
-      pendingClientActionId: 'canvas:action-1',
+      pendingClientActionId: 'action-1',
     })
   })
 })

@@ -27,7 +27,7 @@ func TestWorkspaceTaskClaimFailsClosedWhenJobTokenEmpty(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -68,7 +68,7 @@ func TestWorkspaceTaskGenerateRejectsOversizeOutputs(t *testing.T) {
 			ChecksumSHA256: workerTestRemoteChecksum, Role: "result", ResultIndex: i,
 		})
 	}
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return refs, nil
 	}), nil)
 

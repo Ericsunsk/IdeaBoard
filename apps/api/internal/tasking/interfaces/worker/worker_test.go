@@ -273,7 +273,7 @@ func TestWorkspaceTaskWorkerSuccessLoop(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
 	calls := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		calls++
 		if task.Status != tasks.StatusRunning {
 			t.Errorf("provider saw status %q, want running (claimed)", task.Status)
@@ -316,7 +316,7 @@ func TestWorkspaceTaskWorkerDeterministicFailure(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(400, "bad prompt", 0)
 	}), nil)
 
@@ -351,7 +351,7 @@ func TestWorkspaceTaskWorkerRetryableRequeues(t *testing.T) {
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	attempts := 0
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		attempts++
 		if attempts == 1 {
 			return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
@@ -396,7 +396,7 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
 	}), nil)
 
@@ -442,7 +442,7 @@ func TestWorkspaceTaskWorkerStaleTokenDropped(t *testing.T) {
 		t.Fatalf("Retry: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -471,7 +471,7 @@ func TestWorkspaceTaskWorkerTerminalDropped(t *testing.T) {
 		t.Fatalf("FailTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -491,7 +491,7 @@ func TestWorkspaceTaskWorkerCancelledDropped(t *testing.T) {
 		t.Fatalf("CancelTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -507,7 +507,7 @@ func TestWorkspaceTaskWorkerCancelledDropped(t *testing.T) {
 // job) drop without error.
 func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 	env := newWorkerTestEnv()
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		t.Fatal("provider must not run for an unknown task")
 		return nil, nil
 	}), nil)
@@ -544,7 +544,7 @@ func TestWorkspaceTaskWorkerInvalidInputFails(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -587,7 +587,7 @@ func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -636,7 +636,7 @@ func TestWorkspaceTaskWorkerClaimConflictRetries(t *testing.T) {
 		t.Fatalf("ClaimTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -660,7 +660,7 @@ func TestWorkspaceTaskWorkerRedeliveryReacquiresInterruptedLease(t *testing.T) {
 		t.Fatalf("initial ClaimTask: %v", err)
 	}
 	called := false
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), nil)
@@ -765,7 +765,7 @@ func TestWorkerExecutionDeadlineLeavesSettlementBudget(t *testing.T) {
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	var parent context.Context
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		parentDeadline, parentOK := parent.Deadline()
 		executionDeadline, executionOK := ctx.Deadline()
 		if !parentOK || !executionOK || parentDeadline.Sub(executionDeadline) < 10*time.Minute {

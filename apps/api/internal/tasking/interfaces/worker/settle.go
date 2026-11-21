@@ -82,7 +82,7 @@ func (w *WorkspaceTaskWorker) executeModelFallback(
 	claimed.ResolvedModel = snap.RetryCandidate
 	// The fallback send shares the claim's remaining execution budget;
 	// settlement below keeps the parent (River) context.
-	outputs, genErr := w.generate(execCtx, claimed, fallback.layer, fallback.attemptNo)
+	outputs, genErr := w.generate(ctx, execCtx, claimed, fallback.layer, fallback.attemptNo)
 	// The fallback observation fires at send completion when the
 	// outcome is known (#852): decided-but-unrecorded fallbacks (the
 	// ok=false branch above) never inflate the counter. Nil metrics

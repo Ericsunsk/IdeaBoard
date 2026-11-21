@@ -124,6 +124,7 @@ export type PendingImageExecutionCore = {
     attachment: BoardAttachment,
     pending: PendingImageHydrationIdentity,
   ) => PendingImageExecutionLease | null
+  releaseHydratedLease: (lease: PendingImageExecutionLease) => void
   markSubmitted: (
     lease: PendingImageExecutionLease,
     taskId: string,

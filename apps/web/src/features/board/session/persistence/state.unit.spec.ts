@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, test } from 'vitest'
 import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import { makeBoardState } from '../../testing'
+import { makeBoardState, makePendingImageNodeSnapshot } from '../../testing'
 import { scopedBoardStorageKey } from '../catalog/scope'
 import {
   deleteBoardState,
+  capturePendingBoardTask,
   duplicateBoardState,
   getBoardState,
   replaceBoardStateMap,
@@ -68,6 +69,79 @@ describe('board local persistence', () => {
     localStorage.clear()
     clearStoredAuth()
     primeScope()
+  })
+
+  test('merges late acceptance into the latest origin draft without changing its timestamp', () => {
+    const snapshot = makeBoardState({
+      imageNodes: [
+        makePendingImageNodeSnapshot({
+          pendingTaskId: undefined,
+          pendingClientActionId: 'action-origin',
+          pendingResultIndex: 0,
+        }),
+      ],
+    })
+    const retain = capturePendingBoardTask({
+      boardId: 'origin',
+      snapshot,
+      resultNodeIds: ['image-1'],
+      clientActionId: 'action-origin',
+    })
+    const newer = setBoardState('origin', {
+      ...snapshot,
+      imageNodes: [{ ...snapshot.imageNodes[0]!, x: 999 }],
+    })!
+    getWorkspaceSelectionStore().select('ws_other123')
+
+    expect(retain('task_accepted')).toBe(true)
+    expect(getBoardState('origin')).toBeNull()
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+    expect(getBoardState('origin')).toMatchObject({
+      updatedAt: newer.updatedAt,
+      imageNodes: [{ x: 999, pendingTaskId: 'task_accepted' }],
+    })
+  })
+
+  test.each([
+    'deleted-board',
+    'deleted-slot',
+    'superseded',
+    'terminal',
+    'conflicting-task',
+    'wrong-index',
+  ] as const)('does not restore or overwrite a %s after late acceptance', (change) => {
+    const node = makePendingImageNodeSnapshot({
+      pendingTaskId: undefined,
+      pendingClientActionId: 'action-origin',
+      pendingResultIndex: 0,
+    })
+    const snapshot = makeBoardState({ imageNodes: [node] })
+    const retain = capturePendingBoardTask({
+      boardId: 'origin',
+      snapshot,
+      resultNodeIds: ['image-1'],
+      clientActionId: 'action-origin',
+    })
+    if (change === 'deleted-board') deleteBoardState('origin')
+    else
+      setBoardState('origin', {
+        ...snapshot,
+        imageNodes:
+          change === 'deleted-slot'
+            ? []
+            : [
+                {
+                  ...node,
+                  ...(change === 'superseded' ? { pendingClientActionId: 'action-new' } : {}),
+                  ...(change === 'terminal' ? { outputStatus: 'ready' as const } : {}),
+                  ...(change === 'conflicting-task' ? { pendingTaskId: 'task_new' } : {}),
+                  ...(change === 'wrong-index' ? { pendingResultIndex: 1 } : {}),
+                },
+              ],
+      })
+    const before = getBoardState('origin')
+    retain('task_accepted')
+    expect(getBoardState('origin')).toEqual(before)
   })
 
   it('rejects drafts that still carry the retired preview cache', () => {

@@ -507,10 +507,6 @@ func (h *Handler) createWorkspaceTask(c *gin.Context) {
 			}
 			workspaceRole = role
 		}
-		var quantity int64 = 1
-		if body.Data.Quantity != nil {
-			quantity = *body.Data.Quantity
-		}
 		// Canonicalize the request once at ingress. `params.output_resolution`
 		// is the durable source of truth; the top-level field is accepted as
 		// an envelope convenience and is folded into the params map before
@@ -558,6 +554,11 @@ func (h *Handler) createWorkspaceTask(c *gin.Context) {
 				renderTaskError(c, compileErr)
 				return
 			}
+		}
+		quantity, err := taskapp.ResolveSubmissionQuantity(canonicalParams, body.Data.Quantity)
+		if err != nil {
+			renderTaskError(c, err)
+			return
 		}
 		hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
 			strings.Join(assetIDs, ","), prompt, string(paramsJSON),

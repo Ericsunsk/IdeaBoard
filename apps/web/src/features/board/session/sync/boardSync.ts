@@ -33,7 +33,11 @@ import {
   setBoardRevision,
   type BoardMeta,
 } from '../catalog/boards'
-import { getBoardState, replaceBoardStateMap } from '../persistence/state'
+import {
+  getBoardState,
+  mergeAcceptedBoardTaskIdentities,
+  replaceBoardStateMap,
+} from '../persistence/state'
 import { normalizeBoardState, serializeBoardState } from '../persistence/boardStateSerialization'
 import {
   InvalidBoardStateError,
@@ -310,7 +314,10 @@ function applyRemoteBoardsToLocal(
       return
     }
     if (remoteState) {
-      mergedStateMap[boardId] = remoteState
+      mergedStateMap[boardId] =
+        localState && shouldPreserveLocal(boardId)
+          ? mergeAcceptedBoardTaskIdentities(remoteState, localState.imageNodes)
+          : remoteState
       return
     }
     if (localState && shouldPreserveLocal(boardId)) {

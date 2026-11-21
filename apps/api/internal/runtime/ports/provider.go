@@ -46,6 +46,9 @@ type WorkerCallInput struct {
 	Model     string
 	AttemptNo int32
 	Client    WorkerClient
+	// ExecutionContext bounds provider work separately from materialization.
+	// Nil uses CallWorkerAPI's context for callers without a separate budget.
+	ExecutionContext context.Context
 }
 
 // WorkerCaller hides the Worker transport from task execution

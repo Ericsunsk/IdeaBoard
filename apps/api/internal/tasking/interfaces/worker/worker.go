@@ -121,16 +121,18 @@ type WorkspaceTaskWorkerSettler interface {
 // Production bridges the sole Worker executor (see
 // NewWorkspaceWorkerProvider); tests inject deterministic fakes. A nil
 // provider fails closed: tasks converge to failed, never strand.
+// executionCtx bounds sends; ctx retains the parent budget and cancellation
+// for materializing accepted outputs after the execution deadline.
 type WorkspaceTaskProvider interface {
-	Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
+	Generate(ctx context.Context, executionCtx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
 }
 
 // WorkspaceTaskGenerateFunc adapts a function to WorkspaceTaskProvider.
-type WorkspaceTaskGenerateFunc func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
+type WorkspaceTaskGenerateFunc func(ctx context.Context, executionCtx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error)
 
 // Generate implements WorkspaceTaskProvider.
-func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
-	return f(ctx, task)
+func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, executionCtx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	return f(ctx, executionCtx, task)
 }
 
 // WorkspaceTaskWorkerDeps wires the worker. Store and Settler are required;
@@ -293,11 +295,11 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue
 	ctx = taskruntime.WithResultIngestionScope(ctx, claimed)
 	// The execution budget bounds every provider send in this claim
 	// (primary + at most one bounded fallback) without touching settlement:
-	// an over-budget send converges as a retryable timeout, while Complete,
-	// Fail, and Retry below keep the parent (River) context.
+	// an over-budget send without accepted outputs is retryable. Materialization,
+	// Complete, Fail, and Retry retain the parent (River) context.
 	execCtx, cancel := context.WithTimeout(ctx, riverpolicy.WorkspaceExecutionBudget())
 	defer cancel()
-	outputs, genErr := w.generate(execCtx, claimed, send.layer, send.attemptNo)
+	outputs, genErr := w.generate(ctx, execCtx, claimed, send.layer, send.attemptNo)
 	if genErr == nil {
 		return w.completeExecution(ctx, send, claimed, outputs, model)
 	}

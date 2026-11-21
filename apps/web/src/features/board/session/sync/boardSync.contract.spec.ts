@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import type { BoardState } from '../../core/document/nodes'
 import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
 import { InvalidBoardStateError } from '../../core/document/latestBoardState'
@@ -6,6 +6,7 @@ import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
   makeBoardState,
+  makePendingImageNodeSnapshot,
   primeAuthenticatedWorkspace,
   type MockWorkspaceBoardApiState,
 } from '../../testing'
@@ -149,6 +150,37 @@ describe('boardSync', () => {
 
     expect(listBoards()[0]?.name).toBe('Local Rename')
     expect(getPromptText('board-1')).toBe('local-newer')
+  })
+
+  test('preserves accepted task identity while adopting a newer remote pending action', async () => {
+    const pending = makePendingImageNodeSnapshot({
+      pendingTaskId: undefined,
+      pendingClientActionId: 'action-origin',
+      pendingResultIndex: 0,
+    })
+    replaceBoards([{ id: 'board-accepted', name: 'Origin', createdAt: 100, updatedAt: 1_000 }])
+    replaceBoardStateMap({
+      'board-accepted': makeBoardState({
+        updatedAt: 1_000,
+        imageNodes: [{ ...pending, pendingTaskId: 'task_accepted' }],
+      }),
+    })
+    addRemoteBoard({
+      id: 'board-accepted',
+      name: 'Remote newer',
+      createdAt: 100,
+      updatedAt: 2_000,
+      revision: 3,
+      state: makeBoardState({ updatedAt: 2_000, imageNodes: [{ ...pending, x: 999 }] }),
+    })
+
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
+
+    expect(getBoardState('board-accepted')).toMatchObject({
+      updatedAt: 2_000,
+      imageNodes: [{ x: 999, pendingTaskId: 'task_accepted' }],
+    })
+    expect(listBoards()[0]).toMatchObject({ name: 'Remote newer', revision: 3 })
   })
 
   it('publishes remote hydrate only after metadata and board state are both committed', async () => {

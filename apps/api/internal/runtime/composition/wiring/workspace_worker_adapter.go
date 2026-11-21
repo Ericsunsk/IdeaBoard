@@ -28,8 +28,9 @@ func (a *workspaceWorkerCallerAdapter) CallWorkerAPI(ctx context.Context, input 
 		return taskworker.WorkspaceWorkerCallOutput{}, errors.New(errorrender.MsgRuntimeCompositionWiringCallWorkerAPI)
 	}
 	output, err := a.executor.CallWorkerAPI(ctx, runtimeports.WorkerCallInput{
-		Task:  input.Task,
-		Model: input.Model,
+		Task:             input.Task,
+		Model:            input.Model,
+		ExecutionContext: input.ExecutionContext,
 	})
 	if err != nil {
 		return taskworker.WorkspaceWorkerCallOutput{}, err

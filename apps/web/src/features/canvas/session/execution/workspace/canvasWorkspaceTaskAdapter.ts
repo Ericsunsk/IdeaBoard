@@ -98,9 +98,9 @@ export async function submitCanvasWorkspaceTask(
     idempotencyKey,
     scope,
   )
-  if (!isBoardScopeCurrent(scope)) throw boardScopeChangedError()
   registerCanvasWorkspaceTask(item.id, item.workspace_id)
-  notifyUserCreditsInvalidation({ source: 'task-hold', taskId: item.id })
+  if (isBoardScopeCurrent(scope))
+    notifyUserCreditsInvalidation({ source: 'task-hold', taskId: item.id })
   return { taskId: item.id, workspaceId: item.workspace_id }
 }
 

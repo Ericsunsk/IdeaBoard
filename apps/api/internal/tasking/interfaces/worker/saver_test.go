@@ -137,7 +137,7 @@ func TestWorkerReplaysLibrarySaverAfterCompleteRedelivery(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return workerTestRemoteOutput(), nil
 		}),
 		LibrarySaver: recorder,
@@ -179,7 +179,7 @@ func TestWorkerSwallowsLibrarySaverError(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return workerTestRemoteOutput(), nil
 		}),
 		LibrarySaver: &recordingWorkerLibrarySaver{err: errors.New("library down")},
@@ -223,7 +223,7 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.tasks, Settler: service,
 		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
-		Provider: WorkspaceTaskGenerateFunc(func(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return []tasks.OutputRef{{Kind: tasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0}}, nil
 		}),
 		LibrarySaver: trigger,

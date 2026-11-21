@@ -3660,6 +3660,7 @@
     "BoardScope",
     "BoardSyncConflictKind",
     "ShareDialog",
+    "capturePendingBoardTask",
     "fetchBoardArchivedAt",
     "getBoardById",
     "getBoardScope",

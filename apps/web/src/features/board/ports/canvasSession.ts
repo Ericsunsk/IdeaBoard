@@ -1,7 +1,11 @@
 /** Browser persistence, catalog, and synchronization for Canvas Board Sessions. */
 
 // Local persistence and document adapters.
-export { loadBoardState, setBoardState } from '../session/persistence/state'
+export {
+  capturePendingBoardTask,
+  loadBoardState,
+  setBoardState,
+} from '../session/persistence/state'
 export { serializeBoardState } from '../session/persistence/boardStateSerialization'
 
 // Catalog and revision-gated sync use cases.

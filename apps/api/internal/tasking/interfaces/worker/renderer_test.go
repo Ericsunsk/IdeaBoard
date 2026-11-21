@@ -123,7 +123,7 @@ func materializingProvider(t *testing.T, media workspacemedia.WorkspaceMediaStor
 	if err != nil {
 		t.Fatal(err)
 	}
-	return func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	return func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		results, err := m.MaterializeRemoteResults(ctx, task.OwnerUserID, task.ID, []string{"data:image/png;base64," + base64.StdEncoding.EncodeToString(png)}, taskmedia.ResultMaterializeOptions{})
 		if err != nil {
 			return nil, err
@@ -134,7 +134,7 @@ func materializingProvider(t *testing.T, media workspacemedia.WorkspaceMediaStor
 
 func (e *rendererTestEnv) materialize(t *testing.T, ctx context.Context, task *tasks.WorkspaceTask) []tasks.OutputRef {
 	t.Helper()
-	refs, err := materializingProvider(t, e.media, e.objects, e.pegged)(ctx, task)
+	refs, err := materializingProvider(t, e.media, e.objects, e.pegged)(ctx, ctx, task)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ context.Context, _ *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return []tasks.OutputRef{{Kind: tasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"}}, nil
 		}),
 		Renderer: renderer,

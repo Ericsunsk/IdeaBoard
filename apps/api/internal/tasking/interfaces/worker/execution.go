@@ -39,7 +39,7 @@ import (
 
 // generate runs the provider seam. A nil provider fails closed with a clear
 // message (tasks converge to failed, never strand).
-func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *tasks.WorkspaceTask, retryLayer string, attemptNumber int32) ([]tasks.OutputRef, error) {
+func (w *WorkspaceTaskWorker) generate(ctx context.Context, executionCtx context.Context, task *tasks.WorkspaceTask, retryLayer string, attemptNumber int32) ([]tasks.OutputRef, error) {
 	if attemptNumber <= 0 {
 		attemptNumber = int32(task.RetryCount + 1)
 	}
@@ -50,7 +50,7 @@ func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *tasks.Workspac
 	if w.provider == nil {
 		return nil, errors.New(errorrender.MsgGenerate)
 	}
-	outputs, err := w.provider.Generate(ctx, task)
+	outputs, err := w.provider.Generate(ctx, executionCtx, task)
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +227,9 @@ func (w *WorkspaceTaskWorker) saveCompletedTask(ctx context.Context, completed *
 type WorkspaceWorkerCallInput struct {
 	Task  *tasks.TaskPayload
 	Model string
+	// ExecutionContext shares the claim's provider budget; ctx remains alive
+	// for materializing accepted outputs after that budget expires.
+	ExecutionContext context.Context
 }
 
 // WorkspaceWorkerCallOutput is the Worker result subset the workspace
@@ -257,7 +260,7 @@ func NewWorkspaceWorkerProvider(caller WorkspaceWorkerCaller) WorkspaceTaskProvi
 // snapshot-derived target the worker stamped onto the transient task
 // copy before calling: the bridge never resolves a model itself and
 // never consults the live pool or admin mapping.
-func (p *workspaceWorkerProvider) Generate(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+func (p *workspaceWorkerProvider) Generate(ctx context.Context, executionCtx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	if p == nil || p.caller == nil {
 		return nil, errors.New(errorrender.MsgGenerate4)
 	}
@@ -270,8 +273,9 @@ func (p *workspaceWorkerProvider) Generate(ctx context.Context, task *tasks.Work
 		return nil, err
 	}
 	output, err := p.caller.CallWorkerAPI(ctx, WorkspaceWorkerCallInput{
-		Task:  payload,
-		Model: model,
+		Task:             payload,
+		Model:            model,
+		ExecutionContext: executionCtx,
 	})
 	if err != nil {
 		return nil, err

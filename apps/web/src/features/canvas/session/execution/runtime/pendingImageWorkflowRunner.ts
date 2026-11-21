@@ -68,7 +68,7 @@ export type PendingImageWorkflowRunner = {
 export type PendingImageWorkflowRunnerOptions = {
   pendingResults: Pick<
     PendingImageResultExecution,
-    'reservePendingResults' | 'attachPendingTaskIds' | 'removePendingResults'
+    'reservePendingResults' | 'removePendingResults'
   >
   taskTransport: PendingImageWorkflowTaskTransport
   executionCore: PendingImageExecutionCore
@@ -154,38 +154,17 @@ export function createPendingImageWorkflowRunner(
   async function submitSharedTask(
     intent: PendingImageWorkflowIntent,
     leases: readonly PendingImageExecutionLease[],
-    resultNodeIds: readonly string[],
-  ): Promise<string> {
-    const actionId = (options.createClientActionId ?? createCanvasTaskClientActionId)()
+    reservation: ReturnType<PendingImageResultExecution['reservePendingResults']>,
+    actionId: string,
+  ): Promise<string | null> {
+    let submission: { taskId: string } | undefined
     for (let attempt = 0; attempt < SHARED_TASK_REQUEST_ATTEMPTS; attempt += 1) {
       if (!isExecutionCurrent(intent)) {
         throw new TaskCancelledError('Canvas execution is no longer active')
       }
       try {
-        const submission = await options.taskTransport.submit(intent.taskRequest, actionId)
-        const applied = leases.filter(
-          (lease) =>
-            options.executionCore.markSubmitted(lease, submission.taskId, actionId).kind ===
-            'applied',
-        )
-        if (applied.length !== leases.length) {
-          const release = options.executionCore.release(applied)
-          options.cancelTasks([submission.taskId, ...release.cancellableTaskIds])
-          const releasedNodeIds = releasedResultNodeIds(release)
-          if (releasedNodeIds.length > 0)
-            options.pendingResults.removePendingResults(releasedNodeIds)
-          throw new TaskCancelledError('Canvas execution lease is no longer current')
-        }
-        options.pendingResults.attachPendingTaskIds(
-          resultNodeIds.map((resultNodeId, resultIndex) => ({
-            resultNodeId,
-            resultIndex,
-            taskId: submission.taskId,
-            clientActionId: actionId,
-          })),
-        )
-        await options.afterTaskIdAttached?.()
-        return submission.taskId
+        submission = await options.taskTransport.submit(intent.taskRequest, actionId)
+        break
       } catch (error) {
         // 共用重试预算 (#P1-4): 可重试错误（network / 503 定价瞬态 /
         // 原始 503-429）单次重试；空池、余额、校验类确定性失败与
@@ -199,12 +178,69 @@ export function createPendingImageWorkflowRunner(
         throw error
       }
     }
-    throw new Error(i18n.global.t('canvas.execution.networkRetry'))
+    if (!submission) throw new Error(i18n.global.t('canvas.execution.networkRetry'))
+    return acceptSharedTask(intent, leases, reservation, actionId, submission.taskId)
+  }
+
+  async function acceptSharedTask(
+    intent: PendingImageWorkflowIntent,
+    leases: readonly PendingImageExecutionLease[],
+    reservation: ReturnType<PendingImageResultExecution['reservePendingResults']>,
+    actionId: string,
+    taskId: string,
+  ): Promise<string | null> {
+    // Acceptance ends the submit retry budget. Local persistence or graph
+    // failures must never resubmit an already-created Task.
+    let accepted: ReturnType<typeof reservation.acceptTask>
+    try {
+      accepted = reservation.acceptTask(taskId)
+    } catch (error) {
+      console.warn('[Canvas] Failed to retain accepted task identity', {
+        code: 'accepted_task_recovery_failed',
+        taskId,
+        error,
+      })
+      if (isExecutionCurrent(intent))
+        options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
+      return null
+    }
+    if (!accepted.isPersisted || accepted.projectionError) {
+      console.warn('[Canvas] Failed to retain accepted task identity', {
+        code: 'accepted_task_recovery_failed',
+        taskId,
+        isPersisted: accepted.isPersisted,
+        error: accepted.projectionError,
+      })
+      if (accepted.isAttached && isExecutionCurrent(intent))
+        options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
+    }
+    if (!accepted.isAttached || !options.executionCore.isAttachmentCurrent(intent.attachment))
+      return null
+    const applied = leases.filter(
+      (lease) => options.executionCore.markSubmitted(lease, taskId, actionId).kind === 'applied',
+    )
+    if (applied.length !== leases.length) {
+      const release = options.executionCore.release(applied)
+      options.cancelTasks([taskId, ...release.cancellableTaskIds])
+      const releasedNodeIds = releasedResultNodeIds(release)
+      if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+      throw new TaskCancelledError('Canvas execution lease is no longer current')
+    }
+    if (accepted.projectionError) return null
+    if (!isExecutionCurrent(intent)) return null
+    try {
+      await options.afterTaskIdAttached?.()
+    } catch (error) {
+      console.warn('[Canvas] Failed to flush accepted task identity', error)
+      return null
+    }
+    return taskId
   }
 
   type AcquiredExecutionLeases = {
     leases: PendingImageExecutionLease[]
     resultNodeIds: string[]
+    reservation: ReturnType<PendingImageResultExecution['reservePendingResults']>
   }
 
   type SettledExecutionAttempt = PromiseSettledResult<{
@@ -214,13 +250,16 @@ export function createPendingImageWorkflowRunner(
 
   function acquireExecutionLeases(
     intent: PendingImageWorkflowIntent,
+    clientActionId: string,
   ): AcquiredExecutionLeases | null {
-    const resultNodeIds = options.pendingResults.reservePendingResults({
+    const reservation = options.pendingResults.reservePendingResults({
       source: intent.source,
       sourceNodeId: intent.sourceNodeId,
       outputCount: intent.outputCount,
+      clientActionId,
       resultOptions: intent.resultOptions,
-    }).resultNodeIds
+    })
+    const { resultNodeIds } = reservation
     const leases = resultNodeIds.flatMap((resultNodeId) => {
       const started = options.executionCore.begin(
         intent.attachment,
@@ -228,7 +267,7 @@ export function createPendingImageWorkflowRunner(
       )
       return started.kind === 'started' ? [started.lease] : []
     })
-    if (leases.length === resultNodeIds.length) return { leases, resultNodeIds }
+    if (leases.length === resultNodeIds.length) return { leases, resultNodeIds, reservation }
     const release = options.executionCore.release(leases)
     const releasedNodeIds = releasedResultNodeIds(release)
     if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
@@ -480,13 +519,12 @@ export function createPendingImageWorkflowRunner(
     if (!isExecutionCurrent(intent)) return
     let leases: PendingImageExecutionLease[] = []
     try {
-      const acquired = acquireExecutionLeases(intent)
+      const actionId = (options.createClientActionId ?? createCanvasTaskClientActionId)()
+      const acquired = acquireExecutionLeases(intent, actionId)
       if (!acquired) return
       leases = acquired.leases
-      const resultNodeIds = acquired.resultNodeIds
-
-      const taskId = await submitSharedTask(intent, leases, resultNodeIds)
-      if (!isExecutionCurrent(intent)) return
+      const taskId = await submitSharedTask(intent, leases, acquired.reservation, actionId)
+      if (!taskId || !isExecutionCurrent(intent)) return
       const wait = createWait(intent, taskId, leases)
       try {
         const attempts = await resolveSlots(

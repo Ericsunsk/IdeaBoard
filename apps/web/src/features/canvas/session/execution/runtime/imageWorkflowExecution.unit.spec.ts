@@ -1,8 +1,20 @@
 import { effectScope, ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../task-runner/taskResultErrors'
 import { createEmptyBoardSnapshot } from '../../../../board'
+import { setStoredAuth } from '../../../../../core/utils/auth'
+import { getWorkspaceSelectionStore } from '../../../../workspace'
+
+beforeEach(() => {
+  setStoredAuth({
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'tester',
+    avatar: '',
+    role: 'user',
+  })
+  getWorkspaceSelectionStore().select('ws_test123')
+})
 import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import {
   createFlowGraphCommandOptions,

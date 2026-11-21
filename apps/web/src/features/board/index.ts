@@ -49,7 +49,15 @@ export * from './session/sync/boardQueryKeys'
 export * from './session/sync/boardQueries'
 export * from './session/sync/boardSseInvalidation'
 // Stable adapters for persistence and gallery scene boundaries.
-export * from './session/persistence/state'
+export {
+  replaceBoardStateMap,
+  getBoardState,
+  getBoardStates,
+  loadBoardState,
+  setBoardState,
+  deleteBoardState,
+  duplicateBoardState,
+} from './session/persistence/state'
 export * from './session/persistence/boardStateSerialization'
 export { blankBoardPreviewSurfaceClass } from './ui/gallery'
 export {

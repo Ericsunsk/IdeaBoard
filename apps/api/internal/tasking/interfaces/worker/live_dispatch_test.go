@@ -193,7 +193,7 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.WorkerCl
 		Store: e.store, Settler: e.service, Assets: assets,
 		Provider: NewWorkspaceWorkerProvider(liveDispatchWorkerCall(func(ctx context.Context, input WorkspaceWorkerCallInput) (WorkspaceWorkerCallOutput, error) {
 			output, err := executor.CallWorkerAPI(ctx, runtimeports.WorkerCallInput{
-				Task: input.Task, Model: input.Model,
+				Task: input.Task, Model: input.Model, ExecutionContext: input.ExecutionContext,
 			})
 			if err != nil {
 				return WorkspaceWorkerCallOutput{}, err

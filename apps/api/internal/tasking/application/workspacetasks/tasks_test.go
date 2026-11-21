@@ -658,9 +658,10 @@ func planTestService() (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
 func TestCreatePersistsWithoutResolvedModel(t *testing.T) {
 	ctx := context.Background()
 	store, _, _, service := planTestService()
+	canonical := canonicalQuantityParams(t, "render", 1)
 	created, err := service.Create(ctx, CreateInput{
 		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render",
-		CanonicalParams: `{"schema_version":6,"service":"render"}`,
+		CanonicalParams: canonical,
 	}, "plan-key-1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -671,7 +672,7 @@ func TestCreatePersistsWithoutResolvedModel(t *testing.T) {
 	if created.ResolvedModel != "" {
 		t.Fatalf("resolved_model = %q, want empty until the #848 snapshot lands", created.ResolvedModel)
 	}
-	if created.CanonicalParams != `{"schema_version":6,"service":"render"}` {
+	if created.CanonicalParams != canonical {
 		t.Fatalf("canonical_params = %q, want passthrough untouched", created.CanonicalParams)
 	}
 	// The persisted fact survives the store round-trip (durable plan).

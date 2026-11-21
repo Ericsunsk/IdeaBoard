@@ -39,6 +39,10 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 	if c.transfer == nil {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf("worker transfer is not configured"))
 	}
+	executionCtx := input.ExecutionContext
+	if executionCtx == nil {
+		executionCtx = ctx
+	}
 	task := input.Task
 	if task == nil || strings.TrimSpace(task.TaskID) == "" {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("drawing task is missing"))
@@ -62,7 +66,7 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 	// behavior (tests, minimal wiring).
 	var providerOptions map[string]interface{}
 	if c != nil && c.customParams != nil {
-		foundParams, found, routeErr := c.customParams.LookupCustomParams(ctx, provider, modelName)
+		foundParams, found, routeErr := c.customParams.LookupCustomParams(executionCtx, provider, modelName)
 		if routeErr != nil {
 			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(errorrender.MsgCallWorkerAPI2, routeErr))
 		}
@@ -73,7 +77,7 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 			providerOptions, _ = workflow.ParseProviderOptions(foundParams)
 		}
 	}
-	params, err := c.parseAndNormalizeTaskParams(ctx, task)
+	params, err := c.parseAndNormalizeTaskParams(executionCtx, task)
 	if err != nil {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
@@ -103,7 +107,7 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 	// contract carries no idempotency field, and local settlement never
 	// depended on upstream dedup (the claim token fences terminal writes).
 	callResult, err := c.callWorker(
-		ctx, task.TaskID, workerFeature, workspaceID, provider, modelName,
+		executionCtx, task.TaskID, workerFeature, workspaceID, provider, modelName,
 		task.Prompt, params, providerOptions,
 	)
 	providerFinishedAt := time.Now()
@@ -118,6 +122,9 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 			providerFailureCategory(err),
 			fmt.Errorf(errorrender.MsgCallWorkerAPI3, model, err),
 		)
+	}
+	if err := ctx.Err(); err != nil {
+		return output, err
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
 	if len(imageURLs) == 0 {
@@ -141,6 +148,10 @@ func (c *Executor) CallWorkerAPI(ctx context.Context, input runtimeports.WorkerC
 		correlationID: task.EffectiveCorrelationID(),
 	}
 	finalizeResult := finalization.finalize(ctx, task.UserID, task.TaskID, imageURLs)
+	if err := ctx.Err(); err != nil {
+		markFinalizeFinished()
+		return output, err
+	}
 	imageURLs, taskOutputs, err := finalizeResult.completedOutputs()
 	if err != nil {
 		markFinalizeFinished()
@@ -267,7 +278,7 @@ func (c *Executor) workerClientForCall(ctx context.Context) (runtimeports.Worker
 
 // callWorker executes ordered single-image sends with independent signed slots.
 // Accepted bytes survive later send failures through the normal Complete path.
-// Context cancellation keeps the existing interruption and retry semantics.
+// Deadline exhaustion completes accepted outputs; explicit cancellation interrupts.
 func (c *Executor) callWorker(
 	ctx context.Context,
 	taskID, feature string,
@@ -291,10 +302,28 @@ func (c *Executor) callWorker(
 		count = params.ExecutionPlan.RequestedOutputCount().Int()
 	}
 	result := providerCallResult{Model: provider + "/" + model, ParsedOutputKind: "image-results"}
+	// Every slot boundary has the same interruption policy. The parent context
+	// still bounds materialization after this provider budget expires.
+	stopAfterError := func(err error) error {
+		if errors.Is(err, context.Canceled) {
+			return err
+		}
+		if contextErr := ctx.Err(); contextErr != nil {
+			err = contextErr
+		}
+		if len(result.ImageURLs) == 0 || errors.Is(err, context.Canceled) {
+			return err
+		}
+		slog.Warn("worker stopped with partial outputs", "task_id", taskID, "requested", count, "completed", len(result.ImageURLs), "category", providerFailureCategory(err))
+		return nil
+	}
 outputs:
 	for index := 0; index < count; index++ {
 		if err := ctx.Err(); err != nil {
-			return result, err
+			if err := stopAfterError(err); err != nil {
+				return result, err
+			}
+			break
 		}
 		// Presigned GETs for inputs (inputs first, mask last).
 		var inputURLs []string
@@ -305,10 +334,10 @@ outputs:
 			}
 			signed, _, err := c.transfer.PresignInputGET(ctx, workspaceID, publicID)
 			if err != nil {
-				if len(result.ImageURLs) > 0 && ctx.Err() == nil {
-					break outputs
+				if err := stopAfterError(err); err != nil {
+					return result, err
 				}
-				return result, err
+				break outputs
 			}
 			inputURLs = append(inputURLs, signed)
 		}
@@ -322,10 +351,10 @@ outputs:
 		}
 		slot, err := c.transfer.PrepareOutput(workspaceID, taskID, index)
 		if err != nil {
-			if len(result.ImageURLs) > 0 && ctx.Err() == nil {
-				break
+			if err := stopAfterError(err); err != nil {
+				return result, err
 			}
-			return result, err
+			break
 		}
 		var seed uint64
 		if params.Canonical != nil && params.Canonical.Generation != nil {
@@ -344,23 +373,22 @@ outputs:
 			Timeout: runtimeports.WorkerDefaultTimeout,
 		})
 		if err != nil {
-			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+			if len(result.ImageURLs) == 0 {
+				result.Receipt = resp.Receipt
+			}
+			if err := stopAfterError(fmt.Errorf("worker image call failed: %w", err)); err != nil {
 				return result, err
 			}
-			if len(result.ImageURLs) == 0 {
-				return providerCallResult{Receipt: resp.Receipt}, fmt.Errorf("worker image call failed: %w", err)
-			}
-			// A successful output must never trigger whole-task fallback/requeue.
-			// Complete captures only these outputs and releases the unused hold.
-			slog.Warn("worker stopped with partial outputs", "task_id", taskID, "requested", count, "completed", len(result.ImageURLs), "category", providerFailureCategory(err))
 			break
 		}
 		dataURL, err := slot.Accept(ctx, resp.ImageURL, resp.ContentType)
 		if err != nil {
-			if errors.Is(err, context.Canceled) || ctx.Err() != nil || len(result.ImageURLs) == 0 {
-				return providerCallResult{Receipt: resp.Receipt}, err
+			if len(result.ImageURLs) == 0 {
+				result.Receipt = resp.Receipt
 			}
-			slog.Warn("worker stopped after output acceptance failed", "task_id", taskID, "requested", count, "completed", len(result.ImageURLs))
+			if err := stopAfterError(err); err != nil {
+				return result, err
+			}
 			break
 		}
 		result.Receipt = resp.Receipt

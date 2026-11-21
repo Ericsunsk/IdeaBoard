@@ -2,6 +2,11 @@ import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../../core/nodes/canvasNodeFactory.ts'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../../board/ports/canvas'
+import {
+  capturePendingBoardTask,
+  getBoardScope,
+  isBoardScopeCurrent,
+} from '../../../../board/ports/canvasSession'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { resolveImageNodeFrameSize } from '../../../../board/ports/canvas'
 import type {
@@ -45,6 +50,7 @@ type PendingImageResultReservationParams = {
   source: ImageExecutionInput
   sourceNodeId: string
   outputCount: number
+  clientActionId: string
   resultOptions?: PendingImageResultOptions | undefined
 }
 
@@ -52,19 +58,16 @@ export type PendingImageResultExecution = {
   reservePendingResults: (
     params: PendingImageResultReservationParams,
   ) => PendingImageResultReservation
-  attachPendingTaskIds: (
-    slots: readonly Readonly<{
-      resultNodeId: string
-      taskId: string
-      resultIndex: number
-      clientActionId: string
-    }>[],
-  ) => void
   removePendingResults: (resultNodeIds: readonly string[]) => void
 }
 
 type PendingImageResultReservation = {
   resultNodeIds: string[]
+  acceptTask: (taskId: string) => {
+    isAttached: boolean
+    isPersisted: boolean
+    projectionError?: unknown
+  }
 }
 
 type PendingImageResultReservationPlan = {
@@ -286,6 +289,7 @@ export function usePendingImageResultExecution(
     if (!attachment || !options.isAttachmentCurrent(attachment)) {
       throw new Error('Pending result reservation requires the current Board attachment')
     }
+    const reservationAttachment = attachment
     let nextConnectionId =
       store.getEdgeIds().reduce((highest, edgeId) => {
         const match = /^connection-(\d+)$/.exec(edgeId)
@@ -308,6 +312,10 @@ export function usePendingImageResultExecution(
       plans.forEach((plan) => {
         const snapshot = (plan.nextNode.data as FlowNodeData).snapshotNode
         if (!snapshot || typeof snapshot !== 'object') return
+        Object.assign(snapshot, {
+          pendingClientActionId: params.clientActionId,
+          pendingResultIndex: resultNodeIds.indexOf(plan.resultNodeId),
+        })
         const nodeId = plan.resultNodeId as `image-${number}`
         if (store.getNode(nodeId)) transaction.updateNode(nodeId, () => snapshot as ImageNodeItem)
         else transaction.addNode(snapshot as ImageNodeItem)
@@ -320,44 +328,46 @@ export function usePendingImageResultExecution(
       throw new Error('Unable to reserve pending result nodes', { cause: error })
     }
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
-    options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
-    return { resultNodeIds }
-  }
-
-  function attachPendingTaskIds(
-    slots: readonly Readonly<{
-      resultNodeId: string
-      taskId: string
-      resultIndex: number
-      clientActionId: string
-    }>[],
-  ) {
-    const store = writeGraphStore()
-    const transaction = store.beginTransaction('node-update', {
-      origin: 'system',
-      shouldRecordHistory: false,
-      shouldMarkDirty: true,
+    const scope = getBoardScope()
+    const retainTask = capturePendingBoardTask({
+      boardId: attachment.boardId,
+      snapshot: store.exportSnapshot(),
+      resultNodeIds,
+      clientActionId: params.clientActionId,
     })
-    for (const slot of slots) {
-      const taskId = slot.taskId.trim()
-      if (!taskId) continue
-      const record = store.getNode(slot.resultNodeId as `image-${number}`)
-      if (record?.kind !== 'image') continue
-      const nextSnapshot: ImageNodeItem = {
-        ...(record.snapshot as ImageNodeItem),
-        pendingTaskId: taskId,
-        pendingResultIndex: slot.resultIndex,
-        pendingClientActionId: slot.clientActionId,
+
+    function acceptTask(taskId: string) {
+      const isPersisted = retainTask(taskId)
+      if (
+        !isBoardScopeCurrent(scope) ||
+        !options.isAttachmentCurrent(reservationAttachment) ||
+        options.readCanvasGraphStore() !== store
+      )
+        return { isAttached: false, isPersisted }
+      try {
+        const transaction = store.beginTransaction('node-update', {
+          origin: 'system',
+          shouldRecordHistory: false,
+          shouldMarkDirty: true,
+        })
+        resultNodeIds.forEach((resultNodeId) => {
+          const record = store.getNode(resultNodeId as `image-${number}`)
+          if (
+            record?.snapshot.type !== 'image-node' ||
+            record.snapshot.outputStatus !== 'running' ||
+            record.snapshot.pendingClientActionId !== params.clientActionId ||
+            (record.snapshot.pendingTaskId && record.snapshot.pendingTaskId !== taskId)
+          )
+            return
+          transaction.updateNode(resultNodeId as `image-${number}`, { pendingTaskId: taskId })
+        })
+        transaction.commit()
+        return { isAttached: true, isPersisted }
+      } catch (projectionError) {
+        return { isAttached: true, isPersisted, projectionError }
       }
-      transaction.updateNode(slot.resultNodeId as `image-${number}`, () => nextSnapshot)
     }
-    try {
-      transaction.commit()
-    } catch (error) {
-      transaction.cancel()
-      console.error('[Canvas] Failed to attach pending task ids', error)
-      return
-    }
+    return { resultNodeIds, acceptTask }
   }
 
   function removePendingResults(resultNodeIds: readonly string[]) {
@@ -383,7 +393,6 @@ export function usePendingImageResultExecution(
 
   return {
     reservePendingResults,
-    attachPendingTaskIds,
     removePendingResults,
   }
 }

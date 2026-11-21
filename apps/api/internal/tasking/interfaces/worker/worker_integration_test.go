@@ -98,7 +98,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 
 	// The args mirror exactly what workspaceTaskEnqueuer writes at submit.
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			if task.Status != tasks.StatusRunning {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
@@ -152,7 +152,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			return nil, fmt.Errorf("上游图像服务未配置，请联系管理员")
 		}))
 	if err := worker.Work(ctx, &river.Job[taskqueue.WorkspaceTaskArgs]{Args: taskqueue.WorkspaceTaskArgs{

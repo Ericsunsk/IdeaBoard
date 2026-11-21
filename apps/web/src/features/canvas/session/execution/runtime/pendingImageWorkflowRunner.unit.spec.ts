@@ -35,11 +35,12 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   const store = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()
   const attachment = core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
+  const acceptTask = vi.fn(() => ({ isAttached: true, isPersisted: true }))
   const pendingResults = {
     reservePendingResults: vi.fn(() => ({
       resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`),
+      acceptTask,
     })),
-    attachPendingTaskIds: vi.fn(),
     removePendingResults: vi.fn(),
   }
   const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
@@ -78,6 +79,7 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   return {
     attachment,
     afterTaskIdAttached,
+    acceptTask,
     cancelTasks,
     core,
     intent,
@@ -140,10 +142,8 @@ describe('pendingImageWorkflowRunner', () => {
       taskId: 'task-1',
       clientActionId: 'action-1',
     })
-    expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledExactlyOnceWith([
-      { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },
-    ])
-    expect(harness.afterTaskIdAttached).toHaveBeenCalledOnce()
+    expect(harness.acceptTask).toHaveBeenCalledExactlyOnceWith('task-1')
+    expect(harness.afterTaskIdAttached).not.toHaveBeenCalled()
     expect(harness.resolve).not.toHaveBeenCalled()
     expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
     expect(harness.cancelTasks).not.toHaveBeenCalled()
@@ -156,10 +156,7 @@ describe('pendingImageWorkflowRunner', () => {
     const harness = createHarness(['task-1', 'task-1'])
     await harness.runner.execute(harness.intent)
     expect(harness.transport.submit).toHaveBeenCalledWith(harness.intent.taskRequest, 'action-1')
-    expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledWith([
-      { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },
-      { resultNodeId: 'image-2', resultIndex: 1, taskId: 'task-1', clientActionId: 'action-1' },
-    ])
+    expect(harness.acceptTask).toHaveBeenCalledWith('task-1')
     expect(harness.core.snapshot().executions.every((fact) => fact.status === 'succeeded')).toBe(
       true,
     )
@@ -581,8 +578,10 @@ describe('pendingImageWorkflowRunner', () => {
       BoardGraphSession.create('board-a', { graphSession: store }),
     )
     const pendingResults = {
-      reservePendingResults: vi.fn(() => ({ resultNodeIds: ['image-1'] })),
-      attachPendingTaskIds: vi.fn(),
+      reservePendingResults: vi.fn(() => ({
+        resultNodeIds: ['image-1'],
+        acceptTask: () => ({ isAttached: true, isPersisted: true }),
+      })),
       removePendingResults: vi.fn(),
     }
     const observe = vi

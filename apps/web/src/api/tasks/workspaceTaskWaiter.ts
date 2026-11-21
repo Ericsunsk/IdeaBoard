@@ -9,9 +9,9 @@
 // Prefers the workspace SSE stream, using self-contained completion outputs
 // with the latest Task snapshot and refreshing other matching envelopes.
 // Falls back to polling when EventSource is unavailable or the
-// transport errors; reconciles current state after subscribing in case the
-// task settled first; rejects on timeout or abort. Failure/copy mapping
-// stays with the caller (feedback boundary).
+// transport errors; reconciles after subscribing and at low frequency because
+// a healthy live-only stream can miss terminal events; rejects on timeout or
+// abort. Failure/copy mapping stays with the caller (feedback boundary).
 
 import {
   assertWorkspaceTaskId,
@@ -39,6 +39,7 @@ const WORKSPACE_TASK_WAIT_TYPES = [
 ] as const
 
 const WORKSPACE_TASK_WAIT_TIMEOUT_MS = 6 * 60 * 1000
+const WORKSPACE_TASK_RECONCILE_INTERVAL_MS = 15_000
 const WORKSPACE_TASK_POLL_INITIAL_DELAY_MS = TASK_POLL_INITIAL_DELAY_MS
 const WORKSPACE_TASK_POLL_MAX_DELAY_MS = TASK_POLL_MAX_DELAY_MS
 const WORKSPACE_TASK_POLL_BACKOFF_FACTOR = TASK_POLL_BACKOFF_FACTOR
@@ -55,7 +56,8 @@ export type WaitWorkspaceTaskOptions = {
 /**
  * Resolve with the terminal workspace task (`completed`/`failed`/`cancelled`).
  * Prefers completion outputs from the workspace SSE stream and refreshes
- * matching task events as needed; falls back to polling when
+ * matching task events as needed, with low-frequency reconciliation for missed
+ * notifications; falls back to polling when
  * EventSource is unavailable or the transport errors. Rejects on timeout
  * or abort. Failure/copy mapping stays with the caller (feedback boundary).
  */
@@ -150,12 +152,15 @@ function waitWorkspaceTaskWithStream(
 ): Promise<WorkspaceTaskItem> {
   return new Promise((resolve, reject) => {
     let settled = false
-    let refreshing = false
+    let refreshPromise: Promise<WorkspaceTaskItem> | undefined
     let hasPendingRefresh = false
     let currentItem = initialItem
     let unsubscribe: () => void = () => undefined
+    let reconcileTimer: ReturnType<typeof setTimeout> | undefined
 
     const cleanup = () => {
+      clearTimeout(reconcileTimer)
+      reconcileTimer = undefined
       readOptions.signal?.removeEventListener('abort', onAbort)
       unsubscribe()
     }
@@ -175,35 +180,58 @@ function waitWorkspaceTaskWithStream(
       if (settled) return
       settled = true
       cleanup()
-      pollWorkspaceTaskTerminal(workspaceId, taskId, deadlineAt, pollOptions, readOptions).then(
-        resolve,
-        reject,
-      )
+      Promise.resolve(refreshPromise)
+        .catch(() => undefined)
+        .then((item) => {
+          readOptions.signal?.throwIfAborted()
+          if (item && isWorkspaceTaskTerminal(item.status)) return item
+          return pollWorkspaceTaskTerminal(
+            workspaceId,
+            taskId,
+            deadlineAt,
+            pollOptions,
+            readOptions,
+          )
+        })
+        .then(resolve, reject)
     }
     const onAbort = () => {
       settleReject(readOptions.signal?.reason ?? new Error('Workspace task wait aborted'))
     }
     readOptions.signal?.addEventListener('abort', onAbort, { once: true })
 
+    const scheduleReconciliation = () => {
+      if (settled) return
+      clearTimeout(reconcileTimer)
+      reconcileTimer = setTimeout(() => {
+        reconcileTimer = undefined
+        // An in-flight GET owns the next timer; a timer never queues another GET.
+        if (refreshPromise === undefined) void refreshTask()
+      }, WORKSPACE_TASK_RECONCILE_INTERVAL_MS)
+    }
+
     const refreshTask = async () => {
       if (settled) return
-      if (refreshing) {
+      if (refreshPromise !== undefined) {
         // The in-flight snapshot may predate this event.
         hasPendingRefresh = true
         return
       }
-      refreshing = true
       try {
-        const item = await getWorkspaceTask(workspaceId, taskId, readOptions)
+        refreshPromise = getWorkspaceTask(workspaceId, taskId, readOptions)
+        const item = await refreshPromise
         currentItem = item
         if (isWorkspaceTaskTerminal(item.status)) settleResolve(item)
+        else scheduleReconciliation()
       } catch (error) {
         if (isWorkspaceTaskGoneError(error)) settleReject(error as Error)
       } finally {
-        refreshing = false
+        refreshPromise = undefined
         if (hasPendingRefresh) {
           hasPendingRefresh = false
           void refreshTask()
+        } else if (reconcileTimer === undefined) {
+          scheduleReconciliation()
         }
       }
     }

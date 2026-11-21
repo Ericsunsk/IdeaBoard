@@ -148,7 +148,16 @@ func (s *Service) Create(ctx context.Context, input tasks.CreateInput, idempoten
 		return nil, fmt.Errorf("workspacetasks: settlement unavailable: %w", tasks.ErrQuoteUnavailable)
 	}
 	quantity := input.Quantity
-	if quantity <= 0 {
+	if input.CanonicalParams != "" {
+		var requested *int64
+		if quantity != 0 {
+			requested = &quantity
+		}
+		quantity, err = ResolveSubmissionQuantity(input.CanonicalParams, requested)
+		if err != nil {
+			return nil, err
+		}
+	} else if quantity <= 0 {
 		quantity = 1
 	}
 	resolution := strings.TrimSpace(input.Resolution)

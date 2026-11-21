@@ -488,6 +488,9 @@ export function createPendingImageExecutionCore(
     begin,
     hydratePendingLease,
     claimHydratedLease,
+    releaseHydratedLease: (lease) => {
+      claimedHydrationLeases.delete(lease)
+    },
     markSubmitted,
     fail,
     cancel: (leases) =>

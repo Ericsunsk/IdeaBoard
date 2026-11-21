@@ -118,7 +118,6 @@ function createReattachWorkspace(
     boardBaseSnapshot: ref(store.exportSnapshot()),
     pendingResults: {
       reservePendingResults: vi.fn(),
-      attachPendingTaskIds: vi.fn(),
       removePendingResults: vi.fn(),
     },
     executionCore: core,
@@ -147,7 +146,10 @@ describe('useCanvasExecutionWorkspace', () => {
     const graph = createStore()
     const core = createPendingImageExecutionCore()
     core.attachBoard(BoardGraphSession.create('board-a', { graphSession: graph }))
-    const reservePendingResults = vi.fn(() => ({ resultNodeIds: ['image-1'] }))
+    const reservePendingResults = vi.fn(() => ({
+      resultNodeIds: ['image-1'],
+      acceptTask: () => ({ isAttached: true, isPersisted: true }),
+    }))
     vi.mocked(submitTaskRequest).mockClear()
     const workspace = useCanvasExecutionWorkspace({
       nodes: ref([]),
@@ -157,7 +159,6 @@ describe('useCanvasExecutionWorkspace', () => {
       boardBaseSnapshot: ref(createEmptyBoardSnapshot()),
       pendingResults: {
         reservePendingResults,
-        attachPendingTaskIds: vi.fn(),
         removePendingResults: vi.fn(),
       },
       executionCore: core,
@@ -218,7 +219,7 @@ describe('useCanvasExecutionWorkspace', () => {
       const core = createPendingImageExecutionCore()
       core.attachBoard(BoardGraphSession.create('board-a', { graphSession: store }))
       const flushAutosave = vi.fn(async () => undefined)
-      const attachPendingTaskIds = vi.fn()
+      const acceptTask = vi.fn(() => ({ isAttached: true, isPersisted: true }))
       const waitTaskImageOutcome = vi.fn<TaskImageOutcomeWaiter>(async () => ({
         kind: 'completed',
         results: Array.from({ length: outputCount }, (_, resultIndex) => ({
@@ -237,9 +238,9 @@ describe('useCanvasExecutionWorkspace', () => {
         boardBaseSnapshot: ref(createEmptyBoardSnapshot()),
         pendingResults: {
           reservePendingResults: () => ({
+            acceptTask,
             resultNodeIds: Array.from({ length: outputCount }, (_, index) => `image-${index + 1}`),
           }),
-          attachPendingTaskIds,
           removePendingResults: vi.fn(),
         },
         executionCore: core,
@@ -260,16 +261,7 @@ describe('useCanvasExecutionWorkspace', () => {
         aspectRatio: 'auto',
         resultOptions: {},
       } as never)
-      expect(attachPendingTaskIds).toHaveBeenCalledWith(
-        Array.from({ length: outputCount }, (_, resultIndex) =>
-          expect.objectContaining({
-            resultNodeId: `image-${resultIndex + 1}`,
-            resultIndex,
-            taskId: 'task-1',
-            clientActionId: expect.any(String),
-          }),
-        ),
-      )
+      expect(acceptTask).toHaveBeenCalledWith('task-1')
       expect(waitTaskImageOutcome).toHaveBeenCalledOnce()
       expect(flushAutosave).toHaveBeenCalledWith({ isSilent: true })
       expect(core.snapshot().executions).toHaveLength(outputCount)

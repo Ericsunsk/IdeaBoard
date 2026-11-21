@@ -70,11 +70,11 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
 	}
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+		func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 			if task.Status != tasks.StatusRunning {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
-			return materializingProvider(t, env.media, objects, png)(ctx, task)
+			return materializingProvider(t, env.media, objects, png)(ctx, ctx, task)
 		}))
 	// The shared test worker carries no renderer; rebuild with the #827
 	// renderer so the loop exercises the production ordering

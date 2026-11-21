@@ -2,6 +2,16 @@
 
 Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 
+## 2026-11-17 — Canvas 本地图片连续显示验收
+
+- 2026-11-17（Asia/Shanghai），[PR #994](https://github.com/Ericsunsk/IdeaBoard/pull/994) 与后续 [PR #995](https://github.com/Ericsunsk/IdeaBoard/pull/995) 修复三类原因：Graph 投影丢失 attachment 的 runtime 上传预览（含增量提交及 remote/save/recovery 完整投影）；source identity 变化重建引用已释放 Blob 的图片 DOM，且旧帧 loaded 状态被重置；可见 Canvas 的 detached Image decode 默认请求优先级导致 Chromium 约 15 秒调度等待。#994 初次上线后的真实 QA 仍复现 3.339 秒交接空窗，#995 补齐完整投影路径，不能把初次上线当作完整验收通过。
+- 2026-11-17，最终 `Ericsunsk/IdeaBoard@453fd4cff6bc534642f2676692a3e1d88d0d7edd` 经 [main CI](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44101848382) 与 [Cloudflare Pages deployment `2eb70314`](https://2eb70314.ideaboard-b2r.pages.dev) 验证通过，正式 `https://ideaboard.art` script/style 与该部署一致。完整 FlowCanvasNode 的 remote/save/recovery Chromium 回归旧实现均红、修复后绿；7 个 browser tests、96 个相关 unit tests、app/test typecheck、lint/guardrails/strict import 与 public surface 通过。公开 Seam inventory 仅按生成流程登记新测试 consumer/measurements，未放宽 API、ownership 或 deep-import allowance；本轮未发布 backend 或 Docker tag。
+- 2026-11-17，无 override 的正式 QA 画板 `QA PR994 image regression 2026-11-17` 上传交接采样 725 次：38ms 显示 Blob，上传期间拖动保持 512px 完整，4568ms 同一图片 DOM 直接换 managed URL，empty/Preparing/undecoded 与图片错误均为 0。双轮刷新全部 4 图分别 3475ms / 3516ms 解码完成（8 秒预算内），每图 512×384、256/256 非黑采样，derivative 3–10ms；拖后 `translate(835px,145px)` 两轮保持。QA 板保留 4 个合成图节点，未触碰用户原画板/原图或提交计费任务。临时证据 `/tmp/ideaboard-pr995-{handoff,reloads}-final.json` 与 `/tmp/ideaboard-pr995-final.png` 不保证跨会话保留，持久来源为上述 PR、commit、CI 与部署；本段补充 Canvas runtime 验收，不改写下方 v0.1.41 的图片基础设施恢复历史。
+
+## 2026-11-17 — v0.1.41 图片恢复验收通过
+
+- 2026-11-17（Asia/Shanghai），`Ericsunsk/IdeaBoard@736e0673bedcb66c3aa5393cac54745f216bfdf4` 经 [v0.1.41 正式签名发布](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44055861923) 上线后，浏览器确认 Search 24/24、既有 Local 两素材 × 三个 Display Tiers、active S3 Branding Logo 全部 HTTP 200 且实际解码成功，原 Canvas 图节点正常显示。运行态复核确认 imgproxy `65532:65532`、共享 volume 只读、health 200，持续运行超过四分钟且 restart 0。此后验收取代下方“Local 未恢复 / 后续发布待验”的历史状态；未改写历史，未修改对象、文件权限或数据库。
+
 ## 2026-11-17 — imgproxy 正式恢复与 Local 权限后续
 
 - 2026-11-17（Asia/Shanghai），用户批准生产修复后，`Ericsunsk/IdeaBoard@0840d6f0ee3ac9faef1776e3620c9c621f345f57` 经 [v0.1.39 正式签名发布](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44049510265) 上线，Cloud boolean、path-style 与既有 S3 secret 同步；浏览器 Search 24/24 图片及 active S3 Branding Logo 均 200 并成功解码，取代下方“未授权、线上未恢复”的历史状态。Local 受管素材原图 200、derivatives 404，不能据此声明全部恢复。
@@ -153,3 +163,72 @@ Related: [Wiki Index](../index.md), [DEVELOPMENT.md](../../../DEVELOPMENT.md)
 - 2026-11-06，Member Quota focused 与独立回归、app/test typecheck、定向 ESLint/format、strict dependencies 与正反 fixtures、API surface 通过。最终 frontend `npm run build`（vue-tsc/Vite/bundle size）、只读 manifest diff 与 normal/production Knip 通过。依赖 gate 首次发现真实 measurements drift 后，仅同步 [Seam inventory](../../frontend-seam-inventory.md) 九个既有 entries 的 consumer/fan measurements；ownership、public exports/deep-import allowances 未变，无新增 waiver。
 - 2026-11-06，Task Readiness semantic/HTTP 独立回归、实现方相关包测试、targeted race（3 packages，0 skip）与 Go build 通过；相关包报告的 **181 skip events** 中，178 项受 DSN gate、3 项受 NATS gate 限制，不计作集成通过。实现方另用隔离临时 DB 通过 [两个 production adapter/Submit parity cases](../../../apps/api/internal/tasking/application/workspacetasks/readiness_test.go)：Personal Actor + private Board → Editor 的零预检写入，以及 Org Admin cap 拒绝与 pending Hold parity；独立复核核对源码、原始 JSON 与 DB/role cleanup 机制，未独立重跑 DB。
 - 2026-11-06，本轮不声称全量 Org Owner/role matrix 的 DB 覆盖；queue 证据为 canonical transaction enqueue probe，非 live River/NATS worker。未重跑完整 frontend suites、Browser/视觉、live backend 或 migration replay。持久依据为上述实现/tests 与 Account/Workspace/Tasking CONTEXT；`/tmp/ideaboard-deepen-*.md` 和日志仅为临时补证。
+
+
+## 2026-11-18 — Canvas auto 比例与输出尺寸验收
+
+- [#996](https://github.com/Ericsunsk/IdeaBoard/pull/996) 将图生图 `auto` 固定为首张输入图片的原始比例，由 Backend 统一按 1k/2k/4k 长边计算尺寸；canonical main CI 通过，signed release `v0.1.42` 的 source 为 `d3c9bcaeaf6c05c8f563513b0d2429ac49201481`，Production 部署与健康检查通过。
+- [#997](https://github.com/Ericsunsk/IdeaBoard/pull/997) 使用 Task / Media 原图尺寸显示结果，并只读校正既有节点比例；source `91f6b6fc5c9311c1231d5ac1884d8445943dc136` 的 main CI 与 Pages 均通过。Production native reload 命中 `index-CKf3AA4w.js`，1254×1254 原图对应 Stage 260×260；Board revision 26、保存的 width / position / ratio 均未变化。
+- 验证涵盖尺寸合同、metadata 优先级、preview / handoff 与完整 Media DTO 回归；未执行真实付费生成（paid generation unverified），未写入生产 Board。
+
+
+## 2026-11-18 — CI/CD 首批精简与验证
+
+- 2026-11-18，[#998](https://github.com/Ericsunsk/IdeaBoard/pull/998) 合入 `Ericsunsk/IdeaBoard@1c0905de9fab90efa4ee91f458948a994933792e`：Grype cache 恢复数据库 bytes；删除 Web Unit/Browser Report 合并 jobs；CI Build 直接执行 Vite + bundle budget，独立 App/Node/test Typecheck 与本地 build 保持；三项 CI 纯自测文件只选 Ops，真实 runner/planner 保留原影响范围。全部 shards、测试 exit code、日志、blob artifacts 和逐 digest DB update / High/Critical scan / cosign gate 保留。
+- 2026-11-18，本地 41 Ops self-tests、workflow 正反 fixtures、dependency map（52 edges / 29 inputs）、actionlint、ShellCheck、gofmt、既有 YAML 风格和 diff 检查通过，独立 review 无阻塞。exact PR head `3a8b4d501` 的 [PR CI](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44286063574) 与 exact merge commit 的 [main CI](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44286550680) 最终均 success。两次样本 wall-clock 分别 215s / 184s，Web Build 均 38s；样本范围与缓存条件不同，不据此推导稳定节省。
+- 2026-11-18，执行事故：shell 未因全绿断言失败停止，PR 于 **10:33:34 UTC** 提前合入；最后 Unit (2/4) 于 **10:33:49 UTC**、PR CI Gate 于 **10:34:07 UTC** 才 success，main CI Gate 于 **10:36:40 UTC** success。这不满足先全绿再合入的顺序。纠正方式：依赖检查与 merge 分两次工具调用，读取 exact-head 完整成功结果后才调用 match-head merge；未改 branch protection 或外部设置。
+- 2026-11-18，本轮未触发 tag/release 或修改 Production 设置。`release-artifacts.py` 对整个 `publish-images` job 计算 build_recipe hash，cache 一行改动会使下一自然 release 的五个 image 首次重建；本轮不改 fingerprint 算法。实际 Grype cache 收益仍待下一自然 release 验证，不能将 PR/main CI 的结构验证当作缓存收益实测。
+
+
+## 2026-11-19 — 维护入口与发布指纹精简评估
+
+- 2026-11-19，基于 `Ericsunsk/IdeaBoard@1c0905de9fab90efa4ee91f458948a994933792e` 只读评估：[README Quickstart](../../../README.md) 仍要求覆盖 `docker/.env`、直接 source 该文件并分别执行 API/Auth migration；[DEVELOPMENT.md](../../../DEVELOPMENT.md#本地开发) 已说明该文件为 tracked encrypted secret、不得从 example 覆盖，并以 `process-compose` 与 `scripts/migrate.sh` 编排启动。建议先将 README 的重复初始化命令收敛为 canonical onboarding 链接与启动入口，保留版本来源引用；仅评估，未实施。
+- 2026-11-19，核对 [release-artifacts.py](../../../scripts/release-artifacts.py) 的 `build_recipe`、`fingerprint` 与 `make_plan`，并在内存中仅将实际 workflow 的 scan timeout 从 10 改为 11：API、API migrator、Auth、Auth migrator、Realtime 五个 fingerprint 全部变化，未改 Git inputs 或仓库文件。建议由现有 fingerprint owner 直接读取实际 build recipe，最小试点排除 build 完成后的 scan/sign/metadata，并补结构异常拒绝复用的 contract；不增加重复 recipe 清单，不削弱逐 digest scan、签名与 provenance。算法变更预计触发一次保守重建，稳定收益须自然 release 验证；本轮未实施。
+- 2026-11-19，`bash scripts/release-artifacts-test.sh` 的 10 tests 与 `bash scripts/handbook-version-contract.sh` 通过；后者检查版本引用和链接，不能证明 README 启动步骤有效。相关代码通过 graph、CodeGraph/source 与 coverage 交叉核对；未运行部署、真实 onboarding 或外部写入。本段仅记录观察和建议，不替代 canonical 文档，也不声称精简已完成。
+
+
+## 2026-11-19 — 四项精简合入与验证
+
+- 2026-11-19，[#999](https://github.com/Ericsunsk/IdeaBoard/pull/999) 合入 `Ericsunsk/IdeaBoard@7eb6b9aae16ed052a27e9700dbafede72cb4a994`：README Quickstart 收敛到 `DEVELOPMENT.md` 与根目录 `process-compose` 入口，移除覆盖加密 `.env`、直接 source 与重复的逐服务启动命令；保留首次准备和版本来源。Handbook version/link contract、anchor 与区块外逐字一致检查通过，未执行本地 migration。
+- 2026-11-19，[#1000](https://github.com/Ericsunsk/IdeaBoard/pull/1000) 合入 `Ericsunsk/IdeaBoard@1d2de50e24a654bd25f05f796544b45c617e979e`：Canvas 完整替换的上传／Library preview 保留策略回到既有 Graph→Flow projection owner，incremental runtime data 策略和 Stage decode/handoff 保持。173 unit/component tests、7 Chromium tests 及相关 type/boundary/public surface 检查通过；canonical main CI 与对应 Cloudflare Pages check success。
+- 2026-11-19，[#1001](https://github.com/Ericsunsk/IdeaBoard/pull/1001) 合入 `Ericsunsk/IdeaBoard@2908e14e2062a0d70a2d4dea5150c5c04b33655c`：移除无生产 caller 的 readiness compiler mode、synthetic media 分支和旧入口，HTTP/OpenAPI、持久化格式与生产 transaction 未变。相关本地 suites 449 pass；134 PostgreSQL tests 因缺少 `API_TEST_DATABASE_DSN` 跳过，不计为通过；三个 Go modules build、退役 identifier 零引用检查及 canonical PR/main CI 通过。
+- 2026-11-19，[#1002](https://github.com/Ericsunsk/IdeaBoard/pull/1002) 合入 `Ericsunsk/IdeaBoard@80d14010135dd715994e43cd639f4bcec80f21d8`：image fingerprint 连续覆盖实际 build 前缀，排除 build 后的 scan/cache/sign/metadata；未知 YAML、shell/interpreter/condition、action 或文件输入禁用 reuse、保守构建。历史 v2/v3 source/target 校验保留，source-frozen 闭包证据不依赖后来的常量。17 release 回归、plan/provenance/eligibility/workflow contracts、6 deployment-bundle tests 与完整 Ops CI 通过；独立复核对真实旧 tag `v0.1.42` 的五个 fingerprint 与 legacy 算法逐项比对一致。
+- 2026-11-19，上述四项均在 exact PR head CI success 后由根代理 match-head 合入；对应 canonical main push CI 全部 success：[#999](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44362020381)、[#1000](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44365630367)、[#1001](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44367915687)、[#1002](https://github.com/Ericsunsk/IdeaBoard/actions/runs/44377552745)。本段取代此前“仅评估、未实施”的状态，不改写旧记录。v2 → v3 首次自然 release 将保守重建五张 image，真实复用与耗时收益仍待后续自然 release；本轮未触发 tag/release 或后端 Production 发版；Cloudflare Pages 按既有 Git 流程自动执行。
+
+
+## 2026-11-21 — Prompt Apply 资产引用修复（未提交 worktree）
+
+- 2026-11-21，基于 `Ericsunsk/IdeaBoard@c56657d1086376c697fab88f5140963c9fa84076` 的未提交修复定位：上传与连接图片保留 `mediaRef.assetId`，但 [generationIntent](../../../apps/web/src/features/canvas/session/image-workflow/generationIntent.ts) 将 `mediaRef` 传入仅消费顶层 `assetId` 的 Execution Plan，导致合法引用触发 missing-asset warning。修复在 Apply 边界翻译 identity，并复用既有 execution public type；未放宽 Task request 的资产校验。
+- 2026-11-21，首次真实 intent → planner → request 复现得到相同 warning；保留的 [回归测试](../../../apps/web/src/features/canvas/session/image-workflow/generationIntent.unit.spec.ts) 通过 public seam 验证上传/连接引用 identity、顺序、数量、未受管引用保留与纯文本路径，原版代码 **4 failed / 1 passed**，修复后 **5 passed**。相关六 suites **64 passed**；测试调整后受影响三 suites **36 passed**。完整 Web build、test typecheck、targeted ESLint、test guardrails 和 public surface 校验通过；[Seam inventory](../../frontend-seam-inventory.md) 仅同步实际 public consumer/target 变化，无新增 private import 例外。
+- 2026-11-21，本轮未 commit、未部署，也未执行 Browser 交互或真实付费生成；以上是未提交 worktree 的本地验证，不代表该 HEAD 已包含修复。Agent 环境改进限于保留可重跑回归与真实类型边界；不新增治理流程。
+
+
+## 2026-11-21 — 生图链路只读审计与轻量回顾
+
+- 2026-11-21，以下五项以 `Ericsunsk/IdeaBoard@c56657d1086376c697fab88f5140963c9fa84076` 为代码基线，经独立复核；上节未提交的 Prompt Apply 修复不影响结论。本轮不修生产源码，保留原有五项文件改动，未运行 Browser、付费生成、部署或外部写入。
+- **P1 — 提交期间切换 Workspace / logout。** [adapter](../../../apps/web/src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.ts) `:101` 在成功创建 Task 后抛出 `board_scope_changed`、丢弃 taskId；原 Board 缺少 pendingTaskId，被 [task snapshot](../../../apps/web/src/features/canvas/session/execution/pending-execution/taskSnapshot.ts) `:14` 排除。后台可继续执行和扣费，前端无法自动恢复结果。
+- **P1 — quantity / output_count 不绑定。** [公开 API](../../../apps/api/internal/runtime/interfaces/http/v1/tasks/tasks.go) `:510/:576` 允许 `output_count=4`、quantity 省略或为 1；[settlement](../../../apps/api/internal/tasking/application/workspacetasks/settle_tx.go) `:143/:261` 按 quantity Hold、按实际输出结算。[DB contract](../../../apps/api/internal/db/migrations/20261113000000_baseline.sql) `:4932` 拒绝超出 snapshot quantity（`IB203`），[worker](../../../apps/api/internal/tasking/interfaces/worker/execution.go) `:106` 随后 failed / refund。用户无图，平台已付生成成本；未证明用户少付费拿到多图。
+- **P1 — 多图 deadline 后重发已成功 slot。** [worker](../../../apps/api/internal/tasking/interfaces/worker/worker.go) `:298` 共享 360 秒 budget；[provider](../../../apps/api/internal/runtime/interfaces/worker/providers/execute.go) `:347/:112` 在已有图时返回 deadline、跳过 finalize / persist；[settle](../../../apps/api/internal/tasking/interfaces/worker/settle.go) `:118` 按 Retryable 整任务重排。provider `:102` 无上游 idempotency key，可重复承担已成功 slot 的生成成本。
+- **P2 — SSE 首次 open 前漏终态。** [waiter](../../../apps/web/src/api/tasks/workspaceTaskWaiter.ts) `:245` 在 stream 真正 open 前完成第二次 GET；此后到 [live-only handshake](../../../apps/web/src/api/realtime/workspaceEventStream.ts) `:338` 之间的终态可被健康 stream 漏过。正常 Runner 约 360 秒后后台补查，表现为结果延迟。
+- **P2 — 恢复超时后不再 observe。** [recovery coordinator](../../../apps/web/src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts) `:144/:164` 保留 pending，但 [hydrate claim](../../../apps/web/src/features/canvas/session/execution/pending-execution/core.ts) `:283` 不释放；同 attachment 后续 recover 一直 running，刷新或重进可恢复。
+- 2026-11-21，Workspace 问题由真实 adapter + Runner + GraphStore 的两个临时用例复现；另两项前端问题由 fake-timer 用例复现，均独立复跑。相关既有检查 **6 suites / 89 tests** 与结果复核 **7 files / 101 tests** 通过，集合重叠，不相加。quantity 问题仅经独立静态复核，无 DB / 付费复现。deadline 的 std-only 原函数提取测试以 10ms deadline、stub client / transfer 得到首轮 calls=2、accepted=1、returned_images=1 且返回 deadline；retry 累计 calls=6、slot indexes `[0 1 0 1 2 3]`，独立复跑一致，不代表完整 provider / River / DB 集成通过。该测试以 `GOPROXY=off GOSUMDB=off go test -v ./...` 执行，临时证据目录 `/var/folders/vg/6pndbyhd7xjb07p65yzfg0_80000gn/T/ideaboard-exact-callworker-9pjvjao3` 不保证跨会话保留；完整 Go tests 因缺少 `klauspost/compress@v1.20.2` 等依赖无法运行。
+- 2026-11-21，轻量回顾：上一轮 Prompt Apply 测试因 private deep imports 触发 strict dependency lint 返工，改用既有 public seam 后检查通过。后续先选择 public seam、用无付费 fake-timer 验证时间窗口，并预检 Go 依赖；[既有 Public API 规则](../../../apps/web/DESIGN.md) 与 [验证入口](../../../DEVELOPMENT.md) 已覆盖边界和检查职责，本轮不重复添加规范、不创建 skill。
+
+
+## 2026-11-21 — 生图链路修复计划发布（未提交 worktree）
+
+- 2026-11-21，基于 `Ericsunsk/IdeaBoard@c56657d1086376c697fab88f5140963c9fa84076` 的[只读审计](#2026-11-21--生图链路只读审计与轻量回顾)，用户授权逐项修复五项既有 seams；发布 [Spec #1003](https://github.com/Ericsunsk/IdeaBoard/issues/1003)，原生 sub-issues 为 [#1004 quantity / output_count](https://github.com/Ericsunsk/IdeaBoard/issues/1004)、[#1005 多图 deadline partial](https://github.com/Ericsunsk/IdeaBoard/issues/1005)、[#1006 submit pending 跨 Workspace / logout](https://github.com/Ericsunsk/IdeaBoard/issues/1006)、[#1007 SSE 首次 handshake](https://github.com/Ericsunsk/IdeaBoard/issues/1007)、[#1008 recovery timeout 再观察](https://github.com/Ericsunsk/IdeaBoard/issues/1008)。六票均标记 `ready-for-agent`；五个子 issue 的 `Blocked by` 均为 None，1→5 仅表示用户指定执行顺序，不构造技术依赖。
+- 2026-11-21，计划保留 Tasking acceptance / settlement、Runtime Provider、Canvas lifecycle 与 API realtime 的既有职责；Task GET 为权威事实，SSE 为通知。验收复用 public seams、fake Worker、fake timers 与相关 DB 回归；不新增 schema、不部署、不执行付费生成、不扩大取消语义、不进行跨进程 crash idempotency 重构。历史已关闭的 #984、#629、#859、#903 仅作为边界背景，不重开。
+- 2026-11-21，记录 `implement-spec` 独立 integration branch / 每票 worktree 流程的本轮例外：共享工作区已含用户未提交的 Prompt Apply 修复、测试与文档依赖，按用户保护工作要求继续在该工作区顺序增量实施，不 stash、不搬运、不提交用户改动、不切换 branch，也不创建无内容 PR。此段只记录计划发布和流程选择，不宣称任何修复或验收完成；issues 保持 open，完成记录与关闭等待最终验证。
+
+
+## 2026-11-21 — 生图链路五项修复与验证（未提交 worktree）
+
+- 2026-11-21，[Spec #1003](https://github.com/Ericsunsk/IdeaBoard/issues/1003) 的五项修复已在基于 `Ericsunsk/IdeaBoard@c56657d1086376c697fab88f5140963c9fa84076` 的本地未提交 worktree 实现并验证；本段 **supersedes** [此前只读审计](#2026-11-21--生图链路只读审计与轻量回顾) 的五项待修诊断及[计划发布](#2026-11-21--生图链路修复计划发布未提交-worktree)的未实施状态，保留旧记录。HEAD 未包含这些修复，commit range 为空，未合并、未部署；#1003–#1008 保持 open。
+- 2026-11-21，[#1004](https://github.com/Ericsunsk/IdeaBoard/issues/1004)：[Task acceptance quantity](../../../apps/api/internal/tasking/application/workspacetasks/quantity.go) 从规范化 Plan 派生缺省值，显式冲突在 Quote / Hold / Task / enqueue 前拒绝。真实数量回归先红后绿；两个 Go 包 standard / race、完整 Go build 通过。隔离 PostgreSQL 17 验证冲突无副作用、四图 Capture 40、48 项 billing 与 2 项 atomic 回归通过；OpenAPI 移除 quantity 的 default 1，经 Orval 正规生成 DTO 注释，相关 Web 41 tests 通过。
+- 2026-11-21，[#1005](https://github.com/Ericsunsk/IdeaBoard/issues/1005)：[Provider execution](../../../apps/api/internal/runtime/interfaces/worker/providers/execute.go) 与 [Worker settlement](../../../apps/api/internal/tasking/interfaces/worker/settle.go) 保留 deadline 前成功输出、持久化后按实际数量结算，不整批重发成功 slot；Canceled 优先，parent cancel 不误报成功。真实 Provider 2–4 图逐 slot deadline 矩阵及完整 bridge 的 0–3 图路径通过：partial Capture 10 / 20 / 30、释放余量、requeue 0；零输出保留 retry 1。独立 PostgreSQL partial 1–3 与 atomic 检查无 skip，provider / worker / wiring race 与完整 Go build 通过。
+- 2026-11-21，[#1006](https://github.com/Ericsunsk/IdeaBoard/issues/1006)：[submission adapter](../../../apps/web/src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.ts) 成功返回已接受 taskId，[Board persistence](../../../apps/web/src/features/board/session/persistence/state.ts) 对捕获的原 scope draft 窄合并并保留 reservation；autosave / remote 新 snapshot 仅合并同 action 的 pendingTaskId，不复活删除、不污染新 User / Workspace。相关 10 suites / 194 tests、type / build、ESLint、strict imports / fixtures、guardrail / surface 通过；独立复核的 97 与 64 tests 有重叠，不相加。storage 拒写且 detach 时不能保证完全 durable，保留带 taskId 的原 scope warning，不自动重提或错误 cancel。
+- 2026-11-21，[#1007](https://github.com/Ericsunsk/IdeaBoard/issues/1007)：[Task waiter](../../../apps/web/src/api/tasks/workspaceTaskWaiter.ts) 在健康 stream 期间每 15 秒用 authoritative Task GET 补漏，维持 singleflight、断线 fallback 和 cleanup，覆盖首次 handshake 终态窗口。相关 7 suites / 160 tests、type / build、imports / ESLint 通过，独立复核 53 tests 通过。
+- 2026-11-21，[#1008](https://github.com/Ericsunsk/IdeaBoard/issues/1008)：[Recovery Coordinator](../../../apps/web/src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts) 保持前台 360 秒返回语义，后台复用八轮 5→60 秒续等（315 秒，总预算 675 秒）；terminal observation cache 只续 pending，exact claim release、去重与 fencing 保留。预算耗尽时明确 warning、保留 taskId 并允许同 attachment 再 recover。相关 6 suites / 95 tests、type / build、ESLint / format、strict imports / fixtures、guardrail / surface 通过，独立复核 43 tests 与 app typecheck 通过。
+- 2026-11-21，五项均逐项 red / green 并经独立 review；最终固定补丁经 fresh Standards / Spec 两轴复核 **PASS / 0 findings**。本地 review artifact 为 `/tmp/ideaboard-final-image-review`，56-file fixed point 的 `final.patch` SHA256 为 `000b5c26c43c1962ba90209f58caf36c2e397d36a2dc7fd8a7f66a6de418e295`（临时目录不保证跨会话保留）；该指纹包含记录追加前的文档，不代表 commit。不同测试集合有重叠，不累计总数。
+- 2026-11-21，本轮无 schema 变更，隔离 PostgreSQL 容器已清理；未执行 Browser、真实付费生成或部署。Provider 跨进程 crash、上游已接受但尚未返回的结果仍在 scope 外。后续若需回退，按票移除本轮增量并保留既有 Prompt Apply 与用户修改；生产未发布，无生产回滚动作。

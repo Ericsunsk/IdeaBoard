@@ -1,7 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import type { BoardSnapshot, BoardState } from '../../../board'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
+import { setStoredAuth } from '../../../../core/utils/auth'
+import { getWorkspaceSelectionStore } from '../../../workspace'
+import {
+  capturePendingBoardTask,
+  loadBoardState,
+  setBoardState,
+} from '../../../board/ports/canvasSession'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
 import {
   BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
@@ -93,6 +100,63 @@ describe('useBoardSession', () => {
     // and no second sync ride the save.
     expect(events).toEqual(['stabilize', 'repository.save'])
     expect(repository.sync).not.toHaveBeenCalled()
+  })
+
+  test('keeps accepted task identity when an earlier save finishes media stabilization', async () => {
+    setStoredAuth({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'tester',
+      avatar: '',
+      role: 'user',
+    })
+    getWorkspaceSelectionStore().select('ws_stabilize123')
+    const snapshot = makeBoardSnapshot({
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: '',
+          sourceImageRatio: 1,
+          outputStatus: 'running',
+          outputImages: [],
+          pendingClientActionId: 'action-origin',
+          pendingResultIndex: 0,
+        },
+      ],
+    })
+    const retain = capturePendingBoardTask({
+      boardId: 'board-a',
+      snapshot,
+      resultNodeIds: ['image-1'],
+      clientActionId: 'action-origin',
+    })
+    let finish!: (snapshot: BoardSnapshot) => void
+    const session = useBoardSession({
+      getBoardIdQuery: () => 'board-a',
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+      repository: createRepository({
+        save: vi.fn(async (boardId, received) => setBoardState(boardId, received)!),
+      }),
+      message: { warning: vi.fn() },
+      createUploadLifecycle: () => ({
+        stabilizeSnapshotForSave: () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      }),
+    })
+    const saving = session.save(snapshot)
+    expect(retain('task_accepted')).toBe(true)
+    finish({ ...snapshot, imageNodes: [{ ...snapshot.imageNodes[0]!, x: 999 }] })
+    await saving
+
+    expect(loadBoardState('board-a')?.imageNodes[0]).toMatchObject({
+      x: 999,
+      pendingTaskId: 'task_accepted',
+    })
   })
 
   it('rejects with BOARD_NOT_FOUND before creating an upload lifecycle', async () => {

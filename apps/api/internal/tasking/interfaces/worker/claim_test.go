@@ -129,7 +129,7 @@ type countingProvider struct {
 	calls int
 }
 
-func (p *countingProvider) Generate(context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+func (p *countingProvider) Generate(context.Context, context.Context, *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 	p.mu.Lock()
 	p.calls++
 	p.mu.Unlock()
@@ -415,7 +415,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	}
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "inpaint", []string{"openrouter/only-model"}))
 	seenMask := ""
-	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		id, _ := tasks.MaskAssetIDFromParams(task.Params)
 		seenMask = id
 		return workerTestRemoteOutput(), nil
@@ -449,7 +449,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	called := false
-	worker = env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
+	worker = env.newWorker(WorkspaceTaskGenerateFunc(func(_ context.Context, ctx context.Context, task *tasks.WorkspaceTask) ([]tasks.OutputRef, error) {
 		called = true
 		return workerTestRemoteOutput(), nil
 	}), assets)

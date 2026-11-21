@@ -1,9 +1,15 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../core/i18n'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import type { TaskImageObserver } from '../task-runner/taskImageOutcome'
+import type { TaskImageObservation, TaskImageObserver } from '../task-runner/taskImageOutcome'
 import { runWithDeadline } from '../../../../../core/utils/request'
-import { CANVAS_FOREGROUND_WAIT_MS } from '../canvasBudgets'
+import { sleep } from '../../../../../core/utils/polling'
+import {
+  BACKGROUND_CONTINUATION_MAX_ATTEMPTS,
+  backgroundContinuationDelayMs,
+  CANVAS_FOREGROUND_WAIT_MS,
+  CANVAS_TOTAL_WAIT_MS,
+} from '../canvasBudgets'
 import {
   PendingImageMaterializationError,
   type PendingImageExecutionCore,
@@ -119,131 +125,221 @@ export function createCanvasExecutionRecoveryCoordinator(
     return groups
   }
 
-  async function recoverForAttachment(
-    attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
-  ): Promise<CanvasExecutionRecoveryResult> {
-    const pending = collectPendingImageTasks(options.readBoardSnapshot())
-    const hydratedCount = hydratePendingLeases()
-    const recoveredNodeIds: string[] = []
-    const pendingNodeIds: string[] = []
-    const failedNodeIds: string[] = []
-    const rejectedNodeIds: string[] = []
-    const recoveryErrors: unknown[] = []
-    let shouldFlushAutosave = false
-    let cancelledCount = 0
+  type RecoveryTaskGroup = {
+    taskId: string
+    controller: AbortController
+    observation?: TaskImageObservation
+  }
 
-    const groups = claimPendingTaskGroups(attachment, pending)
+  type RecoveryProgress = {
+    recoveredNodeIds: string[]
+    pendingSlots: RecoverySlot[]
+    failedNodeIds: string[]
+    rejectedNodeIds: string[]
+    errors: unknown[]
+    cancelledCount: number
+  }
 
-    function recordSlotError({ task, lease }: RecoverySlot, error: unknown): void {
-      if (isDisposed || !options.executionCore.isAttachmentCurrent(attachment)) return
+  async function observeSlots(
+    group: RecoveryTaskGroup,
+    slots: readonly RecoverySlot[],
+    deadlineAt: number,
+  ): Promise<RecoveryProgress> {
+    const { taskId, controller } = group
+    const progress: RecoveryProgress = {
+      recoveredNodeIds: [],
+      pendingSlots: [],
+      failedNodeIds: [],
+      rejectedNodeIds: [],
+      errors: [],
+      cancelledCount: 0,
+    }
+    function recordSlotError(slot: RecoverySlot, error: unknown): void {
+      const { task, lease } = slot
+      if (isDisposed || !options.executionCore.isAttachmentCurrent(lease.attachment)) return
       if (
         !options.executionCore.isCurrent(lease, task.taskId) &&
         !(error instanceof PendingImageMaterializationError)
       )
         return
       if (isRecoveryPending(error)) {
-        pendingNodeIds.push(task.resultNodeId)
+        progress.pendingSlots.push(slot)
       } else if (error instanceof TaskCancelledError) {
         const cancelled = options.executionCore.cancel([lease])
         options.cancelTasks(releasedTaskIds(cancelled))
       } else {
-        failedNodeIds.push(task.resultNodeId)
+        progress.failedNodeIds.push(task.resultNodeId)
         if (!(error instanceof PendingImageMaterializationError)) options.executionCore.fail(lease)
-        recoveryErrors.push(error)
+        progress.errors.push(error)
       }
     }
+    try {
+      group.observation ??= await runWithDeadline(deadlineAt, controller.signal, (signal) =>
+        options.observeTask(taskId, { deadlineAt, signal }),
+      )
+      const observation = group.observation
+      await Promise.all(
+        slots.map(async (slot) => {
+          const { task, lease } = slot
+          if (!options.executionCore.isCurrent(lease, taskId)) return
+          try {
+            const outcome = await runWithDeadline(deadlineAt, controller.signal, (signal) =>
+              observation.resolve(task.resultIndex, task.fallbackRatio, { deadlineAt, signal }),
+            )
+            if (isDisposed || !options.executionCore.isCurrent(lease, taskId)) return
+            if (outcome.kind === 'cancelled') progress.cancelledCount += 1
+            if (!outcome.result) {
+              options.executionCore.cancel([lease])
+              return
+            }
+            const materialized = options.executionCore.materializeBatch([
+              { lease, result: outcome.result },
+            ])
+            progress.recoveredNodeIds.push(...materializedNodeIds(materialized))
+            progress.rejectedNodeIds.push(...readRejectedNodeIds(materialized))
+          } catch (error) {
+            recordSlotError(slot, error)
+          }
+        }),
+      )
+    } catch (error) {
+      slots.forEach((slot) => recordSlotError(slot, error))
+    }
+    return progress
+  }
 
-    await Promise.all(
+  async function publishProgress(
+    attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
+    progress: readonly RecoveryProgress[],
+  ): Promise<void> {
+    if (isDisposed || !options.executionCore.isAttachmentCurrent(attachment)) return
+    const errors = progress.flatMap((item) => item.errors)
+    const recoveredCount = progress.reduce((total, item) => total + item.recoveredNodeIds.length, 0)
+    if (recoveredCount > 0) {
+      try {
+        await options.flushAutosave()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    if (isDisposed || !options.executionCore.isAttachmentCurrent(attachment)) return
+    if (errors.length > 0) {
+      reportError(
+        errors.length === 1
+          ? errors[0]
+          : new AggregateError(errors, 'Canvas execution recovery failed'),
+      )
+    }
+    if (progress.some((item) => item.cancelledCount > 0)) {
+      options.onWarning(
+        i18n.global.t(
+          recoveredCount > 0 ? 'canvas.task.cancelledWithPartialResults' : 'canvas.task.cancelled',
+        ),
+      )
+    }
+  }
+
+  async function continueInBackground(
+    attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
+    group: RecoveryTaskGroup,
+    initialSlots: readonly RecoverySlot[],
+    deadlineAt: number,
+  ): Promise<void> {
+    const { taskId, controller } = group
+    let slots = initialSlots
+    try {
+      for (let attempt = 0; attempt < BACKGROUND_CONTINUATION_MAX_ATTEMPTS; attempt += 1) {
+        const remainingMs = deadlineAt - Date.now()
+        if (remainingMs <= 0) break
+        await sleep(
+          Math.min(backgroundContinuationDelayMs(attempt), remainingMs),
+          controller.signal,
+        )
+        slots = slots.filter(({ lease }) => options.executionCore.isCurrent(lease, taskId))
+        if (slots.length === 0 || Date.now() >= deadlineAt) break
+        const progress = await observeSlots(group, slots, deadlineAt)
+        await publishProgress(attachment, [progress])
+        slots = progress.pendingSlots.filter(({ lease }) =>
+          options.executionCore.isCurrent(lease, taskId),
+        )
+        if (slots.length === 0) return
+      }
+      if (
+        !isDisposed &&
+        !controller.signal.aborted &&
+        slots.some(({ lease }) => options.executionCore.isCurrent(lease, taskId))
+      ) {
+        options.onWarning(i18n.global.t('canvas.task.progressTimeout'))
+      }
+    } catch (error) {
+      if (
+        !isDisposed &&
+        !controller.signal.aborted &&
+        options.executionCore.isAttachmentCurrent(attachment)
+      )
+        reportError(error)
+    }
+  }
+
+  async function recoverForAttachment(
+    attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
+    backgroundContinuations: Promise<void>[],
+  ): Promise<CanvasExecutionRecoveryResult> {
+    const pending = collectPendingImageTasks(options.readBoardSnapshot())
+    const hydratedCount = hydratePendingLeases()
+    const groups = claimPendingTaskGroups(attachment, pending)
+    const progress = await Promise.all(
       [...groups].map(async ([taskId, slots]) => {
         const controller = new AbortController()
+        const group: RecoveryTaskGroup = { taskId, controller }
         activeReads.add(controller)
         const stop = options.executionCore.subscribe(() => {
           if (!slots.some(({ lease }) => options.executionCore.isCurrent(lease, taskId)))
             controller.abort()
         })
-        const deadlineAt = Date.now() + CANVAS_FOREGROUND_WAIT_MS
-        try {
-          const observation = await runWithDeadline(deadlineAt, controller.signal, (signal) =>
-            options.observeTask(taskId, { deadlineAt, signal }),
-          )
-          await Promise.all(
-            slots.map(async (slot) => {
-              const { task, lease } = slot
-              if (!options.executionCore.isCurrent(lease, taskId)) return
-              try {
-                const outcome = await runWithDeadline(deadlineAt, controller.signal, (signal) =>
-                  observation.resolve(task.resultIndex, task.fallbackRatio, { deadlineAt, signal }),
-                )
-                if (isDisposed || !options.executionCore.isCurrent(lease, taskId)) return
-                if (outcome.kind === 'cancelled') cancelledCount += 1
-                if (!outcome.result) {
-                  options.executionCore.cancel([lease])
-                  return
-                }
-                const materialized = options.executionCore.materializeBatch([
-                  { lease, result: outcome.result },
-                ])
-                const materializedIds = materializedNodeIds(materialized)
-                recoveredNodeIds.push(...materializedIds)
-                rejectedNodeIds.push(...readRejectedNodeIds(materialized))
-                if (materializedIds.length > 0) shouldFlushAutosave = true
-              } catch (error) {
-                recordSlotError(slot, error)
-              }
-            }),
-          )
-        } catch (error) {
-          slots.forEach((slot) => recordSlotError(slot, error))
-        } finally {
+        const deadlineAt = Date.now() + CANVAS_TOTAL_WAIT_MS
+        function finish(): void {
           stop()
           controller.abort()
           activeReads.delete(controller)
+          slots.forEach(({ lease }) => options.executionCore.releaseHydratedLease(lease))
+        }
+        try {
+          const foreground = await observeSlots(
+            group,
+            slots,
+            Date.now() + CANVAS_FOREGROUND_WAIT_MS,
+          )
+          if (foreground.pendingSlots.length > 0 && !isDisposed && !controller.signal.aborted) {
+            backgroundContinuations.push(
+              continueInBackground(attachment, group, foreground.pendingSlots, deadlineAt).finally(
+                finish,
+              ),
+            )
+          } else finish()
+          return foreground
+        } catch (error) {
+          finish()
+          throw error
         }
       }),
     )
-
-    if (
-      !isDisposed &&
-      shouldFlushAutosave &&
-      options.executionCore.isAttachmentCurrent(attachment)
-    ) {
-      try {
-        await options.flushAutosave()
-      } catch (error) {
-        recoveryErrors.push(error)
-      }
-    }
-    if (
-      !isDisposed &&
-      recoveryErrors.length > 0 &&
-      options.executionCore.isAttachmentCurrent(attachment)
-    ) {
-      reportError(
-        recoveryErrors.length === 1
-          ? recoveryErrors[0]
-          : new AggregateError(recoveryErrors, 'Canvas execution recovery failed'),
-      )
-    }
-    if (
-      !isDisposed &&
-      cancelledCount > 0 &&
-      options.executionCore.isAttachmentCurrent(attachment)
-    ) {
-      options.onWarning(
-        i18n.global.t(
-          recoveredNodeIds.length > 0
-            ? 'canvas.task.cancelledWithPartialResults'
-            : 'canvas.task.cancelled',
-        ),
-      )
-    }
+    await publishProgress(attachment, progress)
     return Object.freeze({
       attachment: Object.freeze({ boardId: attachment.boardId, epoch: attachment.epoch }),
       hydratedCount,
-      recoveredNodeIds: Object.freeze([...new Set(recoveredNodeIds)]),
-      pendingNodeIds: Object.freeze([...new Set(pendingNodeIds)]),
-      failedNodeIds: Object.freeze([...new Set(failedNodeIds)]),
-      rejectedNodeIds: Object.freeze([...new Set(rejectedNodeIds)]),
+      recoveredNodeIds: Object.freeze([
+        ...new Set(progress.flatMap((item) => item.recoveredNodeIds)),
+      ]),
+      pendingNodeIds: Object.freeze([
+        ...new Set(
+          progress.flatMap((item) => item.pendingSlots.map(({ task }) => task.resultNodeId)),
+        ),
+      ]),
+      failedNodeIds: Object.freeze([...new Set(progress.flatMap((item) => item.failedNodeIds))]),
+      rejectedNodeIds: Object.freeze([
+        ...new Set(progress.flatMap((item) => item.rejectedNodeIds)),
+      ]),
     })
   }
 
@@ -253,10 +349,16 @@ export function createCanvasExecutionRecoveryCoordinator(
     const key = attachmentKey(attachment)
     const current = activeRecoveries.get(key)
     if (current) return current
-    const recovery = recoverForAttachment(attachment).finally(() => {
-      if (activeRecoveries.get(key) === recovery) activeRecoveries.delete(key)
-    })
+    const backgroundContinuations: Promise<void>[] = []
+    const recovery = recoverForAttachment(attachment, backgroundContinuations)
     activeRecoveries.set(key, recovery)
+    // Keep concurrent drivers on the foreground result while its Task groups
+    // continue observing. Completion releases the claims for a later recovery.
+    const finish = async () => {
+      await Promise.allSettled(backgroundContinuations)
+      if (activeRecoveries.get(key) === recovery) activeRecoveries.delete(key)
+    }
+    void recovery.then(finish, finish)
     return recovery
   }
 

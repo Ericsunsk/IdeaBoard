@@ -8155,7 +8155,11 @@ components:
               type: integer
               format: int64
               minimum: 1
-              default: 1
+              description: >-
+                Billing quantity; omitted input derives from the compiled
+                execution plan output count (params.output_count or the Service
+                default). An explicit value must match that count, otherwise
+                submission returns 422 validation_failed before Quote or Hold.
             resolution:
               type: string
               description: Output resolution; omitted input is normalized to the Service policy canonical value.

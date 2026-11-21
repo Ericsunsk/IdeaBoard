@@ -1,20 +1,14 @@
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../board/ports/canvas'
 import { i18n } from '../../../../core/i18n'
 import type { MediaInputImage } from '../graph-editing'
-import type { MediaRef } from '../../../../core/media/mediaRef'
+import type { ImageWorkflowCommands } from '../execution'
 
 export type GenerationIntentOptions = {
   cancelFlowOutpaintMode: () => void
   cancelFlowInpaintMode: () => void
   getMediaInputImages: (nodeId: string) => MediaInputImage[]
   onWarning: (message: string) => void
-  runGeneration: (
-    nodeId: string,
-    referenceImages: readonly { url: string; ratio: number; mediaRef?: MediaRef }[],
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-  ) => Promise<void> | void
+  runGeneration: ImageWorkflowCommands['runGeneration']
 }
 
 export function createGenerationIntent(options: GenerationIntentOptions) {
@@ -33,7 +27,7 @@ export function createGenerationIntent(options: GenerationIntentOptions) {
       inputImages.map((item) => ({
         url: item.url,
         ratio: item.ratio,
-        ...(item.mediaRef ? { mediaRef: item.mediaRef } : {}),
+        ...(item.mediaRef?.assetId ? { assetId: item.mediaRef.assetId } : {}),
       })),
       prompt,
       outputCount,
