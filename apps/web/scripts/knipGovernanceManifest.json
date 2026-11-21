@@ -18923,7 +18923,7 @@
       ]
     },
     "src/api/generated-query/public/model/createWorkspaceTaskRequestData.ts": {
-      "sha256": "8c36b827780ceb14fcf9063f9e9b0d321244306dd0847f7188efb646653674e5",
+      "sha256": "e9ff5a54f0a38350f552986de47c1443af8cb04e3c4a27908bad7ba091018a78",
       "exports": [
         "CreateWorkspaceTaskRequestData"
       ]
