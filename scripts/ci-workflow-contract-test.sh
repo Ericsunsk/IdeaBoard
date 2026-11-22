@@ -158,3 +158,6 @@ reject_mutation .github/workflows/web.yml '/        shard: \[1, 2\]/a\
 reject_mutation .github/workflows/web.yml '/run: npm run test:browser --/s/$/ || true/' 'Web browser must execute each shard and propagate failures'
 reject_mutation .github/workflows/web.yml '/      - name: Upload shard blob report/,+3s#actions/upload-artifact@#actions/download-artifact@#' 'Web shard reports must use the pinned artifact uploader'
 echo 'CI workflow negative fixtures passed'
+
+reject_mutation .github/workflows/ci.yml '/          RUNTIME_RESULT:/d' 'Runtime gate must receive the runtime result'
+reject_mutation .github/workflows/production-runtime.yml 's#run: bash scripts/production-runtime-test.sh#run: true#' 'Runtime contracts must execute the network fixtures'

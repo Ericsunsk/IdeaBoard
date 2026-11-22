@@ -23,6 +23,7 @@ while IFS= read -r changed_path; do
     .github/actions/deploy-production/* | .github/actions/setup-grype/* | .github/actions/pipeline-metrics/*) ops=true ;;
     .github/actions/setup-go/*) mark_api_all; auth=true; ai_proxy=true; migration_integration=true; ops=true ;;
     .github/actions/setup-node/* | .github/actions/npm-ci/* | .node-version) mark_node_consumers ;;
+    .bun-image | scripts/production-runtime-test.sh | scripts/runtime-contracts/* | .github/workflows/production-runtime.yml) auth=true; realtime=true; docker=true; migration_integration=true; browser_smoke=true; ops=true ;;
     .github/actions/*) mark_all_contexts ;;
     .github/workflows/web.yml) web=true; ops=true ;;
     .github/workflows/api.yml) mark_api_all; api_images=true; docker=true; ops=true ;;

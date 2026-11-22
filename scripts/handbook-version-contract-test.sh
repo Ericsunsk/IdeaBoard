@@ -27,6 +27,10 @@ make_fixture() {
   printf 'module ideaboard/api\n\ngo 1.26.6\n' >"$root/apps/api/go.mod"
   printf '# syntax=docker/dockerfile:1.7\n\nARG NODE_VERSION=22.23.2\n' >"$root/apps/auth/Dockerfile"
   printf '# syntax=docker/dockerfile:1.7\n\nARG NODE_VERSION=22.23.2\n' >"$root/apps/realtime/Dockerfile"
+  printf 'oven/bun:1.4.5-alpine@sha256:%064d\n' 0 >"$root/.bun-image"
+  for service in auth realtime; do
+    printf 'ARG BUN_IMAGE=%s\n' "$(cat "$root/.bun-image")" >>"$root/apps/$service/Dockerfile"
+  done
   # shellcheck disable=SC2016 # $BUILDPLATFORM is a Dockerfile literal in the fixture.
   printf '# syntax=docker/dockerfile:1.7\n\nFROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder\n' >"$root/apps/api/Dockerfile"
   # shellcheck disable=SC2016 # Backticks are markdown code spans in the fixture.
@@ -53,6 +57,8 @@ expect_fail() {
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 make_fixture "$tmp/clean"
+REPO_ROOT="$tmp/clean" bash "$contract" >/dev/null
+
 cp -r "$tmp/clean" "$tmp/node-drift"
 printf '# syntax=docker/dockerfile:1.7\n\nARG NODE_VERSION=20.19.0\n' >"$tmp/node-drift/apps/auth/Dockerfile"
 expect_fail "node pin drift" "$tmp/node-drift"
@@ -74,5 +80,12 @@ cp -r "$tmp/clean" "$tmp/bad-literal"
 # shellcheck disable=SC2016 # Backticks are markdown code spans in the fixture.
 printf '# stub with Node.js `22.23.2` literal and `apps/api/go.mod`\n' >"$tmp/bad-literal/README.md"
 expect_fail "duplicated version literal" "$tmp/bad-literal"
+
+cp -r "$tmp/clean" "$tmp/bun-drift"
+sed 's/ARG BUN_IMAGE=.*/ARG BUN_IMAGE=oven\/bun:1.0.0-alpine/' "$tmp/clean/apps/auth/Dockerfile" >"$tmp/bun-drift/apps/auth/Dockerfile"
+expect_fail "Bun runtime pin drift" "$tmp/bun-drift"
+cp -r "$tmp/clean" "$tmp/bun-unpinned"
+printf 'oven/bun:latest\n' >"$tmp/bun-unpinned/.bun-image"
+expect_fail "mutable Bun image" "$tmp/bun-unpinned"
 
 echo "handbook version contract tests passed"

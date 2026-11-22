@@ -595,3 +595,9 @@ Watch paths 在 production 与 Preview base 两边保持一致：Include 填 `ap
 本地验证：`cd apps/ai-proxy && npm ci && npm run build && npx wrangler versions upload --dry-run`。Cloudflare 验收则先重新加载设置、核对 Preview base 命令包含 `--dry-run`，再重试一次既有非 production 失败构建，确认成功且日志含 `--dry-run: exiting now.`；检查 production 配置未变化。Watch paths 需保存后重新加载两边核对。回退时可恢复原 Watch paths；若恢复旧 Preview 命令，缺少 `[previews]` 的原始失败会重现，不能借回退触发 production 部署。
 
 VPS 侧 prod `WORKER_BASE_URL` 填 production Worker 地址（`https://ideaboard-ai-proxy.<account>.workers.dev` 或自定域名），与 preview 无关。回滚 = CF dashboard 回滚 Worker 版本（无状态，无需数据回滚）。本地 bindings 与启动步骤见 [ai-proxy README](../../apps/ai-proxy/README.md#运行与验证)。
+
+### Auth/Realtime production runtime
+
+Auth、Auth migrator 和 Realtime 的 production runtime 使用 `.bun-image` 固定的官方 Bun Alpine immutable image；Node `.node-version` 继续用于 dependency install、build 和开发/CI tests。Dockerfile fallback 必须通过 handbook contract，与 canonical image 完全一致。保留 CA bundle，卸载 production 不需要的 APK package manager、TLS CLI 及其系统 OpenSSL 依赖；Bun 使用其内嵌 BoringSSL。服务以 image 自带 `bun` user 运行，healthcheck 显式调用 `bun`。
+
+2026-11-22 的迁移验证覆盖实际 ARM64 image 的 Auth migration、PG `verify-full` TLS 正负用例、登录/session/sign-out、Node/Bun password hash 双向兼容与 Realtime WebSocket。Bun 是 Fastify alternative runtime，未来升级需重跑兼容验证。锁定 Grype 0.110.0 内的 Syft 1.42.3 尚不 catalog Bun binary：其 High/Critical gate 覆盖系统与应用 dependencies，不能证明 Bun 本身无漏洞。每次 runtime 升级必须额外核对 [Bun 官方 security advisories](https://github.com/oven-sh/bun/security/advisories) 及精确 BoringSSL commit source。此次 Bun 的四项官方 advisory 均已在所选版本修复；内嵌 BoringSSL `fe703e9faa3bfd22b04eb192066856557b7e015c` 的 PEM stack cleanup 已修正，且不含此次 OpenSSL DANE/CMS verification/QUIC transport 受影响实现，独立 source 审查补足 binary scan 盲区。回退使用上一份完整 verified bundle；不要单独回退到带已知 High/Critical CVE 的旧 Node patch。

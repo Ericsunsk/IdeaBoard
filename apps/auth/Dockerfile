@@ -2,6 +2,8 @@
 
 # Canonical source: root .node-version (enforced by scripts/handbook-version-contract.sh).
 ARG NODE_VERSION=22.23.5
+# Canonical production runtime: root .bun-image (same fallback contract).
+ARG BUN_IMAGE=oven/bun:1.4.5-alpine@sha256:da816670775f4c2b4e990b6b1847cf5540dcdc721a42033dd331ce7a88ba6a3b
 
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 
@@ -22,15 +24,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional
 
-FROM node:${NODE_VERSION}-alpine AS runtime-base
+FROM ${BUN_IMAGE} AS runtime-base
 
-RUN apk upgrade --no-cache && \
-    rm -rf \
-    /usr/local/bin/corepack \
-    /usr/local/bin/npm \
-    /usr/local/bin/npx \
-    /usr/local/lib/node_modules/corepack \
-    /usr/local/lib/node_modules/npm
+# Bun embeds BoringSSL. Keep the CA bundle; remove the unused package manager
+# and its OpenSSL/CLI dependency chain from the production runtime.
+# Resolve CA and OS security updates together; the runtime base is digest-pinned.
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates-bundle && \
+    apk upgrade --no-cache && \
+    apk del --no-cache apk-tools libapk ssl_client scanelf libcrypto3 libssl3
 
 WORKDIR /app
 
@@ -40,28 +42,28 @@ ENV NODE_ENV=production \
     AUTH_HOST=0.0.0.0 \
     AUTH_PORT=6001
 
-COPY --from=prod-deps --chown=node:node /app/package.json ./
-COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=prod-deps --chown=bun:bun /app/package.json ./
+COPY --from=prod-deps --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/dist ./dist
 
 EXPOSE 6001
 
-# The official Node image owns and maintains this named runtime user.
+# The official Bun image owns and maintains this named runtime user.
 # hadolint ignore=DL3066
-USER node
+USER bun
 
-CMD ["node", "dist/index.js"]
+CMD ["bun", "dist/index.js"]
 
 FROM runtime-base AS migrator
 
 ENV NODE_ENV=production
 
-COPY --from=prod-deps --chown=node:node /app/package.json ./
-COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=prod-deps --chown=bun:bun /app/package.json ./
+COPY --from=prod-deps --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/dist ./dist
 
-# The official Node image owns and maintains this named runtime user.
+# The official Bun image owns and maintains this named runtime user.
 # hadolint ignore=DL3066
-USER node
+USER bun
 
-CMD ["node", "dist/migrate.js"]
+CMD ["bun", "dist/migrate.js"]

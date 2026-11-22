@@ -197,7 +197,7 @@ services:
     healthcheck:
       test:
         - CMD
-        - node
+        - bun
         - -e
         - "fetch('http://127.0.0.1:6001/api/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 20s
@@ -261,7 +261,7 @@ services:
     healthcheck:
       test:
         - CMD
-        - node
+        - bun
         - -e
         - "fetch('http://127.0.0.1:6002/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 20s

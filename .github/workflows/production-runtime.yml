@@ -1,0 +1,63 @@
+name: Production Runtime
+
+on:
+  workflow_call:
+    inputs:
+      source_commit:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
+jobs:
+  contracts:
+    name: Production Runtime Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ inputs.source_commit || github.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+      - name: Build Auth runtime
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./apps/auth
+          file: ./apps/auth/Dockerfile
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ideaboard-auth-bun-final:local
+          cache-from: type=gha,scope=runtime-contract-auth
+          cache-to: type=gha,mode=max,scope=runtime-contract-auth
+      - name: Build Auth migrator
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./apps/auth
+          file: ./apps/auth/Dockerfile
+          target: migrator
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ideaboard-auth-migrate-bun-final:local
+          cache-from: type=gha,scope=runtime-contract-auth
+      - name: Build Realtime runtime
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./apps/realtime
+          file: ./apps/realtime/Dockerfile
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ideaboard-realtime-bun-final:local
+          cache-from: type=gha,scope=runtime-contract-realtime
+          cache-to: type=gha,mode=max,scope=runtime-contract-realtime
+      - name: Verify production runtime network contracts
+        run: bash scripts/production-runtime-test.sh

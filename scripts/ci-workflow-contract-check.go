@@ -158,7 +158,7 @@ func checkCI(ci workflow) {
 		}
 		requireEqual(inputs["force_full"], "${{ needs.changes.outputs.force_full == 'true' }}", lane+" must consume full fallback")
 	}
-	for _, lane := range []string{"auth", "realtime", "ai-proxy", "ops", "migration-integration"} {
+	for _, lane := range []string{"auth", "realtime", "production-runtime", "ai-proxy", "ops", "migration-integration"} {
 		requireEqual(object(object(jobs, lane), "with")["source_commit"], "${{ needs.changes.outputs.head_sha }}", lane+" must verify the same selected source")
 	}
 	for input, output := range map[string]string{"run_tests": "api_tests", "run_sqlc": "api_sqlc", "run_migrations": "api_migrations", "build_api": "api_build"} {
@@ -168,6 +168,10 @@ func checkCI(ci workflow) {
 	requireEqual(object(jobs, "api")["uses"], "./.github/workflows/api.yml", "API job must call api.yml")
 	requireEqual(object(jobs, "auth")["uses"], "./.github/workflows/auth.yml", "Auth job must call auth.yml")
 	requireEqual(object(jobs, "realtime")["uses"], "./.github/workflows/realtime.yml", "Realtime job must call realtime.yml")
+	runtimeCondition := "${{ needs.changes.outputs.docker == 'true' && (needs.changes.outputs.auth == 'true' || needs.changes.outputs.realtime == 'true') && (inputs.preview_images || !inputs.source_commit) }}"
+	runtime := object(jobs, "production-runtime")
+	requireEqual(runtime["if"], runtimeCondition, "Runtime contracts must follow selected image verification")
+	requireEqual(runtime["uses"], "./.github/workflows/production-runtime.yml", "Runtime contracts must use their owning workflow")
 	aiProxy := object(jobs, "ai-proxy")
 	requireEqual(aiProxy["uses"], "./.github/workflows/ai-proxy.yml", "AI Proxy job must call ai-proxy.yml")
 	requireEqual(aiProxy["if"], "needs.changes.outputs.ai_proxy == 'true'", "AI Proxy must use its selected scope")
@@ -204,6 +208,10 @@ func checkCI(ci workflow) {
 	requireEqual(gateStep["if"], "always()", "CI Gate policy must run after failed or skipped lanes")
 	rejectKey(gateStep, "continue-on-error", "CI Gate policy failures must block CI")
 	gateEnv := object(gateStep, "env")
+	requireStringIn(gate, "needs", "production-runtime", "CI Gate must wait for runtime contracts")
+	requireEqual(gateEnv["RUNTIME_REQUIRED"], runtimeCondition, "Runtime gate must share the image condition")
+	requireEqual(gateEnv["RUNTIME_RESULT"], "${{ needs.production-runtime.result }}", "Runtime gate must receive the runtime result")
+
 	requireEqual(gateEnv["BROWSER_SMOKE_REQUIRED"], "${{ needs.changes.outputs.browser_smoke }}", "Browser smoke must use the explicit runtime-impact flag")
 	requireEqual(gateEnv["WEB_REQUIRED"], "${{ needs.changes.outputs.web }}", "CI Gate must receive the Web required flag")
 	requireEqual(gateEnv["WEB_RESULT"], "${{ needs.web.result }}", "CI Gate must receive the aggregate Web result")
@@ -294,6 +302,19 @@ func checkReusableWorkflows(root string) {
 	backendCopy := requireStep(staticContracts, "Check backend copy vocabulary")
 	requireEqual(stringValue(backendCopy["run"]), "bash scripts/check-backend-copy.sh", "API contracts must run the backend copy guard")
 
+	runtime := loadWorkflow(root, "production-runtime.yml")
+	contracts := object(object(runtime, "jobs"), "contracts")
+	for _, name := range []string{"Build Auth runtime", "Build Auth migrator", "Build Realtime runtime"} {
+		step := requireStep(contracts, name)
+		requireEqual(object(step, "with")["load"], true, "Runtime contract images must be loaded")
+		requireEqual(object(step, "with")["push"], false, "Runtime contracts must not publish images")
+		rejectKey(step, "if", "Runtime contract builds must not be skipped")
+		rejectKey(step, "continue-on-error", "Runtime contract build failures must block CI")
+	}
+	runtimeTest := requireStep(contracts, "Verify production runtime network contracts")
+	requireEqual(runtimeTest["run"], "bash scripts/production-runtime-test.sh", "Runtime contracts must execute the network fixtures")
+	rejectKey(runtimeTest, "if", "Runtime contracts must not be skipped")
+	rejectKey(runtimeTest, "continue-on-error", "Runtime contract failures must block CI")
 	auth := loadWorkflow(root, "auth.yml")
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
 	authQuality := object(object(auth, "jobs"), "quality")

@@ -93,4 +93,11 @@ for result in failure cancelled skipped ''; do
     exit 1
   fi
 done
+if CHANGES_RESULT=success RUNTIME_REQUIRED=true RUNTIME_RESULT=skipped bash "${script_dir}/ci-gate.sh" >/dev/null; then
+  echo 'Required runtime contract must reject a skipped job' >&2
+  exit 1
+fi
+CHANGES_RESULT=success RUNTIME_REQUIRED=true RUNTIME_RESULT=success bash "${script_dir}/ci-gate.sh" >/dev/null
+CHANGES_RESULT=success RUNTIME_REQUIRED=false RUNTIME_RESULT=skipped bash "${script_dir}/ci-gate.sh" >/dev/null
+
 echo 'CI gate contract tests passed'

@@ -108,6 +108,10 @@ apps/api/internal/platform/workerwire/testdata/requests.json|api ai_proxy
 .github/actions/setup-node/action.yml|web auth realtime ai_proxy migration_integration ops
 .github/actions/npm-ci/action.yml|web auth realtime ai_proxy migration_integration ops
 .node-version|web auth realtime ai_proxy migration_integration ops
+.bun-image|auth realtime migration_integration ops
+scripts/production-runtime-test.sh|auth realtime migration_integration ops
+scripts/runtime-contracts/auth.mjs|auth realtime migration_integration ops
+.github/workflows/production-runtime.yml|auth realtime migration_integration ops
 .github/actions/setup-go/action.yml|api auth ai_proxy migration_integration ops
 apps/api/go.mod|api auth ai_proxy migration_integration ops
 apps/api/go.sum|api auth ai_proxy migration_integration ops
@@ -495,4 +499,9 @@ for atlas_input in apps/api/install-atlas.sh apps/api/atlas-checksums; do
   for lane in web auth realtime; do
     assert_output_line "$atlas_output" "$lane=false"
   done
+done
+
+bun_output="$(printf '%s\n' .bun-image | "${classifier}")"
+for lane in auth realtime docker migration_integration browser_smoke ops; do
+  assert_output_line "$bun_output" "$lane=true"
 done

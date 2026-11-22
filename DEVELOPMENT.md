@@ -296,7 +296,7 @@ bash scripts/ci-migration-integration-test.sh
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 ```
 
-Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。Dockerfile 中的 `NODE_VERSION` / `golang` pin 只是可独立构建的 fallback，必须与 canonical source 一致；handbook 入口链接与版本一致性由 `scripts/handbook-version-contract.sh` 在 CI 强制校验（见 `Handbook Contract` lane）。
+Node build/development 版本只维护在根目录 `.node-version`，Auth/Realtime production runtime 的 Bun immutable image 只维护在 `.bun-image`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。Dockerfile 中的 `NODE_VERSION` / `golang` pin 只是可独立构建的 fallback，必须与 canonical source 一致；handbook 入口链接与版本一致性由 `scripts/handbook-version-contract.sh` 在 CI 强制校验（见 `Handbook Contract` lane）。
 
 Atlas 的 image build 与 CI 安装共用 `apps/api/install-atlas.sh`，从 Dockerfile pin 和 `apps/api/atlas-checksums` 校验官方 binary。该 pin 暂为修复上游依赖漏洞的精确 canary build；升级时同时更新两种架构 checksum 并验证 migration replay，不使用 mutable latest。
 
@@ -546,3 +546,7 @@ apps/auth/
 4. 改 domain language 时更新相关 `CONTEXT.md`。
 5. 改系统设计 contract 时更新 [DESIGN.md](./DESIGN.md)。
 6. 改执行流程或日常入口时更新本文档。
+
+Auth/Realtime production 使用 Bun，Node 继续负责 `npm ci`、build 和现有完整 test suite。两个 Dockerfile 的 `BUN_IMAGE` 是 `.bun-image` 的独立构建 fallback，由 handbook contract 强制一致；Dockerfile 已纳入 component fingerprint，沿用原 fingerprint 算法和历史 release 验证。升级 Bun 后须运行真实 image 的 Auth migration/login/session、PostgreSQL TLS 正负验证与 Realtime WebSocket 契约，并使用 fresh Grype DB 扫描全部三个 ARM64 targets。Bun 属于 Fastify alternative runtime，兼容性由项目回归验证，不等同于 Fastify 官方 Node 支持保证。
+
+Production runtime 回归入口：先分别构建 Auth `runtime`、Auth `migrator` 和 Realtime `runtime`，再运行 `bash scripts/production-runtime-test.sh <auth-image> <auth-migrator-image> <realtime-image>`。CI 的 `Production Runtime` lane 在选中 image verification 时持续运行此契约并由 `CI Gate` 强制收敛；CI 使用 AMD64，本地发布前已验证 production ARM64，release 的 fresh Grype High/Critical gate 保持独立。

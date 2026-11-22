@@ -4,7 +4,8 @@
 # Issue #855: Developer Handbook entry points + one version source of truth.
 #
 # Canonical sources (defined once, never duplicated):
-#   - Node.js runtime: root `.node-version`
+#   - Node.js build/development runtime: root `.node-version`
+#   - Bun production runtime image: root `.bun-image`
 #   - Go toolchain: `apps/api/go.mod` (`go` directive)
 #
 # Consumers that must stay consistent, verified here:
@@ -41,6 +42,14 @@ docker_node="$(sed -n 's/^ARG NODE_VERSION=//p' "$repo_root/apps/auth/Dockerfile
 realtime_node="$(sed -n 's/^ARG NODE_VERSION=//p' "$repo_root/apps/realtime/Dockerfile" | tr -d '[:space:]')"
 [[ -n "${realtime_node}" ]] || deny "apps/realtime/Dockerfile has no ARG NODE_VERSION pin"
 [[ "${realtime_node}" == "${node_version}" ]] || deny "apps/realtime/Dockerfile NODE_VERSION=${realtime_node} != .node-version ${node_version}"
+
+# Production runtime pins must be immutable and agree with standalone builds.
+bun_image="$(tr -d '[:space:]' <"$repo_root/.bun-image")"
+[[ "$bun_image" =~ ^oven/bun:[0-9]+\.[0-9]+\.[0-9]+-alpine@sha256:[0-9a-f]{64}$ ]] || deny "root .bun-image must pin a stable Alpine Bun image by digest"
+for service in auth realtime; do
+  docker_bun="$(sed -n 's/^ARG BUN_IMAGE=//p' "$repo_root/apps/$service/Dockerfile" | tr -d '[:space:]')"
+  [[ "$docker_bun" == "$bun_image" ]] || deny "apps/$service/Dockerfile BUN_IMAGE differs from .bun-image"
+done
 
 # --- 2. Go: go.mod vs api Dockerfile base image pin ---
 go_version="$(sed -n 's/^go \([0-9][0-9.]*\)$/\1/p' "$repo_root/apps/api/go.mod" | head -n 1)"

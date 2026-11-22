@@ -119,6 +119,13 @@ jobs:
       source_commit: ${{ needs.changes.outputs.head_sha }}
       build_images: ${{ needs.changes.outputs.docker == 'true' && (inputs.preview_images || !inputs.source_commit) }}
       audit_dependencies: ${{ needs.changes.outputs.realtime_audit == 'true' }}
+  production-runtime:
+    name: Production Runtime
+    if: ${{ needs.changes.outputs.docker == 'true' && (needs.changes.outputs.auth == 'true' || needs.changes.outputs.realtime == 'true') && (inputs.preview_images || !inputs.source_commit) }}
+    needs: [changes]
+    uses: ./.github/workflows/production-runtime.yml
+    with:
+      source_commit: ${{ needs.changes.outputs.head_sha }}
   ai-proxy:
     name: AI Proxy Verification
     if: needs.changes.outputs.ai_proxy == 'true'
@@ -234,7 +241,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [changes, web, api, auth, realtime, ai-proxy, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
+    needs: [changes, web, api, auth, realtime, production-runtime, ai-proxy, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -254,6 +261,8 @@ jobs:
           AUTH_RESULT: ${{ needs.auth.result }}
           REALTIME_REQUIRED: ${{ needs.changes.outputs.realtime }}
           REALTIME_RESULT: ${{ needs.realtime.result }}
+          RUNTIME_REQUIRED: ${{ needs.changes.outputs.docker == 'true' && (needs.changes.outputs.auth == 'true' || needs.changes.outputs.realtime == 'true') && (inputs.preview_images || !inputs.source_commit) }}
+          RUNTIME_RESULT: ${{ needs.production-runtime.result }}
           AI_PROXY_REQUIRED: ${{ needs.changes.outputs.ai_proxy }}
           AI_PROXY_RESULT: ${{ needs.ai-proxy.result }}
           MIGRATION_REQUIRED: ${{ needs.changes.outputs.migration_integration }}
