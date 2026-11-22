@@ -78,3 +78,8 @@
 ## 2026-11-21 — 生图链路五项修复
 
 - [生图链路五项修复与验证](operations/static-analysis-baseline.md#2026-11-21--生图链路五项修复与验证未提交-worktree) — 基于 `Ericsunsk/IdeaBoard@c56657d10` 的未提交 #1004–#1008 修复经逐项验证与最终 Standards / Spec 双轴 PASS，supersedes 五项待修诊断；尚未合并/部署，Browser 与真实付费生成未验。
+
+
+## 2026-11-22 — Bun runtime 修复
+
+- [Bun runtime 修复与 v0.1.46 发布](operations/static-analysis-baseline.md#2026-11-22--bun-runtime-修复与-v0146-发布) — 2026-11-22 `Ericsunsk/IdeaBoard@8c21a2e0e` 修复 OpenSSL High 阻断；真实 image / CI 验证与签名发布通过，保留 Bun binary scan 盲区及兼容性维护边界。
