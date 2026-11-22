@@ -312,7 +312,7 @@ func checkReusableWorkflows(root string) {
 		rejectKey(step, "continue-on-error", "Runtime contract build failures must block CI")
 	}
 	runtimeTest := requireStep(contracts, "Verify production runtime network contracts")
-	requireEqual(runtimeTest["run"], "bash scripts/production-runtime-test.sh", "Runtime contracts must execute the network fixtures")
+	requireEqual(runtimeTest["run"], "bash scripts/production-runtime-contracts.sh", "Runtime contracts must execute the network fixtures")
 	rejectKey(runtimeTest, "if", "Runtime contracts must not be skipped")
 	rejectKey(runtimeTest, "continue-on-error", "Runtime contract failures must block CI")
 	auth := loadWorkflow(root, "auth.yml")

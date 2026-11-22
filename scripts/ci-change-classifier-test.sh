@@ -109,7 +109,7 @@ apps/api/internal/platform/workerwire/testdata/requests.json|api ai_proxy
 .github/actions/npm-ci/action.yml|web auth realtime ai_proxy migration_integration ops
 .node-version|web auth realtime ai_proxy migration_integration ops
 .bun-image|auth realtime migration_integration ops
-scripts/production-runtime-test.sh|auth realtime migration_integration ops
+scripts/production-runtime-contracts.sh|auth realtime migration_integration ops
 scripts/runtime-contracts/auth.mjs|auth realtime migration_integration ops
 .github/workflows/production-runtime.yml|auth realtime migration_integration ops
 .github/actions/setup-go/action.yml|api auth ai_proxy migration_integration ops

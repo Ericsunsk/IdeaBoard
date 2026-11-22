@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Exercise built production images against isolated PostgreSQL/TLS and HTTP/WS fixtures.
-# Usage: scripts/production-runtime-test.sh [auth-image] [auth-migrator-image] [realtime-image]
+# Usage: scripts/production-runtime-contracts.sh [auth-image] [auth-migrator-image] [realtime-image]
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 auth_image="${1:-ideaboard-auth-bun-final:local}"
@@ -48,7 +48,13 @@ docker run -d --name "$pg_container" --network "$network" --network-alias pg \
   'cp /certs/server.* /tmp/ && chown postgres:postgres /tmp/server.* && chmod 0600 /tmp/server.key && exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key' >/dev/null
 ready=false
 for _ in {1..60}; do
-  if docker exec "$pg_container" pg_isready -U migrator >/dev/null 2>&1; then ready=true; break; fi
+  # The entrypoint temporarily opens a Unix socket before POSTGRES_DB exists.
+  # Require the final TCP server and an authenticated query in the target DB.
+  if docker exec -e PGPASSWORD=local-poc-migrator-password "$pg_container" \
+    psql -h 127.0.0.1 -U migrator -d ideaboard -Atqc 'SELECT 1' >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
   sleep 1
 done
 [[ "$ready" == true ]] || { docker logs "$pg_container"; exit 1; }

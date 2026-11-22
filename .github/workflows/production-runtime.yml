@@ -60,4 +60,4 @@ jobs:
           cache-from: type=gha,scope=runtime-contract-realtime
           cache-to: type=gha,mode=max,scope=runtime-contract-realtime
       - name: Verify production runtime network contracts
-        run: bash scripts/production-runtime-test.sh
+        run: bash scripts/production-runtime-contracts.sh

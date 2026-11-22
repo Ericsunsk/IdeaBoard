@@ -160,4 +160,4 @@ reject_mutation .github/workflows/web.yml '/      - name: Upload shard blob repo
 echo 'CI workflow negative fixtures passed'
 
 reject_mutation .github/workflows/ci.yml '/          RUNTIME_RESULT:/d' 'Runtime gate must receive the runtime result'
-reject_mutation .github/workflows/production-runtime.yml 's#run: bash scripts/production-runtime-test.sh#run: true#' 'Runtime contracts must execute the network fixtures'
+reject_mutation .github/workflows/production-runtime.yml 's#run: bash scripts/production-runtime-contracts.sh#run: true#' 'Runtime contracts must execute the network fixtures'

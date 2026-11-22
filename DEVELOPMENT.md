@@ -549,4 +549,4 @@ apps/auth/
 
 Auth/Realtime production 使用 Bun，Node 继续负责 `npm ci`、build 和现有完整 test suite。两个 Dockerfile 的 `BUN_IMAGE` 是 `.bun-image` 的独立构建 fallback，由 handbook contract 强制一致；Dockerfile 已纳入 component fingerprint，沿用原 fingerprint 算法和历史 release 验证。升级 Bun 后须运行真实 image 的 Auth migration/login/session、PostgreSQL TLS 正负验证与 Realtime WebSocket 契约，并使用 fresh Grype DB 扫描全部三个 ARM64 targets。Bun 属于 Fastify alternative runtime，兼容性由项目回归验证，不等同于 Fastify 官方 Node 支持保证。
 
-Production runtime 回归入口：先分别构建 Auth `runtime`、Auth `migrator` 和 Realtime `runtime`，再运行 `bash scripts/production-runtime-test.sh <auth-image> <auth-migrator-image> <realtime-image>`。CI 的 `Production Runtime` lane 在选中 image verification 时持续运行此契约并由 `CI Gate` 强制收敛；CI 使用 AMD64，本地发布前已验证 production ARM64，release 的 fresh Grype High/Critical gate 保持独立。
+Production runtime 回归入口：先分别构建 Auth `runtime`、Auth `migrator` 和 Realtime `runtime`，再运行 `bash scripts/production-runtime-contracts.sh <auth-image> <auth-migrator-image> <realtime-image>`。CI 的 `Production Runtime` lane 在选中 image verification 时持续运行此契约并由 `CI Gate` 强制收敛；CI 使用 AMD64，本地发布前已验证 production ARM64，release 的 fresh Grype High/Critical gate 保持独立。
